@@ -1,5 +1,7 @@
 # ReyondBroom FTE-native map editor
 
+**Optional FTE Custom assets:** [Reyond's GLSL Shader Pack](docs/shader-pack.md) adds a separate MIT-only download, materials and environment controls through **Assets > Shaders**. Editor integration is currently a local preview build; the existing download links below remain unchanged.
+
 [**Join our Discord**](https://discord.gg/eDMf53Kny)
 
 **Alpha 111: automatic compiler-leak routes, viewport overlays and camera navigation by point.** [Leak inspection guide](docs/leak111.md) · [Quake II compile fixes](docs/contents110.md) · [Recent-project cache retention](docs/cache109.md) · [UV and Quake II fixes](docs/uv107.md) · [Lighting guide](docs/mod-lighting100.md). [Usage, limits and verification](docs/native-models-alpha95.md) · [Game profiles](docs/legacy-games-alpha94.md) · [Plugins](docs/plugins.md) · [Model editor](docs/model-editor.md).

@@ -75,6 +75,7 @@ static void modLaunch(const std::filesystem::path& source,bool raw)
     }
     std::filesystem::copy_file(source,maps/(name+(raw?".map":".bsp")),std::filesystem::copy_options::overwrite_existing);
     if(raw)modRawMaterials(source,home/mod.filename());
+    shaderPackStage(home/mod.filename());
     auto lightSource=raw?source:source.parent_path()/"snapshot.map";
     modLightingSource.clear();modLightingRaw=raw;modLightingLoad();
     if(std::filesystem::is_regular_file(lightSource)){
@@ -113,6 +114,7 @@ static void modLaunch(const std::filesystem::path& source,bool raw)
 #endif
     std::string args=previewSwitch+"-noupdates -quake -basedir "+modQuote(mod.parent_path().generic_u8string())+" "+gameSwitch+"-game "+modQuote(mod.filename().u8string())+
       " -homedir "+modQuote(home.generic_u8string())+" -usehome -readonly -window -width 1280 -height 800 +set viewsize 120 +set sv_public 0 +set deathmatch 0 +set coop 0 +set sv_nopvs 0 +set ftebroom_preview_play 1 +set r_drawviewmodel 1 +set chase_active 0 +set cl_idlefps 60 +set cl_maxfps 60 +set vid_wait 0 "+(gameProfile==1?std::string("+set r_glsl_offsetmapping 1 "):std::string())+(gameProfile==4?std::string("+set forceqmenu 1 +exec quake.rc +set r_fullbright ")+(raw?"1":"0")+std::string(" +set r_vertexlight 0 +set pm_thirdPerson 0 +set r_showViewModels 1 +set com_protocolname Nuclide +set g_gametype ")+(hlRuntime?"counterstrike ":"singleplayer "):std::string())+(raw?std::string("+set r_fullbright 1 "):std::string())+"+map "+(raw?modQuote("maps/"+name+".map"):name);
+    if(gameProfile==1 && cvars->GetFloat("ftebroom_shader_pack_enabled"))args+=" +exec reyond-pack.cfg";
     args+=" +"+modLightingCommand();
 #ifndef _WIN32
     modControlsLoad();

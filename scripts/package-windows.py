@@ -71,6 +71,7 @@ for name in filter(None, tracked):
     target = root / "sources/ftebroom" / name
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source / name, target)
+shutil.copytree(source / "assets/reyond-shader-pack", root / "sources/ftebroom/assets/reyond-shader-pack", dirs_exist_ok=True)
 archives = list((bundle / "sources").glob("*.zip"))
 if len(archives) < 2:
     raise RuntimeError("Pinned FTE and ImGui source archives are required")

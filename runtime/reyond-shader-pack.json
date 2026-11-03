@@ -1,0 +1,132 @@
+{
+  "version": "1.0.0",
+  "url": "https://github.com/reyond9079/Reyond-FTE-Assets/releases/download/shaders-v1.0.0/Reyond-GLSL-Shader-Pack-1.0.0.zip",
+  "sha256": "d32660a96a3897ae583eed8fd801900a0c8e0894ee2937d983ad136b028e0775",
+  "size": 6589240,
+  "files": {
+    "glsl/reyondpack/post.glsl": {
+      "sha256": "18acb839eb488f162aba42dd2dcc9cef2034b4523fb976bb31c0a8124f4a33a7",
+      "size": 2069
+    },
+    "glsl/reyondpack/reyond_atmosphere_shared.glsl": {
+      "sha256": "0b4f2ca8ab0d6ac28f91f449d800cc20f2e88b5d0354dc714a9b53ab11f3e8be",
+      "size": 16067
+    },
+    "glsl/reyondpack/reyond_daylight.glsl": {
+      "sha256": "b1d772cae89dbc29a78e3c7ab932fdec83e3aeb692d5aee3e3b2e3a1081d1b95",
+      "size": 1399
+    },
+    "glsl/reyondpack/reyond_lens.glsl": {
+      "sha256": "b4124fb1bf5553bc841d134ef50927f53522dc4db6929416484623108faa8472",
+      "size": 2341
+    },
+    "glsl/reyondpack/reyond_noise.glsl": {
+      "sha256": "ed08564b535683a7d2285844bbb4a0540d44c4d0160e6e009689bc4d75e31573",
+      "size": 772
+    },
+    "glsl/reyondpack/sky.glsl": {
+      "sha256": "7e1727732f865d41447c1c572992ddecad7929cf02783f14d7d67075cf30dac9",
+      "size": 1314
+    },
+    "glsl/reyondpack/surface.glsl": {
+      "sha256": "60dc833f04a1d2c9675eba69f9360b1c16b1ad90992c8c5663378b93889abe53",
+      "size": 3360
+    },
+    "glsl/reyondpack/water.glsl": {
+      "sha256": "0749ccd9d6e7f3db70430820365ecc1d2a1cf8855240a87a260520369c436ae9",
+      "size": 2223
+    },
+    "glsl/reyondpack/waves.glsl": {
+      "sha256": "ef5f8dc70d9acedae95a3f3491f7b5e085a69aeb9003ccf26300cec61cb338e6",
+      "size": 626
+    },
+    "glsl/reyondpack/weather_puddle.glsl": {
+      "sha256": "6c70fc272875330c52f58ec262f2110faf42c78f6de5815d35e9a619537a3a9b",
+      "size": 2600
+    },
+    "glsl/reyondpack/winter_ice.glsl": {
+      "sha256": "6fbea84133605d1b54bcf044ff2bbb1a54b6be755e348b3e98c3108911180c03",
+      "size": 2037
+    },
+    "glsl/reyondpack/winter_snow.glsl": {
+      "sha256": "2f5f5768256bb38f6a225b5458cda444518691ef0c2c35f651bc4ec369c162b6",
+      "size": 2220
+    },
+    "LICENSE.txt": {
+      "sha256": "add81c1b692051c3fa8ae61a43085f3d07a6ed3cfa37eaa6022cce0e37d6e267",
+      "size": 1314
+    },
+    "PROVENANCE.md": {
+      "sha256": "f41e0a7feeb0938d82760a9aeba5dbf0f71ceeb86ae363d39c282b75be524cc9",
+      "size": 1291
+    },
+    "README.md": {
+      "sha256": "f07517777cd87bb8f51042e13e4dad970f535e562866d5fa2d3620657f8e45d4",
+      "size": 1554
+    },
+    "reyond-pack.cfg": {
+      "sha256": "c7c5d91bed4126a82594a5984c995e7daeecfc4e1a58e4f1ddd0eab1dfa5653a",
+      "size": 1249
+    },
+    "scripts/reyond-pack.shader": {
+      "sha256": "1e59b11e12a8451851182ec628ee3f9a8ee64a55534859cb486b671958793987",
+      "size": 2434
+    },
+    "scripts/shaderlist.txt": {
+      "sha256": "cdfe43208b9aff1f61c232f8138fce2267317a30204dce80ab698610932a8a60",
+      "size": 44
+    },
+    "sdk/reyond-pack.qc": {
+      "sha256": "62b8cd0880eaca5e90279cc4140e4538bf56d3c763b675866f0f2fe8270d8d44",
+      "size": 18858
+    },
+    "textures/reyondpack/ambient_gi.tga": {
+      "sha256": "590132feb942e2dcd734295cc7a491357824bca364102f437b5fc5ee846461ce",
+      "size": 12306
+    },
+    "textures/reyondpack/cloud-volume.ktx": {
+      "sha256": "e08870c402803ec2e57775c5a23f976c04491434b076121a2c4d10544d3253fc",
+      "size": 8001572
+    },
+    "textures/reyondpack/explosion.tga": {
+      "sha256": "f7f43641323cf78bcaa3b151026a2942f8bf52a25b298d331e3b74833849a785",
+      "size": 12306
+    },
+    "textures/reyondpack/fire.tga": {
+      "sha256": "b224444e2cafb9691b7b2a3cfe73328e12dd0707a126f00a6eb1d73b2573d362",
+      "size": 12306
+    },
+    "textures/reyondpack/fog.tga": {
+      "sha256": "c9a46f9b5d43b6baf10f8226108de41f9ef6d0e66e90d180f590c41af673dd7c",
+      "size": 12306
+    },
+    "textures/reyondpack/ice.tga": {
+      "sha256": "61ea2d424eae42411da44334a095dfb60e63382c059d473b0c1b7a5dbb9aec10",
+      "size": 12306
+    },
+    "textures/reyondpack/ocean.tga": {
+      "sha256": "17a2ac463c6b6ead504a68b3c7db670fe1e52d4a5479a9629f6c6ffd8c7c99f4",
+      "size": 12306
+    },
+    "textures/reyondpack/puddle.tga": {
+      "sha256": "cc5d970ab16d625b05c6f1356fcb866ce2fb73f173b669604c1364a2efbf26b5",
+      "size": 12306
+    },
+    "textures/reyondpack/rain.tga": {
+      "sha256": "9e0cb03ac519119e47ca29817965baa66acf3f861f40fb364cb64ccd65ebd55b",
+      "size": 4140
+    },
+    "textures/reyondpack/sky.tga": {
+      "sha256": "53ba285769de5e6e42772409a26f65c348a8fcaeca8dace8df6526430642d597",
+      "size": 12306
+    },
+    "textures/reyondpack/snow.tga": {
+      "sha256": "cc8254c52ed5ae450a3d8e85d24116c295076fe824b1b1f97ecb54609ebef0dd",
+      "size": 12306
+    },
+    "textures/reyondpack/snowflake.tga": {
+      "sha256": "1b4cea123c6bc7cce209a6be57983956ff9454c0e518818774e2a2eeac2ecc8a",
+      "size": 4140
+    }
+  }
+}

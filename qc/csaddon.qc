@@ -319,7 +319,7 @@ void() wrap_renderscene =
         fb_profile_sum[2]+=gettime(1)-profileTime;profileTime=gettime(1);
         fb_visual_draw();
         fb_profile_sum[3]+=gettime(1)-profileTime;profileTime=gettime(1);
-        perf_renderscene();
+        fb_shader_pack_frame();perf_renderscene();fb_shader_pack_finish();
         fb_profile_sum[4]+=gettime(1)-profileTime;
         if(!cached) {fb_label_native_traces=fb_label_full_traces=0;fb_label_trace_seconds=fb_label_draw_seconds=0;profileTime=gettime(1);fb_pick_draw_entities(TRUE);fb_profile_sum[5]+=gettime(1)-profileTime;fb_profile_sum[7]+=fb_label_trace_seconds;fb_profile_sum[8]+=fb_label_draw_seconds;profileTime=gettime(1);fb_visual_labels();fb_profile_sum[6]+=gettime(1)-profileTime;if(cvar("ftebroom_benchmark"))cvar_set("ftebroom_label_stats",sprintf("%i %i",fb_label_native_traces,fb_label_full_traces));}
         fb_view_render_cache=FALSE;
@@ -697,6 +697,7 @@ float(string txt, string info) CSQC_ConsoleLink =
 float(string cmd) CSQC_ConsoleCommand =
 {
     fb_entity_tokenize(cmd);
+    if(argv(0)=="reyond_shader_status"){RSPStatus();return TRUE;}
     if(argv(0)=="ftebroom_pointer" && argv(5)!="" && cvar("ftebroom_view_count")>1) {
         int pane=bound(0,stoi(argv(5)),cvar("ftebroom_view_count")-1);
         cvar_set("ftebroom_view_active",itos(pane));
@@ -816,6 +817,7 @@ void(float prevprogs) init =
 	
 	//brush editor needs some commands for easier binds.
 	editor_brushes_registercommands();
+    registercommand("reyond_shader_status");
 	registercommand("ftebroom_test_drag");
 	registercommand("ftebroom_box");
     registercommand("ftebroom_move");

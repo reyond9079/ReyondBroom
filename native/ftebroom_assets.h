@@ -61,6 +61,8 @@ static void scanDirectory(const std::string& path)
 #include "ftebroom_quake2_assets.h"
 static void profileStartMap();
 static void resetBuildPlaceholders();
+static void shaderPackPrepareProfile();
+static void shaderPackStage(const std::filesystem::path& directory);
 static void assetsReady()
 {
   resetBuildPlaceholders();
@@ -95,6 +97,8 @@ static void assetsReady()
   }
   for (auto& path : resourceFiles)
   {
+    if(gameProfile!=1 && path.rfind("textures/reyondpack/",0)==0)continue;
+    if(path=="textures/reyondpack/snowflake.tga"||path=="textures/reyondpack/rain.tga")continue;
     auto dot = path.find_last_of('.');
     if (dot == std::string::npos)
       continue;
@@ -126,6 +130,7 @@ static void assetsReady()
   }
   for (auto& path : resourceFiles)
   {
+    if(gameProfile!=1 && path=="scripts/reyond-pack-active.shader")continue;
     // Generated WAL aliases are output, never authoritative input resources.
     if(gameProfile==3 && path=="scripts/reyondbroom-quake2.shader")continue;
     if (path.size() < 7 || path.substr(path.size() - 7) != ".shader")
@@ -146,6 +151,7 @@ static void assetsReady()
       if (token(source, offset) != "{")
         continue;
       auto material=ftebroom::shaderpreview::parse(source,offset);
+      if(name.rfind("reyondpack/",0)==0 || (gameProfile!=1&&name.rfind("textures/reyondpack/",0)==0))continue;
       if(material.valid)materials[name]={name,material.preview,true,material.tags,material.opacity,material.masked,material.blend,material.alphaTest};
     }
   }
@@ -251,6 +257,7 @@ static bool mountAssets()
     settings.close();
     if(!settings)throw std::runtime_error("Cannot save the resource configuration.");
     std::snprintf(baseq3,sizeof baseq3,"%s",normalized.c_str());
+    shaderPackPrepareProfile();
     prepareEditorWall();
     gameProfileRendering();
     assetsLoading = true;

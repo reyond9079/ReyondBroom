@@ -252,6 +252,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_model_viewer.h"
 #include "ftebroom_mod_files.h"
 #include "ftebroom_desktop.h"
+#include "ftebroom_shader_pack.h"
 #include "ftebroom_update.h"
 #include "ftebroom_cache_maintenance.h"
 #include "ftebroom_bsp_model.h"
@@ -435,7 +436,7 @@ static void panel(float w, float h)
   ImGui::BeginDisabled(modEmbedded);
   if (ImGui::BeginMainMenuBar())
   {
-    actionMenus();pluginsMenu();
+    actionMenus();pluginsMenu();shaderPackMenu();
     if (ImGui::BeginMenu("Workspace"))
     {
       ImGui::MenuItem("Mod file manager",nullptr,&modFilesOpen);
@@ -1128,6 +1129,7 @@ static void panel(float w, float h)
     nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
   tracePanel();
   terrainPanel();
+  shaderPackPanel();
   modFilesPanel();
   modelViewerPanel();
   pluginsPanel();
@@ -1521,7 +1523,7 @@ static void mapReady()
 static void profileStartMap(){if(!pendingDocumentFile.empty())return;static bool first=true;if(first){recentLoad();recentWindow=!cvars->GetFloat("ftebroom_skip_setup")&&firstSetupStep<0&&!recentMaps.empty();first=false;}gameProfileLoad();command(gameClassic()?"mapedit maps/start-quake1.map\n":"mapedit maps/start.map\n");}
 static void QDECL actionFocusTick(int)
 {
-  libreTick();
+  libreTick();shaderPackTick();
   updateTick();
   clipboardPump();
   documentTick();
@@ -1989,6 +1991,7 @@ extern "C" qboolean NATIVEEXPORT FTEPlug_Init(plugcorefuncs_t* api)
   commands->AddCommand("ftebroom_ui", uiActionCommand, "Run an editor UI action.");
   commands->AddCommand(
     "ftebroom_assets_ready", assetsReady, "Index mounted project assets.");
+  commands->AddCommand("reyond_shader_pack",shaderPackCommand,"Manage the optional FTE Custom shader pack.");
   commands->AddCommand("ftebroom_start_map",profileStartMap,"Open the starter for the selected game profile.");
   commands->AddCommand("ftebroom_build_placeholders",buildRemapPlaceholders,"Refresh generated material previews after loading a compile result.");
   commands->AddCommand(

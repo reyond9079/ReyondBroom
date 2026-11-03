@@ -149,5 +149,6 @@ fb_spawn_master_tests.qc
 fb_array_preview_tests.qc
 fb_conversion_tests.qc
 fb_generators_tests.qc
+fb_shader_pack.qc
 csaddon.qc
 #endlist

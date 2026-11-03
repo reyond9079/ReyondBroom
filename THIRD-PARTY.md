@@ -1,5 +1,7 @@
 # Third-party notices
 
+- The optional **Reyond's GLSL Shader Pack** is separately distributed original MIT work. See `assets/reyond-shader-pack/LICENSE.txt` and `PROVENANCE.md`. No restricted Shadertoy adaptations are included in this pack; the editor's existing GPL licensing is unchanged.
+
 Release binaries and corresponding sources are separate downloads. Publish the matching
 `ReyondBroom-<version>-<platform>-Sources.zip` alongside every binary asset. It contains
 the pinned FTE, Bullet, ImGui and compiler sources, editor changes and build scripts.

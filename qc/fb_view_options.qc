@@ -204,6 +204,7 @@ float fb_surface_opacity(string source,int tags)
 // Every editable preview keeps masked WAD texels, including selection/drag layers.
 string fb_surface_preview_shader(string source,float alpha)
 {
+    if(cvar("ftebroom_game_profile")==1 && cvar("ftebroom_shader_pack_enabled") && (substring(source,0,19)=="textures/reyondpack/" || substring(source,0,11)=="reyondpack/"))return substring(source,0,9)=="textures/"?source:strcat("textures/",source);
     string material=fb_material_key(source),preview="";
     string lookup=fb_material_preview_key(material);
     if(fb_shader_previews)preview=fb_shader_previews[lookup];

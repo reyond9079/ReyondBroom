@@ -79,3 +79,19 @@ void fb_shader_pack_frame(){
  RSPFrame();
 }
 void fb_shader_pack_finish(){RSPFinish();}
+
+// Cloudless, editor-only background. Explicit map sky surfaces draw over it.
+void fb_editor_clear_sky(){
+ if(cvar("ftebroom_game_profile")!=1 || !cvar("ftebroom_clear_sky") || cvar("ca_brush_view"))return;
+ string sky=fb_editor_sky_material();
+ vector center=getproperty(VF_ORIGIN);
+ for(int axis=0;axis<3;axis++)for(int side=0;side<2;side++){
+  int u=(axis+1)%3,v=(axis+2)%3;
+  R_BeginPolygon(sky,3);
+  for(int corner=0;corner<4;corner++){
+   vector p=center;p[axis]+=side?8192:-8192;p[u]+=(corner==1||corner==2)?8192:-8192;p[v]+=corner>=2?8192:-8192;
+   R_PolygonVertex(p,'0 0 0','1 1 1',1);
+  }
+  R_EndPolygon();
+ }
+}

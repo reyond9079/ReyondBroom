@@ -119,7 +119,7 @@ int fb_filter_custom(int node)
     if(node<0 || node>=fb_filter_tag_count)return FALSE;
     // Classic MAPs use one material/shading path for world, group and selected
     // brushes. Native lightmap shaders must not brighten only some surfaces.
-    if(cvar("ftebroom_classic_map"))return TRUE;
+    if(cvar("ftebroom_classic_map") || cvar("ftebroom_studio_material"))return TRUE;
     // Map-edit submodels have no server entity submitting their surfaces.
     // Draw them explicitly, independently of selection and point-model visibility.
     if(fb_nodes[node].kind>=FB_NODE_BRUSH && fb_nodes[node].model!=1)return TRUE;
@@ -184,6 +184,7 @@ void fb_static_preview_prepare()
 string fb_surface_material_shader(string material,float alpha)
 {
     string name=strcat(alpha<1?"ftebroom/filtered/":"ftebroom/opaque/",material);
+    if(cvar("ftebroom_studio_material"))name=strcat(name,"#studio5");
     name=strcat(name,"#assets_",cvar_string("ftebroom_material_tag_epoch"));
     return name;
 }
@@ -201,10 +202,17 @@ float fb_surface_opacity(string source,int tags)
     }
     return 1;
 }
+// Register before either a MAP sky face or the editor background uses it.
+string fb_editor_sky_material(){
+    static int ready;
+    if(!ready){shaderforname("ftebroom/clear-sky","{\n sort opaque\n cull none\n program glsl/ftebroom_clear_sky.glsl\n {\n map $whiteimage\n nodepth\n }\n }\n");ready=TRUE;}
+    return "ftebroom/clear-sky";
+}
 // Every editable preview keeps masked WAD texels, including selection/drag layers.
 string fb_surface_preview_shader(string source,float alpha)
 {
     if(cvar("ftebroom_game_profile")==1 && cvar("ftebroom_shader_pack_enabled") && (substring(source,0,19)=="textures/reyondpack/" || substring(source,0,11)=="reyondpack/"))return substring(source,0,9)=="textures/"?source:strcat("textures/",source);
+    if(cvar("ftebroom_game_profile")==1 && fb_sky_material(source))return cvar("ftebroom_clear_sky")?fb_editor_sky_material():source;
     string material=fb_material_key(source),preview="";
     string lookup=fb_material_preview_key(material);
     if(fb_shader_previews)preview=fb_shader_previews[lookup];
@@ -213,7 +221,7 @@ string fb_surface_preview_shader(string source,float alpha)
     int masked=cvar("ftebroom_quake1") && substring(material,0,1)=="{";if(fb_shader_masked)if((int)fb_shader_masked[material])masked=TRUE;
     string blend="";if(fb_shader_blend)blend=fb_shader_blend[material];
     string depth="depthwrite\n";if(alpha<1 || blend!="")depth=strcat("blendfunc ",blend!=""?blend:"blend","\n");
-    string program="";if(masked){string test="ge128";if(fb_shader_alpha_test)if(fb_shader_alpha_test[material]!="")test=fb_shader_alpha_test[material];if(alpha<1)program=strcat("program ftebroom_mask#",test=="lt128"?"LT128":test=="gt0"?"GT0":"GE128","\n");else depth=strcat("alphafunc ",test,"\n",depth);}
+    string program="";if(cvar("ftebroom_studio_material") && alpha>=1 && blend=="" && !masked)program="program ftebroom_unreal_wall\n";if(masked){string test="ge128";if(fb_shader_alpha_test)if(fb_shader_alpha_test[material]!="")test=fb_shader_alpha_test[material];if(alpha<1)program=strcat("program ftebroom_mask#",test=="lt128"?"LT128":test=="gt0"?"GT0":"GE128","\n");else depth=strcat("alphafunc ",test,"\n",depth);}
     shaderforname(shader,strcat("{\ncull none\n",program,(alpha<1 || blend!="")?"sort blend\n":"sort opaque\n","{\nmap ",fb_map_quote(preview),"\nrgbgen vertex\nalphagen vertex\n",depth,"}\n}"));
     return shader;
 }

@@ -18,7 +18,7 @@ static ShaderPackSetting shaderPackSettings[]={
  {"ryn_cloud_region_feather","Cloud boundary softness",15,1,60},{"ryn_cloud_region_min","Cloud minimum elevation",0,0,89},{"ryn_cloud_region_max","Cloud maximum elevation",90,1,90},
  {"ryn_aurora_strength","Polar aurora",1,0,3},{"ryn_star_brightness","Stars",1,0,3},{"ryn_sky_exposure","Sky exposure",1,.2,3},
  {"ryn_sunrise","Clock sunrise anchor",6,0,11.5},{"ryn_sunset","Clock sunset anchor",18,12,23.5},
- {"ryn_weather_mode","Weather: 0 clear / 1 cloudy / 2 rain or snow",1,0,2},{"ryn_weather_transition","Weather transition (seconds)",8,1,60},
+ {"ryn_weather_mode","Weather: 0 clear / 1 cloudy / 2 rain or snow",0,0,2},{"ryn_weather_transition","Weather transition (seconds)",8,1,60},
  {"ryn_weather_auto","Automatic weather",0,0,1},{"ryn_weather_interval","Weather interval (seconds)",120,15,900},
  {"ryn_season","Season: 0 spring / 1 summer / 2 autumn / 3 winter",1,0,3},{"ryn_season_auto","Automatic seasons",0,0,1},{"ryn_year_minutes","Year duration (minutes)",20,1,120},
  {"ryn_moon_phase","Moon phase: 0 new / 0.5 full",.5,0,1},{"ryn_sun_radius","Sun angular radius",.266,.15,2},{"ryn_moon_radius","Moon angular radius",.272,.15,2},

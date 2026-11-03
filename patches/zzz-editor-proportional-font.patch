@@ -1,0 +1,11 @@
+--- a/engine/gl/gl_font.c
++++ b/engine/gl/gl_font.c
+@@ -3593,7 +3593,7 @@
+ 	{
+ 		sx = ((px+c->left*cw));
+ 		sy = ((py+c->top*ch));
+-		sw = ((font->charheight*cw));
++		sw = ((c->texplane == BITMAPPLANE ? c->advance : font->charheight)*cw);
+ 		sh = ((font->charheight*ch));
+ 
+ 		if (c->texplane == DEFAULTPLANE)

@@ -1,6 +1,6 @@
 # ReyondBroom FTE-native map editor
 
-**Optional FTE Custom assets:** [Reyond's GLSL Shader Pack](docs/shader-pack.md) adds a separate MIT-only download, materials and environment controls through **Assets > Shaders**. Editor integration is currently a local preview build; the existing download links below remain unchanged.
+**Optional FTE Custom assets:** [Reyond's GLSL Shader Pack](docs/shader-pack.md) adds a separate MIT-only download, materials and environment controls through **Assets > Shaders**. Editor integration is currently a local preview build; the existing download links below remain unchanged. [Viewport labels and the bundled clear-sky/studio preview](docs/studio-preview.md) are included in this preview branch.
 
 [**Join our Discord**](https://discord.gg/eDMf53Kny)
 

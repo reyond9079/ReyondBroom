@@ -172,9 +172,12 @@ static void assetsReady()
 }
 static void prepareEditorWall(){
   cvars->SetFloat("ftebroom_wall_override",0);
+  cvars->SetFloat("ftebroom_studio_material",gameProfile==1&&gameWallMode==5);
+  cvars->SetFloat("ftebroom_clear_sky",gameProfile==1&&gameClearSky);
   if(gameProfile!=1||gameWallMode==0)return;
   std::string shader;
   if(gameWallMode==4)shader=gameWallReadFile(std::filesystem::u8path(gameWallFile));
+  else if(gameWallMode==5){size_t length=0;auto bytes=(char*)files->LoadFile("glsl/ftebroom_unreal_wall.glsl",&length);if(bytes){shader.assign(bytes,length);core->Free(bytes);}}
   else if(gameWallMode==3){size_t length=0;auto bytes=(char*)files->LoadFile("glsl/ftebroom_studio_wall.glsl",&length);if(bytes){shader.assign(bytes,length);core->Free(bytes);}}
   else {
     auto root=std::filesystem::u8path(gameWallMode==1?baseq3:gameMod);

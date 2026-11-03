@@ -1,0 +1,34 @@
+--- a/engine/client/pr_menu.c
++++ b/engine/client/pr_menu.c
+@@ -520,6 +520,13 @@
+ }
+ 
+ //float	drawstring(vector position, string text, vector scale, float alpha, float flag) = #455;
++// Editor names are literal UTF-8 even if the game uses the Quake character set.
++static int PR_CL_EditorFontFlags(pubprogfuncs_t *vm,int flags){
++ world_t *world=vm->parms->user;
++ int slot=world->g.drawfont?(int)*world->g.drawfont:-1;
++ if(slot>=0 && slot<FONT_SLOTS && !strcmp(fontslot[slot].slotname,"reyond-labels"))flags|=PFS_FORCEUTF8|PFS_NOMARKUP;
++ return flags;
++}
+ void QCBUILTIN PF_CL_drawcolouredstring (pubprogfuncs_t *prinst, struct globalvars_s *pr_globals)
+ {
+ 	float *pos = G_VECTOR(OFS_PARM0);
+@@ -556,7 +563,7 @@
+ 		return;
+ 	}
+ 
+-	COM_ParseFunString(CON_WHITEMASK, text, buffer, sizeof(buffer), false);
++	COM_ParseFunString(CON_WHITEMASK, text, buffer, sizeof(buffer), PR_CL_EditorFontFlags(prinst,0));
+ 	str = buffer;
+ 
+ 	r2d_be_flags = PF_SelectDPDrawFlag(prinst, flag);
+@@ -594,7 +601,7 @@
+ 		return;
+ 	}
+ 
+-	end = COM_ParseFunString(CON_WHITEMASK, text, buffer, sizeof(buffer), !usecolours);
++	end = COM_ParseFunString(CON_WHITEMASK, text, buffer, sizeof(buffer), PR_CL_EditorFontFlags(prinst,!usecolours));
+ 
+ 	PR_CL_BeginString(prinst, 0, 0, size?size[0]:8, size?size[1]:8, &px, &py);
+ 	px = Font_LineScaleWidth(buffer, end);

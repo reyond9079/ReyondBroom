@@ -4,6 +4,28 @@ float fb_label_alpha(vector point,int selected,int ortho)
     if(ortho || selected || autocvar_ftebroom_label_distance<=0)return 1;
     return bound(0,(autocvar_ftebroom_label_distance-vlen(point-getproperty(VF_ORIGIN)))/128,1);
 }
+// Match the editor label typography without changing game HUD fonts.
+float fb_label_font;
+int fb_label_font_loaded;
+void fb_label_font_prepare(){
+    if(!fb_label_font_loaded){fb_label_font=loadfont("reyond-labels","ReyondLabels","13",-1);fb_label_font_loaded=TRUE;}
+}
+void fb_label_draw(vector anchor,string text,int selected,int group,float alpha){
+    if(alpha<=0)return;
+    float previous=drawfont;fb_label_font_prepare();drawfont=fb_label_font;
+    float width=stringwidth(text,TRUE,'13 13 0');
+    vector pos=anchor-[width*.5,17,0],bg=selected?'1 0 0':'0 0 0';
+    pos_x=floor(pos_x);pos_y=floor(pos_y);
+    // Three-pixel corners and four-pixel padding, like TrenchBroom overlays.
+    drawfill(pos+'-1 -4 0',[width+2,1,0],bg,.6*alpha,0);
+    drawfill(pos+'-3 -3 0',[width+6,2,0],bg,.6*alpha,0);
+    drawfill(pos+'-4 -1 0',[width+8,15,0],bg,.6*alpha,0);
+    drawfill(pos+'-3 14 0',[width+6,2,0],bg,.6*alpha,0);
+    drawfill(pos+'-1 16 0',[width+2,1,0],bg,.6*alpha,0);
+    vector foreground='1 1 1';if(group && !selected)foreground='0.7 0.4 1';
+    drawstring(pos,text,'13 13 0',foreground,alpha,0);
+    drawfont=previous;
+}
 var float autocvar_ftebroom_label_cache=1;
 int fb_filter_epoch,fb_visibility_epoch,fb_transform_preview;
 float fb_active;
@@ -295,10 +317,10 @@ void fb_pick_draw_entities_uncached(int labelsOnly)
             vector label=(bounds[0]+bounds[1])*.5;label_z=bounds[1][2]+12;
             if(!ortho && (label-eye)*forward<=0)continue;
             vector pixel=project(label);pixel_z=0;
-            float width=strlen(item.name)*8;
-            if(pixel_x+width<mn_x || pixel_y+8<mn_y || pixel_x>=mn_x+sz_x || pixel_y>=mn_y+sz_y)continue;
+            float width=strlen(item.name)*13+8;
+            if(pixel_x+width*.5<mn_x || pixel_y+4<mn_y || pixel_x-width*.5>=mn_x+sz_x || pixel_y-21>=mn_y+sz_y)continue;
             if(!ortho){float startTrace=profileLabels?gettime(1):0;int visible=fb_label_visible(eye,label,node);if(profileLabels)fb_label_trace_seconds+=gettime(1)-startTrace;if(!visible)continue;}
-            float startText=profileLabels?gettime(1):0;drawstring(pixel,item.name,'8 8 0',colour,fb_label_alpha(label,fb_entity_selected(item.id),ortho),0);if(profileLabels)fb_label_draw_seconds+=gettime(1)-startText;continue;
+            float startText=profileLabels?gettime(1):0;fb_label_draw(pixel,item.name,fb_entity_selected(item.id),FALSE,fb_label_alpha(label,fb_entity_selected(item.id),ortho));if(profileLabels)fb_label_draw_seconds+=gettime(1)-startText;continue;
         }
         fb_point_draw_ids[drawCount]=item.id;fb_point_draw_colors[drawCount++]=colour;
     }
@@ -401,8 +423,9 @@ void fb_pick_draw_entities(int labelsOnly)
     fb_point_render_prepare();
     cvar_set("ftebroom_selected_entity",fb_entity_classname(fb_selected_entity()));
     if(labelsOnly && autocvar_ftebroom_native_overlays && checkbuiltin(ftebroom_draw_labels)){
+        fb_label_font_prepare();float previousFont=drawfont;drawfont=fb_label_font;
         float nativeStarted=gettime(1);vector result=ftebroom_draw_labels(fb_point_render,fb_point_render_count,sizeof(fb_point_render_t),ortho?1:0,fb_point_upload_epoch,fb_selected_entities,fb_selected_entity_count);
-        if(result_x>=0){fb_label_native_traces+=(int)result_y;if(cvar("ftebroom_benchmark"))fb_label_trace_seconds+=gettime(1)-nativeStarted;return;}
+        drawfont=previousFont;if(result_x>=0){fb_label_native_traces+=(int)result_y;if(cvar("ftebroom_benchmark"))fb_label_trace_seconds+=gettime(1)-nativeStarted;return;}
     }
     vector eye=getproperty(VF_ORIGIN),mn=getproperty(VF_MIN),sz=getproperty(VF_SIZE),fov=getproperty(VF_FOV);makevectors(getproperty(VF_ANGLES));
     vector forward=v_forward,right=v_right,up=v_up;float tx=tan(fov_x*M_PI/360),ty=tan(fov_y*M_PI/360);
@@ -429,9 +452,10 @@ void fb_pick_draw_entities(int labelsOnly)
         if(labelsOnly){
             if(!ortho && (item->label-eye)*forward<=0)continue;
             vector pixel=project(item->label);pixel_z=0;
-            if(pixel_x+strlen(item->name)*8<mn_x || pixel_y+8<mn_y || pixel_x>=mn_x+sz_x || pixel_y>=mn_y+sz_y)continue;
+            float width=strlen(item->name)*13+8;
+            if(pixel_x+width*.5<mn_x || pixel_y+4<mn_y || pixel_x-width*.5>=mn_x+sz_x || pixel_y-21>=mn_y+sz_y)continue;
             if(!ortho){float startTrace=profileLabels?gettime(1):0;int visible=fb_label_visible(eye,item->label,item->node);if(profileLabels)fb_label_trace_seconds+=gettime(1)-startTrace;if(!visible)continue;}
-            drawstring(pixel,item->name,'8 8 0',item->color,fb_label_alpha(item->label,fb_entity_selected(item->id),ortho),0);
+            fb_label_draw(pixel,item->name,fb_entity_selected(item->id),FALSE,fb_label_alpha(item->label,fb_entity_selected(item->id),ortho));
         }else fb_point_draw_ids[drawCount++]=entry;
     }
     if(!labelsOnly)for(int pass=0;pass<2;pass++){

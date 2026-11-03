@@ -1,0 +1,19 @@
+--- a/engine/gl/gl_editor_materials.h
++++ b/engine/gl/gl_editor_materials.h
+@@ -55,13 +55,14 @@
+  shaderpass_t *pass=&source->passes[0];shader->passes[0].texgen=pass->texgen;shader->passes[0].anim_numframes=pass->anim_numframes;shader->passes[0].anim_frames[0]=pass->anim_frames[0];shader->defaulttextures->base=source->defaulttextures->base;
+  if(i==rb_materials.singleCount){rb_materials.singles[i].source=source;rb_materials.singles[i].target=shader;rb_materials.singles[i].untextured=untextured;rb_materials.singleCount++;}*tag=-1;return shader;
+ }
++static qboolean GLBE_StudioProgram(program_t *p){return !p || (p->name && !strncmp(p->name,"ftebroom_unreal_wall",20) && (!p->name[20] || p->name[20]=='#'));}
+ shader_t *GLBE_EditorMaterial(shader_t *source,int *tag)
+ {
+  *tag=0;
+ 
+- if(!rb_materials.supported||Cvar_VariableValue("ftebroom_bindless_materials")==0||!source||(strncmp(source->name,"ftebroom/opaque/",16)&&strcmp(source->name,"ftebroom/flatface"))||source->sort!=SHADER_SORT_OPAQUE||source->numpasses!=1||source->prog||source->numdeforms||source->numdefaulttextures>1)return source;
++ if(!rb_materials.supported||Cvar_VariableValue("ftebroom_bindless_materials")==0||!source||(strncmp(source->name,"ftebroom/opaque/",16)&&strcmp(source->name,"ftebroom/flatface"))||source->sort!=SHADER_SORT_OPAQUE||source->numpasses!=1||!GLBE_StudioProgram(source->prog)||source->numdeforms||source->numdefaulttextures>1)return source;
+  shaderpass_t *pass=&source->passes[0];unsigned int blend=pass->shaderbits&SBITS_BLEND_BITS;
+- if(pass->prog||pass->numtcmods||pass->tcgen!=TC_GEN_BASE||pass->rgbgen!=RGB_GEN_VERTEX_LIGHTING||(pass->alphagen!=ALPHA_GEN_VERTEX&&strcmp(source->name,"ftebroom/flatface"))||!(pass->shaderbits&SBITS_MISC_DEPTHWRITE)||(blend&&blend!=(SBITS_SRCBLEND_ONE|SBITS_DSTBLEND_ZERO)))return source;
++ if(!GLBE_StudioProgram(pass->prog)||pass->numtcmods||pass->tcgen!=TC_GEN_BASE||pass->rgbgen!=RGB_GEN_VERTEX_LIGHTING||(pass->alphagen!=ALPHA_GEN_VERTEX&&strcmp(source->name,"ftebroom/flatface"))||!(pass->shaderbits&SBITS_MISC_DEPTHWRITE)||(blend&&blend!=(SBITS_SRCBLEND_ONE|SBITS_DSTBLEND_ZERO)))return source;
+  texid_t image=pass->texgen==T_GEN_SINGLEMAP?pass->anim_frames[0]:pass->texgen==T_GEN_DIFFUSE?source->defaulttextures->base:NULL;
+  if(pass->anim_numframes>1||(image&&((image->status!=TEX_LOADED&&image->status!=TEX_FAILED)||(image->flags&IF_TEXTYPEMASK)!=IF_TEXTYPE_2D)))return source;
+  // Compatibility FTE disables incomplete fixed-function textures. Sampling a

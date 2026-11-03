@@ -73,7 +73,7 @@ void fb_container_draw(int labels)
         if(group && !groups)continue;if(!group && !entities)continue;
         bounds[0]=fb_container_cache[n].mins;bounds[1]=fb_container_cache[n].maxs;
         if(visibleCount<0 && !ortho){vector delta=item->center-camera;float radius=item->radius,depth=delta*forward;if(depth+radius<0||fabs(delta*right)>depth*tx+radius*(1+tx)||fabs(delta*up)>depth*ty+radius*(1+ty))continue;}
-        if(labels){vector top=(bounds[0]+bounds[1])*0.5;top_z=bounds[1][2]+12;float labelAlpha=fb_label_alpha(top,fb_selection_selected(n),ortho);if(labelAlpha<=0)continue;if(!ortho && (top-camera)*forward<=0)continue;vector pixel=project(top);pixel_z=0;if(pixel_x<mn_x||pixel_y<mn_y||pixel_x>=mn_x+size_x||pixel_y>=mn_y+size_y)continue;if(!ortho && !fb_label_visible(camera,top,n))continue;drawstring(pixel,fb_nodes[n].name,'8 8 0','0.35 0.6 1',labelAlpha,0);}
+        if(labels){vector top=(bounds[0]+bounds[1])*0.5;top_z=bounds[1][2]+12;float labelAlpha=fb_label_alpha(top,fb_selection_selected(n),ortho);if(labelAlpha<=0)continue;if(!ortho && (top-camera)*forward<=0)continue;vector pixel=project(top);pixel_z=0;if(pixel_x<mn_x||pixel_y<mn_y||pixel_x>=mn_x+size_x||pixel_y>=mn_y+size_y)continue;if(!ortho && !fb_label_visible(camera,top,n))continue;fb_label_draw(pixel,fb_nodes[n].name,fb_selection_selected(n),group,labelAlpha);}
         else {
             vector color='0.2 0.45 1';if(group && fb_nodes[n].fields["_tb_linked_group_id"]!="")color='0.65 0.35 1';
             fb_container_bounds_t *box=&fb_container_cache[n];

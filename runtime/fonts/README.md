@@ -16,3 +16,15 @@ The Windows UI continues using Segoe UI for Latin and Cyrillic text.
 
 Linux uses the bundled subset for its base UI font; Latin and Cyrillic ranges
 are included independently of the current translation catalog.
+
+## Viewport labels
+
+Source Sans Pro Regular uses the SIL Open Font License 1.1 (see
+LICENSE-SourceSansPro.txt). This is the same font family used for viewport
+labels in TrenchBroom. The original font is included unchanged.
+
+`ReyondLabels.kfont` and `ReyondLabels.tga` are a proportional atlas generated
+from that font for FTE's native bitmap-font loader. Missing glyphs, including
+Cyrillic, use the already bundled OFL-licensed Noto subset. They include Latin, Cyrillic and common punctuation. The editor needs no system font installation
+or additional FreeType DLL. Rebuild with `python scripts/bake-label-font.py`
+(Pillow and FontTools required for generation only).

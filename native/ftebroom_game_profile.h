@@ -5,7 +5,8 @@
 #include "ftebroom_wall_file.h"
 #include "ftebroom_mod_definitions.h"
 static int gameProfile;
-static int gameWallMode=0;
+static int gameWallMode=5;
+static bool gameClearSky=true;
 static char gameWallFile[4096]="";
 static void gameWallBrowse();
 static void gameWallBrowser();
@@ -44,8 +45,10 @@ static void gameProfileLoad()
     std::string defs,qc;
     if(input>>std::quoted(defs)>>std::quoted(qc)){std::snprintf(gameDefinitions,sizeof gameDefinitions,"%s",defs.c_str());std::snprintf(gameQC,sizeof gameQC,"%s",qc.c_str());}
     // Earlier versions enabled mod launch implicitly. Require a new explicit opt-in.
-    int previewPolicy=0;input>>previewPolicy;input>>gameWallMode;gameWallMode=std::clamp(gameWallMode,0,4);
+    int previewPolicy=0;input>>previewPolicy;input>>gameWallMode;gameWallMode=std::clamp(gameWallMode,0,5);
     std::string wall;if(input>>std::quoted(wall))std::snprintf(gameWallFile,sizeof gameWallFile,"%s",wall.c_str());
+    int styleRevision=0,clearSky=1;input>>styleRevision>>clearSky;gameClearSky=clearSky!=0;
+    if(styleRevision<1 && gameWallMode==0)gameWallMode=5;
     gameProfile=std::clamp(selected,0,4);gamePreviewAfterBuild=previewPolicy==1 && automatic!=0;
     std::snprintf(gameMod,sizeof gameMod,"%s",mod.c_str());
     std::snprintf(gameEngine,sizeof gameEngine,"%s",engine.c_str());
@@ -70,7 +73,7 @@ static bool gameProfileSave()
 {
   auto target=settingsPath().parent_path()/"ftebroom-game-profile.txt";
   std::ofstream output(target,std::ios::binary);
-  output<<gameProfile<<' '<<gamePreviewAfterBuild<<' '<<std::quoted(gameMod)<<' '<<std::quoted(gameEngine)<<' '<<std::quoted(gameDefinitions)<<' '<<std::quoted(gameQC)<<" 1 "<<gameWallMode<<' '<<std::quoted(gameWallFile)<<"\n";
+  output<<gameProfile<<' '<<gamePreviewAfterBuild<<' '<<std::quoted(gameMod)<<' '<<std::quoted(gameEngine)<<' '<<std::quoted(gameDefinitions)<<' '<<std::quoted(gameQC)<<" 1 "<<gameWallMode<<' '<<std::quoted(gameWallFile)<<" 1 "<<gameClearSky<<"\n";
   output.close();
   std::ofstream quake(settingsPath().parent_path()/"ftebroom-quake1.txt");
   quake<<std::quoted(std::string())<<' '<<std::quoted(q1Mod)<<' '<<std::quoted(q1Wads)<<' '<<std::quoted(q1Definitions)<<' '<<q1MapFormat<<' '<<q1BspFormat<<' '<<std::quoted(q3Root)<<' '<<q1UseLibre<<'\n';
@@ -113,9 +116,10 @@ static void gameProfileFields(bool wizard=false)
     ImGui::InputText("Entity definitions (optional .def / .fgd)",gameDefinitions,sizeof gameDefinitions);
     ImGui::InputText("QuakeC source folder (optional)",gameQC,sizeof gameQC);
     ImGui::Checkbox("Open mod preview after Build",&gamePreviewAfterBuild);
-    ImGui::Combo("Editor defaultwall",&gameWallMode,"Current FTE default\0Map source folder\0Mod folder\0Neutral studio (Unity-like)\0Custom GLSL file\0");
+    ImGui::Checkbox("Clear sky background (editor)",&gameClearSky);
+    ImGui::Combo("Editor defaultwall",&gameWallMode,"Current FTE default\0Map source folder\0Mod folder\0Neutral studio (Unity-like)\0Custom GLSL file\0Neutral studio (Unreal-like)\0");
     if(gameWallMode==4){ImGui::InputText("GLSL file",gameWallFile,sizeof gameWallFile);ImGui::SameLine();if(ImGui::Button("Browse...##wall"))gameWallBrowse();ImGui::TextWrapped("Use an FTE-compatible defaultwall program. Includes resolve through the mounted game resources. Apply/load resources to save and activate this path.");}
-    ImGui::TextWrapped("Applied when loading resources. Only the editor material changes; mod files and build output are untouched. Neutral studio is an original approximation, not Unity PBR.");
+    ImGui::TextWrapped("Applied when loading resources. Only the editor material changes; mod files and build output are untouched. Studio materials are original editor lighting approximations; they preserve texture mapping.");
     ImGui::TextWrapped("Quake 3 BSP with Quake game logic. Preview runs your mod inside the 3D viewport, using a temporary home and read-only filesystem. Only mod assets are loaded; baseq3 is the authoring library.");
   }
   ImGui::EndDisabled();

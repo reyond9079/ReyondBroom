@@ -678,12 +678,36 @@ static void testDesktop(){
     cvars->SetFloat("r_glsl_offsetmapping",1);gameProfile=1;gameProfileRendering();gameProfile=2;gameProfileRendering();expect(cvars->GetFloat("r_glsl_offsetmapping")==1,"offset60_user_value_preserved");
     gameProfile=profile;cvars->SetFloat("r_glsl_offsetmapping",value);
   }
+  if(std::string(mode)=="setup112games") {
+    recentWindow=false;setupNeeded=false;setupInitialized=true;gameProfileLocked=false;firstSetupStep=3;
+    frame();frame();
+    for(const char* name:{"ui/games/quake2.png","ui/games/halflife.png"}){
+      auto image=draw->LoadImage(name);float w=0,h=0;expect(image&&draw->ImageSize(image,&w,&h)>0&&w==256&&h==256,"setup112_game_icon_loaded");
+    }
+    for(int slot:{1,3}){auto point=setupGameCenters[slot];event(0,0,0,point.x,point.y,1280,800);event(1,mouseKeys[0],0,point.x,point.y,1280,800);event(0,0,0,point.x,point.y,1280,800);event(2,mouseKeys[0],0,point.x,point.y,1280,800);frame();expect(gameProfile==(slot==1?3:4),"setup112_profile_choice");}
+  }
+  if(std::string(mode)=="setup112discord"){
+    recentWindow=false;setupNeeded=false;setupInitialized=true;gameProfileLocked=false;assetsLoading=false;firstSetupStep=5;
+    frame();frame();expect(setupDiscordSize.y>=58*uiScale()-.1f&&setupDiscordSize.x>=250*uiScale(),"setup112_prominent_discord_button");
+  }
+  if(std::string(mode)=="setup112join"){
+    static bool opened=false;opened=false;
+    auto previous=ImGui::GetPlatformIO().Platform_OpenInShellFn;
+    ImGui::GetPlatformIO().Platform_OpenInShellFn=[](ImGuiContext*,const char* path){opened=std::string(path)=="https://discord.gg/eDMf53Kny";return true;};
+    frame();frame();
+    auto point=setupDiscordCenter;event(0,0,0,point.x,point.y,1280,800);event(1,mouseKeys[0],0,point.x,point.y,1280,800);event(0,0,0,point.x,point.y,1280,800);event(2,mouseKeys[0],0,point.x,point.y,1280,800);frame();
+    ImGui::GetPlatformIO().Platform_OpenInShellFn=previous;
+    expect(opened&&firstSetupStep==5&&!setupDiscordOpenFailed,"setup112_discord_invite_target");
+  }
+  if(std::string(mode)=="setup112russian"){uiLanguage=1;firstSetupStep=5;frame();frame();}
+  if(std::string(mode)=="setup112chinese"){uiLanguage=4;firstSetupStep=5;frame();frame();}
   if(std::string(mode)=="setup68discord") {
     recentWindow=false;setupNeeded=false;setupInitialized=true;gameProfileLocked=false;assetsLoading=false;firstSetupStep=5;
     frame();frame();auto window=ImGui::FindWindowByName("First-time setup");
     expect(window&&window->Active&&firstSetupStep==5,"setup68_discord_step_visible");
   }
   if(std::string(mode)=="setup68finish") {
+    frame();frame();
     auto p=setupFinishCenter;
     event(0,0,0,p.x,p.y,1280,800);event(1,mouseKeys[0],0,p.x,p.y,1280,800);
     event(0,0,0,p.x,p.y,1280,800);event(2,mouseKeys[0],0,p.x,p.y,1280,800);frame();

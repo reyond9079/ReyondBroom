@@ -24,7 +24,7 @@ static void setupGameChoices() {
   const int order[]={2,3,0,4,1};
   const char* titles[]={"Quake 1","Quake II","Quake III Arena","Half-Life","FTE Custom game"};
   const char* captions[]={"Classic Quake maps, WAD textures and mods","Quake II maps, WAL textures and PAK archives","Quake III maps, patches and shaders","GoldSrc maps, WAD3 textures, FreeHL / FreeCS","Custom FTE games and engine features"};
-  const char* logos[]={"ui/games/quake1.png",nullptr,"ui/games/quake3.png",nullptr,"ui/games/fte.png"};
+  const char* logos[]={"ui/games/quake1.png","ui/games/quake2.png","ui/games/quake3.png","ui/games/halflife.png","ui/games/fte.png"};
   for(int i=0;i<5;i++)if(setupChoice(titles[i],titles[i],captions[i],gameProfile==order[i],logos[i],&setupGameCenters[i])){
     if(gameProfile<2)q3Root=baseq3;
     gameProfile=order[i];
@@ -89,4 +89,60 @@ static void setupQuakeModFields() {
     ImGui::Combo("Target BSP",&q1BspFormat,"BSP29 (classic limits)\0BSP2 (modern engines)\0");
   }
   setupModBrowse();
+}
+
+// A clear community invitation; joining never advances or blocks setup.
+static ImVec2 setupDiscordCenter;
+static ImVec2 setupDiscordSize;
+static bool setupDiscordOpenFailed=false;
+static void setupChatMark(ImDrawList* list,ImVec2 center,float size,ImU32 color){
+  const float unit=size/32.f;
+  list->AddRectFilled({center.x-14*unit,center.y-10*unit},{center.x+14*unit,center.y+8*unit},color,7*unit);
+  list->AddTriangleFilled({center.x-8*unit,center.y+5*unit},{center.x-8*unit,center.y+13*unit},{center.x+unit,center.y+5*unit},color);
+  const auto eye=IM_COL32(88,101,242,255);
+  list->AddCircleFilled({center.x-5*unit,center.y-unit},1.8f*unit,eye,12);
+  list->AddCircleFilled({center.x+5*unit,center.y-unit},1.8f*unit,eye,12);
+}
+static void setupDiscordInvitation(){
+  const float scale=uiScale(),available=ImGui::GetContentRegionAvail().x;
+  auto centeredText=[&](const char* text,bool disabled=false){
+    const char* end=nullptr;FteBroomTranslate(text,end);
+    const float width=ImGui::CalcTextSize(text,end).x;
+    ImGui::SetCursorPosX(std::max(0.f,(available-width)*.5f));
+    if(width>available)ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+available);
+    if(disabled)ImGui::PushStyleColor(ImGuiCol_Text,ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+    ImGui::TextUnformatted(text,end);
+    if(disabled)ImGui::PopStyleColor();
+    if(width>available)ImGui::PopTextWrapPos();
+  };
+  ImGui::Dummy({0,18*scale});
+  auto p=ImGui::GetCursorScreenPos();
+  auto list=ImGui::GetWindowDrawList();ImVec2 center{p.x+available*.5f,p.y+38*scale};
+  list->AddCircleFilled(center,38*scale,IM_COL32(88,101,242,255),48);
+  setupChatMark(list,center,44*scale,IM_COL32_WHITE);
+  ImGui::Dummy({0,90*scale});
+  if(uiBoldFonts[uiScaleChoice])ImGui::PushFont(uiBoldFonts[uiScaleChoice]);
+  centeredText("Join the ReyondBroom community");
+  if(uiBoldFonts[uiScaleChoice])ImGui::PopFont();
+  ImGui::Dummy({0,8*scale});
+  centeredText("Share your maps. Get help. Follow new releases.");
+  ImGui::Dummy({0,22*scale});
+  const char* label="Join Discord";const char* end=nullptr;FteBroomTranslate(label,end);
+  const float width=std::min(available,std::max(300*scale,ImGui::CalcTextSize(label,end).x+112*scale));
+  ImGui::SetCursorPosX(std::max(0.f,(available-width)*.5f));
+  ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(88/255.f,101/255.f,242/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(71/255.f,82/255.f,196/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(60/255.f,69/255.f,165/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1,1,1,1));
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,10*scale);
+  ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign,ImVec2(.6f,.5f));
+  bool clicked=ImGui::Button("Join Discord##setupInvite",{width,58*scale});
+  auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();setupDiscordCenter={(a.x+b.x)*.5f,(a.y+b.y)*.5f};setupDiscordSize={b.x-a.x,b.y-a.y};
+  setupChatMark(list,{a.x+32*scale,setupDiscordCenter.y},26*scale,IM_COL32_WHITE);
+  ImGui::PopStyleVar(2);ImGui::PopStyleColor(4);
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("https://discord.gg/eDMf53Kny");
+  if(clicked){auto open=ImGui::GetPlatformIO().Platform_OpenInShellFn;setupDiscordOpenFailed=!open||!open(ImGui::GetCurrentContext(),"https://discord.gg/eDMf53Kny");}
+  ImGui::Dummy({0,12*scale});
+  centeredText("Joining is optional. Start editing whenever you are ready.",true);
+  if(setupDiscordOpenFailed){ImGui::Spacing();ImGui::TextWrapped("Open this invite in your browser:");ImGui::TextLinkOpenURL("https://discord.gg/eDMf53Kny","https://discord.gg/eDMf53Kny");}
 }

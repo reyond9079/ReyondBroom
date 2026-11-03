@@ -362,14 +362,7 @@ static void projectSetup()
       } else if(firstSetupStep==3) {
         setupGameChoices();
       } else if(firstSetupStep==4) projectResourceFields();
-      else {
-        ImGui::Spacing();
-        ImGui::TextWrapped("Share your maps, get help and follow ReyondBroom updates.");
-        ImGui::Spacing();
-        ImGui::TextLinkOpenURL("https://discord.gg/eDMf53Kny","https://discord.gg/eDMf53Kny");
-        ImGui::Spacing();
-        ImGui::TextDisabled("Joining is optional. You can start editing right away.");
-      }
+      else setupDiscordInvitation();
       ImGui::EndChild();
       ImGui::Separator();
       ImGui::BeginDisabled(firstSetupStep==0||assetsLoading||libreBusy());

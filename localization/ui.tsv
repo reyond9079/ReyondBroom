@@ -327,3 +327,41 @@ Mod files|Файлы мода|Mod-Dateien|Fichiers du mod|模组文件|MOD フ�
 Map sources / authoring assets|Исходники карт / ресурсы|Kartenquellen / Ressourcen|Sources des cartes / ressources|地图源文件和资源|マップソースと素材|Fuentes de mapas / recursos
 FTE Engine terrain|Террейн движка FTE|FTE-Engine-Terrain|Terrain du moteur FTE|FTE 引擎地形|FTE エンジン地形|Terreno del motor FTE
 Create FTE Engine terrain...|Создать террейн движка FTE…|FTE-Engine-Terrain erstellen…|Créer un terrain FTE…|创建 FTE 引擎地形…|FTE 地形を作成…|Crear terreno FTE…
+Join our Discord|Вступайте в наш Discord|Tritt unserem Discord bei|Rejoignez notre Discord|加入我们的 Discord|Discord に参加|Únete a nuestro Discord
+Join the ReyondBroom community|Присоединяйтесь к сообществу ReyondBroom|Werde Teil der ReyondBroom-Community|Rejoignez la communauté ReyondBroom|加入 ReyondBroom 社区|ReyondBroom コミュニティに参加|Únete a la comunidad de ReyondBroom
+Share your maps. Get help. Follow new releases.|Делитесь картами. Получайте помощь. Следите за обновлениями.|Teile deine Karten. Erhalte Hilfe. Verfolge neue Versionen.|Partagez vos cartes. Obtenez de l’aide. Suivez les nouveautés.|分享地图，获取帮助，关注新版本。|マップを共有し、質問し、新バージョンをチェック。|Comparte mapas. Obtén ayuda. Descubre nuevas versiones.
+Join Discord|Вступить в Discord|Discord beitreten|Rejoindre Discord|加入 Discord|Discord に参加|Unirse a Discord
+Joining is optional. Start editing whenever you are ready.|Вступать необязательно. Начать работу можно сразу.|Der Beitritt ist freiwillig. Du kannst sofort mit dem Bearbeiten beginnen.|L’inscription est facultative. Commencez à créer quand vous le souhaitez.|加入是可选的，您可以随时开始编辑。|参加は任意です。いつでも編集を始められます。|Unirse es opcional. Puedes empezar a editar cuando quieras.
+Open this invite in your browser:|Откройте приглашение в браузере:|Öffne diese Einladung im Browser:|Ouvrez cette invitation dans votre navigateur :|在浏览器中打开此邀请：|この招待リンクをブラウザーで開いてください：|Abre esta invitación en tu navegador:
+Start editing|Начать работу|Mit dem Bearbeiten beginnen|Commencer à créer|开始编辑|編集を始める|Empezar a editar
+Exit mod preview|Выйти из Mod preview|Mod-Vorschau beenden|Quitter l’aperçu du mod|退出模组预览|Modプレビューを終了|Salir de la vista previa del mod
+Setup build|Параметры сборки...|Kompilieren...|Compiler...|编译设置...|ビルド設定...|Compilar...
+Play mod|Играть в мод|Mod spielen|Jouer au mod|游玩模组|MODをプレイ|Jugar al mod
+Free camera|Свободная камера|Freie Kamera|Caméra libre|自由相机|フリーカメラ|Cámara libre
+Cursor size|Размер курсора|Zeigergröße|Taille du curseur|光标大小|カーソルサイズ|Tamaño del cursor
+Map has uncompiled changes|У карты есть нескомпилированные изменения|Karte enthält nicht kompilierte Änderungen|Modifications de carte non compilées|地图存在未编译的更改|未コンパイルの変更があります|El mapa tiene cambios sin compilar
+Compile changes and play|Скомпилировать изменения и запустить|Änderungen kompilieren und spielen|Compiler les modifications et jouer|编译更改并游玩|変更をコンパイルしてプレイ|Compilar cambios y jugar
+Play last compiled BSP|Запустить последний BSP|Letzte kompilierte BSP spielen|Jouer au dernier BSP compilé|游玩上次编译的BSP|最後にコンパイルしたBSPをプレイ|Jugar al último BSP compilado
+Play current MAP without compiling|Запустить текущую MAP без компиляции|Aktuelle MAP ohne Kompilieren spielen|Jouer à la MAP actuelle sans compiler|不编译直接游玩当前MAP|コンパイルせず現在のMAPをプレイ|Jugar a la MAP actual sin compilar
+Reset cursor size|Сбросить размер курсора|Zeigergröße zurücksetzen|Réinitialiser le curseur|重置光标大小|カーソルサイズをリセット|Restablecer tamaño del cursor
+Appearance...|Оформление...|Darstellung...|Apparence...|外观...|外観...|Apariencia...
+Cursor size is independent of UI / font scale and applies immediately.|Размер курсора не зависит от масштаба интерфейса и шрифта и применяется сразу.|Die Zeigergröße ist unabhängig von der UI-/Schriftskalierung und wird sofort übernommen.|La taille du curseur est indépendante de l’interface et s’applique immédiatement.|光标大小独立于界面和字体缩放，并立即生效。|カーソルサイズはUIやフォントの倍率に依存せず、すぐに反映されます。|El tamaño del cursor es independiente de la interfaz y se aplica inmediatamente.
+Rotate Grid|Вращение сетки|Raster drehen|Tourner la grille|旋转网格|グリッド回転|Rotar cuadrícula
+Pick center|Выбрать центр|Mittelpunkt wählen|Choisir le centre|选择中心|中心を選択|Elegir centro
+Reset grid|Сбросить сетку|Raster zurücksetzen|Réinitialiser la grille|重置网格|グリッドをリセット|Restablecer cuadrícula
+Reset center|Сбросить центр|Mittelpunkt zurücksetzen|Réinitialiser le centre|重置中心|中心をリセット|Restablecer centro
+Step (degrees)|Шаг (градусы)|Schritt (Grad)|Pas (degrés)|步长（度）|ステップ（度）|Paso (grados)
+Click a point in the viewport|Укажите точку во вьюпорте|Punkt im Ansichtsfenster wählen|Cliquez sur un point dans la vue|在视口中点击一个点|ビューポート内の点をクリック|Haz clic en un punto de la vista
+Compile|Компилировать|Kompilieren|Compiler|编译|コンパイル|Compilar
+Setup compile|Настройка компиляции|Kompilierung einrichten|Configurer la compilation|编译设置|コンパイル設定|Configurar compilación
+Shape / move|Форма / перемещение|Form / Verschieben|Forme / déplacement|形状 / 移动|形状 / 移動|Forma / mover
+Lighting|Освещение|Beleuchtung|Éclairage|照明|照明|Iluminación
+FTE-native RTL instead of lightmaps|RTL-свет FTE вместо лайтмап|FTE-RTL statt Lightmaps|RTL FTE au lieu des lightmaps|FTE 实时照明替代光照贴图|ライトマップの代わりに FTE RTL|RTL de FTE en lugar de lightmaps
+RTL distance (map units)|Дальность RTL (единицы карты)|RTL-Reichweite (Karteneinheiten)|Distance RTL (unités de carte)|实时灯光距离（地图单位）|RTL 距離（マップ単位）|Distancia RTL (unidades del mapa)
+Lightmap-like|Как лайтмапа|Lightmap-ähnlich|Proche de la lightmap|接近光照贴图|ライトマップ風|Similar a lightmap
+Soft RTL only|Только мягкий RTL|Nur weiches RTL|RTL doux uniquement|仅柔和实时光|柔らかい RTL のみ|Solo RTL suave
+Native RTL|Обычный RTL|Natives RTL|RTL natif|原生实时光|標準 RTL|RTL nativo
+Light reach|Радиус света|Lichtreichweite|Portée de la lumière|光照范围|光の到達距離|Alcance de luz
+RTL brightness|Яркость RTL|RTL-Helligkeit|Luminosité RTL|实时光亮度|RTL の明るさ|Brillo RTL
+Directional fill|Заполнение направлений|Richtungsfüllung|Remplissage directionnel|方向填充|方向補間|Relleno direccional
+Baked light contribution|Вклад запечённого света|Anteil gebackenen Lichts|Contribution de lumière précalculée|烘焙光照贡献|ベイク光の寄与|Aporte de luz precalculada

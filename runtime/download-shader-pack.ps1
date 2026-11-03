@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath($Destination)
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 try {
+ [IO.File]::Delete((Join-Path $root 'error.txt'))
  $spec=Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json
  if(!$spec.url.StartsWith('https://github.com/reyond9079/Reyond-FTE-Assets/releases/download/') -or $spec.size -le 0 -or $spec.size -gt 67108864){throw 'Invalid shader download manifest.'}
  $archive=Join-Path $root 'pack.part'
@@ -11,7 +12,9 @@ try {
  try {$buffer=New-Object byte[] 65536;$received=0
   while(($count=$inputStream.Read($buffer,0,$buffer.Length)) -gt 0){$received+=$count;if($received -gt $spec.size){throw 'Download exceeds pinned size.'};$output.Write($buffer,0,$count);[IO.File]::WriteAllText((Join-Path $root 'progress.txt'),"$received $($spec.size) Downloading")}
  }finally{$output.Dispose();$inputStream.Dispose();$response.Dispose()}
- if($received -ne $spec.size -or (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $spec.sha256){throw 'Shader archive checksum mismatch.'}
+ $sha=[Security.Cryptography.SHA256]::Create();$hashStream=[IO.File]::OpenRead($archive)
+ try{$archiveHash=([BitConverter]::ToString($sha.ComputeHash($hashStream))).Replace('-','').ToLowerInvariant()}finally{$hashStream.Dispose();$sha.Dispose()}
+ if($received -ne $spec.size -or $archiveHash -ne $spec.sha256){throw 'Shader archive checksum mismatch.'}
  Add-Type -AssemblyName System.IO.Compression.FileSystem
  $zip=[IO.Compression.ZipFile]::OpenRead($archive)
  $ready=Join-Path $root 'ready.txt';if(Test-Path -LiteralPath $ready){Remove-Item -LiteralPath $ready}

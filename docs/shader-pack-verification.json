@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-03",
+  "asset_version": "1.0.0",
+  "asset_bytes": 6589240,
+  "asset_sha256": "d32660a96a3897ae583eed8fd801900a0c8e0894ee2937d983ad136b028e0775",
+  "editor_delivery": "preview branch, existing alpha.111 release unchanged",
+  "builds": {
+    "Windows": "MinGW C++17, O2",
+    "Linux": "Ubuntu 24.04 C++17, O2",
+    "QC": "FTE format, one pre-existing duplicate-player test warning"
+  },
+  "checks": {
+    "installer_unit_tests": 5,
+    "Windows_real_GitHub_download": "passed both standalone PowerShell and native editor command; progress and 9 indexed materials verified",
+    "Linux_real_GitHub_download": "passed both standalone Python and native SDL2 editor command; 9 materials verified",
+    "Windows_rendering": "sky, day/night, materials, panel, precipitation and snow inspected in native screenshots",
+    "MAP_winter": {
+      "cover": 1.0,
+      "snow_surfaces": 8,
+      "snow_vertices": 48,
+      "outdoor_columns": 7
+    },
+    "Quake_III_profile": "Assets hidden, pack enabled=0, only 5 baseline materials",
+    "q3map2": "material gallery compiled successfully; native fog volume emitted; no missing material warnings",
+    "settings": "saved values written and restored",
+    "Linux_environment": "WSL Ubuntu 24.04, X11 SDL2, Mesa llvmpipe; not Arch/KDE hardware",
+    "git_diff_check": "passed"
+  },
+  "limitations": [
+    "Replacement water/fire/explosion/fog/GI are independent approximations, not pixel-identical reference adaptations",
+    "No wave collision displacement; floes are visual",
+    "Runtime weather and optics in arbitrary mods require SDK integration",
+    "Ambient material is not full-scene GI",
+    "Snow targets exposed brush faces, bounded to 256 surfaces and 4096 vertices",
+    "Existing cloud contour banding remains",
+    "No FPS benchmark for this change"
+  ]
+}

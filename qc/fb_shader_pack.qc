@@ -54,7 +54,7 @@ void fb_pack_snow_scan(vector eye){
   for(int f=0;f<min(count,64);f++){
    vector normal=faces[f].planenormal;
    if(normal_z<.35 || RSPIsSky(faces[f].shadername))continue;
-   if(fb_filter_face_tags(&faces[f],contents)&(FB_TAG_LIQUID|FB_TAG_CLIP|FB_TAG_CAULK|FB_TAG_HINT))continue;
+   if(fb_filter_face_tags(&faces[f],contents)&(FB_TAG_LIQUID|FB_TAG_TRANSLUCENT|FB_TAG_TRIGGER|FB_TAG_CLIP|FB_TAG_CAULK|FB_TAG_HINT))continue;
    int vertices=brush_getfacepoints(fb_nodes[node].model,fb_nodes[node].id,f+1,points,64);
    if(vertices<3 || vertices>64 || rsp_winter_faces>=256 || rsp_winter_vertices+(vertices-2)*3>=4096)continue;
    vector center='0 0 0';for(int p=0;p<vertices;p++)center+=points[p];center=center/(float)vertices;

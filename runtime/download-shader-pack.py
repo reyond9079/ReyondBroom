@@ -5,6 +5,7 @@ import argparse, hashlib, json, os, stat, tempfile, urllib.request, zipfile
 
 def install(destination,manifest):
     destination=destination.resolve();destination.mkdir(parents=True,exist_ok=True)
+    (destination/'error.txt').unlink(missing_ok=True)
     expected=json.loads(manifest.read_text(encoding='utf-8-sig'))
     if not expected['url'].startswith('https://github.com/reyond9079/Reyond-FTE-Assets/releases/download/'):
         raise ValueError('Unexpected shader pack download host.')

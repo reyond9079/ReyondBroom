@@ -3,3 +3,8 @@
 runtime/*.fgd -whitespace
 
 *.sh text eol=lf
+assets/reyond-shader-pack/** text eol=lf
+assets/reyond-shader-pack/**/*.tga binary
+assets/reyond-shader-pack/**/*.ktx binary
+runtime/download-shader-pack.* text eol=lf
+runtime/reyond-shader-pack.json text eol=lf

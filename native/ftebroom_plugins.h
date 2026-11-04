@@ -22,6 +22,11 @@ static int pluginImportMap(const char* text,size_t length){
   std::string bytes(text,length);qhandle_t f;if(files->Open("data/import-in.map",&f,2)<0)return 0;int done=files->Write(f,bytes.data(),int(length));files->Close(f);if(done!=int(length))return 0;
   command("ftebroom_import_file 1 0 0\n");return 1;
 }
+static int pluginWriteData(const char* path,const char* text,size_t length){
+ if(!path||(!text&&length)||length>16*1024*1024||!ftebroom::pak::zipName(path)||std::string(path).rfind("plugin-",0)!=0)return 0;
+ try{auto target=documentPath(std::string("data/")+path);std::filesystem::create_directories(target.parent_path());std::ofstream out(target,std::ios::binary);out.write(text?text:"",length);out.close();return bool(out);}catch(...){return 0;}
+}
+static int pluginReplaceSelection(const char* text,size_t length){if(!text||!length||length>16*1024*1024||modEmbedded||documentTerrain)return 0;qhandle_t file;if(files->Open("data/import-in.map",&file,2)<0)return 0;std::string bytes(text,length);int count=files->Write(file,bytes.data(),int(length));files->Close(file);if(count!=int(length))return 0;command("ftebroom_import_file 1 0 0 1\n");return 1;}
 static bool pluginPhysicsOwned=false;
 static int pluginSettle(int operation,const RBSettleOptionsV1* options){
   if(operation==0){
@@ -136,7 +141,7 @@ static int pluginWriteModel(const char* path,const char* text,size_t length){
     command("fs_flush\n");modFilesRefresh=true;return 1;
   }catch(const std::exception& e){pluginManagerError=e.what();return 0;}
 }
-static const RBHostV1 pluginHost{RB_PLUGIN_API_VERSION,sizeof(RBHostV1),pluginNumber,pluginString,pluginSetNumber,pluginSetString,pluginCommand,pluginLog,pluginImportMap,pluginSettle,pluginText,pluginSeparator,pluginInt,pluginFloat,pluginBool,pluginCombo,pluginButton,pluginSameLine,pluginDisabled,pluginProgress,pluginReadData,pluginWriteAsset,pluginInputText,pluginPreview,pluginSection,pluginMaterialPicker,pluginWriteModel};
+static const RBHostV1 pluginHost{RB_PLUGIN_API_VERSION,sizeof(RBHostV1),pluginNumber,pluginString,pluginSetNumber,pluginSetString,pluginCommand,pluginLog,pluginImportMap,pluginSettle,pluginText,pluginSeparator,pluginInt,pluginFloat,pluginBool,pluginCombo,pluginButton,pluginSameLine,pluginDisabled,pluginProgress,pluginReadData,pluginWriteAsset,pluginInputText,pluginPreview,pluginSection,pluginMaterialPicker,pluginWriteModel,pluginWriteData,pluginReplaceSelection};
 static void pluginUnload(EditorPlugin& p){
   pluginPreviewLines.clear();
   if(p.api&&p.api->shutdown)try{p.api->shutdown();}catch(...){p.error="Plugin shutdown failed.";}

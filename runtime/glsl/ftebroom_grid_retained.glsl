@@ -1,4 +1,5 @@
 !!ver 400-450
+!!cvar3f ftebroom_grid_color=1,1,1
 !!cvarf ftebroom_grid_aa=1.005
 !!cvarf ftebroom_grid_fade_start=512
 !!cvarf ftebroom_grid_fade_end=1024
@@ -16,6 +17,7 @@ void main() {
 }
 #endif
 #ifdef FRAGMENT_SHADER
+uniform vec3 cvar_ftebroom_grid_color;
 uniform float cvar_ftebroom_grid_aa;
 uniform float cvar_ftebroom_grid_fade_start;
 uniform float cvar_ftebroom_grid_fade_end;
@@ -33,6 +35,6 @@ void main() {
     vec2 distanceToLine = abs(fract(coordinate + 0.5) - 0.5) / width;
     float feather = clamp(cvar_ftebroom_grid_aa, 0.05, 2.0);
     float coverage = 1.0 - smoothstep(max(0.0, 0.75-feather*0.5), 0.75+feather*0.5, min(distanceToLine.x, distanceToLine.y));
-    gl_FragColor = vec4(vc.rgb, vc.a * coverage * distanceFade);
+    gl_FragColor = vec4(vc.rgb * cvar_ftebroom_grid_color, vc.a * coverage * distanceFade);
 }
 #endif

@@ -159,7 +159,7 @@ trisoup_simple_vert_t *fb_entity_vertices(int index,int solid)
     return &editents[index].bboxverts[0];
 }
 string fb_entity_classname(int index){if(index>=0 && index<numents)return editents[index].fields["classname"];return "";}
-int fb_entity_has_model(int index){if(index<0 || index>=numents)return FALSE;return editents[index].modelindex && !editents[index].isbsp;}
+int fb_entity_has_model(int index){if(index<0 || index>=numents)return FALSE;return (editents[index].modelindex && !editents[index].isbsp)||editents[index].fields["classname"]=="light";}
 void fb_entity_draw_box(int index,vector colour,int solid,int wire,string shader)
 {
     if(index<0 || index>=numents)return;
@@ -182,6 +182,16 @@ vector fb_entity_color(int index) {if(index>=0 && index<numents)return editents[
 void fb_entity_draw_model(int index)
 {
     if(index<0 || index>=numents)return;
+    if(editents[index].fields["classname"]=="light"){
+        static int cameraValid;static vector savedEye,savedAngles,savedFov,bulbForward,bulbRight,bulbUp;static float bulbTanX,bulbTanY;
+        vector bulbEye=getproperty(VF_ORIGIN),cameraAngles=getproperty(VF_ANGLES),bulbFov=getproperty(VF_FOV),center=editents[index].org;
+        if(!cameraValid||savedEye!=bulbEye||savedAngles!=cameraAngles||savedFov!=bulbFov){cameraValid=TRUE;savedEye=bulbEye;savedAngles=cameraAngles;savedFov=bulbFov;makevectors(cameraAngles);bulbForward=v_forward;bulbRight=v_right;bulbUp=v_up;bulbTanX=tan(bulbFov_x*M_PI/360);bulbTanY=tan(bulbFov_y*M_PI/360);}
+        vector difference=center-bulbEye;float depth=difference*bulbForward;if(depth< -20||fabs(difference*bulbRight)>max(0,depth)*bulbTanX+24||fabs(difference*bulbUp)>max(0,depth)*bulbTanY+24)return;
+        shaderforname("ftebroom/light-icon","{\ncull none\n{\nmap icons/light-bulb.tga\nblendfunc blend\nrgbgen vertex\nalphagen vertex\ndepthwrite\nalphafunc GE128\n}\n}");
+        static trisoup_simple_vert_t bulb[4];static int bulbIndices[6]={0,1,2,0,2,3};
+        for(int i=0;i<4;i++){float x=(i==1||i==2)?1:-1,y=i>=2?1:-1;vector position=center+bulbRight*x*11+bulbUp*y*14;for(int axis=0;axis<3;axis++)bulb[i].xyz[axis]=position[axis];bulb[i].st=(vec2){(x+1)*.5,(1-y)*.5};bulb[i].rgba=(vec4){1,1,1,1};}
+        addtrisoup_simple("ftebroom/light-icon",3,bulb,bulbIndices,6);return;
+    }
     entedit_t *item=&editents[index];if(!item->modelindex || item->isbsp)return;
     if(!tempent)tempent=spawn();tempent.modelindex=item->modelindex;tempent.alpha=1;tempent.scale=item->scale;tempent.angles=item->ang;tempent.colormod='1 1 1';tempent.effects=0;tempent.frame=item->modelframe;tempent.skin=item->modelskin;
     tempent.renderflags=0;
@@ -220,6 +230,7 @@ int fb_entity_model_ready(int index)
 {
     return index>=0 && index<numents && editents[index].modelindex && modelframecount(editents[index].modelindex)>0;
 }
+float fb_entity_model_frame(int index){if(index>=0&&index<numents)return editents[index].modelframe;return 0;}
 int fb_entity_bounds(int index,vector *bounds)
 {
     if(index<0 || index>=numents || !editents[index].fields) return FALSE;
@@ -485,6 +496,10 @@ void(entedit_t *nent) editor_ents_updated =
             }
 
 			string model=def->model;if(def->modelkey!="")model=nent->fields[def->modelkey];
+            for(int r=0;r<def->ruleCount;r++){fb_definition_rule_t *rule=&fb_definition_rules[def->firstRule+r];if(!fb_fgd_condition(rule->condition,nent->fields,def->classname))continue;
+                model=fb_fgd_value(rule->path,nent->fields,def->classname);nent->modelskin=stof(fb_fgd_value(rule->skin,nent->fields,def->classname));nent->modelframe=stof(fb_fgd_value(rule->frame,nent->fields,def->classname));
+                string ruleScale=fb_fgd_value(rule->scale,nent->fields,def->classname);if(ruleScale!=""){if(strstrofs(ruleScale," ",0)>=0){nent->modelaxes=stov(ruleScale);nent->scale=1;}else nent->scale=stof(ruleScale);}break;
+            }if(nent->scale==0)nent->scale=1;
 			if(nent->fields["model"]!="")model=nent->fields["model"];
 			nent->modelindex=0;if(model!="")nent->modelindex=modelindexforname(model);
 		}

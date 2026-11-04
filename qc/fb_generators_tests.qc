@@ -65,6 +65,8 @@ void fb_fullbench_tick()
     }
     localcmd(strcat("ftebroom_test_generators frame76\nin 3 screenshot ",name,".png\nin 4 set ftebroom_benchmark 1\nin 15 set ftebroom_right 1\nin 15 set ftebroom_benchmark 1\nin 26 set ftebroom_right 0\nin 26 screenshot full77-end.png\nin 27 ftebroom_test_generators bench76\nin 28 quit force\n"));
 }
+int fb_test_zombie117;
+int fb_test_replace117_count,fb_test_replace117_history;
 int fb_generators_testcommand()
 {
     if(argv(0)!="ftebroom_test_generators"||!cvar("ftebroom_skip_setup"))return FALSE;
@@ -77,6 +79,40 @@ int fb_generators_testcommand()
         ftebroom_cached_mesh_stats();return TRUE;
     }
     if(argv(1)=="features113ivywall"){fb_selection_clear();fb_createbox('0 0 144','320 24 288');return TRUE;}
+    if(argv(1)=="ivy117face"){
+        fb_selection_clear();int wall117=fb_createbox('0 0 144','320 24 288');brushface_t faces117[64];int count117=brush_get(1,wall117,faces117,64,__NULL__);int chosen117=0;
+        for(int f117=0;f117<count117;f117++)if(faces117[f117].planenormal[1]<-.9)chosen117=f117+1;
+        brush_deselectall();brushface_select(1,wall117,chosen117);fb_transform_expect(fb_faces_count()==1,"ivy117_single_wall_face_selected");return TRUE;
+    }
+    if(argv(1)=="ivy117root"){
+        int history117=history;vector pixel117=project('0 -12 144');pixel117_z=0;
+        fb_plugin_root_pointer("down",pixel117,0);fb_plugin_root_pointer("up",pixel117,0);
+        filestream file117=fopen("plugin-root.txt",FILE_READ);string data117=fgets(file117);fclose(file117);
+        fb_transform_expect(!fb_plugin_root_pending&&substring(data117,0,5)=="POINT","ivy117_viewport_root_pick");
+        fb_transform_expect(history==history117&&fb_faces_count()==1,"ivy117_pick_preserves_selection_and_history");
+        return TRUE;
+    }
+    if(argv(1)=="ivy117cancel"){
+        fb_plugin_root_pending=TRUE;fb_tool_escape();fb_transform_expect(!fb_plugin_root_pending&&fb_faces_count()==1,"ivy117_escape_cancels_without_deselect");return TRUE;
+    }
+    if(argv(1)=="fgd117scene"){
+        fb_selection_clear();fb_entity_create("monster_zombie",FALSE,'-64 0 24');int zombie117=fb_selected_entity();editor_ents_reload();
+        fb_transform_expect(fb_entity_model_name(zombie117)=="progs/mon_zombie.mdl"&&fb_entity_model_ready(zombie117),"fgd117_monster_model_loaded");
+        fb_test_zombie117=zombie117;fb_tx_begin("Test model variant");fb_tx_set_key(zombie117,"spawnflags","1",HIST_ENTITY);fb_tx_commit();editor_ents_reload();
+        fb_entity_create("monster_knight",FALSE,'64 0 24');int knight117=fb_selected_entity();editor_ents_reload();fb_transform_expect(fb_entity_model_ready(knight117),"fgd117_second_monster_model_loaded");
+        fb_entity_create("light",FALSE,'0 -32 72');int lamp117=fb_selected_entity();fb_transform_expect(fb_entity_has_model(lamp117),"fgd117_light_uses_bulb_icon");return TRUE;
+    }
+    if(argv(1)=="fgd117variant"){fb_transform_expect(fb_entity_model_frame(fb_test_zombie117)==192,"fgd117_property_selects_crucified_pose");return TRUE;}
+    if(argv(1)=="level117beforeReplace"){
+        fb_test_replace117_count=selectedbrushcount;fb_test_replace117_history=history;
+        fb_transform_expect(selectedbrushcount>30,"level117_replace_source_selected");return TRUE;
+    }
+    if(argv(1)=="level117afterReplace"){
+        fb_document_tick();int replacedCount117=selectedbrushcount;
+        fb_transform_expect(replacedCount117>0&&replacedCount117<fb_test_replace117_count&&history>fb_test_replace117_history,"level117_selection_replaced");
+        brush_undo();fb_transform_expect(history==fb_test_replace117_history&&selectedbrushcount==fb_test_replace117_count,"level117_replace_single_undo_restores_source");
+        brush_redo();fb_transform_expect(selectedbrushcount==replacedCount117,"level117_replace_redo");return TRUE;
+    }
     if(argv(1)=="features113import"){
         fb_document_tick();fb_transform_expect(selectedbrushcount>30,"features113_level_imported_brushes");int before113=history;brush_undo();fb_transform_expect(history<before113,"features113_level_single_undo");brush_redo();fb_transform_expect(selectedbrushcount>30,"features113_level_redo");return TRUE;
     }

@@ -140,6 +140,7 @@ static void definitionsLoadCommand()
       for (const auto& prop : d.properties)
         out << "property " << std::quoted(d.name) << ' ' << std::quoted(prop.first) << ' '
             << std::quoted(prop.second.value) << '\n';
+      for(const auto& rule:d.modelRules)out<<"modelrule "<<std::quoted(d.name)<<' '<<std::quoted(rule.condition)<<' '<<std::quoted(rule.path)<<' '<<std::quoted(rule.skin)<<' '<<std::quoted(rule.frame)<<' '<<std::quoted(rule.scale)<<'\n';
     }
     // Publish through FTE's filesystem so its lookup cache sees the new file immediately.
     auto cache = out.str();

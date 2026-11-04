@@ -1,48 +1,67 @@
 // SPDX-License-Identifier: MIT
 #include "reyondbroom_plugin.h"
-#include "../common/geometry.h"
-#include <random>
-#include <set>
-#include <map>
-using namespace rbgen;
-static const RBHostV1* host;
-static int seed=1337,rooms=12,loops=2,ceiling=1,lights=1,player=1;
-static float width=384,height=192,hall=128,gap=192,origin[3]={0,0,0};
-static std::string preview,message;static int brushCount=0,connectionCount=0;static std::vector<float> previewLines;
-static std::string previewKey;
-static std::string parameters(){std::ostringstream s;s<<seed<<' '<<rooms<<' '<<loops<<' '<<width<<' '<<height<<' '<<hall<<' '<<gap<<' '<<ceiling<<lights<<player;for(float v:origin)s<<' '<<v;char tex[512]{};host->string("ca_newbrushtexture",tex,sizeof tex);s<<' '<<tex<<' '<<host->number("rb.document_generation");return s.str();}
-struct Cell{int x,y;bool open[4]={};};
-static std::string generate(){
- for(float v:{width,height,hall,gap,origin[0],origin[1],origin[2]})if(!std::isfinite(v))throw std::runtime_error("Use finite coordinates and dimensions.");
- if(rooms<2||rooms>64||loops<0||loops>64||width<256||width>2048||height<96||height>1024||hall<64||hall>width-64||gap<64||gap>1024)throw std::runtime_error("Use 2..64 rooms, room width 256..2048, height 96..1024, corridor width 64..(room width - 64), gap 64..1024.");
- for(float v:origin)if(std::abs(v)>24000)throw std::runtime_error("Keep the origin within +/-24000 units.");
- std::mt19937 rng(seed);std::vector<Cell> cells{{0,0}};std::map<std::pair<int,int>,int> index{{{0,0},0}};
- const int dx[]={1,0,-1,0},dy[]={0,1,0,-1};std::vector<std::array<int,3>> edges;
- while(int(cells.size())<rooms){int a=int(rng()%cells.size()),side=int(rng()%4);int x=cells[a].x+dx[side],y=cells[a].y+dy[side];if(std::abs(x)>6||std::abs(y)>6||index.count({x,y}))continue;int b=int(cells.size());index[{x,y}]=b;cells.push_back({x,y});cells[a].open[side]=cells[b].open[(side+2)%4]=true;edges.push_back({a,b,side});}
- for(int trial=0,added=0;trial<rooms*8&&added<loops;trial++){int a=int(rng()%cells.size()),side=int(rng()%4);auto it=index.find({cells[a].x+dx[side],cells[a].y+dy[side]});if(it==index.end()||cells[a].open[side])continue;cells[a].open[side]=cells[it->second].open[(side+2)%4]=true;edges.push_back({a,it->second,side});added++;}
- char tex[512]={};host->string("ca_newbrushtexture",tex,sizeof tex);std::string mat=material(tex);std::ostringstream out;out<<"{\n\"classname\" \"worldspawn\"\n";brushCount=0;
- previewLines.clear();V base{origin[0],origin[1],origin[2]};double half=width*.5,t=16,door=std::min(double(height)-16,160.);
- auto add=[&](V lo,V hi){if(++brushCount>2000)throw std::runtime_error("The layout exceeds 2000 brushes.");lo=lo+base;hi=hi+base;for(int a=0;a<3;a++)if(std::abs(lo[a])>32000||std::abs(hi[a])>32000)throw std::runtime_error("Layout exceeds map coordinate bounds.");out<<box(lo,hi,mat);for(int axis=0;axis<3;axis++)for(int side=0;side<4;side++){V a=lo,b=lo;int u=(axis+1)%3,v=(axis+2)%3;a[u]=b[u]=side&1?hi[u]:lo[u];a[v]=b[v]=side&2?hi[v]:lo[v];b[axis]=hi[axis];if(previewLines.size()<16384*6)for(V p:{a,b}){previewLines.push_back(float(p.x));previewLines.push_back(float(p.y));previewLines.push_back(float(p.z));}}};
- auto center=[&](Cell c){return V{c.x*(width+gap),c.y*(width+gap),0};};
- for(auto c:cells){V p=center(c);add(p+V{-half-t,-half-t,-t},p+V{half+t,half+t,0});if(ceiling)add(p+V{-half-t,-half-t,height},p+V{half+t,half+t,height+t});
-  for(int s=0;s<4;s++){
-   int a=s%2,b=1-a;double sign=s<2?1:-1;V lo=p,hi=p;lo[a]+=sign>0?half:-half-t;hi[a]=lo[a]+t;lo[b]-=half+t;hi[b]+=half+t;lo.z=0;hi.z=height;
-   if(!c.open[s])add(lo,hi);else{V left=hi;left[b]=p[b]-hall*.5;add(lo,left);V right=lo;right[b]=p[b]+hall*.5;add(right,hi);lo[b]=p[b]-hall*.5;hi[b]=p[b]+hall*.5;lo.z=door;add(lo,hi);}
-  }
- }
- for(auto e:edges){V a=center(cells[e[0]]),b=center(cells[e[1]]);int axis=e[2]%2,other=1-axis;V lo=a,hi=b;if(lo[axis]>hi[axis])std::swap(lo,hi);lo[axis]+=half;hi[axis]-=half;lo[other]=a[other]-hall*.5;hi[other]=a[other]+hall*.5;lo.z=-t;hi.z=0;add(lo,hi);if(ceiling){lo.z=door;hi.z=door+t;add(lo,hi);}for(int side:{-1,1}){V l=lo,h=hi;l.z=0;h.z=door+t;l[other]=a[other]+side*hall*.5-(side<0?t:0);h[other]=l[other]+t;add(l,h);}}
- out<<"}\n";
- if(player)out<<"{\n\"classname\" \""<<(host->number("rb.profile")==0?"info_player_deathmatch":"info_player_start")<<"\"\n\"origin\" \""<<base.x<<' '<<base.y<<' '<<base.z+48<<"\"\n}\n";
- if(lights)for(auto c:cells){V p=center(c)+base;out<<"{\n\"classname\" \"light\"\n\"origin\" \""<<p.x<<' '<<p.y<<' '<<p.z+height-32<<"\"\n\"light\" \"350\"\n}\n";}
- connectionCount=int(edges.size());return out.str();
+#include "blocks.h"
+#include <future>
+#include <fstream>
+using namespace rbwfc;
+static const RBHostV1* host;static Config config;static std::vector<Block> blocks=defaults();
+static float cell=256,height=192,doorway=128,origin[3]{},groupWeights[3]{1,.1f,0};
+static int seed=1337,ceilings=1,lights=1,player=1,connected=1,replaceSelected=0,selectedBlock=0,selectedConstraint=0,captureMode=0;
+static std::string message,preview,previewKey,layoutKey,pendingKey;static std::vector<int> layout;static std::vector<float> lines;
+static std::atomic<bool> cancelled{false};static std::atomic<float> progress{0};
+struct Job{Build output;Result result;std::string error;};static std::future<Job> job;static std::chrono::steady_clock::time_point captureTime;
+static std::string structure(){std::ostringstream out;for(int n:config.size)out<<n<<' ';out<<cell<<' '<<height;for(auto& b:blocks){out<<std::quoted(b.name)<<' '<<b.rotations<<' '<<b.group<<' '<<b.kind;for(auto n:b.size)out<<' '<<n;for(auto n:b.sockets)out<<' '<<n;out<<' '<<std::hash<std::string>{}(b.source)<<' ' ;}return out.str();}
+static std::string key(){std::ostringstream out;out<<structure()<<' '<<seed<<' '<<doorway<<' '<<ceilings<<lights<<player<<connected;for(float n:origin)out<<' '<<n;for(float n:groupWeights)out<<' '<<n;for(auto b:blocks)out<<' '<<b.weight;for(auto n:config.boundary)out<<' '<<n;for(auto r:config.constraints){for(int n:r.low)out<<' '<<n;for(int n:r.high)out<<' '<<n;out<<' '<<r.group<<' '<<r.block;}char material[512]{};host->string("ca_newbrushtexture",material,sizeof material);out<<material<<host->number("rb.document_generation");return out.str();}
+static std::string names(bool none=false){std::string list=none?std::string("Any module\0",11):std::string();for(auto b:blocks){list+=b.name;list+='\0';}list+='\0';return list;}
+static std::string read(const char* name){int count=host->read_data(name,nullptr,0);if(count<=0)return {};std::string bytes(count+1,0);if(host->read_data(name,bytes.data(),bytes.size())<0)throw std::runtime_error("Cannot read plugin data.");bytes.resize(count);return bytes;}
+static void save(){std::ostringstream out;out<<"REYOND_WFC 1\n"<<seed<<' '<<cell<<' '<<height<<' '<<doorway<<' '<<ceilings<<' '<<lights<<' '<<player<<' '<<connected<<'\n';for(int n:config.size)out<<n<<' ';for(float n:origin)out<<n<<' ';for(float n:groupWeights)out<<n<<' ';for(int n:config.boundary)out<<n<<' ';out<<'\n'<<blocks.size()<<'\n';for(auto b:blocks){out<<std::quoted(b.name)<<' '<<b.weight<<' '<<b.group<<' '<<b.rotations<<' '<<b.kind<<' ';for(int n:b.size)out<<n<<' ';for(int n:b.sockets)out<<n<<' ';out<<std::quoted(b.source)<<'\n';}out<<config.constraints.size()<<'\n';for(auto r:config.constraints){for(int n:r.low)out<<n<<' ';for(int n:r.high)out<<n<<' ';out<<r.group<<' '<<r.block<<'\n';}auto text=out.str();if(!host->write_data("plugin-levelgen-settings.txt",text.data(),text.size()))throw std::runtime_error("Cannot save the block library/settings.");}
+static void load(){auto bytes=read("plugin-levelgen-settings.txt");if(bytes.empty())return;std::istringstream in(bytes);std::string magic;int version;in>>magic>>version;if(magic!="REYOND_WFC"||version!=1)throw std::runtime_error("Unknown block library format.");in>>seed>>cell>>height>>doorway>>ceilings>>lights>>player>>connected;for(int& n:config.size)in>>n;for(float& n:origin)in>>n;for(float& n:groupWeights)in>>n;for(int& n:config.boundary)in>>n;size_t count=0;in>>count;if(count<1||count>64)throw std::runtime_error("Invalid block library count.");std::vector<Block> loaded(count);for(auto& b:loaded){in>>std::quoted(b.name)>>b.weight>>b.group>>b.rotations>>b.kind;for(int& n:b.size)in>>n;for(int& n:b.sockets)in>>n;in>>std::quoted(b.source);}in>>count;if(count>128)throw std::runtime_error("Too many volume constraints.");std::vector<Region> constraints(count);for(auto& r:constraints){for(int& n:r.low)in>>n;for(int& n:r.high)in>>n;in>>r.group>>r.block;}if(!in)throw std::runtime_error("Incomplete block library/settings.");compile(loaded);blocks=std::move(loaded);config.constraints=std::move(constraints);selectedBlock=selectedConstraint=0;}
+static int busy(){return job.valid()||captureMode;}
+static void generate(bool region){
+ if(busy())return;try{
+  for(float value:{cell,height,doorway,origin[0],origin[1],origin[2]})if(!std::isfinite(value))throw std::runtime_error("Dimensions and coordinates must be finite.");
+  if(cell<128||cell>2048||height<96||height>1024||doorway<48||doorway>cell-64)throw std::runtime_error("Use cell width 128..2048, height 96..1024 and doorway 48..(cell width - 64).");
+  Config settings=config;settings.seed=seed;settings.connected=connected;settings.rebuild=region;for(int i=0;i<3;i++)settings.groupWeights[i]=groupWeights[i];
+  for(auto r:settings.constraints)for(int a=0;a<3;a++)if(r.low[a]<0||r.high[a]>config.size[a]||r.low[a]>=r.high[a])throw std::runtime_error("Constraint boxes must be inside the grid; Max is exclusive.");
+  if(region)for(int a=0;a<3;a++)if(config.region.low[a]<0||config.region.high[a]>config.size[a]||config.region.low[a]>=config.region.high[a])throw std::runtime_error("Rebuild region must be a non-empty box inside the grid.");
+  if(region&&layoutKey!=structure())throw std::runtime_error("Grid or module structure changed. Generate a full layout first.");
+  auto variants=compile(blocks);auto library=blocks;auto previous=layout;rbgen::V base{origin[0],origin[1],origin[2]};double width=cell,tall=height,door=doorway;bool roof=ceilings,illumination=lights,spawn=player;int profile=int(host->number("rb.profile"));char material[512]{};host->string("ca_newbrushtexture",material,sizeof material);std::string texture=rbgen::material(material);
+  cancelled=false;progress=0;pendingKey=key();message="Solving module constraints in the background...";
+  job=std::async(std::launch::async,[settings,variants,library,previous,base,width,tall,door,roof,illumination,spawn,profile,texture](){Job result;try{Solver solver(settings,variants,cancelled,progress);result.result=solver.solve(previous);result.output=build(settings,library,variants,result.result,base,width,tall,door,roof,illumination,spawn,profile,texture);}catch(const std::exception& e){result.error=e.what();}return result;});
+ }catch(const std::exception& e){message=e.what();}
 }
-static void draw(){host->text("Generates a connected layout at the chosen origin. Existing map geometry is retained. New objects are selected; Undo removes the complete import.");
- if(!preview.empty()&&previewKey!=parameters()){preview.clear();host->preview_lines(nullptr,0);message="Settings or document changed. Generate the preview again.";}
- if(host->button("Generate preview"))try{preview=generate();previewKey=parameters();host->preview_lines(previewLines.data(),previewLines.size()/6);message="Ready: "+std::to_string(rooms)+" connected rooms, "+std::to_string(connectionCount)+" corridors, "+std::to_string(brushCount)+" brushes. Apply to insert.";}catch(const std::exception& e){preview.clear();host->preview_lines(nullptr,0);message=e.what();}
- host->same_line();bool cannotApply=preview.empty();if(cannotApply)host->disabled(1);if(host->button("Apply to map")){message=host->import_map(preview.data(),preview.size())?"Import queued. All generated objects will be selected.":"Cannot import now. Return to MAP editing first.";preview.clear();host->preview_lines(nullptr,0);}if(cannotApply)host->disabled(0);
- host->input_int("Seed",&seed);host->input_int("Rooms",&rooms);host->input_int("Extra connections",&loops);host->input_float("Room width",&width);host->input_float("Room height",&height);host->input_float("Corridor width",&hall);host->input_float("Corridor length",&gap);
- for(int a=0;a<3;a++)host->input_float(a==0?"Origin X":a==1?"Origin Y":"Origin Z",&origin[a]);
- host->checkbox("Ceilings / sealed rooms",&ceiling);host->checkbox("Add lights",&lights);host->checkbox("Add player start",&player);
+static void tick(){
+ if(job.valid()&&job.wait_for(std::chrono::seconds(0))==std::future_status::ready){auto result=job.get();if(pendingKey!=key()){message="Document/settings changed during generation. Generate a fresh preview.";return;}if(!result.error.empty()){message=result.error;return;}previewKey=pendingKey;layout=std::move(result.result.cells);layoutKey=structure();preview=std::move(result.output.map);lines=std::move(result.output.lines);host->preview_lines(lines.data(),lines.size()/6);message="Ready: "+std::to_string(result.output.modules)+" modules / "+std::to_string(result.output.brushes)+" brushes; "+std::to_string(result.result.backtracks)+" backtracks, "+std::to_string(result.result.seconds)+" seconds. Apply when ready.";}
+ if(captureMode){auto bytes=read("plugin-levelgen-capture.map");if(bytes.empty()){if(std::chrono::steady_clock::now()-captureTime>std::chrono::seconds(6)){captureMode=0;message="Selection capture timed out.";}return;}int operation=captureMode;captureMode=0;try{std::istringstream in(bytes);std::string marker;rbgen::V lo,hi;if(!(in>>marker>>lo.x>>lo.y>>lo.z>>hi.x>>hi.y>>hi.z)||marker!="BOUNDS")throw std::runtime_error(bytes);if(operation==2){for(int a=0;a<3;a++){double step=a==2?height:cell;config.region.low[a]=std::clamp(int(std::floor((lo[a]-origin[a])/step)),0,config.size[a]-1);config.region.high[a]=std::clamp(int(std::ceil((hi[a]-origin[a])/step)),config.region.low[a]+1,config.size[a]);}message="Rebuild region set from the selected brushes.";}else{Block b;b.name="Captured block "+std::to_string(blocks.size()+1);b.source=bytes;for(int a=0;a<3;a++)b.size[a]=std::clamp(int(std::ceil((hi[a]-lo[a])/(a==2?height:cell))),1,4);blocks.push_back(b);selectedBlock=blocks.size()-1;message="Module captured without resizing. Set its six connector IDs and weight; then save the library.";}}catch(const std::exception& e){message=e.what();}}
+}
+static void capture(int mode){host->write_data("plugin-levelgen-capture.map","",0);captureMode=mode;captureTime=std::chrono::steady_clock::now();host->command("ftebroom_plugin_surfaces block\n");}
+static void bounds(Region& r){for(int a=0;a<3;a++){host->input_int(a==0?"Min X":a==1?"Min Y":"Min Z",&r.low[a]);host->input_int(a==0?"Max X (exclusive)":a==1?"Max Y (exclusive)":"Max Z (exclusive)",&r.high[a]);}}
+static void draw(){
+ host->text("Module-based WFC: matching sockets, weighted blocks, volume constraints, rotated and multi-cell modules. Preview first; Apply supports Undo.");
+ bool running=busy();if(running)host->disabled(1);
+ if(!preview.empty()&&previewKey!=key()){preview.clear();host->preview_lines(nullptr,0);message="Parameters/document changed. Generate a fresh preview before applying.";}
+ if(host->button("Generate preview"))generate(false);host->same_line();if(host->button("Rebuild region"))generate(true);host->same_line();bool cannotApply=preview.empty();if(cannotApply)host->disabled(1);if(host->button("Apply to map")){bool ok=replaceSelected?host->replace_selection(preview.data(),preview.size()):host->import_map(preview.data(),preview.size());message=ok?"Import queued. Undo reverses the complete operation.":"Cannot apply outside MAP editing.";if(ok){preview.clear();host->preview_lines(nullptr,0);}}if(cannotApply)host->disabled(0);
+ if(!preview.empty()&&host->button("Export MAP to plugin data")){message=host->write_data("plugin-levelgen-export.map",preview.data(),preview.size())?"Saved ftebroom/data/plugin-levelgen-export.map. Other mesh exports are available after Apply through the editor's Export tools.":"Cannot write the export.";}
+ host->checkbox("Replace current selection on Apply",&replaceSelected);if(replaceSelected)host->text("The currently selected objects will be replaced. Select the previous generated layout only. Undo restores it.");
+ host->input_int("Seed",&seed);for(int a=0;a<3;a++)host->input_int(a==0?"Grid X":a==1?"Grid Y":"Grid Z / floors",&config.size[a]);host->input_float("Cell width",&cell);host->input_float("Cell height",&height);host->input_float("Door width",&doorway);for(int a=0;a<3;a++)host->input_float(a==0?"Origin X":a==1?"Origin Y":"Origin Z",&origin[a]);
+ host->checkbox("Require connected room network",&connected);host->checkbox("Ceilings / sealed rooms",&ceilings);host->checkbox("Add lights",&lights);host->checkbox("Add player start",&player);
+ if(host->section("Block library and weights",1)){
+  auto list=names();host->combo("Module",&selectedBlock,list.c_str());selectedBlock=std::clamp(selectedBlock,0,int(blocks.size())-1);auto& b=blocks[selectedBlock];char moduleName[256]{};std::snprintf(moduleName,sizeof moduleName,"%s",b.name.c_str());if(host->input_text("Module name",moduleName,sizeof moduleName))b.name=moduleName;float weight=b.weight;if(host->input_float("Module weight (0 disables)",&weight))b.weight=weight;host->combo("Module group",&b.group,"Rooms\0Solid\0Empty\0");host->checkbox("Generate 90-degree rotations",&b.rotations);
+  for(int d=0;d<6;d++)host->input_int(d==0?"Socket +X":d==1?"Socket +Y":d==2?"Socket -X":d==3?"Socket -Y":d==4?"Socket +Z":"Socket -Z",&b.sockets[d]);
+  if(!b.source.empty())for(int a=0;a<3;a++)host->input_int(a==0?"Footprint X":a==1?"Footprint Y":"Footprint Z",&b.size[a]);
+  host->text("Equal connector IDs join. 0 is closed. Custom modules retain geometry size and UVs; make their openings match their sockets.");
+  if(host->button("Capture selected brushes as module"))capture(1);host->same_line();if(host->button("Remove module")&&blocks.size()>1){blocks.erase(blocks.begin()+selectedBlock);selectedBlock=0;}
+  for(int g=0;g<3;g++)host->input_float(g==0?"Room group weight":g==1?"Solid group weight":"Empty group weight",&groupWeights[g]);
+ }
+ if(host->section("Boundary constraints",0)){host->text("Socket required outside each grid face. 0 closes the boundary; -1 allows any external connector.");for(int d=0;d<6;d++)host->input_int(d==0?"Boundary +X":d==1?"Boundary +Y":d==2?"Boundary -X":d==3?"Boundary -Y":d==4?"Boundary +Z":"Boundary -Z",&config.boundary[d]);}
+ if(host->section("Volume constraints and pinned modules",0)){
+  if(host->button("Add volume constraint")&&config.constraints.size()<128){Region r;r.high=config.size;config.constraints.push_back(r);selectedConstraint=config.constraints.size()-1;}
+  if(!config.constraints.empty()){host->input_int("Constraint index",&selectedConstraint);selectedConstraint=std::clamp(selectedConstraint,0,int(config.constraints.size())-1);auto& r=config.constraints[selectedConstraint];bounds(r);int group=r.group+1;if(host->combo("Allowed group",&group,"Any group\0Rooms\0Solid\0Empty\0"))r.group=group-1;int block=r.block+1;auto list=names(true);if(host->combo("Allowed module",&block,list.c_str()))r.block=block-1;if(host->button("Remove constraint"))config.constraints.erase(config.constraints.begin()+selectedConstraint);}
+ }
+ if(host->section("Rebuild region",0)){host->text("Cells outside this box remain fixed in the previous preview. Max coordinates are exclusive. Generate a full layout first.");bounds(config.region);if(host->button("Use selected brush bounds as region"))capture(2);}
+ if(host->button("Save library / settings"))try{save();message="Saved plugin-levelgen-settings.txt in the editor's ftebroom/data directory.";}catch(const std::exception& e){message=e.what();}host->same_line();if(host->button("Load library / settings"))try{load();message="Saved library/settings loaded.";}catch(const std::exception& e){message=e.what();}
+ if(running)host->disabled(0);if(busy()){host->progress(progress,"Constraint propagation");if(host->button("Cancel")){cancelled=true;captureMode=0;}}
  if(!message.empty())host->text(message.c_str());
 }
-extern "C" RB_PLUGIN_EXPORT const RBPluginV1* ReyondBroomPluginInit(const RBHostV1* api){if(!api||api->api_version!=1||api->struct_size<sizeof(RBHostV1))return nullptr;host=api;static RBPluginV1 plugin{1,sizeof(RBPluginV1),"org.reyondbroom.levelgen",draw,nullptr,nullptr,nullptr};return &plugin;}
+static void shutdown(){cancelled=true;if(job.valid())job.wait();captureMode=0;host->preview_lines(nullptr,0);}
+extern "C" RB_PLUGIN_EXPORT const RBPluginV1* ReyondBroomPluginInit(const RBHostV1* api){if(!api||api->api_version!=1||api->struct_size<sizeof(RBHostV1))return nullptr;host=api;config.region.high=config.size;try{load();}catch(const std::exception& e){message=e.what();}static RBPluginV1 plugin{1,sizeof(RBPluginV1),"org.reyondbroom.levelgen",draw,tick,busy,shutdown};return &plugin;}

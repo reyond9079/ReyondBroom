@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <iomanip>
+#include "ftebroom_fgd_models.h"
 namespace ftebroom
 {
 struct EntityChoice
@@ -26,6 +28,7 @@ struct EntityDefinition
 {
   std::string name, description, model, modelKey;
   std::string modelSkin, modelFrame, modelScale;
+  std::vector<FgdModelRule> modelRules;
   bool brush = false, base = false, hasBounds = false, hasColor = false;
   std::array<float, 3> color{.65f, .8f, .4f}, mins{-8, -8, -8}, maxs{8, 8, 8};
   std::vector<std::string> bases;
@@ -107,13 +110,13 @@ inline std::vector<EntityToken> entityTokens(const std::string& s)
         throw std::runtime_error("Unclosed quoted string");
       i++;
     }
-    else if (std::string("()[]=:,+").find(s[i]) != std::string::npos)
+    else if (std::string("()[]{}=:,+").find(s[i]) != std::string::npos)
       t.text += s[i++];
     else
     {
       size_t start = i;
       while (i < s.size() && !std::isspace((unsigned char)s[i])
-             && std::string("()[]=:,+\"").find(s[i]) == std::string::npos)
+             && std::string("()[]{}=:,+\"").find(s[i]) == std::string::npos)
         i++;
       t.text = s.substr(start, i - start);
     }
@@ -145,7 +148,7 @@ class EntityFgdReader
   void expect(const char* s)
   {
     if (!accept(s))
-      throw std::runtime_error(std::string("Expected '") + s + "' in FGD");
+      throw std::runtime_error(std::string("Expected '") + s + "' in FGD at line "+std::to_string(pos<tokens.size()?tokens[pos].line:0)+" near '"+peek()+"'");
   }
   std::string scalar()
   {
@@ -154,20 +157,20 @@ class EntityFgdReader
       s += take();
     return s;
   }
-  std::string bracket(const char* open, const char* close)
+  std::string bracket(const char* open, const char* close,bool preserveQuotes=false)
   {
     expect(open);
     int depth = 1;
     std::string value;
     while (pos < tokens.size() && depth)
     {
-      auto t = take();
+      bool quoted=tokens[pos].quoted;auto t = take();
       if (t == open)
         depth++;
       if (t == close)
         depth--;
       if (depth)
-        value += (value.empty() ? "" : " ") + t;
+        {std::ostringstream text;if(preserveQuotes&&quoted)text<<std::quoted(t);else text<<t;value += (value.empty() ? "" : " ") + text.str();}
     }
     if (depth)
       throw std::runtime_error("Unclosed FGD block");
@@ -203,7 +206,7 @@ public:
         auto key = take();
         std::string value;
         if (peek() == "(")
-          value = bracket("(", ")");
+          value = bracket("(", ")",key=="model"||key=="studio");
         if (key == "base")
         {
           std::istringstream in(value);
@@ -242,12 +245,7 @@ public:
           }
         }
         if (key == "model" || key == "studio"){
-          d.model=value;
-          if(value.find('{')!=std::string::npos){
-            auto literal=[&](const char* field){auto at=value.find(field);if(at==value.npos)return std::string{};at=value.find(':',at);if(at==value.npos)return std::string{};at=value.find_first_not_of(" \t",at+1);if(at==value.npos)return std::string{};
-              if(value[at]=='\"'){auto end=value.find('\"',at+1);return end==value.npos?std::string{}:value.substr(at+1,end-at-1);}auto end=value.find_first_of(",} \t",at);return value.substr(at,end-at);};
-            d.model=literal("path");if(!d.model.empty()&&d.model[0]==':')d.model.erase(0,1);d.modelSkin=literal("skin");d.modelFrame=literal("frame");d.modelScale=literal("scale");
-          }
+          if(!value.empty())try{d.modelRules=FgdModels(value).read();}catch(const std::exception& e){throw std::runtime_error(std::string(e.what())+" near FGD line "+std::to_string(tokens[pos-1].line)+": "+value.substr(0,120));}
         }
         if (key == "skin")
           d.modelSkin = value;
@@ -269,7 +267,8 @@ public:
         p.key = take();
         p.label = p.key;
         if (peek() == "(")
-          p.type = bracket("(", ")");
+        p.type = bracket("(", ")");
+        std::transform(p.type.begin(),p.type.end(),p.type.begin(),[](unsigned char c){return char(std::tolower(c));});
         // Read optional readonly/report modifiers before the colon.
         while (peek() != "[" && peek() != "=" && peek() != ":" && peek() != "]"
                && pos < tokens.size() && tokens[pos].line == tokens[pos - 1].line)
@@ -301,6 +300,7 @@ public:
             c.label = scalar();
             if (accept(":"))
               c.enabled = take() != "0";
+            if (accept(":"))scalar(); // Per-choice help text (TrenchBroom FGD).
             if (c.enabled && p.type == "flags")
               try
               {
@@ -643,6 +643,7 @@ inline EntityDefinitions entityResolve(EntityDefinitions definitions)
       }
       if (d.model.empty())
         d.model = b.model;
+      if(d.modelRules.empty())d.modelRules=b.modelRules;
       if (d.modelSkin.empty())
         d.modelSkin = b.modelSkin;
       if (d.modelFrame.empty())
@@ -655,6 +656,8 @@ inline EntityDefinitions entityResolve(EntityDefinitions definitions)
     for (const auto& p : d.properties)
       properties[p.first] = p.second;
     d.properties = std::move(properties);
+    if(!d.modelRules.empty()){std::map<std::string,std::string> defaults;for(auto& p:d.properties)defaults[p.first]=p.second.value;
+      for(auto& rule:d.modelRules)if(fgdCondition(rule.condition,defaults)){d.model=fgdValue(rule.path,defaults);d.modelSkin=fgdValue(rule.skin,defaults);d.modelFrame=fgdValue(rule.frame,defaults);d.modelScale=fgdValue(rule.scale,defaults);if(!rule.path.empty()&&rule.path[0]=='$')d.modelKey=rule.path.substr(1);break;}}
     visiting.erase(name);
     done.insert(name);
     for (int a = 0; a < 3; a++)

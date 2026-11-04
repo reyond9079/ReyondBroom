@@ -1,3 +1,4 @@
+var vector autocvar_ftebroom_grid_color='1 1 1';
 // SPDX-License-Identifier: GPL-2.0-or-later
 var float autocvar_ftebroom_grid_rotation=0;
 vector fb_grid_rotate(vector point,float angle)

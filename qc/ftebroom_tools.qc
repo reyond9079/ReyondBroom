@@ -1,3 +1,4 @@
+int fb_plugin_root_escape();
 int fb_modal_handle_at(vector pixel,int view);
 void fb_array_clear();
 int fb_selection_target(int node);
@@ -165,6 +166,7 @@ float fb_tool_cancel()
 }
 void fb_tool_escape()
 {
+    if(fb_plugin_root_escape())return;
     if(cvar("ftebroom_terrain_edit")){fb_tool_deactivate();return;}
     if(fb_active) {fb_cancel();fb_owner=FB_OWNER_NONE;return;}
     if(cvar("ftebroom_tool")) {

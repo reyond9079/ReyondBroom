@@ -101,7 +101,7 @@ string fb_view_cache_signature(int type,vector mn,vector sz)
 {
     string key=sprintf("%i %v %v %v %v %g",type,mn,sz,vidsize,fb_view_centers[type],cvar("ca_brush_viewsize"));
     key=strcat(key,itos(fb_filter_epoch));
-    key=strcat(key,sprintf(" %g %g %g %i %i %i",cvar("ca_grid"),cvar("ftebroom_grid_visible"),cvar("ftebroom_grid_alpha"),fb_document_revision(),history,fb_selected_entity()),cvar_string("ftebroom_map_bounds"));
+    key=strcat(key,sprintf(" %g %g %g %i %i %i",cvar("ca_grid"),cvar("ftebroom_grid_visible"),cvar("ftebroom_grid_alpha"),fb_document_revision(),history,fb_selected_entity()),cvar_string("ftebroom_map_bounds"),cvar_string("ftebroom_grid_color"));
     for(int i=0;i<selectedbrushcount;i++) key=strcat(key,sprintf(" %i %i",selectedbrushes[i].model,selectedbrushes[i].id));
     key=strcat(key,sprintf(" %i %i %v %v %v %g %g",fb_visual_hover,fb_visual_spikes,autocvar_ftebroom_color_selected,autocvar_ftebroom_color_locked,autocvar_ftebroom_color_hover,autocvar_ftebroom_hover_highlight,autocvar_ftebroom_selection_spikes));
     for(int n=0;n<fb_node_count;n++) if(fb_nodes[n].flags) key=strcat(key,sprintf(" %i:%i",n,fb_nodes[n].flags));

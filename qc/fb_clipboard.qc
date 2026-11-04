@@ -208,6 +208,7 @@ float fb_clip_command()
     int importing=argv(0)=="ftebroom_import_file";
     if(argv(0)!="ftebroom_paste_file" && !importing) return FALSE;
     int original=stoi(argv(1));
+    int replaceSelected=importing&&stoi(argv(4));
     // Capture command coordinates before the MAP parser changes tokenized arguments.
     vector pixel=[cvar("ftebroom_mouse_x"),cvar("ftebroom_mouse_y"),0];
     if(importing) pixel=[stof(argv(2)),stof(argv(3)),0];
@@ -245,7 +246,8 @@ float fb_clip_command()
                 }
                 delta=fb_snap(bounds[0]+delta)-bounds[0];
             }
-            if(success) success=fb_clip_insert(delta);
+            if(success&&replaceSelected){fb_tx_begin("Replace selection with generated level");fb_delete_selection();success=fb_clip_insert(delta);if(success)fb_tx_commit();else fb_tx_cancel();}
+            else if(success) success=fb_clip_insert(delta);
         }
     }
     cvar_set("ftebroom_selection_status",success?(importing?"Map imported":"Clipboard pasted"):strcat(importing?"Import: ":"Paste: ",fb_map_error));

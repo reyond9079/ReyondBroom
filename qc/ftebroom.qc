@@ -8,6 +8,8 @@ int fb_transfer_begin(vector pixel,int rotate,int materialOnly);
 void fb_transfer_at(vector pixel,int allFaces);
 void fb_material_replace();
 void fb_material_drop(string material,vector pixel);
+void fb_plugin_root_cancel();
+int fb_plugin_root_pointer(string action,vector pixel,int view);
 void fb_texture_key(string mode,int direction,int speed);
 void fb_material_usage();
 void fb_entity_publish();
@@ -101,6 +103,7 @@ int fb_createbox(vector center, vector size)
 }
 void fb_cancel()
 {
+    fb_plugin_root_cancel();
     fb_spin_cancel_drag();
     fb_polygon_cancel_drag();
     fb_bend_cancel_drag();
@@ -597,11 +600,11 @@ void ftebroom_frame()
         float g=fb_grid_display_step([0,0,z],'0 0 1');
         for (int i=-32;i<=32;i++) {
             R_BeginPolygon("ftebroom/worldgrid");
-            R_PolygonVertex(fb_grid_world([i*g,-32*g,z]),'0 0','0.16 0.18 0.2',bound(0,cvar("ftebroom_grid_alpha"),1));
-            R_PolygonVertex(fb_grid_world([i*g,32*g,z]),'0 0','0.16 0.18 0.2',bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
+            R_PolygonVertex(fb_grid_world([i*g,-32*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1));
+            R_PolygonVertex(fb_grid_world([i*g,32*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
             R_BeginPolygon("ftebroom/worldgrid");
-            R_PolygonVertex(fb_grid_world([-32*g,i*g,z]),'0 0','0.16 0.18 0.2',bound(0,cvar("ftebroom_grid_alpha"),1));
-            R_PolygonVertex(fb_grid_world([32*g,i*g,z]),'0 0','0.16 0.18 0.2',bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
+            R_PolygonVertex(fb_grid_world([-32*g,i*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1));
+            R_PolygonVertex(fb_grid_world([32*g,i*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
         }
     }
     fb_tool_draw();
@@ -688,6 +691,7 @@ float() ftebroom_command =
     }
     if (argv(0)=="ftebroom_pointer") {
         vector pixel=[stof(argv(2)),stof(argv(3)),0]; float alt=stof(argv(4));
+        if(fb_plugin_root_pointer(argv(1),pixel,cvar("ca_brush_view")))return TRUE;
         if(cvar("ftebroom_terrain_edit")) {
             if(argv(1)=="down")cvar_set("ftebroom_terrain_paint","1");
             if(argv(1)=="up"||argv(1)=="cancel")cvar_set("ftebroom_terrain_paint","0");

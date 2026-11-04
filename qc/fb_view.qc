@@ -99,7 +99,7 @@ void fb_view_background()
             vector tangent=normalize(fb_view_right*(-nu)+fb_view_up*nr)*(right-left+top-bottom)*2;
             for(float level=ceil(low/spacing)*spacing;level<=high;level+=spacing) {
                 vector center=(fb_view_right*nr+fb_view_up*nu)*((level-depth)/den)+fb_view_normal*(lo*fb_view_normal);
-                drawline(1,project(center-tangent),project(center+tangent),'0.18 0.18 0.2',cvar("ftebroom_grid_alpha"),0);
+                drawline(1,project(center-tangent),project(center+tangent),[.18*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],cvar("ftebroom_grid_alpha"),0);
             }
         }
         drawresetcliparea();

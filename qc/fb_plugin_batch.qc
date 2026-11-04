@@ -36,12 +36,39 @@ int fb_plugin_selection_command()
     }
     fb_poly_free(&source);cvar_set("ftebroom_plugin_preflight",valid?"1":"-1");return TRUE;
 }
+int fb_plugin_root_pending,fb_plugin_root_consuming;
+void fb_plugin_root_result(string result){filestream file=fopen("plugin-root.txt",FILE_WRITE);if((float)file>=0){fputs(file,result);fclose(file);}}
+void fb_plugin_root_cancel(){if(fb_plugin_root_pending){fb_plugin_root_pending=FALSE;fb_plugin_root_result("CANCEL\n");}fb_plugin_root_consuming=FALSE;}
+int fb_plugin_root_escape(){if(!fb_plugin_root_pending&&!fb_plugin_root_consuming)return FALSE;fb_plugin_root_cancel();return TRUE;}
+int fb_plugin_root_pointer(string action,vector pixel,int view){
+ if(!fb_plugin_root_pending&&!fb_plugin_root_consuming)return FALSE;
+ if(action=="cancel"){fb_plugin_root_cancel();return TRUE;}
+ if(action=="up"){fb_plugin_root_consuming=FALSE;return TRUE;}
+ if(action=="down"||action=="dblclick"){
+  if(fb_pick_query(unproject(pixel),unproject(pixel+'0 0 8192'),pixel,0,FB_HIT_BRUSH|FB_HIT_PATCH,view!=0)){
+   vector p=fb_hits[0].point;fb_plugin_root_result(sprintf("POINT %.9g %.9g %.9g\n",p_x,p_y,p_z));fb_plugin_root_pending=FALSE;fb_plugin_root_consuming=TRUE;
+  }return TRUE;
+ }return TRUE;
+}
 int fb_plugin_surfaces_command(){
     if(argv(0)!="ftebroom_plugin_surfaces")return FALSE;
+    if(argv(1)=="root"){fb_plugin_root_pending=TRUE;fb_plugin_root_consuming=FALSE;fb_plugin_root_result("WAIT\n");return TRUE;}
+    if(argv(1)=="cancel_root"){fb_plugin_root_cancel();return TRUE;}
+    if(argv(1)=="block"){
+        filestream block=fopen("plugin-levelgen-capture.map",FILE_WRITE);if((float)block<0)return TRUE;
+        if(selectedbrushcount<1||selectedbrushcount>64||fb_faces_count()){fputs(block,"ERROR Select 1..64 whole brushes.\n");fclose(block);return TRUE;}
+        static vector bounds[2];vector low='131072 131072 131072',high='-131072 -131072 -131072';
+        for(int b=0;b<selectedbrushcount;b++){if(brush_getfacepoints(selectedbrushes[b].model,selectedbrushes[b].id,0,bounds,2)!=2)continue;for(int a=0;a<3;a++){low[a]=min(low[a],bounds[0][a]);high[a]=max(high[a],bounds[1][a]);}}
+        fputs(block,sprintf("BOUNDS %.9g %.9g %.9g %.9g %.9g %.9g\n",low_x,low_y,low_z,high_x,high_y,high_z));fputs(block,"{\n\"classname\" \"worldspawn\"\n");
+        for(int b=0;b<selectedbrushcount;b++)fb_clip_write_geometry(block,selectedbrushes[b].model,selectedbrushes[b].id);fputs(block,"}\n");fclose(block);return TRUE;
+    }
     fb_tool_refresh();fb_document_tick();int triangles=0,valid=selectedbrushcount>0&&selectedbrushcount<=512;
+    int onlyFaces=fb_faces_count()>0,faceSerial=0;
     filestream file=fopen("plugin-surfaces.txt",FILE_WRITE);
     if((float)file<0)valid=FALSE;
+    if(valid)fputs(file,onlyFaces?"MODE faces\n":"MODE surfaces\n");
     if(valid)for(int b=0;b<selectedbrushcount&&valid;b++){
+        if(onlyFaces&&selbrush_whole(&selectedbrushes[b]))continue;
         patchinfo_t info;int cpCount=patch_getcp(selectedbrushes[b].model,selectedbrushes[b].id,__NULL__,0,&info);
         if(cpCount>0){
             patchvert_t *cp=memalloc(cpCount*sizeof(patchvert_t));patch_getcp(selectedbrushes[b].model,selectedbrushes[b].id,cp,cpCount,&info);patchvert_t *mesh=fb_patch_preview_mesh(cp,&info);memfree(cp);
@@ -53,6 +80,8 @@ int fb_plugin_surfaces_command(){
         }
         fb_poly_t poly={0};valid=fb_poly_from_brush(selectedbrushes[b].model,selectedbrushes[b].id,&poly);
         if(valid)for(int f=0;f<poly.nf&&valid;f++){
+            if(onlyFaces)if(selbrush_whole(&selectedbrushes[b])||!selbrush_face(&selectedbrushes[b],f))continue;
+            fputs(file,sprintf("F %i\n",++faceSerial));
             fb_poly_face_t *face=&poly.faces[f];vector a=poly.vertices[poly.indices[face->start]];
             for(int j=1;j+1<face->count;j++){
                 if(++triangles>16384){valid=FALSE;break;}

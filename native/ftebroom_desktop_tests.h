@@ -9,6 +9,27 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode)=="fgd117check"){
+    expect(entityDefinitions.size()==346&&definitionError.empty(),"fgd117_actual_ad_loaded");
+    expect(entityDefinitions.at("monster_zombie").model=="progs/mon_zombie.mdl"&&entityDefinitions.at("monster_zombie").modelFrame=="0","fgd117_default_monster_variant");
+    expect(!modelResource(entityDefinitions.at("monster_zombie").model).empty(),"fgd117_monster_asset_resolved_from_ad");
+  }
+  if(std::string(mode)=="level117ready")expect(pluginPreviewLines.size()>100,"level117_background_wfc_preview_ready");
+  if(std::string(mode)=="level117export"){
+    frame();frame();auto point=pluginButtonPositions.at("Export MAP to plugin data");event(0,0,0,point.x,point.y,testW,testH);event(1,mouseKeys[0],0,point.x,point.y,testW,testH);frame();event(2,mouseKeys[0],0,point.x,point.y,testW,testH);frame();
+    expect(std::filesystem::is_regular_file(documentPath("data/plugin-levelgen-export.map")),"level117_map_export_written");
+  }
+  if(std::string(mode)=="level117replace"){auto bytes=q1Read(documentPath("maps/reyond-tutorial.map"));expect(pluginReplaceSelection(bytes.data(),bytes.size()),"level117_replace_selection_queued");}
+  if(std::string(mode)=="ivy117coverage"){
+    auto text=q1Read(documentPath("data/plugin-surfaces.txt"));expect(text.find("MODE faces")!=text.npos,"ivy117_selected_face_capture");
+    float lo=1e20f,hi=-1e20f;bool onFace=true;for(size_t i=0;i+2<pluginPreviewLines.size();i+=3){lo=std::min(lo,pluginPreviewLines[i+2]);hi=std::max(hi,pluginPreviewLines[i+2]);onFace&=pluginPreviewLines[i]>=-160.01f&&pluginPreviewLines[i]<=160.01f&&std::abs(pluginPreviewLines[i+1]+13.95f)<.1f;}
+    expect(pluginPreviewLines.size()>60&&lo<.01&&hi>287.99&&onFace,"ivy117_complete_selected_face_preview");
+  }
+  if(std::string(mode)=="ivy117pick"){
+    pluginsScan();for(auto& p:editorPlugins)if(p.id=="org.reyondbroom.ivy"){if(!p.enabled)pluginLoad(p);p.open=true;}frame();frame();
+    auto point=pluginButtonPositions.at("Pick start point");event(0,0,0,point.x,point.y,testW,testH);event(1,mouseKeys[0],0,point.x,point.y,testW,testH);frame();event(2,mouseKeys[0],0,point.x,point.y,testW,testH);frame();
+  }
+  if(std::string(mode)=="ivy117picked")expect(pluginPreviewLines.size()==18,"ivy117_start_point_marker_visible");
   if(std::string(mode)=="models116compile"){
     firstSetupStep=-1;setupNeeded=false;recentWindow=false;gamePreviewAfterBuild=false;runLoad();buildLoadSettings();buildGeometry=buildVis=buildLight=true;buildArguments[0]="";buildArguments[1]="-fast";buildArguments[2]="";buildBegin();runMissingDecision=1;expect(buildRunning,"models116_build_started");
   }
@@ -119,7 +140,7 @@ static void testDesktop(){
     const char* button=ivy?(apply?"Create ivy":"Grow"):(apply?"Apply to map":"Generate preview");auto point=pluginButtonPositions[button];
     expect(point.y>20&&point.y<780&&point.x>0,"features113_plugin_primary_button_visible");
     event(0,0,0,point.x,point.y,testW,testH);event(1,mouseKeys[0],0,point.x,point.y,testW,testH);event(0,0,0,point.x,point.y,testW,testH);event(2,mouseKeys[0],0,point.x,point.y,testW,testH);frame();
-    if(!ivy&&!apply)expect(!pluginPreviewLines.empty(),"features113_level_preview_lines");
+    if(!ivy&&!apply){bool solving=false;for(auto& p:editorPlugins)if(p.id=="org.reyondbroom.levelgen")solving=pluginBusy(p);expect(!pluginPreviewLines.empty()||solving,"features113_level_preview_lines");}
     if(apply)expect(pluginPreviewLines.empty(),"features113_plugin_apply_clears_preview");
   }
   if(std::string(mode)=="features113ivyready")expect(pluginPreviewLines.size()>60,"features113_ivy_growth_preview");

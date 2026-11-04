@@ -7,7 +7,7 @@
 #include <random>
 namespace ivy {
 using namespace rbgen;
-struct Triangle{V a,b,c,normal;};
+struct Triangle{V a,b,c,normal;int face=0;};
 inline V closest(V p,const Triangle& t){
  V ab=t.b-t.a,ac=t.c-t.a,ap=p-t.a;double d1=dot(ab,ap),d2=dot(ac,ap);if(d1<=0&&d2<=0)return t.a;
  V bp=p-t.b;double d3=dot(ab,bp),d4=dot(ac,bp);if(d3>=0&&d4<=d3)return t.b;
@@ -44,7 +44,7 @@ struct Growth{
  Settings settings;Surface surface;std::vector<Node> nodes;std::vector<Shoot> shoots;std::mt19937 rng;int iteration=0;
  double random(){return double(rng())/4294967296.;}
  V randomVector(){return unit({random()*2-1,random()*2-1,random()*2-1});}
- void start(V root,const Settings& s){settings=s;rng.seed(s.seed);iteration=0;nodes.clear();shoots.clear();V p,n;surface.nearest(root,p,n);nodes.push_back({p+n*s.offset,n,-1,0});shoots.push_back({0,0,{0,0,1},0,true});}
+ void start(V root,const Settings& s){settings=s;rng.seed(s.seed);iteration=0;nodes.clear();shoots.clear();V p,n;if(surface.nearest(root,p,n)>1e20)throw std::runtime_error("No target surface.");nodes.push_back({p+n*s.offset,n,-1,0});shoots.push_back({0,0,{0,0,s.up<0?-1.:1.},0,true});}
  bool advance(){
   if(iteration++>=settings.iterations||int(nodes.size())>=settings.maxNodes)return false;
   int alive=0,count=int(shoots.size());

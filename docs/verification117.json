@@ -1,0 +1,109 @@
+{
+  "release": "0.5.0-alpha.117",
+  "date": "2026-11-05",
+  "scenarios": {
+    "windows": {
+      "entities": {
+        "passed": 12,
+        "log_sha256": "f1c6220feee12690763d2ced6f89c47c9354329da357e90453048bd9eb80ef40"
+      },
+      "ivy": {
+        "passed": 7,
+        "log_sha256": "be26871ba08654ae719d52c76b24a07506b144cc5faedc389c929223a5d8425f"
+      },
+      "root": {
+        "passed": 5,
+        "log_sha256": "2307729bcc5483ca519f592fd66b35bc49ffd1f5ff79b4522f25c121de90eb0f"
+      },
+      "levelgen": {
+        "passed": 14,
+        "log_sha256": "0ea6b07dae9a3594f351454c287d760cfb0bcacfdfb59c65d58f9b920c728bc0"
+      },
+      "grid_restart": {
+        "passed": 1,
+        "log_sha256": "eaab5d7130185410775406a010e0f0fc61cb7dbc2d7379ac9fcd77e514acc3ee"
+      }
+    },
+    "linux-native": {
+      "entities": {
+        "passed": 12,
+        "log_sha256": "6d79b5d240b34c687c75c4b0823f5ec185f7f68edd3b4768fb55850180aa2234"
+      },
+      "ivy": {
+        "passed": 7,
+        "log_sha256": "7aa0766f11933187c8a4ebf832c75ae9c7c1b42c2309fea405bb92b4e545b277"
+      },
+      "root": {
+        "passed": 5,
+        "log_sha256": "a30494a56ebf17ec49d31c329a1025951adaa5b32efa3f329db6eaa3edd576ec"
+      },
+      "levelgen": {
+        "passed": 14,
+        "log_sha256": "9f3454b3de14469666749aa68c082e7636cf5a026ea3103908656fc4fc3b8d47"
+      },
+      "grid_restart": {
+        "passed": 1,
+        "log_sha256": "87fdf3415d174170ed587cd4fcd56510ff407e5bbc71d00c19b5355d940e6386"
+      }
+    },
+    "linux-sdl2": {
+      "entities": {
+        "passed": 12,
+        "log_sha256": "986b4be6631127d4765ed890960f7950fd6d874a4bb94e79a93786fd3b9baec9"
+      },
+      "ivy": {
+        "passed": 7,
+        "log_sha256": "c8165a7172fea0e60371db705d6d2eb406fd07e01d8a9822c0ea76a5131eb388"
+      },
+      "root": {
+        "passed": 5,
+        "log_sha256": "afc42c8180850745e60e3ac16aca58f03848e4896123da4d7883ed3aead9b77c"
+      },
+      "levelgen": {
+        "passed": 14,
+        "log_sha256": "f3ad8588529a30ce5895f51349478ed896137bac2606dd66c9b87a6c64a1b958"
+      },
+      "grid_restart": {
+        "passed": 1,
+        "log_sha256": "ba8381763c2c6a97839c1bad6964a20b0e8b8852fc23b6dcaac0209dae2eaff1"
+      }
+    }
+  },
+  "unit_checks": {
+    "windows": {
+      "ivy-unit": 568,
+      "fgd-unit": 11,
+      "wfc-unit": 12,
+      "plugin-ui-tests": 27
+    },
+    "linux": {
+      "ivy-unit": 568,
+      "fgd-unit": 11,
+      "wfc-unit": 12,
+      "plugin-ui-tests": 27
+    }
+  },
+  "ad_fgd_classes": 346,
+  "ad_resources_tested": "Arcane Dimensions 1.8 monster_zombie and monster_knight, with supplied 1.9 beta5.1 FGD",
+  "generated_level_compile": {
+    "format": "BSP29",
+    "stages": [
+      "QBSP",
+      "VIS",
+      "LIGHT"
+    ],
+    "success": true,
+    "sealed": true,
+    "bsp_bytes": 106488
+  },
+  "original_maps_mods_and_wads_unchanged": true,
+  "environments": {
+    "windows": "Windows / NVIDIA RTX 4060 Laptop GPU",
+    "linux": "WSL / Xvfb / software OpenGL, native and SDL2; not Arch/Wayland hardware testing"
+  },
+  "scope_limits": [
+    "Matching mod assets are required for FGD model paths.",
+    "Modular WFC supports native brush libraries, not Unity prefabs or a Unity/FBX exporter.",
+    "Ivy is procedural geometry, not a wind/rigid-body simulation."
+  ]
+}

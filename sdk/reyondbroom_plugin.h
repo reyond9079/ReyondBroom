@@ -53,6 +53,10 @@ typedef struct RBHostV1 {
     // Relative models/reyond-plugins/*.{mdl,md2,md3} path; returns 0 on error.
     // Textures resolve from the current material catalogue or generated assets.
     int (*write_model)(const char *path, const char *mesh, size_t length);
+    // Optional: plugin-owned settings/MAP snapshots under data/plugin-* only.
+    int (*write_data)(const char *path, const char *bytes, size_t length);
+    // Explicit replacement of the current selection in one Undo transaction.
+    int (*replace_selection)(const char *text, size_t length);
 } RBHostV1;
 typedef struct RBPluginV1 {
     uint32_t api_version, struct_size;

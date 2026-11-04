@@ -173,7 +173,6 @@ static void assetsReady()
 static void prepareEditorWall(){
   cvars->SetFloat("ftebroom_wall_override",0);
   cvars->SetFloat("ftebroom_studio_material",gameProfile==1&&gameWallMode==5);
-  cvars->SetFloat("ftebroom_clear_sky",gameProfile==1&&gameClearSky);
   if(gameProfile!=1||gameWallMode==0)return;
   std::string shader;
   if(gameWallMode==4)shader=gameWallReadFile(std::filesystem::u8path(gameWallFile));

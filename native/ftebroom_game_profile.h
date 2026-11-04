@@ -116,7 +116,6 @@ static void gameProfileFields(bool wizard=false)
     ImGui::InputText("Entity definitions (optional .def / .fgd)",gameDefinitions,sizeof gameDefinitions);
     ImGui::InputText("QuakeC source folder (optional)",gameQC,sizeof gameQC);
     ImGui::Checkbox("Open mod preview after Build",&gamePreviewAfterBuild);
-    ImGui::Checkbox("Clear sky background (editor)",&gameClearSky);
     ImGui::Combo("Editor defaultwall",&gameWallMode,"Current FTE default\0Map source folder\0Mod folder\0Neutral studio (Unity-like)\0Custom GLSL file\0Neutral studio (Unreal-like)\0");
     if(gameWallMode==4){ImGui::InputText("GLSL file",gameWallFile,sizeof gameWallFile);ImGui::SameLine();if(ImGui::Button("Browse...##wall"))gameWallBrowse();ImGui::TextWrapped("Use an FTE-compatible defaultwall program. Includes resolve through the mounted game resources. Apply/load resources to save and activate this path.");}
     ImGui::TextWrapped("Applied when loading resources. Only the editor material changes; mod files and build output are untouched. Studio materials are original editor lighting approximations; they preserve texture mapping.");

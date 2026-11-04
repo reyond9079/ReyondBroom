@@ -5,6 +5,8 @@ var float autocvar_ftebroom_show_brushes=1,autocvar_ftebroom_show_points=1,autoc
 var float autocvar_ftebroom_show_entity_names=1,autocvar_ftebroom_show_entity_bounds=1,autocvar_ftebroom_show_group_bounds=1,autocvar_ftebroom_show_brush_entity_bounds=1;
 var float autocvar_ftebroom_render_faces=0,autocvar_ftebroom_shade_faces=1,autocvar_ftebroom_show_edges=1;
 var float autocvar_ftebroom_tool_opacity=.35;
+var float autocvar_ftebroom_clear_sky=1;
+int fb_clear_sky_faces;
 float fb_surface_shade(vector normal){return autocvar_ftebroom_shade_faces?0.6+0.4*fabs(normal*normalize('0.3 -0.5 1')):1;}
 var float autocvar_ftebroom_bounds_visible=0;
 var float autocvar_ftebroom_hidden_tags=0,autocvar_ftebroom_entity_links=1;

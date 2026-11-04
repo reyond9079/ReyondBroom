@@ -18,12 +18,13 @@ textures and UVs. Masked/translucent surfaces retain their dedicated preview
 paths; the optional shader pack's procedural materials retain their programs.
 The retained GPU material path uses the same studio lighting as ordinary draws.
 
-Change these choices in **Edit > Preferences > Game profile** using
-**Editor defaultwall** and **Clear sky background (editor)**, then load the
-resources. The former default `Current FTE default` setting migrates once to
+Change the studio material in **Edit > Preferences > Game profile** using
+**Editor defaultwall**, then load resources. From alpha.114, the editor sky is
+global: use **Workspace > Appearance > Show sky background / Sky color**. The former default `Current FTE default` setting migrates once to
 the new studio style; explicit source/mod/custom-file choices are preserved.
 Choosing Current FTE default again is saved and respected on the next launch.
-Other game profiles retain their original background and material rendering.
+Other game profiles retain their original material rendering. All profiles
+default to the configurable editor sky background; see [sky settings](sky114.md).
 
 The editor sky is a background preview, not a new MAP brush. It works without
 downloading the optional shader pack. The pack also defaults to Clear weather
@@ -34,7 +35,7 @@ The original clear sky and studio lighting are MIT licensed; see
 `runtime/glsl/REYOND-STUDIO-LICENSE.txt`. The retained material wrappers remain
 GPL-2.0-or-later, matching their FTE source.
 
-## Verification
+## Original studio verification (alpha.112)
 
 Windows (OpenGL/NVIDIA) and Linux SDL2 (Mesa software renderer under WSL)
 rendered the studio scene successfully. The previous defaultwall=0 settings

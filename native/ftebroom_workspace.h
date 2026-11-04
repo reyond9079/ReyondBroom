@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 static bool uiLoaded = false, uiReset = false, uiLocked = false;
 static bool preferencesSave();
+static constexpr float uiDefaultSkyColor[3]={.16f,.39f,.70f};
+static float uiSkyColor[3]={.16f,.39f,.70f};
+static void uiApplySky(){
+  cvars->SetFloat("ftebroom_clear_sky",gameClearSky);
+  char color[128];std::snprintf(color,sizeof color,"%.9g %.9g %.9g",uiSkyColor[0],uiSkyColor[1],uiSkyColor[2]);
+  cvars->SetString("ftebroom_sky_color",color);
+}
+
 static bool uiHasScene = false;
 static ImVec2 uiScenePos, uiSceneSize;
 static ImGuiID uiDockId;
@@ -51,13 +59,14 @@ static void uiSaveAppearance()
   if (cvars->GetFloat("ftebroom_skip_setup"))
     return;
   std::ofstream out(documentPath("appearance.cfg"));
-  out << uiScaleChoice << ' ' << uiLocked << ' ' << uiTheme << ' ' << uiLanguage << ' ' << uiCursorPercent << '\n';
+  out << uiScaleChoice << ' ' << uiLocked << ' ' << uiTheme << ' ' << uiLanguage << ' ' << uiCursorPercent << " 1 " << gameClearSky << ' ' << uiSkyColor[0] << ' ' << uiSkyColor[1] << ' ' << uiSkyColor[2] << '\n';
 }
 static void uiLoad()
 {
   if (uiLoaded)
     return;
   uiLoaded = true;
+  gameProfileLoad(); // Migrate the former custom-profile sky preference once.
   if (!cvars->GetFloat("ftebroom_skip_setup"))
   {
     int scale = 0, locked = 0;
@@ -70,12 +79,18 @@ static void uiLoad()
       int language=0;if(appearance>>language)uiLanguage=std::clamp(language,0,6);
       int cursor=uiDefaultCursorPercent;
       uiCursorPercent=(appearance>>cursor)?std::clamp(cursor,50,250):uiDefaultCursorPercent;
+      int skyVersion=0,skyEnabled=1;float color[3];
+      if((appearance>>skyVersion>>skyEnabled>>color[0]>>color[1]>>color[2])&&skyVersion==1&&(skyEnabled==0||skyEnabled==1)){
+        bool valid=true;for(float value:color)valid&=std::isfinite(value);
+        if(valid){gameClearSky=skyEnabled!=0;for(int a=0;a<3;a++)uiSkyColor[a]=std::clamp(color[a],0.f,1.f);}
+      }
     }
     std::ifstream layout(documentPath("workspace.ini"), std::ios::binary);
     std::string data((std::istreambuf_iterator<char>(layout)), {});
     if (!data.empty() && data.size() <= 1024 * 1024)
       ImGui::LoadIniSettingsFromMemory(data.data(), data.size());
   }
+  uiApplySky();
 }
 static void uiSaveLayout()
 {
@@ -189,6 +204,14 @@ static void uiPreferences()
   if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
   if(ImGui::SliderFloat("Coordinate label size",&coordinateSize,8,40,"%.0f px",ImGuiSliderFlags_AlwaysClamp))cvars->SetFloat("ftebroom_coordinate_size",std::round(coordinateSize));
   if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
+  ImGui::SeparatorText("Viewport sky background");
+  if(ImGui::Checkbox("Show sky background",&gameClearSky)){uiApplySky();uiSaveAppearance();}
+  ImGui::BeginDisabled(!gameClearSky);
+  if(ImGui::ColorEdit3("Sky color",uiSkyColor,ImGuiColorEditFlags_NoInputs)){uiApplySky();uiSaveAppearance();}
+  ImGui::SameLine();if(ImGui::Button("Reset sky color")){std::copy(std::begin(uiDefaultSkyColor),std::end(uiDefaultSkyColor),uiSkyColor);uiApplySky();uiSaveAppearance();}
+  ImGui::EndDisabled();
+  ImGui::TextWrapped("Applies to the 3D editor background in every game profile. Game sky materials and mod preview keep their own rendering.");
+  ImGui::Separator();
   if (
     ImGui::Combo(
       "UI / font scale",

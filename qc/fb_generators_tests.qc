@@ -68,6 +68,9 @@ void fb_fullbench_tick()
 int fb_generators_testcommand()
 {
     if(argv(0)!="ftebroom_test_generators"||!cvar("ftebroom_skip_setup"))return FALSE;
+    if(argv(1)=="sky114on"||argv(1)=="sky114off"){
+        fb_transform_expect(fb_clear_sky_faces==(argv(1)=="sky114on"?6:0),"sky114_actual_background_draw");return TRUE;
+    }
     if(argv(1)=="features113sample"){
         fb_render_faces_prepare();print(sprintf("SAMPLE_PROFILE %g pack=%g clear=%g native=%g\n",cvar("ftebroom_game_profile"),cvar("ftebroom_shader_pack_enabled"),cvar("ftebroom_clear_sky"),cvar("ftebroom_native_faces_drawn")));
         for(int i113=0;i113<fb_render_face_count;i113++){fb_render_face_t *f113=&fb_render_faces[i113];if(strstrofs(f113->shader,"reyondpack/",0)>=0)print(sprintf("SAMPLE_FACE %s enabled=%i alpha=%g node=%i normal=%v\n",f113->shader,f113->enabled,f113->alpha,f113->node,f113->normal));}

@@ -9,6 +9,25 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode)=="sky114profile"){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;frame();char arg[32]{};commands->Argv(2,arg,sizeof arg);gameProfile=std::clamp(std::atoi(arg),0,4);
+    cvars->SetFloat("ftebroom_game_profile",gameProfile);prepareEditorWall();
+    expect(cvars->GetFloat("ftebroom_clear_sky")==1,"sky114_sky_enabled_in_profile");
+    if(gameProfile!=1)expect(cvars->GetFloat("ftebroom_studio_material")==0&&cvars->GetFloat("ftebroom_wall_override")==0,"sky114_other_profiles_keep_materials");
+  }
+  if(std::string(mode)=="sky114red"||std::string(mode)=="sky114off"){
+    frame();bool red=std::string(mode)=="sky114red";gameClearSky=red;
+    uiSkyColor[0]=.65f;uiSkyColor[1]=.12f;uiSkyColor[2]=.08f;uiApplySky();
+    float previous=cvars->GetFloat("ftebroom_skip_setup");cvars->SetFloat("ftebroom_skip_setup",0);uiSaveAppearance();cvars->SetFloat("ftebroom_skip_setup",previous);
+    expect(cvars->GetFloat("ftebroom_clear_sky")==float(red),"sky114_live_toggle");
+    for(int profile=0;profile<5;profile++){gameProfile=profile;prepareEditorWall();expect(cvars->GetFloat("ftebroom_clear_sky")==float(red),"sky114_resource_reload_keeps_choice");}
+    gameProfile=0;cvars->SetFloat("ftebroom_game_profile",0);
+  }
+  if(std::string(mode)=="sky114reload"){
+    frame();expect(!gameClearSky&&cvars->GetFloat("ftebroom_clear_sky")==0,"sky114_disabled_survives_restart");
+    expect(std::abs(uiSkyColor[0]-.65f)<.001f&&std::abs(uiSkyColor[1]-.12f)<.001f&&std::abs(uiSkyColor[2]-.08f)<.001f,"sky114_color_survives_restart");
+    preferencesRequest=true;preferencesAppearanceRequest=true;frame();frame();
+  }
   if(std::string(mode)=="features113ui"){
     recentWindow=false;setupNeeded=false;firstSetupStep=-1;uiTheme=5;cvars->SetFloat("ftebroom_label_size",26);cvars->SetFloat("ftebroom_coordinate_size",16);pluginsScan();
     expect(std::count_if(editorPlugins.begin(),editorPlugins.end(),[](const auto& p){return p.api!=nullptr;})==3,"features113_bundled_plugins_loaded");

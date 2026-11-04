@@ -10,7 +10,7 @@ static const char* preferenceVariables[] = {
   "ftebroom_look_speed","ftebroom_pan_speed","ftebroom_move_speed","ftebroom_fly_speed",
   "ftebroom_fov","ftebroom_invert_horizontal","ftebroom_invert_vertical",
   "ftebroom_move_to_cursor","ftebroom_alt_move","ftebroom_grid_alpha",
-  "ftebroom_grid_color","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
+  "ftebroom_grid_color","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
   "ftebroom_show_entity_names","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
   "ftebroom_texture_lock","ftebroom_uv_lock","ftebroom_auto_integer_snap","ftebroom_sky_overlays","ftebroom_bounds_visible",

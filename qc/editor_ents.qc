@@ -1,4 +1,6 @@
 static int selectedent;
+var vector autocvar_ftebroom_color_entity_bounds='0.65 0.8 0.4';
+var float autocvar_ftebroom_entity_bounds_class_colors=1;
 int *fb_selected_entities;
 int fb_selected_entity_count,fb_open_group;
 int fb_selected_entity() {if(fb_selected_entity_count>0) return fb_selected_entities[0];return -1;}
@@ -178,18 +180,18 @@ void fb_entity_draw_box(int index,vector colour,int solid,int wire,string shader
     if(wire)addtrisoup_simple(shader,3|DRAWFLAG_LINES,item->bboxverts,bbox_line_idxs,bbox_line_idxs.length);
 }
 void fb_entity_native_color(int index,vector color){if(index>=0 && index<numents)editents[index].rendercolour=color;}
-vector fb_entity_color(int index) {if(index>=0 && index<numents)return editents[index].colourmod;return '0.3 0.8 0.4';}
+vector fb_entity_color(int index) {if(!autocvar_ftebroom_entity_bounds_class_colors)return autocvar_ftebroom_color_entity_bounds;if(index>=0 && index<numents)return editents[index].colourmod;return '0.3 0.8 0.4';}
 void fb_entity_draw_model(int index)
 {
     if(index<0 || index>=numents)return;
-    if(editents[index].fields["classname"]=="light"){
+    if(editents[index].fields["classname"]=="light"&&!editents[index].modelindex){
         static int cameraValid;static vector savedEye,savedAngles,savedFov,bulbForward,bulbRight,bulbUp;static float bulbTanX,bulbTanY;
         vector bulbEye=getproperty(VF_ORIGIN),cameraAngles=getproperty(VF_ANGLES),bulbFov=getproperty(VF_FOV),center=editents[index].org;
         if(!cameraValid||savedEye!=bulbEye||savedAngles!=cameraAngles||savedFov!=bulbFov){cameraValid=TRUE;savedEye=bulbEye;savedAngles=cameraAngles;savedFov=bulbFov;makevectors(cameraAngles);bulbForward=v_forward;bulbRight=v_right;bulbUp=v_up;bulbTanX=tan(bulbFov_x*M_PI/360);bulbTanY=tan(bulbFov_y*M_PI/360);}
         vector difference=center-bulbEye;float depth=difference*bulbForward;if(depth< -20||fabs(difference*bulbRight)>max(0,depth)*bulbTanX+24||fabs(difference*bulbUp)>max(0,depth)*bulbTanY+24)return;
         shaderforname("ftebroom/light-icon","{\ncull none\n{\nmap icons/light-bulb.tga\nblendfunc blend\nrgbgen vertex\nalphagen vertex\ndepthwrite\nalphafunc GE128\n}\n}");
         static trisoup_simple_vert_t bulb[4];static int bulbIndices[6]={0,1,2,0,2,3};
-        for(int i=0;i<4;i++){float x=(i==1||i==2)?1:-1,y=i>=2?1:-1;vector position=center+bulbRight*x*11+bulbUp*y*14;for(int axis=0;axis<3;axis++)bulb[i].xyz[axis]=position[axis];bulb[i].st=(vec2){(x+1)*.5,(1-y)*.5};bulb[i].rgba=(vec4){1,1,1,1};}
+        for(int i=0;i<4;i++){float x=(i==1||i==2)?1:-1,y=i>=2?1:-1;vector position=center+bulbRight*x*12+bulbUp*y*12;for(int axis=0;axis<3;axis++)bulb[i].xyz[axis]=position[axis];bulb[i].st=(vec2){(x+1)*.5,(1-y)*.5};bulb[i].rgba=(vec4){1,1,1,1};}
         addtrisoup_simple("ftebroom/light-icon",3,bulb,bulbIndices,6);return;
     }
     entedit_t *item=&editents[index];if(!item->modelindex || item->isbsp)return;

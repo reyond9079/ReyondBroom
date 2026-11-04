@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ftebroom_md3.h"
 #include "ftebroom_legacy_models.h"
+#include "ftebroom_sprite.h"
 struct EntityPreviewPart {qhandle_t image=0;std::vector<std::array<ftebroom::MdlVertex,3>> triangles;};
-struct EntityPreview {qhandle_t image=0;std::vector<EntityPreviewPart> parts;std::vector<std::pair<size_t,size_t>> order;};
+struct EntityPreview {qhandle_t image=0;int spriteWidth=0,spriteHeight=0;std::vector<EntityPreviewPart> parts;std::vector<std::pair<size_t,size_t>> order;};
 static std::map<std::string,EntityPreview> entityPreviews;
 static void clearEntityPreviews(){for(auto& p:entityPreviews)for(auto& part:p.second.parts)if(part.image)draw->UnloadImage(part.image);entityPreviews.clear();}
 static std::string modelResource(const std::string& path){if(path=="gfx/palette.lmp")return q1Palette();size_t length=0;auto raw=(char*)files->LoadFile(path.c_str(),&length);if(!raw)return {};std::string result(raw,length);core->Free(raw);return result;}
@@ -14,12 +15,18 @@ static qhandle_t modelImage(std::string path){
 static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,float size){
  if(def.brush||def.model.empty()||def.model.find_first_of("{}()\"'")!=std::string::npos)return false;
  if(!ImGui::IsRectVisible(tile,{tile.x+size,tile.y+size}))return true;
- auto key=def.model+":"+def.modelSkin;auto it=entityPreviews.find(key);
+ auto key=def.model+":"+def.modelSkin+(def.modelFrame.empty()?"":":"+def.modelFrame);auto it=entityPreviews.find(key);
  if(it==entityPreviews.end()){
   EntityPreview preview;
   try {
    auto bytes=modelResource(def.model);if(bytes.empty())throw std::runtime_error("Missing model");
-   if(bytes.substr(0,4)=="IDST"||bytes.substr(0,4)=="IDP2"){
+   if(bytes.substr(0,4)=="IDSP"||bytes.substr(0,4)=="IDS2"){
+    auto sprite=ftebroom::readSprite(bytes,bytes.substr(0,4)=="IDSP"&&ftebroom::quake1::word(bytes,4)==1?modelResource("gfx/palette.lmp"):std::string{},std::max(0,std::atoi(def.modelFrame.c_str())));
+    qhandle_t image=0;if(!sprite.image.empty())image=modelImage(sprite.image);
+    else{auto name="ftebroom/sprite-"+std::to_string(entityDefinitionEpoch)+"-"+std::to_string(std::hash<std::string>{}(key))+".tga";draw->LoadImageData(name.c_str(),"image/tga",sprite.tga.data(),sprite.tga.size());
+     if(sprite.additive){std::string shader="{\n{\nmap "+name+"\nblendfunc add\nrgbgen vertex\nalphagen vertex\n}\n}";image=draw->LoadImageShader((name+"-additive").c_str(),shader.c_str());}else image=draw->LoadImage(name.c_str());}
+    preview.spriteWidth=sprite.width;preview.spriteHeight=sprite.height;preview.parts.push_back({image,{}});
+   }else if(bytes.substr(0,4)=="IDST"||bytes.substr(0,4)=="IDP2"){
     std::string companion;
     if(bytes.substr(0,4)=="IDST"&&bytes.size()>=244&&!ftebroom::quake1::word(bytes,180)){
       auto stem=def.model.substr(0,def.model.find_last_of('.'));companion=modelResource(stem+"t.mdl");if(companion.empty())companion=modelResource(stem+"T.mdl");}
@@ -51,6 +58,7 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
   it=entityPreviews.emplace(key,std::move(preview)).first;
  }
  auto& p=it->second;if(!p.image)return false;auto list=ImGui::GetWindowDrawList();list->PushClipRect(tile,{tile.x+size,tile.y+size},true);
+ if(p.spriteWidth>0&&p.spriteHeight>0){float scale=size*.88f/std::max(p.spriteWidth,p.spriteHeight);ImVec2 low{tile.x+(size-p.spriteWidth*scale)*.5f,tile.y+(size-p.spriteHeight*scale)*.5f};list->AddImage((ImTextureID)p.image,low,{low.x+p.spriteWidth*scale,low.y+p.spriteHeight*scale});list->PopClipRect();return true;}
  qhandle_t active=0;
  for(auto entry:p.order){auto& part=p.parts[entry.first];if(!part.image)continue;if(active!=part.image){if(active)list->PopTextureID();active=part.image;list->PushTextureID((ImTextureID)active);}auto tri=part.triangles[entry.second];
   float area=(tri[1].point[0]-tri[0].point[0])*(tri[2].point[1]-tri[0].point[1])-(tri[1].point[1]-tri[0].point[1])*(tri[2].point[0]-tri[0].point[0]);

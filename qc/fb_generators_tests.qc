@@ -70,6 +70,18 @@ int fb_test_replace117_count,fb_test_replace117_history;
 int fb_generators_testcommand()
 {
     if(argv(0)!="ftebroom_test_generators"||!cvar("ftebroom_skip_setup"))return FALSE;
+    if(argv(1)=="sprites118"){
+        fb_selection_clear();fb_entity_create("test118_sprite",FALSE,'-48 0 48');int sprite118=fb_selected_entity();editor_ents_reload();
+        fb_transform_expect(fb_entity_model_ready(sprite118)&&fb_entity_model_name(sprite118)=="progs/s_bubble_blue1.spr","sprites118_pak_sprite_in_viewport");
+        fb_entity_create("test118_rgba",FALSE,'48 0 48');int rgba118=fb_selected_entity();editor_ents_reload();
+        fb_transform_expect(fb_entity_model_ready(rgba118)&&fb_entity_model_name(rgba118)=="progs/qa118.spr","sprites118_rgba_sprite_in_viewport");
+        fb_entity_create("light",FALSE,'0 -24 82');fb_transform_expect(fb_entity_has_model(fb_selected_entity()),"sprites118_light_icon_visible");return TRUE;
+    }
+    if(argv(1)=="sprites118colors"){
+        int id118=fb_selected_entity();vector class118=fb_entity_color(id118);cvar_set("ftebroom_color_entity_bounds","0.2 0.8 0.9");cvar_set("ftebroom_entity_bounds_class_colors","0");fb_point_render_prepare();
+        fb_transform_expect(vlen(fb_entity_color(id118)-'0.2 0.8 0.9')<.001,"sprites118_custom_entity_bounds_color");cvar_set("ftebroom_entity_bounds_class_colors","1");
+        fb_transform_expect(fb_entity_color(id118)==class118,"sprites118_restore_entity_class_colors");cvar_set("ftebroom_entity_bounds_class_colors","0");fb_selection_clear();return TRUE;
+    }
     if(argv(1)=="sky114on"||argv(1)=="sky114off"){
         fb_transform_expect(fb_clear_sky_faces==(argv(1)=="sky114on"?6:0),"sky114_actual_background_draw");return TRUE;
     }

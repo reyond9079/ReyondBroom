@@ -1,5 +1,7 @@
 # ReyondBroom FTE-native map editor
 
+**Alpha 118:** FGD sprite icons in the Entity Browser and viewport; clearer light markers; entity-bound color controls; RGB 170 grid default; corrected island-water reflections. [Sprite guide](docs/sprites118.md).
+
 **Alpha 117:** connected, muted ivy with point roots and face coverage; Arcane Dimensions FGD models; light-bulb viewport icons; modular WFC level generation; configurable grid color. [Guide and checks](docs/fixes117.md) · [Modular generation](docs/modular-levelgen117.md).
 
 **Alpha 116:** ivy remains visible in compiled BSP and LibreQuake mod preview; generated models and skins are staged with the build. Recompile existing maps to update their BSP entity list. [Fix details and checks](docs/fixes116.md).
@@ -17,13 +19,13 @@
 Automatic Blender download: [English](docs/alpha62.md).
 Model import, texture transfer and skin preview: [guide](docs/model-import64.md). Tools adapt to horizontal and vertical panels.
 
-[**Illustrated user manual**](docs/manual.md) · [**Linux x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.117/ReyondBroom-0.5.0-alpha.117-Linux-x64.tar.gz) · [**Linux SDL2 x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.117/ReyondBroom-0.5.0-alpha.117-Linux-SDL2-x64.tar.gz) · [Linux requirements](docs/linux.md)
+[**Illustrated user manual**](docs/manual.md) · [**Linux x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.118/ReyondBroom-0.5.0-alpha.118-Linux-x64.tar.gz) · [**Linux SDL2 x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.118/ReyondBroom-0.5.0-alpha.118-Linux-SDL2-x64.tar.gz) · [Linux requirements](docs/linux.md)
 
 [Quake 1 / LibreQuake / PAK / entity models](docs/alpha29.md)
 
 [FTE Custom game — game profile](docs/when-the-sky-went-dark.md)
 
-[**Download Windows x64 - 0.5.0-alpha.117**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.117/ReyondBroom-0.5.0-alpha.117-Windows-x64.zip)
+[**Download Windows x64 - 0.5.0-alpha.118**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.118/ReyondBroom-0.5.0-alpha.118-Windows-x64.zip)
 
 An independent map editor built on FTE Quake, csaddon and Dear ImGui. Menus and tools surround a live engine viewport, with a persistent inspector and one to four perspective/orthographic panes. Profiles support Quake 1, Quake II, Quake III Arena, Half-Life and FTE Custom game. Quake 1 supports standard and Valve 220 MAP; Quake 3 retains its shaders and patches.
 

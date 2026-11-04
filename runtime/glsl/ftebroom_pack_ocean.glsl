@@ -37,10 +37,10 @@
 !!cvarf rsp_wave_length=180
 !!cvarf rsp_water_alpha=0.8
 #include "sys/defs.h"
-varying vec3 waterPosition;
-#include "glsl/reyondpack/waves.glsl"
+varying vec3 waterPosition;varying vec4 waterClip;
+#include "glsl/ftebroom_pack_waves.glsl"
 #ifdef VERTEX_SHADER
-void main(){waterPosition=v_position;gl_Position=ftetransform();}
+void main(){waterPosition=v_position;waterClip=ftetransform();gl_Position=waterClip;}
 #endif
 #ifdef FRAGMENT_SHADER
 #include "glsl/reyondpack/reyond_atmosphere_shared.glsl"
@@ -48,16 +48,9 @@ uniform float cvar_rsp_water_alpha;
 // Editable MAP meshes have no BSP reflection portal. Reflect the procedural sky;
 // normal alpha blending supplies the visible geometry beneath the surface.
 void main(){
- vec3 wave=vec3(0.);
- for(int band=0;band<6;band++){
-  float b=float(band),heading=.42+b*1.91;
-  vec2 direction=vec2(cos(heading),sin(heading));
-  float k=6.2831853/max(cvar_rsp_wave_length,8.)*pow(1.79,b);
-  float footprint=length(vec2(dot(dFdx(waterPosition.xy),direction),dot(dFdy(waterPosition.xy),direction)))*k;
-  float amplitude=cvar_rsp_wave_height*pow(.48,b)*(1.-smoothstep(.35,1.5,footprint));
-  float phase=dot(waterPosition.xy,direction)*k-e_time*sqrt(800.*k)*cvar_rsp_wave_speed+b*2.37;
-  wave.x+=amplitude*sin(phase);wave.yz+=amplitude*k*cos(phase)*direction;
- }
+ vec2 ndc=waterClip.xy/waterClip.w;
+ float angularPixel=max(abs(dFdx(ndc.x))/max(abs(m_projection[0][0]),.001),abs(dFdy(ndc.y))/max(abs(m_projection[1][1]),.001));
+ vec3 wave=RSPWaveFiltered(waterPosition.xy,e_eyepos-waterPosition,e_time,angularPixel);
  vec3 normal=normalize(vec3(-wave.yz,1.)),view=normalize(e_eyepos-waterPosition);
  if(view.z<0.)normal=-normal;
  float fresnel=.025+.975*pow(1.-abs(dot(view,normal)),5.);

@@ -76,6 +76,7 @@ void fb_container_draw(int labels)
         if(labels){vector top=(bounds[0]+bounds[1])*0.5;top_z=bounds[1][2]+12;float labelAlpha=fb_label_alpha(top,fb_selection_selected(n),ortho);if(labelAlpha<=0)continue;if(!ortho && (top-camera)*forward<=0)continue;vector pixel=project(top);pixel_z=0;if(pixel_x<mn_x||pixel_y<mn_y||pixel_x>=mn_x+size_x||pixel_y>=mn_y+size_y)continue;if(!ortho && !fb_label_visible(camera,top,n))continue;fb_label_draw(pixel,fb_nodes[n].name,fb_selection_selected(n),group,labelAlpha);}
         else {
             vector color='0.2 0.45 1';if(group && fb_nodes[n].fields["_tb_linked_group_id"]!="")color='0.65 0.35 1';
+            if(!group&&!autocvar_ftebroom_entity_bounds_class_colors)color=autocvar_ftebroom_color_entity_bounds;
             fb_container_bounds_t *box=&fb_container_cache[n];
             if(box->color!=color){box->color=color;for(int v=0;v<8;v++){
                 for(int a=0;a<3;a++)box->vertices[v].xyz[a]=(v&(1i<<a))?bounds[1][a]:bounds[0][a];

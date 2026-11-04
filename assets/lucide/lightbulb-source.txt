@@ -1,0 +1,4 @@
+Lucide lightbulb icon
+https://github.com/lucide-icons/lucide/blob/91a1359b5ea235f620ba3a9682015ab8d6ada3af/icons/lightbulb.svg
+License: ISC (see LICENSE).
+Runtime rendering: warm outline with a dark contrast keyline, supersampled.

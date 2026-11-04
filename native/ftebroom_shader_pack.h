@@ -59,7 +59,11 @@ static void shaderPackCopy(const std::filesystem::path& destination,bool exporti
   auto target=destination/std::filesystem::u8path(name);
   if(name=="scripts/reyond-pack.shader"&&!exporting)target=destination/"scripts/reyond-pack-active.shader";
   if(exporting&&(name=="LICENSE.txt"||name=="README.md"||name=="PROVENANCE.md"))target=destination/"reyond-shader-pack"/name;
-  std::filesystem::create_directories(target.parent_path());std::filesystem::copy_file(shaderPackRoot()/"content"/name,target,std::filesystem::copy_options::overwrite_existing);any=true;
+  auto source=shaderPackRoot()/"content"/name;
+  // Ship portal-coordinate fixes for already-downloaded 1.0.0 packs as well.
+  if(name=="glsl/reyondpack/water.glsl"&&std::filesystem::is_regular_file(documentPath("glsl/ftebroom_pack_water.glsl")))source=documentPath("glsl/ftebroom_pack_water.glsl");
+  if(name=="glsl/reyondpack/waves.glsl"&&std::filesystem::is_regular_file(documentPath("glsl/ftebroom_pack_waves.glsl")))source=documentPath("glsl/ftebroom_pack_waves.glsl");
+  std::filesystem::create_directories(target.parent_path());if(source!=target)std::filesystem::copy_file(source,target,std::filesystem::copy_options::overwrite_existing);any=true;
  }
  if(!any)throw std::runtime_error("The shader pack is incomplete. Download it again.");
  if(exporting){std::ofstream config(destination/"reyond-pack.cfg");for(auto& p:shaderPackSettings)config<<"set "<<p.key<<' '<<cvars->GetFloat(p.key)<<'\n';
@@ -68,6 +72,7 @@ static void shaderPackCopy(const std::filesystem::path& destination,bool exporti
 }
 static void shaderPackActivate(bool reload){
  if(gameProfile!=1||!shaderPackReady())return;
+ cvars->SetFloat("ftebroom_game_profile",gameProfile);
  shaderPackLoad();shaderPackCopy(documentPath("scripts/reyond-pack-active.shader").parent_path().parent_path(),false);
  cvars->SetFloat("ftebroom_shader_pack_enabled",1);
  if(reload)command("fs_restart\nftebroom_assets_ready\n");

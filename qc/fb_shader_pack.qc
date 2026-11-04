@@ -88,6 +88,9 @@ void fb_editor_clear_sky(){
  // place a second editor backdrop in front of that shell or its water pass.
  static int skyEpoch=-1,hasPackSky;
  if(skyEpoch!=fb_face_upload_epoch){skyEpoch=fb_face_upload_epoch;hasPackSky=FALSE;for(int f=0;f<fb_render_face_count;f++)if(strstrofs(fb_render_faces[f].shader,"ftebroom/pack-sky#",0)==0){hasPackSky=TRUE;break;}}
+ // With native FTE wall shading, opaque sky faces are absent from the overlay
+ // cache. Reuse the existing incremental material counts instead of rescanning.
+ if(!hasPackSky)if(fb_material_counts)if((int)fb_material_counts["reyondpack/sky"]>0)hasPackSky=TRUE;
  if(hasPackSky&&cvar("ftebroom_game_profile")==1&&cvar("ftebroom_shader_pack_enabled"))return;
  string sky=fb_editor_sky_material();
  vector center=getproperty(VF_ORIGIN);

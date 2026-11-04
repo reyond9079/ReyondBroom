@@ -1,0 +1,108 @@
+{
+  "release": "0.5.0-alpha.118",
+  "date": "2026-11-05",
+  "integration_checks": {
+    "windows": [
+      {
+        "checks": [
+          "sprites118_fgd_icon_resolved",
+          "sprites118_paletted_browser_thumbnail",
+          "sprites118_rgba_browser_thumbnail",
+          "sprites118_default_grid_rgb170",
+          "sprites118_pak_sprite_in_viewport",
+          "sprites118_rgba_sprite_in_viewport",
+          "sprites118_light_icon_visible",
+          "sprites118_custom_entity_bounds_color",
+          "sprites118_restore_entity_class_colors",
+          "sprites118_colors_saved",
+          "sprites118_bounds_color_persisted"
+        ],
+        "log_sha256": "739805f17f5f1bd9467b8a358011313664ba5884e0bf30f4441177be93d45566"
+      },
+      {
+        "checks": [
+          "sprites118_bounds_color_restored"
+        ],
+        "log_sha256": "9af8266eebc57a12d70763bed88e1aeeec16912f6fa2316ccd76920e3ed9085b"
+      }
+    ],
+    "linux-native": [
+      {
+        "checks": [
+          "sprites118_fgd_icon_resolved",
+          "sprites118_paletted_browser_thumbnail",
+          "sprites118_rgba_browser_thumbnail",
+          "sprites118_default_grid_rgb170",
+          "sprites118_pak_sprite_in_viewport",
+          "sprites118_rgba_sprite_in_viewport",
+          "sprites118_light_icon_visible",
+          "sprites118_custom_entity_bounds_color",
+          "sprites118_restore_entity_class_colors",
+          "sprites118_colors_saved",
+          "sprites118_bounds_color_persisted"
+        ],
+        "log_sha256": "8b1879956e3a38c0f63e8d794b8ceb65cef4872bf4204e0f9281538eeb35b263"
+      },
+      {
+        "checks": [
+          "sprites118_bounds_color_restored"
+        ],
+        "log_sha256": "4620aefe632885db9532e3cb558bb26b55f798f9f19f480d697e55a134370946"
+      }
+    ],
+    "linux-sdl2": [
+      {
+        "checks": [
+          "sprites118_fgd_icon_resolved",
+          "sprites118_paletted_browser_thumbnail",
+          "sprites118_rgba_browser_thumbnail",
+          "sprites118_default_grid_rgb170",
+          "sprites118_pak_sprite_in_viewport",
+          "sprites118_rgba_sprite_in_viewport",
+          "sprites118_light_icon_visible",
+          "sprites118_custom_entity_bounds_color",
+          "sprites118_restore_entity_class_colors",
+          "sprites118_colors_saved",
+          "sprites118_bounds_color_persisted"
+        ],
+        "log_sha256": "771809b9791411ab3aa15693e3564e5a8536880704dfb49885b81686d06b44e7"
+      },
+      {
+        "checks": [
+          "sprites118_bounds_color_restored"
+        ],
+        "log_sha256": "165be06896d25d25c808e5599348725202dba0643033ed129d56596ab39ba916"
+      }
+    ]
+  },
+  "sprite_unit_platforms": [
+    "Windows",
+    "Linux"
+  ],
+  "real_ad_sprites_decoded": 67,
+  "fgd_classes": 346,
+  "water": {
+    "compiled_test_bsp_surfaces": 239,
+    "camera_pitch_degrees": [
+      -12,
+      0,
+      12
+    ],
+    "windows": [
+      "editable MAP",
+      "Show BSP",
+      "isolated FTE + LibreQuake play"
+    ],
+    "linux": [
+      "editable MAP",
+      "Show BSP, software OpenGL"
+    ],
+    "existing_pack_1_0_0_stages_bundled_water_and_wave_fixes": true,
+    "compiled_bsp_mode_confirmed_visually": true
+  },
+  "runtime_environment": {
+    "windows": "NVIDIA RTX 4060 Laptop GPU",
+    "linux": "WSL / Xvfb / software OpenGL; not Arch/Wayland hardware certification"
+  },
+  "original_user_maps_wads_and_mod_files_unchanged": true
+}

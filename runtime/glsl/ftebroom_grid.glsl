@@ -1,5 +1,5 @@
 !!ver 130-450
-!!cvar3f ftebroom_grid_color=1,1,1
+!!cvar3f ftebroom_grid_color=0.666666667,0.666666667,0.666666667
 !!cvarf ftebroom_grid_aa=1.005
 !!cvarf ftebroom_grid_fade_start=512
 !!cvarf ftebroom_grid_fade_end=1024

@@ -458,7 +458,7 @@ static void panel(float w, float h)
         uiReset = true;
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 117");
+    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 118");
     ImGui::EndMainMenuBar();
   }
   const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
@@ -1094,11 +1094,13 @@ static void panel(float w, float h)
     }
     if(ImGui::BeginTabItem("Colors"))
     {
-      for(auto setting:{std::pair{"Grid","ftebroom_grid_color"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
+      for(auto setting:{std::pair{"Grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
       {
         char text[128]={};float color[3]={};cvars->GetString(setting.second,text,sizeof text);std::sscanf(text,"%f %f %f",&color[0],&color[1],&color[2]);
-        if(ImGui::ColorEdit3(setting.first,color)){std::snprintf(text,sizeof text,"%.6g %.6g %.6g",color[0],color[1],color[2]);cvars->SetString(setting.second,text);}
+        if(ImGui::ColorEdit3(setting.first,color)){std::snprintf(text,sizeof text,"%.6g %.6g %.6g",color[0],color[1],color[2]);cvars->SetString(setting.second,text);if(!std::strcmp(setting.second,"ftebroom_color_entity_bounds"))cvars->SetFloat("ftebroom_entity_bounds_class_colors",0);}
       }
+      bool classColors=cvars->GetFloat("ftebroom_entity_bounds_class_colors")!=0;
+      if(ImGui::Checkbox("Use entity class colors for bounds",&classColors))cvars->SetFloat("ftebroom_entity_bounds_class_colors",classColors);
       ImGui::EndTabItem();
     }
     if(ImGui::BeginTabItem("Game profile"))
@@ -1122,7 +1124,7 @@ static void panel(float w, float h)
     if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
-      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 117");
+      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 118");
       ImGui::TextLinkOpenURL("Check published releases","https://github.com/reyond9079/ReyondBroom/releases");
       updatePanel();
       ImGui::EndTabItem();

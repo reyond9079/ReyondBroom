@@ -356,7 +356,8 @@ void fb_render_faces_prepare()
     static string style;string nextStyle=strcat(cvar_string("ftebroom_render_faces")," ",cvar_string("ftebroom_shade_faces")," ",cvar_string("ftebroom_material_tag_epoch")," ",cvar_string("r_wateralpha"));
     nextStyle=strcat(nextStyle," ",cvar_string("r_lavaalpha")," ",cvar_string("r_slimealpha")," ",cvar_string("r_telealpha"));
     nextStyle=strcat(nextStyle," ",cvar_string("ftebroom_tool_opacity"));
-    if(geometry==fb_grid_geometry_epoch && ((fb_incremental_enabled()||cvar("ftebroom_classic_map"))?nextStyle==style:(filters==fb_filter_epoch&&selection==fb_selection_epoch)))return;
+    nextStyle=strcat(nextStyle," ",cvar_string("ftebroom_game_profile")," ",cvar_string("ftebroom_shader_pack_enabled"));
+    if(geometry==fb_grid_geometry_epoch && nextStyle==style && ((fb_incremental_enabled()||cvar("ftebroom_classic_map"))||(filters==fb_filter_epoch&&selection==fb_selection_epoch)))return;
     strunzone(style);style=strzone(nextStyle);
     geometry=fb_grid_geometry_epoch;filters=fb_filter_epoch;selection=fb_selection_epoch;fb_face_upload_epoch++;
     while(fb_render_shader_names){fb_render_shader_t *entry=fb_render_shader_names;fb_render_shader_names=entry.next;strunzone(entry.name);memfree(entry);}

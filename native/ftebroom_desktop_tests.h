@@ -9,6 +9,24 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode)=="sprites118setup"){
+    std::ofstream(documentPath("data/sprites118.fgd"))<<"@PointClass iconsprite(\"progs/s_bubble_blue1.spr\") = test118_sprite []\n@PointClass iconsprite(\"progs/qa118.spr\") = test118_rgba []\n";
+    command(("ftebroom_definitions \""+documentPath("data/sprites118.fgd").generic_u8string()+"\"\n").c_str());
+  }
+  if(std::string(mode)=="sprites118check"){
+    expect(entityDefinitions.at("test118_sprite").model=="progs/s_bubble_blue1.spr","sprites118_fgd_icon_resolved");
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;selectEntityTab=true;cvars->SetString("ftebroom_test_entity_filter","test118_");frame();frame();
+    bool palette=false,rgba=false;for(auto& pair:entityPreviews){if(pair.first.rfind("progs/s_bubble_blue1.spr:",0)==0)palette=pair.second.image&&pair.second.spriteWidth>0;if(pair.first.rfind("progs/qa118.spr:",0)==0)rgba=pair.second.image&&pair.second.spriteWidth==64;}
+    expect(palette,"sprites118_paletted_browser_thumbnail");expect(rgba,"sprites118_rgba_browser_thumbnail");
+    char grid[128]{};cvars->GetString("ftebroom_grid_color",grid,sizeof grid);float r=0,g=0,b=0;std::sscanf(grid,"%f %f %f",&r,&g,&b);expect(std::abs(r-170.f/255)<.00001&&std::abs(g-r)<.00001&&std::abs(b-r)<.00001,"sprites118_default_grid_rgb170");
+  }
+  if(std::string(mode)=="sprites118save"){
+    expect(preferencesSave(),"sprites118_colors_saved");std::ifstream in(documentPath("ftebroom-preferences.cfg"));std::string text((std::istreambuf_iterator<char>(in)),{});
+    expect(text.find("seta ftebroom_color_entity_bounds \"0.2 0.8 0.9\"")!=text.npos&&text.find("seta ftebroom_entity_bounds_class_colors \"0\"")!=text.npos,"sprites118_bounds_color_persisted");
+  }
+  if(std::string(mode)=="sprites118reload"){
+    char text[128]{};cvars->GetString("ftebroom_color_entity_bounds",text,sizeof text);expect(std::string(text)=="0.2 0.8 0.9"&&cvars->GetFloat("ftebroom_entity_bounds_class_colors")==0,"sprites118_bounds_color_restored");
+  }
   if(std::string(mode)=="fgd117check"){
     expect(entityDefinitions.size()==346&&definitionError.empty(),"fgd117_actual_ad_loaded");
     expect(entityDefinitions.at("monster_zombie").model=="progs/mon_zombie.mdl"&&entityDefinitions.at("monster_zombie").modelFrame=="0","fgd117_default_monster_variant");

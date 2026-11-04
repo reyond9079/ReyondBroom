@@ -48,11 +48,17 @@ void main(){waterPosition=v_position;vec4 clip=ftetransform();waterClip=clip;gl_
 #include "glsl/reyondpack/reyond_daylight.glsl"
 uniform float cvar_rsp_water_alpha;
 void main(){
- vec3 wave=RSPWave(waterPosition.xy,e_time);
+ vec2 ndc=waterClip.xy/waterClip.w;
+ float angularPixel=max(abs(dFdx(ndc.x))/max(abs(m_projection[0][0]),.001),abs(dFdy(ndc.y))/max(abs(m_projection[1][1]),.001));
+ vec3 wave=RSPWaveFiltered(waterPosition.xy,e_eyepos-waterPosition,e_time,angularPixel);
  vec3 normal=normalize(vec3(-wave.yz,1.)),view=normalize(e_eyepos-waterPosition);
  if(view.z<0.)normal=-normal;
- vec2 uv=clamp(waterClip.xy/waterClip.w*.5+.5+normal.xy*.012,vec2(.002),vec2(.998));
- vec3 behind=texture2D(s_refraction,uv).rgb,reflected=texture2D(s_reflection,vec2(uv.x,1.-uv.y)).rgb;
+ // FTE renders both portal targets in the surface screen projection.
+ // A second Y flip samples the wrong side of the reflected horizon.
+ vec2 screen=waterClip.xy/waterClip.w*.5+.5;
+ vec2 refractionUV=clamp(screen+normal.xy*.012,vec2(.002),vec2(.998));
+ vec2 reflectionUV=clamp(screen-normal.xy*.012,vec2(.002),vec2(.998));
+ vec3 behind=texture2D(s_refraction,refractionUV).rgb,reflected=texture2D(s_reflection,reflectionUV).rgb;
  float fresnel=.025+.975*pow(1.-abs(dot(view,normal)),5.);
  vec3 sun=RynSunDirection(),halfway=normalize(view+sun);
  float glitter=pow(max(dot(normal,halfway),0.),180.)*RynDaylight();

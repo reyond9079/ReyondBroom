@@ -199,14 +199,16 @@ public:
         continue;
       }
       EntityDefinition d;
+      bool explicitModel = false;
       d.brush = kind == "@SolidClass";
       d.base = kind == "@BaseClass";
       while (pos < tokens.size() && peek() != "=")
       {
         auto key = take();
+        std::transform(key.begin(),key.end(),key.begin(),[](unsigned char c){return char(std::tolower(c));});
         std::string value;
         if (peek() == "(")
-          value = bracket("(", ")",key=="model"||key=="studio");
+          value = bracket("(", ")",key=="model"||key=="studio"||key=="iconsprite"||key=="sprite");
         if (key == "base")
         {
           std::istringstream in(value);
@@ -244,8 +246,10 @@ public:
             d.hasColor = true;
           }
         }
-        if (key == "model" || key == "studio"){
+        if (key == "model" || key == "studio" || ((key=="iconsprite"||key=="sprite")&&!explicitModel)){
           if(!value.empty())try{d.modelRules=FgdModels(value).read();}catch(const std::exception& e){throw std::runtime_error(std::string(e.what())+" near FGD line "+std::to_string(tokens[pos-1].line)+": "+value.substr(0,120));}
+          else if(key=="sprite")d.modelKey="model";
+          if(key=="model"||key=="studio")explicitModel=true;
         }
         if (key == "skin")
           d.modelSkin = value;
@@ -656,6 +660,7 @@ inline EntityDefinitions entityResolve(EntityDefinitions definitions)
     for (const auto& p : d.properties)
       properties[p.first] = p.second;
     d.properties = std::move(properties);
+    if(d.model.empty()&&!d.modelKey.empty()){auto p=d.properties.find(d.modelKey);if(p!=d.properties.end())d.model=p->second.value;}
     if(!d.modelRules.empty()){std::map<std::string,std::string> defaults;for(auto& p:d.properties)defaults[p.first]=p.second.value;
       for(auto& rule:d.modelRules)if(fgdCondition(rule.condition,defaults)){d.model=fgdValue(rule.path,defaults);d.modelSkin=fgdValue(rule.skin,defaults);d.modelFrame=fgdValue(rule.frame,defaults);d.modelScale=fgdValue(rule.scale,defaults);if(!rule.path.empty()&&rule.path[0]=='$')d.modelKey=rule.path.substr(1);break;}}
     visiting.erase(name);

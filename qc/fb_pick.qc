@@ -363,6 +363,7 @@ void fb_point_render_prepare()
     static int geometry=-1,selection=-1,filters=-1,visibility=-1,revision=-1,entityRevision=-1;
     static string colors;
     string currentColors=strcat(cvar_string("ftebroom_color_locked"),"|",cvar_string("ftebroom_color_selected"));
+    currentColors=strcat(currentColors,"|",cvar_string("ftebroom_color_entity_bounds"),"|",cvar_string("ftebroom_entity_bounds_class_colors"));
     int currentRevision=fb_grid_geometry_epoch;
     if(geometry==fb_grid_geometry_epoch && selection==fb_entity_selection_key() && filters==fb_filter_epoch && visibility==fb_visibility_epoch && revision==currentRevision && entityRevision==fb_entity_render_epoch && colors==currentColors)return;
     int moved=fb_point_move_refresh && geometry==fb_grid_geometry_epoch && filters==fb_filter_epoch && visibility==fb_point_move_visibility && colors==currentColors;

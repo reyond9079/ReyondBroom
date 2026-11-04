@@ -46,6 +46,13 @@ typedef struct RBHostV1 {
     // Non-destructive world-space line preview: six floats per segment; NULL clears it.
     void (*preview_lines)(const float *xyz, size_t segments);
     int (*section)(const char *label, int default_open);
+    // Optional: searchable picker from the mounted Material browser catalogue.
+    // Empty selection means the plugin's generated/default material.
+    int (*material_picker)(const char *label, char *value, size_t capacity);
+    // Optional: export a static FTEBROOM_MESH v1 snapshot with native codecs.
+    // Relative models/reyond-plugins/*.{mdl,md2,md3} path; returns 0 on error.
+    // Textures resolve from the current material catalogue or generated assets.
+    int (*write_model)(const char *path, const char *mesh, size_t length);
 } RBHostV1;
 typedef struct RBPluginV1 {
     uint32_t api_version, struct_size;

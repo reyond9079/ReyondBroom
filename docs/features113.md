@@ -58,6 +58,8 @@ surface adhesion, upward phototropism, gravity, branch probability and maximum
 floating length. The triangle acceleration tree is built once per growth run.
 Growth is capped at 1,800 nodes (900 for combined brush output). It stops on the node/iteration budget or when all tendrils die.
 
+In alpha 115 and later the model output below is replaced by automatic native
+MDL/MD2/MD3 output and searchable material pickers; see [the updated guide](fixes115.md#ivy-grower).
 Branches and leaves can be enabled separately. Adjust branch radius, leaf size,
 density and variation, then choose **Create ivy**:
 

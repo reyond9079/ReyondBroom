@@ -25,6 +25,20 @@ static int buildCurrentContentRevision(){
 static int traceRevisionNow(){return buildCurrentContentRevision();}
 static void traceEditingView();
 static bool buildLeakFound=false;
+static bool buildLeakOffer=false,buildOpenMap=false;
+static int buildJobProfile=-1;
+// Remove only the stop-on-leak switch; preserve all other arguments verbatim.
+static std::string buildOpenArguments(std::string args){
+ size_t at=0;
+ while(at<args.size()){
+  while(at<args.size()&&std::isspace((unsigned char)args[at]))++at;
+  const size_t start=at;bool quoted=false;
+  while(at<args.size()&&(quoted||!std::isspace((unsigned char)args[at]))){if(args[at]=='"')quoted=!quoted;++at;}
+  const auto token=args.substr(start,at-start);
+  if(token=="-leaktest"||token=="\"-leaktest\""){args.erase(start,at-start);at=start;}
+ }
+ return args;
+}
 static void buildDetectLeak(){
  if(!buildGeometry||buildDocument!=documentFile||buildGeneration!=documentGeneration)return;
  auto path=ftebroom::leak::find(buildPending);if(path.empty()||(buildLeakFound&&tracePaths[0]==path))return;
@@ -185,13 +199,14 @@ static void mapGpuBegin(int rays, int samples=4){
 static std::string modQuote(const std::string& text);
 static void modValidate();
 static void modPreview();
-static void buildBegin()
+static void buildBegin(bool allowLeaks=false)
 {
   if(documentTerrain){buildMessage="FTE Engine terrain uses MAP plus section files; BSP compilation is unavailable for this document.";return;}
   if(runActive || runExclusive || buildRunning)return;
   if(documentFile.empty()){buildMessage="Save the map once before building.";return;}
   if(assetsLoading){buildMessage="Wait for game resources to finish loading before building.";return;}
-  buildLeakFound=false;buildMessage.clear();runLoad();buildLoadSettings();gameProfileLoad();
+  buildLeakOffer=false;buildLeakFound=false;buildMessage.clear();runLoad();buildLoadSettings();gameProfileLoad();
+  buildOpenMap=allowLeaks;buildJobProfile=gameProfile;
   if(gameProfile==1 && gamePreviewAfterBuild){try{modValidate();}catch(const std::exception& e){buildMessage=e.what();return;}}
   std::error_code projectError;
   if(!*baseq3 || !std::filesystem::is_directory(std::filesystem::u8path(baseq3),projectError)){buildMessage="Configure an existing game resource folder in Game / resources.";setupNeeded=true;return;}
@@ -212,6 +227,10 @@ static void buildBegin()
         std::filesystem::copy_file(folder/"saved-portals.prt",folder/"snapshot.prt");
       if(buildVis && !std::filesystem::exists(folder/"snapshot.prt"))throw std::runtime_error("VIS needs a portal file. Rebuild Geometry on a sealed map.");}
     RunProfile profile{"Viewport build: "+documentFile.filename().u8string(),folder.u8string(),false,{{0,"${WORK_DIR_PATH}/snapshot.map",""}}};
+    // This is a one-run override, never a change to the user's saved pipeline.
+    const bool visibility=buildVis&&!allowLeaks;
+    std::string geometryArguments=allowLeaks?buildOpenArguments(buildArguments[0]):buildArguments[0];
+    if(allowLeaks&&gameProfile>=2)geometryArguments="-nofill "+geometryArguments;
     buildStages={"Exporting "+documentFile.filename().u8string()};
     std::string common="-game quake3 -fs_basepath \"${GAME_DIR_PATH}/..\" -fs_game baseq3 -threads ${CPU_COUNT} ";
     if(gameProfile==1 && *gameMod && std::filesystem::is_directory(std::filesystem::u8path(gameMod))){
@@ -223,31 +242,32 @@ static void buildBegin()
     if(gameProfile==3){
       auto q2base=std::filesystem::u8path(q2Mod).parent_path()/"baseq2";if(!std::filesystem::is_directory(q2base))q2base=std::filesystem::u8path(q2Mod);
       auto paths="-basedir "+modQuote(q2base.generic_u8string())+" -gamedir "+modQuote(std::filesystem::u8path(q2Mod).generic_u8string())+" -path \"${WORK_DIR_PATH}\" ";
-      const char* names[]={"q2bsp","q2vis","q2light"};bool enabled[]={buildGeometry,buildVis,buildLight};
+      const char* names[]={"q2bsp","q2vis","q2light"};bool enabled[]={buildGeometry,visibility,buildLight};
       for(int i=0;i<3;i++)if(enabled[i]){
         if(runVariables[names[i]].empty())throw std::runtime_error(std::string("Configure ")+names[i]+" in Setup compile.");
-        profile.tasks.push_back({1,std::string("${")+names[i]+"}",paths+(i==0?"-q2bsp ":"")+buildArguments[i]+" \"${WORK_DIR_PATH}/snapshot."+(i==0?"map":"bsp")+"\""});buildStages.push_back(names[i]);
+        profile.tasks.push_back({1,std::string("${")+names[i]+"}",paths+(i==0?"-q2bsp ":"")+(i==0?geometryArguments:buildArguments[i])+" \"${WORK_DIR_PATH}/snapshot."+(i==0?"map":"bsp")+"\""});buildStages.push_back(names[i]);
       }
     }else if(gameProfile==4){
       const char* names[]={"hlcsg","hlbsp","hlvis","hlrad"};
-      for(int i=0;i<4;i++)if(i<2?buildGeometry:i==2?buildVis:buildLight){
+      for(int i=0;i<4;i++)if(i<2?buildGeometry:i==2?visibility:buildLight){
         if(runVariables[names[i]].empty())throw std::runtime_error(std::string("Configure ")+names[i]+" in Setup compile.");
-        profile.tasks.push_back({1,std::string("${")+names[i]+"}",(i==0?std::string("-nowadtextures "):std::string())+(i==0?buildCsgArguments:buildArguments[i-1])+" \"${WORK_DIR_PATH}/snapshot.map\""});buildStages.push_back(names[i]);
+        profile.tasks.push_back({1,std::string("${")+names[i]+"}",(i==0?std::string("-nowadtextures "):std::string())+(i==0?buildCsgArguments:i==1?geometryArguments:buildArguments[i-1])+" \"${WORK_DIR_PATH}/snapshot.map\""});buildStages.push_back(names[i]);
       }
     }else if(gameProfile==2) {
-      const char* names[]={"qbsp","vis","light"};bool enabled[]={buildGeometry,buildVis,buildLight};
+      const char* names[]={"qbsp","vis","light"};bool enabled[]={buildGeometry,visibility,buildLight};
       for(int i=0;i<3;i++)if(enabled[i]){
         if(runVariables[names[i]].empty())throw std::runtime_error(std::string("Set the ")+names[i]+" executable path.");
-        std::string args=(i==0 && q1BspFormat==1?"-bsp2 ":"")+buildArguments[i]+" \"${WORK_DIR_PATH}/snapshot."+(i==0?"map":"bsp")+"\"";
+        std::string args=(i==0 && q1BspFormat==1?"-bsp2 ":"")+(i==0?geometryArguments:buildArguments[i])+" \"${WORK_DIR_PATH}/snapshot."+(i==0?"map":"bsp")+"\"";
         profile.tasks.push_back({1,std::string("${")+names[i]+"}",args});buildStages.push_back(names[i]);
       }
     } else {
     common+="-fs_pakpath \"${WORK_DIR_PATH}\" ";
-    if(buildGeometry){profile.tasks.push_back({1,"${q3map2}",common+"-meta "+buildArguments[0]+" \"${WORK_DIR_PATH}/snapshot.map\""});buildStages.push_back("Geometry / BSP");}
-    if(buildVis){profile.tasks.push_back({1,"${q3map2}",common+"-vis "+buildArguments[1]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});buildStages.push_back("Visibility / VIS");}
+    if(buildGeometry){profile.tasks.push_back({1,"${q3map2}",common+"-meta "+geometryArguments+" \"${WORK_DIR_PATH}/snapshot.map\""});buildStages.push_back("Geometry / BSP");}
+    if(visibility){profile.tasks.push_back({1,"${q3map2}",common+"-vis "+buildArguments[1]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});buildStages.push_back("Visibility / VIS");}
     if(buildLight){profile.tasks.push_back({1,"${q3map2}",common+"-light "+buildArguments[2]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});buildStages.push_back("Lighting / LIGHT");}
     }
     runExportHook=buildExported;runStageHook=buildStageFinished;runBegin(profile);runWindow=false;buildRunning=runActive;gameProfileLocked=buildRunning;buildStarted=ImGui::GetTime();
+    if(allowLeaks)runAppend("Open-map compile: outside filling disabled where supported; VIS skipped. Saved compiler settings and source MAP are unchanged.\n");
     if(!buildRunning){runExportHook=nullptr;runStageHook=nullptr;buildMessage=runError;}
     runSaveProfiles();
     {std::ofstream settings(documentPath(buildSettingsFile()));settings<<buildGeometry<<' '<<buildVis<<' '<<buildLight;for(auto& argument:buildArguments)settings<<' '<<std::quoted(argument);if(gameProfile==4)settings<<' '<<std::quoted(buildCsgArguments);}
@@ -281,6 +301,8 @@ static void buildTick()
   buildDetectLeak();
   buildRunning=false;gameProfileLocked=false;runExportHook=nullptr;runStageHook=nullptr;
   bool playAfterBuild=modCompilePending;modCompilePending=false;
+  // A failed BSP/VIS stage may still have written a valid point file.
+  buildLeakOffer=buildLeakFound&&!buildOpenMap&&(runHadError||runStep==(int)buildStages.size());
   {std::ofstream log(buildPending.parent_path()/"build.log");log<<runLog;}
   if(runHadError){buildMessage=runError;return;}
   if(runStep!=(int)buildStages.size()){buildMessage="Build cancelled. Previous successful BSP is retained.";return;}
@@ -291,9 +313,26 @@ static void buildTick()
     buildResultContentRevision=buildContentRevision;buildResultGeneration=buildGeneration;
     buildSaveHistory();
     buildMessage="Build complete. Ready to preview.";
-    if(gameProfile!=0 && gameProfile!=3 && (gamePreviewAfterBuild||playAfterBuild))modPreview();
+    if(!buildLeakFound && gameProfile!=0 && gameProfile!=3 && (gamePreviewAfterBuild||playAfterBuild))modPreview();
     else if(!buildLeakFound)buildShow();
   }catch(const std::exception& error){buildMessage=error.what();}
+}
+static void buildLeakDialog(){
+  if(uiClosedDialog=="Leak detected"){buildLeakOffer=false;uiClosedDialog.clear();}
+  if(!buildLeakOffer)return;
+  if(!ImGui::IsPopupOpen("Leak detected"))ImGui::OpenPopup("Leak detected");
+  if(uiDialog("Leak detected",{640,320})){
+    ImGui::TextWrapped("The map is open to the void. Inspect the leak route, or compile an open map without VIS. This keeps collision and the selected lighting stage. It does not seal the map or fix the leak.");
+    ImGui::TextWrapped("This applies to one compile only. Your saved compiler settings and source MAP stay unchanged.");
+    const bool current=buildDocument==documentFile&&buildGeneration==documentGeneration&&buildJobProfile==gameProfile&&buildContentRevision==buildCurrentContentRevision();
+    if(!current)ImGui::TextWrapped("The map changed. Compile the current map again before retrying.");
+    ImGui::BeginDisabled(!current||runActive||buildRunning);
+    if(ImGui::Button("Compile open map",{-1,0})){buildLeakOffer=false;ImGui::CloseCurrentPopup();buildBegin(true);}
+    ImGui::EndDisabled();
+    if(ImGui::Button("Inspect leak route",{-1,0})){buildLeakOffer=false;traceWindow=true;traceEditingView();if(!tracePoints.empty())traceFocus(0);ImGui::CloseCurrentPopup();}
+    if(ImGui::Button("Close",{-1,0})){buildLeakOffer=false;ImGui::CloseCurrentPopup();}
+    ImGui::EndPopup();
+  }
 }
 #include "ftebroom_mod_preview.h"
 static void buildPanel()

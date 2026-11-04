@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "reyondbroom_plugin.h"
 #include "growth.h"
+#include "model.h"
 #include <chrono>
 using namespace rbgen;
 static const RBHostV1* host;static ivy::Growth growth;static ivy::Settings settings;
@@ -22,7 +23,6 @@ static void tick(){
  if(state==2){for(int i=0;i<5;i++)if(!growth.advance()){state=0;message="Growth finished. Adjust settings and Grow again, or create the geometry.";break;}updatePreview();}
 }
 static std::vector<V> tube(V a,V b,double radius){V d=unit(b-a),u=unit(cross(d,std::abs(d.z)>.8?V{1,0,0}:V{0,0,1})),v=cross(d,u);std::vector<V> p;for(int end=0;end<2;end++)for(int i=0;i<5;i++){double angle=i*6.28318530718/5;p.push_back((end?b:a)+(u*std::cos(angle)+v*std::sin(angle))*radius*(end?.85:1));}return p;}
-static std::string texture(bool leaf){const int size=64;std::string image(18+size*size*4,'\0');image[2]=2;image[12]=size;image[14]=size;image[16]=32;image[17]=0x28;for(int y=0;y<size;y++)for(int x=0;x<size;x++){size_t p=18+(y*size+x)*4;double shade=.7+.2*std::sin(x*.7+y*.4);if(leaf){bool vein=std::abs(x-size/2)<2||std::abs(std::fmod(y*.6+std::abs(x-32),13.)-6)<1;image[p]=char(vein?38:25*shade);image[p+1]=char(vein?116:94*shade);image[p+2]=char(vein?60:40*shade);}else{image[p]=char(28*shade);image[p+1]=char(49*shade);image[p+2]=char(73*shade);}image[p+3]=char(255);}return image;}
 static void create(){
  if(state||growth.nodes.size()<2){message="Grow ivy first.";return;}
  try{
@@ -32,26 +32,36 @@ static void create(){
   if(!branches&&!leaves)throw std::runtime_error("Enable branches or leaves.");
   std::vector<std::vector<V>> pieces;std::vector<bool> leafPiece;std::mt19937 rng(settings.seed+9817);auto random=[&]{return double(rng())/4294967296.;};
   for(size_t i=1;i<growth.nodes.size();i++){auto n=growth.nodes[i];if(branches){double radius=std::max(.6,double(thickness)*(1-double(n.depth)/std::max(1,settings.iterations)*.65));pieces.push_back(tube(growth.nodes[n.parent].p,n.p,radius));leafPiece.push_back(false);}
-   if(leaves&&random()<leafDensity){V direction=unit(n.p-growth.nodes[n.parent].p),normal=unit(n.normal),side=unit(cross(normal,direction));double angle=(random()-.5)*2;side=unit(side+direction*angle);V along=unit(cross(side,normal));double size=leafSize*(1+leafVariation*(random()*2-1));V center=n.p+side*(size*.4)*(i%2?1:-1)+normal*2;
-    std::vector<V> p;for(double depth:{-.6,.6})for(V delta:{along*size,side*(size*.55),along*(-size*.7),side*(-size*.55)})p.push_back(center+delta+normal*depth);pieces.push_back(p);leafPiece.push_back(true);
+   if(leaves&&random()<leafDensity){V direction=unit(n.p-growth.nodes[n.parent].p),normal=unit(n.normal),side=cross(normal,direction);if(length(side)<.01)side=cross(normal,std::abs(normal.z)>.8?V{1,0,0}:V{0,0,1});side=unit(side);double angle=(random()-.5)*2;side=unit(side+direction*angle);V along=unit(cross(side,normal));double size=leafSize*(1+leafVariation*(random()*2-1));V center=n.p+side*(size*.4)*(i%2?1:-1)+normal*2;
+    std::vector<V> p;for(double depth:{-.6,.6}){
+      if(!output)for(V delta:{along*size,side*(size*.55),along*(-size*.7),side*(-size*.55)})p.push_back(center+delta+normal*depth);
+      else for(auto uv:ivy::outline)p.push_back(center+along*(uv[1]*size)+side*(uv[0]*size)+normal*(depth+std::abs(uv[0])*size*.12));
+    }pieces.push_back(p);leafPiece.push_back(true);
    }
   }
   if(pieces.empty())throw std::runtime_error("The chosen density produced no geometry.");
   std::string map="{\n\"classname\" \"worldspawn\"\n";char tex[512]{};host->string("ca_newbrushtexture",tex,sizeof tex);
   if(output==0){if(pieces.size()>1800)throw std::runtime_error("Brush output is limited to 1800 pieces. Reduce iterations/branches/leaves or choose OBJ model.");for(size_t k=0;k<pieces.size();k++){auto mat=leafPiece[k]?leafMaterial:branchMaterial;map+=convex(pieces[k],*mat?mat:tex);}map+="}\n";}
   else{
-   char modelClass[128]{};host->string("rb.model_class",modelClass,sizeof modelClass);if(!*modelClass)throw std::runtime_error("This profile has no native OBJ placement entity. Choose Brush geometry, or convert the model in Model editor first.");
-   auto serial=std::chrono::system_clock::now().time_since_epoch().count();std::string name="ivy-"+std::to_string(serial),path="models/reyond-plugins/"+name;V origin=growth.nodes[0].p;std::ostringstream obj;obj<<"mtllib "<<name<<".mtl\n";int index=1;
-   // Export convex pieces as indexed polygon caps/sides, retaining world scale.
-   std::vector<size_t> order(pieces.size());std::iota(order.begin(),order.end(),0);std::stable_sort(order.begin(),order.end(),[&](size_t a,size_t b){return leafPiece[a]<leafPiece[b];});int previousMaterial=-1,orientation=int(host->number("mod_obj_orientation"));
-   size_t pieceIndex=0;for(size_t k:order){auto& p=pieces[k];int half=int(p.size()/2);if(pieceIndex++%400==0)obj<<"g ivy_batch_"<<pieceIndex/400<<'\n';if(int(leafPiece[k])!=previousMaterial){previousMaterial=int(leafPiece[k]);obj<<"usemtl textures/reyond-plugins/"<<(leafPiece[k]?"ivy_leaf":"ivy_bark")<<"\n";}V center{};for(V v:p)center=center+v;center=center/double(p.size());for(V v:p){v=v-origin;if(orientation==1)std::swap(v.y,v.z);else if(orientation==2)v={v.y,v.z,v.x};obj<<"v "<<v.x<<' '<<v.y<<' '<<v.z<<'\n';}for(int i=0;i<int(p.size());i++){double angle=(i%half)*6.28318530718/half;obj<<"vt "<<(.5+.5*std::cos(angle))<<' '<<(.5+.5*std::sin(angle))<<'\n';}for(V v:p){v=unit(v-center);if(orientation==1)std::swap(v.y,v.z);else if(orientation==2)v={v.y,v.z,v.x};obj<<"vn "<<v.x<<' '<<v.y<<' '<<v.z<<'\n';}
-    auto face=[&](std::vector<int> f){for(int pass=0;pass<2;pass++){obj<<"f";for(int n:f)obj<<' '<<index+n<<'/'<<index+n<<'/'<<index+n;obj<<'\n';std::reverse(f.begin(),f.end());}};
-    std::vector<int> cap;for(int j=0;j<half;j++)cap.push_back(j);face(cap);for(int& v:cap)v+=half;face(cap);for(int j=0;j<half;j++)face({j,(j+1)%half,(j+1)%half+half,j+half});index+=int(p.size());
+   const int profile=int(host->number("rb.profile"));const char* extension=profile==2||profile==4?".mdl":profile==3?".md2":".md3";
+   const auto serial=std::chrono::system_clock::now().time_since_epoch().count();const std::string path="models/reyond-plugins/ivy-"+std::to_string(serial);
+   const std::string bark=*branchMaterial?branchMaterial:"textures/reyond-plugins/ivy_bark_v2.tga",leaf=*leafMaterial?leafMaterial:"textures/reyond-plugins/ivy_leaf_v2.tga";
+   for(bool isLeaf:{false,true})if(!(isLeaf?*leafMaterial:*branchMaterial)){
+    auto bytes=ivy::texture(isLeaf);if(!host->write_asset((isLeaf?leaf:bark).c_str(),bytes.data(),bytes.size()))throw std::runtime_error("Cannot write the ivy textures.");
    }
-   std::string mtl="newmtl textures/reyond-plugins/ivy_leaf\nKd 0.25 0.65 0.2\nmap_Kd ../../textures/reyond-plugins/ivy_leaf.tga\nnewmtl textures/reyond-plugins/ivy_bark\nKd 0.35 0.22 0.1\nmap_Kd ../../textures/reyond-plugins/ivy_bark.tga\n";
-   for(bool leaf:{false,true}){auto bytes=texture(leaf);if(!host->write_asset(leaf?"textures/reyond-plugins/ivy_leaf.tga":"textures/reyond-plugins/ivy_bark.tga",bytes.data(),bytes.size()))throw std::runtime_error("Cannot write the ivy textures.");}
-   auto bytes=obj.str();if(!host->write_asset((path+".obj").c_str(),bytes.data(),bytes.size())||!host->write_asset((path+".mtl").c_str(),mtl.data(),mtl.size()))throw std::runtime_error("Cannot save the generated OBJ/MTL assets.");
-   std::ostringstream entity;entity<<"}\n{\n\"classname\" \""<<modelClass<<"\"\n\"model\" \""<<path<<".obj\"\n\"origin\" \""<<origin.x<<' '<<origin.y<<' '<<origin.z<<"\"\n}\n";map+=entity.str();
+   char modelClass[128]{};host->string("rb.model_class",modelClass,sizeof modelClass);
+   ivy::Model model;V low{1e30,1e30,1e30},high{-1e30,-1e30,-1e30};int part=0;map+="}\n";
+   auto flush=[&](){if(!model.vertices())return;V origin=(low+high)*.5;auto bytes=model.snapshot(origin,bark,leaf);auto name=path+"-"+std::to_string(part++)+extension;
+    if(!host->write_model(name.c_str(),bytes.data(),bytes.size())){char error[2048]{};host->string("rb.last_error",error,sizeof error);throw std::runtime_error(*error?error:"Cannot export the generated native model.");}
+    std::ostringstream entity;entity<<std::setprecision(9)<<"{\n\"classname\" \""<<modelClass<<"\"\n\"model\" \""<<name<<"\"\n\"origin\" \""<<origin.x<<' '<<origin.y<<' '<<origin.z<<"\"\n}\n";map+=entity.str();model={};low={1e30,1e30,1e30};high={-1e30,-1e30,-1e30};
+   };
+   // Split only at complete leaves/stems. Native coordinate precision, origin,
+   // texture atlas and vertex limits are respected without resizing the ivy.
+   for(size_t k=0;k<pieces.size();k++){
+    V lo=low,hi=high;for(V p:pieces[k])for(int a=0;a<3;a++){lo[a]=std::min(lo[a],p[a]);hi[a]=std::max(hi[a],p[a]);}
+    if(model.vertices()+pieces[k].size()+2>1800||std::max({hi.x-lo.x,hi.y-lo.y,hi.z-lo.z})>480)flush();
+    for(V p:pieces[k])for(int a=0;a<3;a++){low[a]=std::min(low[a],p[a]);high[a]=std::max(high[a],p[a]);}model.append(pieces[k],leafPiece[k]);
+   }flush();
   }
   if(!host->import_map(map.data(),map.size()))throw std::runtime_error("Cannot apply ivy outside MAP editing.");host->preview_lines(nullptr,0);message="Ivy import queued: "+std::to_string(pieces.size())+" pieces. Generated assets keep their dimensions and origin. Undo removes the inserted objects.";
  }catch(const std::exception& e){message=e.what();}
@@ -74,10 +84,10 @@ static void draw(){
  host->separator("Growth");host->input_int("Iterations",&settings.iterations);host->input_int("Maximum branches",&settings.maxBranches);host->input_float("Growth step",&step);if(host->section("Advanced growth",0)){host->input_float("Primary direction",&primary);host->input_float("Random influence",&randomWeight);host->input_float("Adhesion",&adhesion);host->input_float("Phototropism (up)",&up);host->input_float("Gravity",&gravity);host->input_float("Branch probability",&branching);host->input_float("Maximum floating length",&maxFloat);}
 
  if(growing)host->disabled(0);
- host->separator("Geometry");host->checkbox("Branches",&branches);host->input_float("Branch radius",&thickness);host->checkbox("Leaves",&leaves);host->input_float("Leaf size",&leafSize);host->input_float("Leaf density",&leafDensity);host->input_float("Leaf size variation",&leafVariation);host->combo("Output",&output,"Brush geometry (game-native)\0Textured OBJ model (FTE / Q3)\0");
+ host->separator("Geometry");host->checkbox("Branches",&branches);host->input_float("Branch radius",&thickness);host->checkbox("Leaves",&leaves);host->input_float("Leaf size",&leafSize);host->input_float("Leaf density",&leafDensity);host->input_float("Leaf size variation",&leafVariation);host->combo("Output",&output,"Brush geometry (game-native)\0Native model (automatic format)\0");
  if(!message.empty())host->text(message.c_str());
- if(!output){host->input_text("Branch material (empty: current)",branchMaterial,sizeof branchMaterial);host->input_text("Leaf material (empty: current)",leafMaterial,sizeof leafMaterial);}
- if(output)host->text("OBJ uses original generated bark/leaf textures. FTE supports this model directly. Vanilla Quake engines require converting it to MDL; brush output works without model conversion.");
+ host->material_picker("Branch material",branchMaterial,sizeof branchMaterial);host->material_picker("Leaf material",leafMaterial,sizeof leafMaterial);
+ if(output){int profile=int(host->number("rb.profile"));host->text(profile==2?"Quake MDL with an embedded paletted skin.":profile==3?"Quake II MD2 with a PCX skin. In-game placement requires a mod with misc_model support.":profile==4?"GoldSrc MDL with embedded textures.":"MD3 model with material textures. Large growth is split into native-sized model parts without changing world size.");}
 }
 static void shutdown(){state=0;host->preview_lines(nullptr,0);}
 extern "C" RB_PLUGIN_EXPORT const RBPluginV1* ReyondBroomPluginInit(const RBHostV1* api){if(!api||api->api_version!=1||api->struct_size<sizeof(RBHostV1))return nullptr;host=api;static RBPluginV1 plugin{1,sizeof(RBPluginV1),"org.reyondbroom.ivy",draw,tick,busy,shutdown};return &plugin;}

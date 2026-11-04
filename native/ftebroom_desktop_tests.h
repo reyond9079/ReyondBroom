@@ -9,6 +9,64 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode)=="fixes115setup"){
+    char step[32]{},scale[32]{},profile[32]{};commands->Argv(2,step,sizeof step);commands->Argv(3,scale,sizeof scale);commands->Argv(4,profile,sizeof profile);
+    recentWindow=false;setupNeeded=false;setupInitialized=true;gameProfileLocked=false;uiLanguage=1;uiScaleChoice=std::clamp(std::atoi(scale),0,4);gameProfile=std::clamp(std::atoi(profile),0,4);firstSetupStep=std::clamp(std::atoi(step),0,5);frame();frame();
+    auto window=ImGui::FindWindowByName("First-time setup");expect(window&&window->Active,"fixes115_russian_setup_visible");
+    for(const char* key:{"Choose interface size","Choose a game","Choose your mod / resources","Make yourself at home","Save the map once before building.","Try camera movement, creating and moving brushes, vertical movement, extrude and the grid. Demonstrations use an animated cursor. Practice in a separate disposable scene; you can skip the lesson at any time."})expect(std::string(uiTr(key))!=key,"fixes115_russian_presentation_key");
+    expect(std::strstr(uiTr("ReyondBroom / Step %d of 6"),"%d")!=nullptr,"fixes115_localized_format_retains_placeholder");
+  }
+  if(std::string(mode)=="fixes115tour"){
+    firstSetupStep=-1;setupNeeded=false;recentWindow=false;uiLanguage=1;uiScaleChoice=1;
+    ImGui::ClosePopupsOverWindow(nullptr,true);tourBegin();tourPrepare(3);frame();frame();
+  }
+  if(std::string(mode)=="fixes115drag"){
+    frame();frame();expect(tourStep==3&&!tourDemo,"fixes115_vertical_practice_ready");
+    auto p=tourAnchor(testW,testH);int alt=input->GetKeyCode("alt",nullptr);
+    event(1,alt,0,p.x,p.y,testW,testH);event(1,mouseKeys[0],0,p.x,p.y,testW,testH);
+    event(0,0,0,p.x,p.y-90,testW,testH);event(2,alt,0,p.x,p.y-90,testW,testH);
+    event(2,mouseKeys[0],0,p.x,p.y-90,testW,testH);frame();
+  }
+  if(std::string(mode)=="fixes115done"){
+    frame();expect(tourDone,"fixes115_preselected_vertical_move_alt_released_first");
+    auto window=ImGui::FindWindowByName("##lesson");float width=ImGui::CalcTextSize(uiTr("Skip onboarding")).x+ImGui::GetStyle().FramePadding.x*2;
+    expect(window&&tourSkipCenter.x+width*.5f<=window->Pos.x+window->Size.x-ImGui::GetStyle().WindowPadding.x+1,"fixes115_russian_skip_button_inside_window");
+    cvars->SetFloat("ftebroom_tour_result",2);frame();expect(tourDone,"fixes115_lesson_completion_is_latched");
+  }
+  if(std::string(mode)=="fixes115unsaved"){
+    if(tourActive)tourFinish(true);firstSetupStep=-1;ImGui::ClosePopupsOverWindow(nullptr,true);setupNeeded=false;recentWindow=false;uiLanguage=1;
+    documentFile.clear();buildBegin();expect(buildMessage=="Save the map once before building.","fixes115_unsaved_compile_rejected");frame();frame();
+    expect(std::string(uiTr(buildMessage.c_str()))=="Перед компиляцией сохраните карту.","fixes115_unsaved_compile_message_russian");
+  }
+  if(std::string(mode)=="fixes115compile"){
+    firstSetupStep=-1;setupNeeded=false;recentWindow=false;ImGui::ClosePopupsOverWindow(nullptr,true);gamePreviewAfterBuild=false;buildLoadSettings();buildGeometry=buildVis=buildLight=true;for(auto& args:buildArguments)args.clear();
+    buildBegin();runMissingDecision=1;expect(buildRunning,"fixes115_compile_started");
+  }
+  if(std::string(mode)=="fixes115leak"){
+    frame();expect(!buildRunning&&buildLeakFound&&buildLeakOffer&&!tracePoints.empty(),"fixes115_leak_offer_after_compiler_result");
+    auto window=ImGui::FindWindowByName("Leak detected");expect(window&&window->Active,"fixes115_leak_modal_visible");
+    expect(buildOpenArguments("-leaktest -path \"/data/my-leaktest map\" -v")==" -path \"/data/my-leaktest map\" -v","fixes115_open_compile_preserves_other_arguments");
+  }
+  if(std::string(mode)=="fixes115retry"){
+    buildLeakOffer=false;ImGui::ClosePopupsOverWindow(nullptr,true);buildBegin(true);runMissingDecision=1;expect(buildRunning,"fixes115_open_compile_started");
+    expect(buildVis&&buildGeometry&&buildLight,"fixes115_saved_stage_selection_preserved");
+    bool vis=false,nofill=false;for(const auto& task:runningProfile.tasks){vis|=task.source.find("vis}")!=std::string::npos||task.destination.find("-vis ")!=std::string::npos;nofill|=task.destination.find("-nofill ")!=std::string::npos;}
+    expect(!vis&&(gameProfile<2||nofill),"fixes115_open_compile_pipeline");
+  }
+  if(std::string(mode)=="fixes115compiled"){
+    frame();expect(!buildRunning&&!runHadError&&!buildResult.empty()&&buildValidBsp(buildResult),"fixes115_open_compile_produces_valid_bsp");
+    expect(!buildLeakOffer&&buildOpenMap,"fixes115_retry_does_not_prompt_again");
+    std::ofstream(documentPath("fixes115-build.log"))<<runLog;
+  }
+  if(std::string(mode)=="fixes115ivymodel"){
+    int count=0;auto extension=gameProfile==2?".mdl":gameProfile==3?".md2":".md3";
+    auto directory=documentPath("models/reyond-plugins");if(std::filesystem::is_directory(directory))for(auto& entry:std::filesystem::directory_iterator(directory))if(entry.path().extension()==extension){
+      auto bytes=q1Read(entry.path());expect(bytes.substr(0,4)==(gameProfile==2?"IDPO":gameProfile==3?"IDP2":"IDP3"),"fixes115_ivy_native_model_header");count++;
+      auto relative="models/reyond-plugins/"+entry.path().filename().u8string();modelEditorShow(relative);
+    }
+    expect(count>0,"fixes115_ivy_native_models_created");frame();frame();
+  }
+  if(std::string(mode)=="fixes115ivyvisible")expect(cvars->GetFloat("ftebroom_modelviewer_count")>0,"fixes115_ivy_native_model_rendered_by_fte");
   if(std::string(mode)=="sky114profile"){
     recentWindow=false;setupNeeded=false;firstSetupStep=-1;frame();char arg[32]{};commands->Argv(2,arg,sizeof arg);gameProfile=std::clamp(std::atoi(arg),0,4);
     cvars->SetFloat("ftebroom_game_profile",gameProfile);prepareEditorWall();

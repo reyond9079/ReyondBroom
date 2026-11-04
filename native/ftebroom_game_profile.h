@@ -103,18 +103,18 @@ static void gameProfileFields(bool wizard=false)
     ImGui::TextWrapped(gameProfile==3?"Choose the Quake II installation, baseq2, or a mod folder. An installation root selects baseq2 automatically. A sibling baseq2 supplies base resources. PAK archives and WAL textures are supported.":"Choose the Half-Life installation, valve, or cstrike. An installation root selects valve for FreeHL or cstrike for FreeCS. A sibling valve supplies base resources. WAD3 textures retain their own palettes.");
     if(gameProfile==4){ImGui::Combo("Game runtime",&hlRuntime,"FreeHL (Half-Life)\0FreeCS (Counter-Strike 1.5)\0");ImGui::TextWrapped("Runtime installation adds a separate ReyondBroom package. Original game files are not replaced. Retail assets are required; arbitrary DLL mods are not supported by FreeHL/FreeCS.");}
     if(ImGui::CollapsingHeader("Advanced settings")){
-      ImGui::InputText("Entity definitions (optional .fgd / .def / .ent)",gameProfile==3?q2Definitions:hlDefinitions,1024);
-      if(gameProfile==4)ImGui::InputTextMultiline("Additional WAD3 archives (optional, one path per line)",hlWads,sizeof hlWads,{0,60*uiScale()});
+      setupPathField("Entity definitions (optional .fgd / .def / .ent)",gameProfile==3?q2Definitions:hlDefinitions,1024);
+      if(gameProfile==4)setupPathField("Additional WAD3 archives (optional, one path per line)",hlWads,sizeof hlWads,true);
       ImGui::TextUnformatted(gameProfile==3?"MAP: Valve 220 with Q2 surface flags | BSP: IBSP 38":"MAP: Valve 220 | BSP: GoldSrc 30");
     }
     ImGui::TextWrapped(gameProfile==3?"Compiler: bundled ericw-tools for Quake II. No compiler path is required here. Configure stages later in Setup compile.":"Compiler: bundled SDHLT (CSG, BSP, VIS and RAD). No compiler path is required here. Keep LIGHT / RAD enabled for lightmaps; configure stages later in Setup compile.");
     setupModBrowse();
   }
   if(gameProfile==1) {
-    ImGui::InputText("Runtime mod directory (optional for mapping)",gameMod,sizeof gameMod);
+    setupPathField("Runtime mod directory (optional for mapping)",gameMod,sizeof gameMod);
     ImGui::TextWrapped("Preview engine: bundled FTE (required for embedded free camera).");
-    ImGui::InputText("Entity definitions (optional .def / .fgd)",gameDefinitions,sizeof gameDefinitions);
-    ImGui::InputText("QuakeC source folder (optional)",gameQC,sizeof gameQC);
+    setupPathField("Entity definitions (optional .def / .fgd)",gameDefinitions,sizeof gameDefinitions);
+    setupPathField("QuakeC source folder (optional)",gameQC,sizeof gameQC);
     ImGui::Checkbox("Open mod preview after Build",&gamePreviewAfterBuild);
     ImGui::Combo("Editor defaultwall",&gameWallMode,"Current FTE default\0Map source folder\0Mod folder\0Neutral studio (Unity-like)\0Custom GLSL file\0Neutral studio (Unreal-like)\0");
     if(gameWallMode==4){ImGui::InputText("GLSL file",gameWallFile,sizeof gameWallFile);ImGui::SameLine();if(ImGui::Button("Browse...##wall"))gameWallBrowse();ImGui::TextWrapped("Use an FTE-compatible defaultwall program. Includes resolve through the mounted game resources. Apply/load resources to save and activate this path.");}

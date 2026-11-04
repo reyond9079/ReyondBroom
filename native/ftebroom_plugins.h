@@ -12,7 +12,7 @@ static bool pluginManagerOpen=false,pluginsScanned=false;
 static std::string pluginManagerError;
 static std::map<std::string,ImVec2> pluginButtonPositions;
 static double pluginNumber(const char* name){if(name&&!std::strcmp(name,"rb.profile"))return gameProfile;if(name&&!std::strcmp(name,"rb.document_generation"))return organizationMapEpoch;return name?cvars->GetFloat(name):0;}
-static int pluginString(const char* name,char* out,size_t size){if(!name||!out||!size)return 0;out[0]=0;if(!std::strcmp(name,"rb.model_class")){try{return std::snprintf(out,size,"%s",modelDropClass(std::filesystem::path("ivy.obj")));}catch(...){return 0;}}return cvars->GetString(name,out,int(std::min<size_t>(size,1048576)));}
+static int pluginString(const char* name,char* out,size_t size){if(!name||!out||!size)return 0;out[0]=0;if(!std::strcmp(name,"rb.last_error"))return std::snprintf(out,size,"%s",pluginManagerError.c_str());if(!std::strcmp(name,"rb.model_class"))return std::snprintf(out,size,"%s",gameProfile==3?"misc_model":gameProfile==4?"cycler":gameProfile==0?"misc_model":"func_model");return cvars->GetString(name,out,int(std::min<size_t>(size,1048576)));}
 static void pluginSetNumber(const char* name,double value){if(name&&std::isfinite(value))cvars->SetFloat(name,float(value));}
 static void pluginSetString(const char* name,const char* value){if(name&&value)cvars->SetString(name,value);}
 static void pluginCommand(const char* value){if(value&&std::strlen(value)<=65536)command(value);}
@@ -59,12 +59,12 @@ static int pluginWriteAsset(const char* path,const char* bytes,size_t length){
   if(!path||!bytes||!length||length>16*1024*1024||!ftebroom::pak::zipName(path))return 0;
   std::string relative=path;auto ext=std::filesystem::path(relative).extension().string();
   if(relative.rfind("models/reyond-plugins/",0)!=0&&relative.rfind("textures/reyond-plugins/",0)!=0)return 0;
-  if(ext!=".obj"&&ext!=".mtl"&&ext!=".tga")return 0;
+  if(ext!=".obj"&&ext!=".mtl"&&ext!=".tga"&&ext!=".mdl"&&ext!=".md2"&&ext!=".md3"&&ext!=".pcx")return 0;
   try{auto target=documentPath(relative);std::filesystem::create_directories(target.parent_path());
     if(std::filesystem::exists(target)){std::ifstream old(target,std::ios::binary);std::string data((std::istreambuf_iterator<char>(old)),{});if(data!=std::string(bytes,length))return 0;}
     else{std::ofstream out(target,std::ios::binary);out.write(bytes,length);out.close();if(!out)return 0;}
     // Copy generated resources beside the mod when one is configured.
-    auto root=gameProfile==1?std::filesystem::u8path(gameMod):gameProfile==3?std::filesystem::u8path(q2Mod):gameWad()?std::filesystem::u8path(q1Mod):std::filesystem::u8path(baseq3);
+    auto root=gameProfile==1?std::filesystem::u8path(gameMod):gameProfile==3?std::filesystem::u8path(q2Mod):gameWad()?std::filesystem::u8path(q1Authoring()):std::filesystem::u8path(baseq3);
     std::vector<std::filesystem::path> roots{root};if(gameProfile==1)roots.push_back(std::filesystem::u8path(baseq3));
     for(const auto& folder:roots)if(!folder.empty()&&std::filesystem::is_directory(folder)){auto destination=folder/std::filesystem::u8path(relative);std::filesystem::create_directories(destination.parent_path());if(!std::filesystem::exists(destination))std::filesystem::copy_file(target,destination);}
     return 1;
@@ -88,7 +88,55 @@ static void pluginPreviewDraw(){
   draw->PopClipRect();
 }
 static int pluginSection(const char* label,int open){return ImGui::CollapsingHeader(label,open?ImGuiTreeNodeFlags_DefaultOpen:0);}
-static const RBHostV1 pluginHost{RB_PLUGIN_API_VERSION,sizeof(RBHostV1),pluginNumber,pluginString,pluginSetNumber,pluginSetString,pluginCommand,pluginLog,pluginImportMap,pluginSettle,pluginText,pluginSeparator,pluginInt,pluginFloat,pluginBool,pluginCombo,pluginButton,pluginSameLine,pluginDisabled,pluginProgress,pluginReadData,pluginWriteAsset,pluginInputText,pluginPreview,pluginSection};
+static int pluginMaterialPicker(const char* label,char* value,size_t size){
+  if(!label||!value||!size)return 0;int changed=0;ImGui::PushID(label);
+  if(ImGui::BeginCombo(label,*value?value:uiTr("Generated default"))){
+    static std::map<ImGuiID,std::array<char,256>> filters;auto& filter=filters[ImGui::GetID("filter")];
+    ImGui::InputTextWithHint("##search",uiTr("Search materials"),filter.data(),filter.size());
+    if(ImGui::Selectable("Generated default",!*value)){value[0]=0;changed=1;}
+    std::vector<const MaterialEntry*> visible;for(const auto& entry:materials)if(materialMatches(entry.first,filter.data()))visible.push_back(&entry.second);
+    ImGui::BeginChild("choices",{std::max(220.f,ImGui::GetContentRegionAvail().x),260*uiScale()});
+    const float height=58*uiScale();ImGuiListClipper clip;clip.Begin(int(visible.size()),height);
+    while(clip.Step())for(int i=clip.DisplayStart;i<clip.DisplayEnd;i++){
+      const auto& material=*visible[i];auto pos=ImGui::GetCursorScreenPos();ImGui::PushID(material.name.c_str());
+      if(ImGui::Selectable("##material",material.name==value,0,{0,height-4*uiScale()})){
+        if(material.name.size()<size){std::snprintf(value,size,"%s",material.name.c_str());changed=1;ImGui::CloseCurrentPopup();}
+      }
+      auto list=ImGui::GetWindowDrawList();list->PushClipRect(pos,{pos.x+ImGui::GetContentRegionAvail().x,pos.y+height-4*uiScale()},true);
+      if(auto image=thumbnail(material.name))list->AddImage((ImTextureID)image,pos,{pos.x+48*uiScale(),pos.y+48*uiScale()});
+      list->AddText(ImGui::GetFont(),ImGui::GetFontSize(),{pos.x+56*uiScale(),pos.y+4*uiScale()},ImGui::GetColorU32(ImGuiCol_Text),material.name.c_str(),nullptr,std::max(1.f,ImGui::GetContentRegionAvail().x-60*uiScale()));list->PopClipRect();ImGui::PopID();
+    }
+    ImGui::EndChild();ImGui::EndCombo();
+  }
+  ImGui::PopID();return changed;
+}
+static int pluginWriteModel(const char* path,const char* text,size_t length){
+  try{
+    if(!path||!text||!length||length>16*1024*1024||!ftebroom::pak::zipName(path)||std::string(path).rfind("models/reyond-plugins/",0)!=0)throw std::runtime_error("Invalid generated model path.");
+    auto mesh=ftebroom::modelExport::parse(std::string(text,length));if(mesh.frames!=1)throw std::runtime_error("Plugin model export currently accepts static meshes only.");
+    auto ext=std::filesystem::path(path).extension().u8string();std::vector<ftebroom::modelExport::Skin> skins;
+    for(auto& surface:mesh.surfaces){
+      auto material=materials.find(surface.material);std::string bytes;
+      if(material!=materials.end()&&!material->second.preview.empty()){
+        auto preview=documentPath(material->second.preview);if(std::filesystem::is_regular_file(preview))bytes=q1Read(preview);else bytes=modelResource(material->second.preview);
+      }
+      else for(const auto* suffix:{"",".tga"}){auto file=documentPath(surface.material+suffix);if(std::filesystem::is_regular_file(file)){bytes=q1Read(file);break;}}
+      if(bytes.empty())bytes=modelImportTexture(surface.material);
+      skins.push_back(modelImportDecode(bytes));
+    }
+    std::string result,skinPath,skinBytes;
+    if(ext==".md3")result=ftebroom::modelExport::md3(mesh);
+    else if(ext==".mdl")result=gameProfile==4?ftebroom::studioExport::bake(mesh,skins,24):ftebroom::modelExport::mdl(mesh,skins,q1Palette());
+    else if(ext==".md2"){
+      auto skin=std::filesystem::path(path);skin.replace_extension(".pcx");skinPath=skin.generic_u8string();
+      auto output=ftebroom::modelExport::md2(mesh,skins,q2Palette(),skinPath);result=std::move(output.model);skinBytes=std::move(output.skin);
+    }else throw std::runtime_error("Unsupported generated model format.");
+    if(!skinBytes.empty()&&!pluginWriteAsset(skinPath.c_str(),skinBytes.data(),skinBytes.size()))throw std::runtime_error("Cannot write generated model skin.");
+    if(!pluginWriteAsset(path,result.data(),result.size()))throw std::runtime_error("Cannot write generated model.");
+    command("fs_flush\n");modFilesRefresh=true;return 1;
+  }catch(const std::exception& e){pluginManagerError=e.what();return 0;}
+}
+static const RBHostV1 pluginHost{RB_PLUGIN_API_VERSION,sizeof(RBHostV1),pluginNumber,pluginString,pluginSetNumber,pluginSetString,pluginCommand,pluginLog,pluginImportMap,pluginSettle,pluginText,pluginSeparator,pluginInt,pluginFloat,pluginBool,pluginCombo,pluginButton,pluginSameLine,pluginDisabled,pluginProgress,pluginReadData,pluginWriteAsset,pluginInputText,pluginPreview,pluginSection,pluginMaterialPicker,pluginWriteModel};
 static void pluginUnload(EditorPlugin& p){
   pluginPreviewLines.clear();
   if(p.api&&p.api->shutdown)try{p.api->shutdown();}catch(...){p.error="Plugin shutdown failed.";}

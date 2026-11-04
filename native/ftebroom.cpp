@@ -458,7 +458,7 @@ static void panel(float w, float h)
         uiReset = true;
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 114");
+    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 115");
     ImGui::EndMainMenuBar();
   }
   const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
@@ -1034,6 +1034,7 @@ static void panel(float w, float h)
   bspModelPanel();
   ImGui::EndDisabled();
   buildOverlay();
+  buildLeakDialog();
   modControlsPanel();
   ImGui::BeginDisabled(modEmbedded);
   sceneContextPanel();
@@ -1121,7 +1122,7 @@ static void panel(float w, float h)
     if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
-      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 114");
+      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 115");
       ImGui::TextLinkOpenURL("Check published releases","https://github.com/reyond9079/ReyondBroom/releases");
       updatePanel();
       ImGui::EndTabItem();
@@ -1285,6 +1286,9 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddMouseButtonEvent(i, down);
     if (key == input->GetKeyCode("alt", nullptr))
     {
+      // Flush the last constrained sample before releasing Alt, even if mouse
+      // movement and key-up arrive between two rendered frames.
+      if(!down&&altHeld&&sceneDrag)pointer("move",x,y);
       altHeld = down;
       io.AddKeyEvent(ImGuiMod_Alt, down);
       cvars->SetFloat("ftebroom_alt", down);

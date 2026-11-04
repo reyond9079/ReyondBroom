@@ -14,6 +14,9 @@ void FteBroomTranslate(const char*& text,const char*& end)
   auto found=lookup.find(std::string_view(text,visible-text));if(found==lookup.end())return;
   text=uiTranslations[found->second][uiLanguage];end=text+std::strlen(text);
 }
+// Translate formats before substitution, and custom-drawn text before measurement.
+// Keep the original labels for ImGui widget IDs.
+static const char* uiTr(const char* text){const char* end=nullptr;FteBroomTranslate(text,end);return text;}
 static ImVector<ImWchar> uiCJKRanges;
 static void uiBuildGlyphRanges()
 {

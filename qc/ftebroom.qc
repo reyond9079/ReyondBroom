@@ -331,7 +331,9 @@ void fb_finish(vector pixel, float alt, int view)
         // Dragging empty space with an existing selection does not create geometry.
     } else if (fb_moving) {
         if (vlen(fb_applied_offset)>0 || fb_transform_duplicate) {
-            int tourStage113=2;if(alt)if(fabs(fb_applied_offset_z)>.001)tourStage113=3;fb_transform_commit(fb_applied_offset);fb_tour_signal(tourStage113);
+            // Judge the committed movement, not selection history or Alt at mouse-up.
+            int tourStage=2;if(fabs(fb_applied_offset_z)>.001)tourStage=3;
+            fb_transform_commit(fb_applied_offset);fb_tour_signal(tourStage);
         }
     } else {
         if(!fb_primitive_create(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5,FALSE)) print("ReyondBroom: shape could not be created.\n");else fb_tour_signal(1);
@@ -558,7 +560,9 @@ void ftebroom_prepare()
     fb_filter_prepare();
     {float stage81_3=gettime(1);fb_view_remember_selection();fb_commit_profile("fb_view_remember_selection",stage81_3);}
     curmousepos=[cvar("ftebroom_mouse_x"),cvar("ftebroom_mouse_y"),0];
-    {float stage81_4=gettime(1);fb_tool_pointer_move(curmousepos,cvar("ftebroom_alt"),cvar("ca_brush_view"));fb_commit_profile("fb_tool_pointer_move",stage81_4);}
+    // Demonstrations supply their own ordered pointer samples. The real cursor
+    // must not pull the example brush away from that animated path.
+    if(!cvar("ftebroom_tour_demo")){float stage81_4=gettime(1);fb_tool_pointer_move(curmousepos,cvar("ftebroom_alt"),cvar("ca_brush_view"));fb_commit_profile("fb_tool_pointer_move",stage81_4);}
     {float stage81_5=gettime(1);fb_visibility_sync();fb_commit_profile("fb_visibility_sync",stage81_5);}
     fb_commit_profile("ftebroom_prepare",profile81Time);
 }
@@ -700,6 +704,7 @@ float() ftebroom_command =
             fb_tool_pointer_down(pixel,alt,cvar("ca_brush_view"));
         }
         else if(argv(1)=="up") fb_tool_pointer_up(pixel,alt,cvar("ca_brush_view"));
+        else if(argv(1)=="move") fb_tool_pointer_move(pixel,alt,cvar("ca_brush_view"));
         else if(argv(1)=="dblclick" && cvar("ftebroom_tool")==FB_TOOL_CLIP) fb_clip_double(pixel,cvar("ca_brush_view"));
         else if(argv(1)=="dblclick" && cvar("ftebroom_tool")==FB_TOOL_BRUSH) fb_assemble_double(pixel,cvar("ca_brush_view"));
         else if(argv(1)=="dblclick" && !cvar("ftebroom_tool")) {

@@ -43,7 +43,8 @@ static void tourOfferPanel(){
     ImGui::TextUnformatted("Learn the basics in a few minutes");
     ImGui::TextWrapped("Try camera movement, creating and moving brushes, vertical movement, extrude and the grid. Demonstrations use an animated cursor. Practice in a separate disposable scene; you can skip the lesson at any time.");
     if(ImGui::Button("Start onboarding")){ImGui::CloseCurrentPopup();documentRequest("__tour");}
-    ImGui::SameLine();if(ImGui::Button("Skip onboarding")){tourRecord("declined");ImGui::CloseCurrentPopup();}
+    if(ImGui::GetWindowPos().x+ImGui::GetWindowContentRegionMax().x-ImGui::GetItemRectMax().x>=ImGui::CalcTextSize(uiTr("Skip onboarding")).x+ImGui::GetStyle().FramePadding.x*2+ImGui::GetStyle().ItemSpacing.x)ImGui::SameLine();
+    if(ImGui::Button("Skip onboarding")){tourRecord("declined");ImGui::CloseCurrentPopup();}
     ImGui::EndPopup();
   }
 }
@@ -67,13 +68,13 @@ static void tourPanel(float w,float h){
     float distance=0;for(int a=0;a<3;a++)distance+=(v[a]-tourCameraStart[a])*(v[a]-tourCameraStart[a]);tourCameraMoved|=distance>32*32;
     tourCameraLooked|=std::abs(v[3]-tourCameraStart[3])+std::abs(v[4]-tourCameraStart[4])>8;tourDone=tourCameraMoved&&tourCameraLooked;
   }}
-  if(!tourDemo&&now>tourInputReady&&tourStep>=1&&tourStep<=4)tourDone=cvars->GetFloat("ftebroom_tour_result")==tourStep;
+  if(!tourDemo&&now>tourInputReady&&tourStep>=1&&tourStep<=4)tourDone|=cvars->GetFloat("ftebroom_tour_result")==tourStep;
   if(tourStep==5&&cvars->GetFloat("ca_grid")!=tourGrid)tourDone=true;if(tourStep==6)tourDone=true;
   ImGui::SetNextWindowPos({16*scale,16*scale});ImGui::SetNextWindowSize({std::max(200.f,w-32*scale),0});
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,8*scale);
   ImGui::Begin("##lesson",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("ReyondBroom / %d of 7",tourStep+1);
-  float buttonWidth=ImGui::CalcTextSize("Skip onboarding").x+ImGui::GetStyle().FramePadding.x*2;
+  ImGui::Text(uiTr("ReyondBroom / %d of 7"),tourStep+1);
+  float buttonWidth=ImGui::CalcTextSize(uiTr("Skip onboarding")).x+ImGui::GetStyle().FramePadding.x*2;
   float right=ImGui::GetWindowWidth()-ImGui::GetStyle().WindowPadding.x-buttonWidth;
   if(right>ImGui::GetItemRectMax().x-ImGui::GetWindowPos().x+ImGui::GetStyle().ItemSpacing.x)ImGui::SameLine(right);else ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,right));
   if(ImGui::Button("Skip onboarding")){tourFinish(true);}
@@ -97,7 +98,7 @@ static void tourPanel(float w,float h){
     draw->AddRectFilled({p.x+20*scale,p.y+10*scale},{p.x+58*scale,p.y+46*scale},IM_COL32(24,26,30,230),6*scale);
     draw->AddRect({p.x+29*scale,p.y+15*scale},{p.x+49*scale,p.y+39*scale},IM_COL32(240,240,240,255),6*scale,0,2);
     if(held)draw->AddRectFilled({p.x+30*scale,p.y+16*scale},{p.x+39*scale,p.y+26*scale},IM_COL32(241,161,70,255),3*scale);
-    if(tourStep>=3)draw->AddText({p.x+20*scale,p.y+50*scale},IM_COL32_WHITE,tourStep==3?"Alt":"Left Shift");
+    if(tourStep>=3)draw->AddText({p.x+20*scale,p.y+50*scale},IM_COL32_WHITE,uiTr(tourStep==3?"Alt":"Left Shift"));
   }
   if(tourStep==6){ImGui::SetNextWindowPos({16*scale,150*scale});ImGui::SetNextWindowSize({w-32*scale,0});ImGui::Begin("Tools##lesson",nullptr,ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoMove);ImGui::BeginDisabled();for(int t:{0,1,2,3,7,8,9,5,6}){if(t)ImGui::SameLine();FteIcons::button(("##lessonTool"+std::to_string(t)).c_str(),t,{34*scale,34*scale});}ImGui::EndDisabled();ImGui::End();}
   ImGui::SetNextWindowPos({w*.5f,h-18*scale},ImGuiCond_Always,{.5f,1});

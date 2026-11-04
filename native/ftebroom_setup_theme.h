@@ -67,7 +67,7 @@ static void setupThemeTiles()
     draw->AddRectFilled({mid-box,cy-box*.5f},{mid+box,cy+box*.7f},color(ImGuiCol_Button));
     draw->AddRect({mid-box,cy-box*.5f},{mid+box,cy+box*.7f},color(ImGuiCol_CheckMark),0,0,2);
     draw->PopClipRect();
-    draw->AddText({pos.x+pad,pos.y+tile.y-ImGui::GetTextLineHeight()-pad},color(ImGuiCol_Text),uiThemeNames[theme]);
+    draw->AddText({pos.x+pad,pos.y+tile.y-ImGui::GetTextLineHeight()-pad},color(ImGuiCol_Text),uiTr(uiThemeNames[theme]));
     bool selected=uiTheme==theme;
     draw->AddRect(pos,{pos.x+tile.x,pos.y+tile.y},selected?ImGui::GetColorU32(ImGuiCol_CheckMark):ImGui::GetColorU32(hovered?ImGuiCol_ButtonHovered:ImGuiCol_Border),round,0,selected?3.f:1.f);
     if(selected)draw->AddCircleFilled({pos.x+tile.x-pad*1.5f,pos.y+pad*1.5f},4*uiScale(),ImGui::GetColorU32(ImGuiCol_CheckMark));

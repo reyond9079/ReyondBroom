@@ -3,6 +3,8 @@
 The bundled **Procedural Level Generator** and **Ivy Grower** are documented in
 [Alpha 113 tools and lessons](features113.md). They use optional tail extensions
 of the same host ABI; older compiled v1 plugins keep their original fields.
+See [Alpha 115 native ivy models](fixes115.md#ivy-grower) for automatic MDL/MD2/MD3
+output, detailed built-in textures and Material browser pickers.
 
 Open **Plugins > Manage plugins...**. This panel shows the installation directory,
 installed plugins, load errors and Enabled/Open controls. Copy each plugin's
@@ -108,10 +110,21 @@ runtime dependencies. The supplied Windows build uses static MinGW runtimes.
 - `log`: write diagnostic messages to the editor console/log.
 - Optional tail fields (check `struct_size` first): `read_data` reads a bounded
   `plugin-*` snapshot from the editor data directory, `write_asset` writes
-  generated OBJ/MTL/TGA resources under `models/reyond-plugins` or
+  generated model, skin and OBJ/MTL/TGA resources under `models/reyond-plugins` or
   `textures/reyond-plugins`, `input_text` adds string fields, `section` adds a
   collapsible header, and `preview_lines` shows bounded world-space line
   segments without document changes. Pass NULL/zero to clear the preview.
+- Further optional tail fields: `material_picker` chooses a mounted material
+  through a searchable thumbnail list; `write_model` exports a static
+  `FTEBROOM_MESH 1` text snapshot using the native MDL/MD2/MD3 codecs. Use a relative
+  `models/reyond-plugins/` path. The snapshot uses engine coordinates and the same
+  format as Model editor extraction. It contains frame/surface counts followed
+  by each surface's quoted material, vertex/triangle counts, position XYZ, normal
+  XYZ, UV and zero-based triangle indices. Export errors are available through
+  `string("rb.last_error", ...)`. Native model limits are enforced; plugins must
+  split large meshes themselves. Material selection and export do not change
+  the map; use `import_map` for undoable placement. Check `struct_size` before
+  using callbacks added after the version of the SDK you compiled against.
 
 All host calls belong on the editor thread, inside its callbacks. UI calls are
 valid only inside `draw`. Do not retain host-owned strings or call callbacks

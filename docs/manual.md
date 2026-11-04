@@ -247,6 +247,10 @@ Run/task profiles support export, compiler invocations, launch, Stop and Rerun.
 MAP and OBJ/MTL export are available. Issues inspect map problems and offer fixes;
 leak paths and portal overlays help inspect compiler output. Use a sealed room and
 player start when testing a first BSP build.
+If compilation detects a leak, **Compile open map** offers a one-run retry without
+VIS and with outside filling disabled where supported. It preserves collision,
+the selected lighting stage and your saved compiler settings. See
+[open-map compilation and native ivy models](fixes115.md).
 
 ## FTE Engine terrain
 

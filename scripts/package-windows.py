@@ -22,7 +22,7 @@ output.mkdir(parents=True, exist_ok=False)
 root = output / "ReyondBroom-Windows-x64"
 root.mkdir()
 (root / "bin").mkdir()
-if not (bundle/'plugins/rubble/rubble.dll').is_file():
+if any(not (bundle/'plugins'/name/(name+'.dll')).is_file() for name in ('rubble','levelgen','ivy')):
     raise RuntimeError('Build bundled plugins with scripts/build-plugins.py first')
 shutil.copytree(bundle/'plugins',root/'plugins')
 for name in (

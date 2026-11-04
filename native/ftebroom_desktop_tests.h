@@ -6,9 +6,47 @@ static void testDesktop(){
 
  auto expect=[](bool ok,const char* name){core->Print((std::string(ok?"FTEBROOM_DESKTOP_PASS ":"FTEBROOM_DESKTOP_FAIL ")+name+"\n").c_str());};
 
- char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);auto frame=[](){event(0,0,0,950,550,1280,800);};
+ char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode)=="features113ui"){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;uiTheme=5;cvars->SetFloat("ftebroom_label_size",26);cvars->SetFloat("ftebroom_coordinate_size",16);pluginsScan();
+    expect(std::count_if(editorPlugins.begin(),editorPlugins.end(),[](const auto& p){return p.api!=nullptr;})==3,"features113_bundled_plugins_loaded");
+    frame();frame();expect(ImGui::GetStyle().Colors[ImGuiCol_WindowBg].x<.2f,"features113_quake_theme");
+  }
+  if(std::string(mode)=="features113level"||std::string(mode)=="features113levelapply"||std::string(mode)=="features113ivy"||std::string(mode)=="features113ivyapply"){
+    bool ivy=std::string(mode).find("ivy")!=std::string::npos,apply=std::string(mode).find("apply")!=std::string::npos;
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;for(auto& p:editorPlugins)p.open=p.id==(ivy?"org.reyondbroom.ivy":"org.reyondbroom.levelgen");frame();frame();
+    const char* button=ivy?(apply?"Create ivy":"Grow"):(apply?"Apply to map":"Generate preview");auto point=pluginButtonPositions[button];
+    expect(point.y>20&&point.y<780&&point.x>0,"features113_plugin_primary_button_visible");
+    event(0,0,0,point.x,point.y,testW,testH);event(1,mouseKeys[0],0,point.x,point.y,testW,testH);event(0,0,0,point.x,point.y,testW,testH);event(2,mouseKeys[0],0,point.x,point.y,testW,testH);frame();
+    if(!ivy&&!apply)expect(!pluginPreviewLines.empty(),"features113_level_preview_lines");
+    if(apply)expect(pluginPreviewLines.empty(),"features113_plugin_apply_clears_preview");
+  }
+  if(std::string(mode)=="features113ivyready")expect(pluginPreviewLines.size()>60,"features113_ivy_growth_preview");
+  if(std::string(mode)=="features113tour"){
+    for(auto& p:editorPlugins)p.open=false;tourBegin();frame();frame();expect(tourActive&&viewRects[0].x==0&&viewRects[0].w==testW,"features113_clean_tour_viewport");
+  }
+  if(std::string(mode)=="features113tourfly"){
+    event(1,mouseKeys[1],0,640,450,testW,testH);event(3,0,0,75,20,testW,testH);event(1,input->GetKeyCode("w",nullptr),0,640,450,testW,testH);frame();
+  }
+  if(std::string(mode)=="features113tourcamera"){
+    event(2,input->GetKeyCode("w",nullptr),0,640,450,testW,testH);event(2,mouseKeys[1],0,640,450,testW,testH);frame();expect(tourDone,"features113_camera_practice_detected");tourPrepare(1);
+  }
+  if(std::string(mode)=="features113tourdrag"){
+    auto pixel=tourAnchor(testW,testH);float x=pixel.x,y=pixel.y;if(tourStep==1){x=testW*.75f;y=testH*.70f;}
+    frame();frame();int modifier=tourStep==3?input->GetKeyCode("alt",nullptr):tourStep==4?input->GetKeyCode("shift",nullptr):0;
+    if(modifier)event(1,modifier,0,x,y,testW,testH);event(1,mouseKeys[0],0,x,y,testW,testH);event(0,0,0,x+((tourStep<3)?90:0),y-60,testW,testH);event(2,mouseKeys[0],0,x+((tourStep<3)?90:0),y-60,testW,testH);if(modifier)event(2,modifier,0,x,y,testW,testH);frame();
+  }
+  if(std::string(mode)=="features113tournext"){
+    frame();expect(tourDone,("features113_practice_stage_"+std::to_string(tourStep)).c_str());tourPrepare(tourStep+1);
+  }
+  if(std::string(mode)=="features113tourwheel"){
+    event(1,wheelUp,0,900,500,testW,testH);event(2,wheelUp,0,900,500,testW,testH);frame();
+  }
+  if(std::string(mode)=="features113tourfinish"){
+    frame();expect(tourStep==6&&tourDone,"features113_tools_reveal");tourFinish(false);frame();expect(!tourActive&&cvars->GetFloat("ftebroom_tour_active")==0,"features113_tour_restores_workspace");
+  }
   if(std::string(mode)=="q2106"){
     recentWindow=false;expect(gameProfile==3&&!assetsLoading&&assetError.empty(),"q2106_resources");
     int aliases=0;bool complete=true;
@@ -412,16 +450,17 @@ static void testDesktop(){
     expect(!q1MissingWads.empty(),"map75_missing_wads_reported");
   }
   if(std::string(mode)=="plugin72open"){
-    pluginsTick();expect(editorPlugins.size()==1&&editorPlugins[0].api&&editorPlugins[0].module,"plugin72_external_module_loaded");
-    if(!editorPlugins.empty()){auto& p=editorPlugins[0];p.open=true;frame();if(auto window=ImGui::FindWindowByName(p.name.c_str())){ImGui::SetWindowPos(window,{10,40},ImGuiCond_Always);ImGui::SetWindowSize(window,{650,730},ImGuiCond_Always);}frame();if(auto window=ImGui::FindWindowByName(p.name.c_str()))ImGui::SetScrollY(window,window->ScrollMax.y);frame();}
+    pluginsTick();auto example=std::find_if(editorPlugins.begin(),editorPlugins.end(),[](const auto& p){return p.id=="org.reyondbroom.rubble";});expect(example!=editorPlugins.end()&&example->api&&example->module,"plugin72_external_module_loaded");
+    if(example!=editorPlugins.end()){auto& p=*example;p.open=true;frame();if(auto window=ImGui::FindWindowByName(p.name.c_str())){ImGui::SetWindowPos(window,{10,40},ImGuiCond_Always);ImGui::SetWindowSize(window,{650,730},ImGuiCond_Always);}frame();if(auto window=ImGui::FindWindowByName(p.name.c_str()))ImGui::SetScrollY(window,window->ScrollMax.y);frame();}
   }
   if(std::string(mode)=="plugin72apply"){
     auto it=pluginButtonPositions.find("Apply");expect(it!=pluginButtonPositions.end(),"plugin72_sdk_button_drawn");
     if(it!=pluginButtonPositions.end()){auto p=it->second;event(0,0,0,p.x,p.y,1280,800);event(1,mouseKeys[0],0,p.x,p.y,1280,800);event(0,0,0,p.x,p.y,1280,800);event(2,mouseKeys[0],0,p.x,p.y,1280,800);event(0,0,0,p.x,p.y,1280,800);}
   }
   if(std::string(mode)=="plugin72done"){
-    expect(!editorPlugins.empty()&&editorPlugins[0].api&&!pluginBusy(editorPlugins[0])&&cvars->GetFloat("ftebroom_settle_applied"),"plugin72_async_workflow_complete");
-    if(!editorPlugins.empty()){pluginUnload(editorPlugins[0]);expect(!editorPlugins[0].api&&!editorPlugins[0].module,"plugin72_unload");pluginLoad(editorPlugins[0]);expect(editorPlugins[0].api!=nullptr,"plugin72_reload");}
+    auto example=std::find_if(editorPlugins.begin(),editorPlugins.end(),[](const auto& p){return p.id=="org.reyondbroom.rubble";});
+    expect(example!=editorPlugins.end()&&example->api&&!pluginBusy(*example)&&cvars->GetFloat("ftebroom_settle_applied"),"plugin72_async_workflow_complete");
+    if(example!=editorPlugins.end()){pluginUnload(*example);expect(!example->api&&!example->module,"plugin72_unload");pluginLoad(*example);expect(example->api!=nullptr,"plugin72_reload");}
   }
   if(std::string(mode)=="medit72camera"){modelEditDirty=false;modelEditorShow("models/qa/test.md3");frame();}
   if(std::string(mode)=="medit72cameraStart"){

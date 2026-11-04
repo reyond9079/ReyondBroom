@@ -164,6 +164,7 @@ static void documentProceed()
     std::ofstream(documentPath("maps/_ftebroom_profile_start.map"),std::ios::binary)<<documentMetadata(scene);
     action("mapedit maps/_ftebroom_profile_start.map\n");
   }
+  else if(next=="__tour")tourBegin();
   else if (next == "__new")
   {
     newMapRequest=true;newMapProfile=gameProfile;
@@ -368,7 +369,7 @@ static void documentRequest(const std::string& next)
     if(!ftebroom::pak::exists(path)){documentError="The requested map is missing or unreadable.";return;}
 
   }
-  else if (next != "exit" && next != "__new" && next.rfind("__profile:",0)!=0)
+  else if (next != "exit" && next != "__new" && next != "__tour" && next.rfind("__profile:",0)!=0)
   {
     qhandle_t handle;
     const int size = files->Open(("maps/" + next + ".map").c_str(), &handle, 1);

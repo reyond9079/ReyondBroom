@@ -36,6 +36,36 @@ int fb_plugin_selection_command()
     }
     fb_poly_free(&source);cvar_set("ftebroom_plugin_preflight",valid?"1":"-1");return TRUE;
 }
+int fb_plugin_surfaces_command(){
+    if(argv(0)!="ftebroom_plugin_surfaces")return FALSE;
+    fb_tool_refresh();fb_document_tick();int triangles=0,valid=selectedbrushcount>0&&selectedbrushcount<=512;
+    filestream file=fopen("plugin-surfaces.txt",FILE_WRITE);
+    if((float)file<0)valid=FALSE;
+    if(valid)for(int b=0;b<selectedbrushcount&&valid;b++){
+        patchinfo_t info;int cpCount=patch_getcp(selectedbrushes[b].model,selectedbrushes[b].id,__NULL__,0,&info);
+        if(cpCount>0){
+            patchvert_t *cp=memalloc(cpCount*sizeof(patchvert_t));patch_getcp(selectedbrushes[b].model,selectedbrushes[b].id,cp,cpCount,&info);patchvert_t *mesh=fb_patch_preview_mesh(cp,&info);memfree(cp);
+            for(int y=0;y<info.cpheight-1&&valid;y++)for(int x=0;x<info.cpwidth-1&&valid;x++)for(int side=0;side<2&&valid;side++){
+                if(++triangles>16384){valid=FALSE;break;}int pa=y*info.cpwidth+x,pb=pa+1,pc=pa+info.cpwidth,pd=pc+1;
+                vector p=mesh[pa].xyz,q=mesh[side?pd:pb].xyz,t=mesh[side?pc:pd].xyz,n=normalize(crossproduct(q-p,t-p));
+                fputs(file,sprintf("T %.9g %.9g %.9g %.9g %.9g %.9g ",p_x,p_y,p_z,q_x,q_y,q_z));fputs(file,sprintf("%.9g %.9g %.9g %.9g %.9g %.9g\n",t_x,t_y,t_z,n_x,n_y,n_z));
+            }memfree(mesh);continue;
+        }
+        fb_poly_t poly={0};valid=fb_poly_from_brush(selectedbrushes[b].model,selectedbrushes[b].id,&poly);
+        if(valid)for(int f=0;f<poly.nf&&valid;f++){
+            fb_poly_face_t *face=&poly.faces[f];vector a=poly.vertices[poly.indices[face->start]];
+            for(int j=1;j+1<face->count;j++){
+                if(++triangles>16384){valid=FALSE;break;}
+                vector p=poly.vertices[poly.indices[face->start+j]],q=poly.vertices[poly.indices[face->start+j+1]],n=face->attr.planenormal;
+                fputs(file,sprintf("T %.9g %.9g %.9g %.9g %.9g %.9g ",a_x,a_y,a_z,p_x,p_y,p_z));
+                fputs(file,sprintf("%.9g %.9g %.9g %.9g %.9g %.9g\n",q_x,q_y,q_z,n_x,n_y,n_z));
+            }
+        }
+        fb_poly_free(&poly);
+    }
+    if((float)file>=0){if(valid)fputs(file,"END\n");fclose(file);}
+    cvar_set("ftebroom_plugin_surfaces_status",valid?"1":"-1");return TRUE;
+}
 int fb_plugin_fracture_selection()
 {
     int count=selectedbrushcount,fragments=bound(2,cvar("ftebroom_fracture_count"),128);

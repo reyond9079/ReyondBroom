@@ -18,7 +18,7 @@ out.mkdir(parents=True, exist_ok=False)
 platform = 'Linux-SDL2-x64' if a.sdl2 else 'Linux-x64'
 root = out / 'ReyondBroom-Linux-x64'
 root.mkdir()
-if not (a.deps/'plugins/rubble/rubble.so').is_file():
+if any(not (a.deps/'plugins'/name/(name+'.so')).is_file() for name in ('rubble','levelgen','ivy')):
     raise RuntimeError('Build bundled plugins with scripts/build-plugins.py first')
 shutil.copytree(a.deps/'plugins',root/'plugins')
 for source, name in [

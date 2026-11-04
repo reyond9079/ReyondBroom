@@ -68,6 +68,22 @@ void fb_fullbench_tick()
 int fb_generators_testcommand()
 {
     if(argv(0)!="ftebroom_test_generators"||!cvar("ftebroom_skip_setup"))return FALSE;
+    if(argv(1)=="features113sample"){
+        fb_render_faces_prepare();print(sprintf("SAMPLE_PROFILE %g pack=%g clear=%g native=%g\n",cvar("ftebroom_game_profile"),cvar("ftebroom_shader_pack_enabled"),cvar("ftebroom_clear_sky"),cvar("ftebroom_native_faces_drawn")));
+        for(int i113=0;i113<fb_render_face_count;i113++){fb_render_face_t *f113=&fb_render_faces[i113];if(strstrofs(f113->shader,"reyondpack/",0)>=0)print(sprintf("SAMPLE_FACE %s enabled=%i alpha=%g node=%i normal=%v\n",f113->shader,f113->enabled,f113->alpha,f113->node,f113->normal));}
+        ftebroom_cached_mesh_stats();return TRUE;
+    }
+    if(argv(1)=="features113ivywall"){fb_selection_clear();fb_createbox('0 0 144','320 24 288');return TRUE;}
+    if(argv(1)=="features113import"){
+        fb_document_tick();fb_transform_expect(selectedbrushcount>30,"features113_level_imported_brushes");int before113=history;brush_undo();fb_transform_expect(history<before113,"features113_level_single_undo");brush_redo();fb_transform_expect(selectedbrushcount>30,"features113_level_redo");return TRUE;
+    }
+    if(argv(1)=="features113model"){
+        fb_document_tick();int models113=0;for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY){string data113=terrain_edit(TEREDIT_ENT_GET,fb_nodes[n].id);if(strstrofs(data113,"models/reyond-plugins/ivy-",0)>=0)models113++;}
+        fb_transform_expect(models113>0,"features113_ivy_model_imported");return TRUE;
+    }
+    if(argv(1)=="features113tourpoint"){
+        if(selectedbrushcount){vector b113[2];brush_getfacepoints(selectedbrushes[0].model,selectedbrushes[0].id,0,b113,2);vector p113=(b113[0]+b113[1])*.5;if(cvar("ftebroom_tour_test_face"))p113_z=b113[1][2];cvar_set("ftebroom_tour_test_pixel",sprintf("%g %g %g",p113_x,p113_y,p113_z));}else cvar_set("ftebroom_tour_test_pixel","0 0 32");return TRUE;
+    }
     if(fb_delete92_testcommand())return TRUE;
     if(argv(1)=="preview89"){
         fb_transform_expect(fb_transform_capture(),"preview89_capture");

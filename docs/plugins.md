@@ -1,5 +1,9 @@
 # Native editor plugins — API v1
 
+The bundled **Procedural Level Generator** and **Ivy Grower** are documented in
+[Alpha 113 tools and lessons](features113.md). They use optional tail extensions
+of the same host ABI; older compiled v1 plugins keep their original fields.
+
 Open **Plugins > Manage plugins...**. This panel shows the installation directory,
 installed plugins, load errors and Enabled/Open controls. Copy each plugin's
 folder there and choose Rescan plugins. Third-party plugins start disabled;
@@ -102,6 +106,12 @@ runtime dependencies. The supplied Windows build uses static MinGW runtimes.
   disabled sections and progress bars build ImGui UI using the editor's theme
   and font. `disabled(1)` begins a disabled block; `disabled(0)` ends it.
 - `log`: write diagnostic messages to the editor console/log.
+- Optional tail fields (check `struct_size` first): `read_data` reads a bounded
+  `plugin-*` snapshot from the editor data directory, `write_asset` writes
+  generated OBJ/MTL/TGA resources under `models/reyond-plugins` or
+  `textures/reyond-plugins`, `input_text` adds string fields, `section` adds a
+  collapsible header, and `preview_lines` shows bounded world-space line
+  segments without document changes. Pass NULL/zero to clear the preview.
 
 All host calls belong on the editor thread, inside its callbacks. UI calls are
 valid only inside `draw`. Do not retain host-owned strings or call callbacks

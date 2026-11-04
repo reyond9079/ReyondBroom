@@ -367,8 +367,10 @@ static void entityPanel()
       ImGui::Checkbox("Used only", &used);
       ImGui::SameLine();
       ImGui::Checkbox("Group by prefix", &grouped);
-      ImGui::Combo("Type", &kind, "All\0Point\0Brush\0");
-      ImGui::Combo("Sort", &sort, "Name\0Usage\0");
+      if(ImGui::BeginTable("Entity filters",2,ImGuiTableFlags_SizingStretchSame)){
+        ImGui::TableNextColumn();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Type");ImGui::SameLine();ImGui::SetNextItemWidth(-1);ImGui::Combo("##entityType",&kind,"All\0Point\0Brush\0");
+        ImGui::TableNextColumn();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Sort");ImGui::SameLine();ImGui::SetNextItemWidth(-1);ImGui::Combo("##entitySort",&sort,"Name\0Usage\0");ImGui::EndTable();
+      }
       ImGui::InputFloat3("Create at", position);
       static int thumbnailSize=80;
       ImGui::SliderInt("Thumbnail size",&thumbnailSize,48,160);

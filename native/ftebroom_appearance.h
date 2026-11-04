@@ -8,7 +8,7 @@ static int uiScaleChoice = uiDefaultScaleChoice;
 static constexpr int uiDefaultCursorPercent=100;
 static int uiCursorPercent=uiDefaultCursorPercent;
 static int uiTheme = 0;
-static const char* uiThemeNames[]={"Modern Dark","Retro Light","Retro Dark","Modern Light","Half-Life"};
+static const char* uiThemeNames[]={"Modern Dark","Retro Light","Retro Dark","Modern Light","Half-Life","Quake"};
 static ImFont* uiFonts[5] = {};
 static ImFont* uiItalicFonts[5] = {};
 static ImFont* uiBoldFonts[5] = {};
@@ -112,10 +112,38 @@ static void uiStyle()
     s.WindowRounding=s.ChildRounding=s.FrameRounding=s.GrabRounding=s.PopupRounding=s.TabRounding=0;
     s.WindowBorderSize=s.ChildBorderSize=s.FrameBorderSize=1;
   }
+  if(uiTheme==5) {
+    // Original dark stone, aged brass and ember palette inspired by Quake menus.
+    for(auto slot:{ImGuiCol_WindowBg,ImGuiCol_PopupBg,ImGuiCol_MenuBarBg,ImGuiCol_Tab,ImGuiCol_TabDimmed})c[slot]=uiColor(39,32,27);
+    c[ImGuiCol_ChildBg]=c[ImGuiCol_FrameBg]=uiColor(22,19,17);
+    c[ImGuiCol_Text]=uiColor(224,201,156);c[ImGuiCol_TextDisabled]=uiColor(139,119,94);
+    c[ImGuiCol_Border]=uiColor(105,76,45);c[ImGuiCol_BorderShadow]=uiColor(12,10,9);
+    c[ImGuiCol_TitleBg]=uiColor(26,21,18);c[ImGuiCol_TitleBgActive]=uiColor(73,42,26);
+    c[ImGuiCol_Button]=uiColor(80,54,34);c[ImGuiCol_ButtonHovered]=uiColor(123,76,38);c[ImGuiCol_ButtonActive]=uiColor(167,90,33);
+    c[ImGuiCol_FrameBgHovered]=uiColor(57,41,28);c[ImGuiCol_FrameBgActive]=uiColor(74,48,30);
+    c[ImGuiCol_Header]=c[ImGuiCol_TabSelected]=uiColor(85,49,29);c[ImGuiCol_HeaderHovered]=c[ImGuiCol_TabHovered]=uiColor(120,68,30);
+    c[ImGuiCol_HeaderActive]=uiColor(149,77,29);c[ImGuiCol_TabDimmedSelected]=uiColor(66,43,28);
+    c[ImGuiCol_CheckMark]=c[ImGuiCol_SliderGrab]=c[ImGuiCol_SliderGrabActive]=c[ImGuiCol_TabSelectedOverline]=uiColor(236,151,62);
+    c[ImGuiCol_Separator]=uiColor(102,69,38);c[ImGuiCol_SeparatorHovered]=c[ImGuiCol_SeparatorActive]=uiColor(236,151,62);
+    s.FrameBorderSize=s.WindowBorderSize=s.ChildBorderSize=1;s.FrameRounding=s.GrabRounding=s.TabRounding=1;
+  }
   s.ScaleAllSizes(uiScale());
   ImGui::GetIO().FontDefault = uiFonts[uiScaleChoice];
 }
 static std::string uiClosedDialog;
+static void uiReachableWindows(){
+  auto display=ImGui::GetIO().DisplaySize;float margin=12*uiScale(),top=ImGui::GetFrameHeight()+margin;
+  for(auto window:ImGui::GetCurrentContext()->Windows){
+    if(!window->Active||window->DockIsActive||window->DockNode||window->Flags&(ImGuiWindowFlags_ChildWindow|ImGuiWindowFlags_Tooltip)||(window->Flags&ImGuiWindowFlags_NoDecoration)==ImGuiWindowFlags_NoDecoration)continue;
+    std::string name=window->Name;if(name=="First-time setup"||name=="Tools"||name=="Map"||name=="Material"||name=="Entity"||name=="FTE Engine terrain")continue;
+    ImVec2 size=window->SizeFull;
+    if(window->Appearing){auto ideal=ImGui::CalcWindowNextAutoFitSize(window);size.x=std::max(size.x,ideal.x);size.y=std::max(size.y,ideal.y);ImGui::SetWindowCollapsed(window,false,ImGuiCond_Always);}
+    size.x=std::clamp(size.x,std::min(280.f,display.x-2*margin),std::max(1.f,display.x-2*margin));
+    size.y=std::clamp(size.y,std::min(140.f,display.y-top-margin),std::max(1.f,display.y-top-margin));
+    if(size.x!=window->SizeFull.x||size.y!=window->SizeFull.y)ImGui::SetWindowSize(window,size,ImGuiCond_Always);
+    ImGui::SetWindowPos(window,{std::clamp(window->Pos.x,margin,std::max(margin,display.x-size.x-margin)),std::clamp(window->Pos.y,top,std::max(top,display.y-size.y-margin))},ImGuiCond_Always);
+  }
+}
 static bool uiDialog(const char* title, ImVec2 initial = {560, 240})
 {
   const auto display = ImGui::GetIO().DisplaySize;

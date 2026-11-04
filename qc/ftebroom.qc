@@ -296,13 +296,14 @@ void fb_update(vector pixel, float alt, int view)
         }
     }
 }
+void fb_tour_signal(int stage){if(cvar("ftebroom_tour_active")&&!cvar("ftebroom_tour_demo"))cvar_set("ftebroom_tour_result",itos(stage));}
 void fb_finish(vector pixel, float alt, int view)
 {
     if (!fb_active || view!=fb_gesture_view) return;
     if(view) alt=0;
     fb_update(pixel,alt,view);
     if(fb_owner==FB_OWNER_EXTRUDE) {
-        if(fb_dragged) fb_extrude_commit();
+        if(fb_dragged){int valid=fabs(fb_extrude_distance)>.001&&fb_extrude_valid(fb_extrude_distance);fb_extrude_commit();if(valid)fb_tour_signal(4);}
         else if(!view) fb_faces_click(fb_model,fb_brush,fb_face,FALSE);
         fb_cancel();return;
     }
@@ -330,10 +331,10 @@ void fb_finish(vector pixel, float alt, int view)
         // Dragging empty space with an existing selection does not create geometry.
     } else if (fb_moving) {
         if (vlen(fb_applied_offset)>0 || fb_transform_duplicate) {
-            fb_transform_commit(fb_applied_offset);
+            int tourStage113=2;if(alt)if(fabs(fb_applied_offset_z)>.001)tourStage113=3;fb_transform_commit(fb_applied_offset);fb_tour_signal(tourStage113);
         }
     } else {
-        if(!fb_primitive_create(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5,FALSE)) print("ReyondBroom: shape could not be created.\n");
+        if(!fb_primitive_create(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5,FALSE)) print("ReyondBroom: shape could not be created.\n");else fb_tour_signal(1);
     }
     int selectedPatch=!fb_dragged && fb_pick_kind==FB_HIT_PATCH && brush_isselected(fb_model,fb_brush);
     fb_cancel();

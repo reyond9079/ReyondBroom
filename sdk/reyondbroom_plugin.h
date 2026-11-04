@@ -37,6 +37,15 @@ typedef struct RBHostV1 {
     void (*same_line)(void);
     void (*disabled)(int begin);
     void (*progress)(float fraction, const char *label);
+    // Optional tail extension: test struct_size before accessing these callbacks.
+    // Paths are relative to the editor's data directory. Read size with out=NULL.
+    int (*read_data)(const char *path, char *out, size_t capacity);
+    // Writes generated OBJ/MTL/TGA under models or textures/reyond-plugins only.
+    int (*write_asset)(const char *path, const char *bytes, size_t length);
+    int (*input_text)(const char *label, char *value, size_t capacity);
+    // Non-destructive world-space line preview: six floats per segment; NULL clears it.
+    void (*preview_lines)(const float *xyz, size_t segments);
+    int (*section)(const char *label, int default_open);
 } RBHostV1;
 typedef struct RBPluginV1 {
     uint32_t api_version, struct_size;

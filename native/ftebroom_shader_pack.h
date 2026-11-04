@@ -129,6 +129,8 @@ static void shaderPackPanel(){
   }else if(!shaderPackReady()){if(ImGui::Button("Download Reyond's GLSL Shader Pack"))shaderPackStart();}
   else {
    shaderPackLoad();ImGui::TextUnformatted("Installed: 1.0.0 | Material collection: textures/reyondpack");
+   if(ImGui::Button("Open sample island")){shaderPackActivate(false);documentRequest("reyond-island-sample");shaderPackOpen=false;}
+   ImGui::TextWrapped("A small island surrounded by ocean and a complete sky. Change time, clouds, weather and seasons here to explore the pack.");
    if(!shaderPackError.empty()&&ImGui::Button("Download again"))shaderPackStart();
    if(!cvars->GetFloat("ftebroom_shader_pack_enabled")){if(ImGui::Button("Enable shader pack"))try{shaderPackActivate(true);}catch(const std::exception& e){shaderPackError=e.what();}}
    ImGui::TextWrapped("Water, sky, puddles, fog, fire, explosion, ambient GI, snow and ice can be applied in Materials. Snow/ice are visual; collision and baked lighting are unchanged.");
@@ -161,6 +163,7 @@ static void shaderPackCommand(){
   if(!std::strcmp(op,"download"))shaderPackStart();
   else if(!std::strcmp(op,"activate"))shaderPackActivate(true);
   else if(!std::strcmp(op,"save"))shaderPackSave();
+  else if(!std::strcmp(op,"sample")){if(!shaderPackReady())throw std::runtime_error("Download the shader pack first.");shaderPackActivate(false);documentRequest("reyond-island-sample");}
   else if(!std::strcmp(op,"status")){
    unsigned count=0;for(auto& pair:materials)if(pair.first.rfind("textures/reyondpack/",0)==0)++count;
    core->Print(("REYOND_SHADER_PACK ready="+std::to_string(shaderPackReady())+" enabled="+std::to_string(cvars->GetFloat("ftebroom_shader_pack_enabled"))+" materials="+std::to_string(count)+"\n").c_str());

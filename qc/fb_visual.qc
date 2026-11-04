@@ -10,6 +10,7 @@ var vector autocvar_ftebroom_color_locked = '0.15 0.4 1';
 var vector autocvar_ftebroom_color_hover = '1 0.8 0.25';
 var float autocvar_ftebroom_hover_highlight = 0;
 var float autocvar_ftebroom_selection_dimensions = 1;
+var float autocvar_ftebroom_coordinate_size=8;
 var float autocvar_ftebroom_selection_spikes = 1;
 int fb_visual_label_count,fb_visual_spike_count;
 int fb_visual_hover,fb_visual_has_bounds,fb_visual_spikes;
@@ -594,11 +595,11 @@ void fb_visual_labels()
         vector pixel=project(position);pixel_z=0;
         string axisName="X";if(axis==1) axisName="Y";if(axis==2) axisName="Z";
         string label=sprintf("%s: %g",axisName,fb_visual_max[axis]-fb_visual_min[axis]);
-        float width=strlen(label)*8;
+        float fontSize=bound(8,autocvar_ftebroom_coordinate_size,40);float width=stringwidth(label,TRUE,[fontSize,fontSize,0]);
         if(pixel_x<mn_x || pixel_y<mn_y || pixel_x>=mn_x+sz_x || pixel_y>=mn_y+sz_y) continue;
-        pixel_x=bound(mn_x+3,pixel_x+6,mn_x+sz_x-width-3);pixel_y=bound(mn_y+3,pixel_y+6,mn_y+sz_y-15);
+        pixel_x=bound(mn_x+3,pixel_x+6,mn_x+sz_x-width-3);pixel_y=bound(mn_y+3,pixel_y+6,mn_y+sz_y-fontSize-7);
         fb_visual_label_count++;
-        drawfill(pixel-'2 1 0',[width+4,13,0],'0.05 0.05 0.05',0.85,0);
-        drawstring(pixel,label,'8 8 0',autocvar_ftebroom_color_selected,1,0);
+        drawfill(pixel-'2 1 0',[width+4,fontSize+5,0],'0.05 0.05 0.05',0.85,0);
+        drawstring(pixel,label,[fontSize,fontSize,0],autocvar_ftebroom_color_selected,1,0);
     }
 }

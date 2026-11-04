@@ -1,0 +1,69 @@
+--- a/client/pr_csqc.c
++++ b/client/pr_csqc.c
+@@ -3269,22 +3269,23 @@
+  G_INT(OFS_RETURN)=trace.fraction>=.999f;
+ }
+ typedef struct {unsigned int index;vec3_t pixel;float alpha,width;qboolean selected;} rb_label_draw_t;
+-static struct {qboolean valid;pubprogfuncs_t *vm;char *base;unsigned int offset,total,revision,mode,generation,count,capacity;float matrix[16],rect[4],distance;rb_label_draw_t *items;unsigned int selectedCount,selectedCapacity;int *selected;} rb_label_draw_cache;
++static struct {qboolean valid;pubprogfuncs_t *vm;char *base;unsigned int offset,total,revision,mode,generation,count,capacity;float matrix[16],rect[4],distance,fontSize;rb_label_draw_t *items;unsigned int selectedCount,selectedCapacity;int *selected;} rb_label_draw_cache;
+ 
+ static unsigned int RB_LabelViewGeneration(void);
+ 
+ // Measure once, then batch all backgrounds before all text, as in TrenchBroom.
++static float rb_editor_label_size=13;
+ static float RB_EditorLabelWidth(pubprogfuncs_t *vm,struct globalvars_s *pr_globals,int text){
+- G_INT(OFS_PARM0)=text;G_FLOAT(OFS_PARM1)=1;VectorSet(G_VECTOR(OFS_PARM2),13,13,0);vm->callargc=3;
++ G_INT(OFS_PARM0)=text;G_FLOAT(OFS_PARM1)=1;VectorSet(G_VECTOR(OFS_PARM2),rb_editor_label_size,rb_editor_label_size,0);vm->callargc=3;
+  PF_CL_stringwidth(vm,pr_globals);return G_FLOAT(OFS_RETURN);
+ }
+ static void RB_DrawEditorLabel(pubprogfuncs_t *vm,struct globalvars_s *pr_globals,const float *anchor,int text,float width,float alpha,qboolean selected,int textPass){
+- float x=floorf(anchor[0]-width*.5f),y=floorf(anchor[1]-17);
++ float scale=rb_editor_label_size/13;float x=floorf(anchor[0]-width*.5f),y=floorf(anchor[1]-17*scale);
+  if(!textPass){
+   R2D_ImageColours(selected?1:0,0,0,.6f*alpha);
+-  R2D_FillBlock(x-1,y-4,width+2,1);R2D_FillBlock(x-3,y-3,width+6,2);R2D_FillBlock(x-4,y-1,width+8,15);R2D_FillBlock(x-3,y+14,width+6,2);R2D_FillBlock(x-1,y+16,width+2,1);return;
++  R2D_FillBlock(x-scale,y-4*scale,width+2*scale,scale);R2D_FillBlock(x-3*scale,y-3*scale,width+6*scale,2*scale);R2D_FillBlock(x-4*scale,y-scale,width+8*scale,15*scale);R2D_FillBlock(x-3*scale,y+14*scale,width+6*scale,2*scale);R2D_FillBlock(x-scale,y+16*scale,width+2*scale,scale);return;
+  }
+- VectorSet(G_VECTOR(OFS_PARM0),x,y,0);G_INT(OFS_PARM1)=text;VectorSet(G_VECTOR(OFS_PARM2),13,13,0);VectorSet(G_VECTOR(OFS_PARM3),1,1,1);G_FLOAT(OFS_PARM4)=alpha;G_FLOAT(OFS_PARM5)=0;vm->callargc=6;
++ VectorSet(G_VECTOR(OFS_PARM0),x,y,0);G_INT(OFS_PARM1)=text;VectorSet(G_VECTOR(OFS_PARM2),rb_editor_label_size,rb_editor_label_size,0);VectorSet(G_VECTOR(OFS_PARM3),1,1,1);G_FLOAT(OFS_PARM4)=alpha;G_FLOAT(OFS_PARM5)=0;vm->callargc=6;
+  PF_CL_drawcolouredstring(vm,pr_globals);
+ }
+ 
+@@ -3293,6 +3294,7 @@
+ {
+  unsigned int offset=G_INT(OFS_PARM0),total=G_INT(OFS_PARM1),stride=G_INT(OFS_PARM2),mode=G_INT(OFS_PARM3),i;
+  int saved[18],argc=vm->callargc,drawn=0,tested=0;vec3_t forward,right,up;float tx,ty;editorqcpoint_t *points;
++ float requestedSize=Cvar_VariableValue("ftebroom_label_size");rb_editor_label_size=isfinite(requestedSize)&&requestedSize>=8?bound(8,requestedSize,40):13;
+  float labelDistance=Cvar_VariableValue("ftebroom_label_distance");unsigned int selectedCount=argc>6?G_INT(OFS_PARM6):0,selectedOffset=argc>6?G_INT(OFS_PARM5):0;
+  unsigned int revision=argc>4?G_INT(OFS_PARM4):0,generation=RB_LabelViewGeneration();float rect[4];
+  G_VECTOR(OFS_RETURN)[0]=-1;G_VECTOR(OFS_RETURN)[1]=G_VECTOR(OFS_RETURN)[2]=0;
+@@ -3304,7 +3306,7 @@
+  memcpy(saved,(int*)pr_globals+OFS_PARM0,sizeof(saved));
+  qboolean cacheable=argc>4&&generation&&Cvar_VariableValue("ftebroom_label_cache");
+  qboolean sameSelection=rb_label_draw_cache.selectedCount==selectedCount&&(!selectedCount||!memcmp(rb_label_draw_cache.selected,vm->stringtable+selectedOffset,selectedCount*sizeof(int)));
+- qboolean reuse=cacheable&&sameSelection&&rb_label_draw_cache.distance==labelDistance&&rb_label_draw_cache.valid&&rb_label_draw_cache.vm==vm&&rb_label_draw_cache.base==vm->stringtable&&rb_label_draw_cache.offset==offset&&rb_label_draw_cache.total==total&&rb_label_draw_cache.revision==revision&&rb_label_draw_cache.mode==mode&&rb_label_draw_cache.generation==generation&&!memcmp(rb_label_draw_cache.matrix,csqc_proj_matrix,sizeof(rb_label_draw_cache.matrix))&&!memcmp(rb_label_draw_cache.rect,rect,sizeof(rect));
++ qboolean reuse=cacheable&&sameSelection&&rb_label_draw_cache.fontSize==rb_editor_label_size&&rb_label_draw_cache.distance==labelDistance&&rb_label_draw_cache.valid&&rb_label_draw_cache.vm==vm&&rb_label_draw_cache.base==vm->stringtable&&rb_label_draw_cache.offset==offset&&rb_label_draw_cache.total==total&&rb_label_draw_cache.revision==revision&&rb_label_draw_cache.mode==mode&&rb_label_draw_cache.generation==generation&&!memcmp(rb_label_draw_cache.matrix,csqc_proj_matrix,sizeof(rb_label_draw_cache.matrix))&&!memcmp(rb_label_draw_cache.rect,rect,sizeof(rect));
+  if(reuse){
+   for(int textPass=0;textPass<2;textPass++)for(unsigned int j=0;j<rb_label_draw_cache.count;j++){
+    rb_label_draw_t *entry=&rb_label_draw_cache.items[j];editorqcpoint_t *p=&points[entry->index];
+@@ -3326,9 +3328,9 @@
+   if(!(mode&1) && !p->model && (depth+p->radius<0||fabs(DotProduct(delta,right))>depth*tx+p->radius*(1+tx)||fabs(DotProduct(delta,up))>depth*ty+p->radius*(1+ty)))continue;
+   VectorSubtract(p->label,r_refdef.vieworg,delta);if(!(mode&1)&&DotProduct(delta,forward)<=0)continue;
+   if(!(mode&1) && RB_OccludedPoint(p->label))continue;
+-  G_INT(OFS_PARM0)=p->name;name=PR_GetStringOfs(vm,OFS_PARM0);width=strlen(name)*13+8;
++  G_INT(OFS_PARM0)=p->name;name=PR_GetStringOfs(vm,OFS_PARM0);width=strlen(name)*rb_editor_label_size+8;
+   VectorCopy(p->label,G_VECTOR(OFS_PARM0));PF_cs_project(vm,pr_globals);VectorCopy(G_VECTOR(OFS_RETURN),pixel);pixel[2]=0;
+-  if(pixel[0]+width*.5f<r_refdef.grect.x||pixel[1]+4<r_refdef.grect.y||pixel[0]-width*.5f>=r_refdef.grect.x+r_refdef.grect.width||pixel[1]-21>=r_refdef.grect.y+r_refdef.grect.height)continue;
++  if(pixel[0]+width*.5f<r_refdef.grect.x||pixel[1]+4<r_refdef.grect.y||pixel[0]-width*.5f>=r_refdef.grect.x+r_refdef.grect.width||pixel[1]-21*rb_editor_label_size/13>=r_refdef.grect.y+r_refdef.grect.height)continue;
+   if(!(mode&1) && !RB_LabelsComplete()){trace_t tr=World_Move(&csqc_world,r_refdef.vieworg,vec3_origin,vec3_origin,p->label,MOVE_NOMONSTERS|MOVE_IGNOREHULL|REYONDBROOM_MOVE_OCCLUSION,(wedict_t*)csqc_world.edicts);tested++;if(tr.fraction<.999f)continue;}
+   {
+    if(rb_label_draw_cache.count==rb_label_draw_cache.capacity){rb_label_draw_cache.capacity=rb_label_draw_cache.capacity?rb_label_draw_cache.capacity*2:256;rb_label_draw_cache.items=BZ_Realloc(rb_label_draw_cache.items,rb_label_draw_cache.capacity*sizeof(*rb_label_draw_cache.items));}
+@@ -3340,7 +3342,7 @@
+   RB_DrawEditorLabel(vm,pr_globals,entry->pixel,p->name,entry->width,entry->alpha,entry->selected,textPass);if(textPass)drawn++;
+  }
+  BZ_Free(selectedHash);
+- if(cacheable){if(selectedCount>rb_label_draw_cache.selectedCapacity){rb_label_draw_cache.selectedCapacity=selectedCount;rb_label_draw_cache.selected=BZ_Realloc(rb_label_draw_cache.selected,selectedCount*sizeof(int));}if(selectedCount)memcpy(rb_label_draw_cache.selected,vm->stringtable+selectedOffset,selectedCount*sizeof(int));rb_label_draw_cache.selectedCount=selectedCount;rb_label_draw_cache.distance=labelDistance;rb_label_draw_cache.vm=vm;rb_label_draw_cache.base=vm->stringtable;rb_label_draw_cache.offset=offset;rb_label_draw_cache.total=total;rb_label_draw_cache.revision=revision;rb_label_draw_cache.mode=mode;rb_label_draw_cache.generation=generation;memcpy(rb_label_draw_cache.matrix,csqc_proj_matrix,sizeof(rb_label_draw_cache.matrix));memcpy(rb_label_draw_cache.rect,rect,sizeof(rect));rb_label_draw_cache.valid=true;}
++ if(cacheable){if(selectedCount>rb_label_draw_cache.selectedCapacity){rb_label_draw_cache.selectedCapacity=selectedCount;rb_label_draw_cache.selected=BZ_Realloc(rb_label_draw_cache.selected,selectedCount*sizeof(int));}if(selectedCount)memcpy(rb_label_draw_cache.selected,vm->stringtable+selectedOffset,selectedCount*sizeof(int));rb_label_draw_cache.selectedCount=selectedCount;rb_label_draw_cache.fontSize=rb_editor_label_size;rb_label_draw_cache.distance=labelDistance;rb_label_draw_cache.vm=vm;rb_label_draw_cache.base=vm->stringtable;rb_label_draw_cache.offset=offset;rb_label_draw_cache.total=total;rb_label_draw_cache.revision=revision;rb_label_draw_cache.mode=mode;rb_label_draw_cache.generation=generation;memcpy(rb_label_draw_cache.matrix,csqc_proj_matrix,sizeof(rb_label_draw_cache.matrix));memcpy(rb_label_draw_cache.rect,rect,sizeof(rect));rb_label_draw_cache.valid=true;}
+  vm->callargc=argc;memcpy((int*)pr_globals+OFS_PARM0,saved,sizeof(saved));VectorSet(G_VECTOR(OFS_RETURN),drawn,tested,0);
+ }
+ typedef struct {int id,model,node,count,u,v,sky,brushEnd;vec3_t center,normal;unsigned int points;float spacing,radius;unsigned int vertices,triangles,lines;int occluder;} rb_grid_face_t;

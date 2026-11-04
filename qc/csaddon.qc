@@ -255,6 +255,12 @@ void() wrap_renderscene =
     fb_view_rect(active);
     if(!activeType) {setproperty(VF_PERSPECTIVE,TRUE);setproperty(VF_MINDIST,4);setproperty(VF_MAXDIST,0);setproperty(VF_AFOV,fb_camera_zoom);}
     fb_view_prepare();
+    if(cvar("ftebroom_tour_active")){
+        vector anchor113='0 0 32';int step113=cvar("ftebroom_tour_step");
+        if(selectedbrushcount){vector bounds113[2];brush_getfacepoints(selectedbrushes[0].model,selectedbrushes[0].id,0,bounds113,2);anchor113=(bounds113[0]+bounds113[1])*.5;if(step113==4)anchor113_z=bounds113[1][2];}
+        vector screen113=project(anchor113);
+        cvar_set("ftebroom_tour_anchor",sprintf("%g %g",screen113_x,screen113_y));
+    }
     float profileTime=gettime(1);
     if(!fb_build_preview_active){
         fb_perf80_pointer();ftebroom_prepare();
@@ -704,7 +710,7 @@ float(string cmd) CSQC_ConsoleCommand =
         cvar_set("ca_brush_view",cvar_string(sprintf("ftebroom_view%i_type",pane)));
     }
     // Restore the focused projection before dispatch; rectangle parsing uses argv.
-    if(cvar("ftebroom_view_count")>1) {
+    if(cvar("ftebroom_view_count")>1 || argv(0)=="ftebroom_pointer") {
         fb_view_rect(cvar("ftebroom_view_active"));
         setproperty(VF_PERSPECTIVE,TRUE);setproperty(VF_MINDIST,4);setproperty(VF_MAXDIST,0);setproperty(VF_ORIGIN,fb_camera_eye);
         setproperty(VF_ANGLES,(vector)getproperty(VF_CL_VIEWANGLES));setproperty(VF_AFOV,fb_camera_zoom);
@@ -758,6 +764,10 @@ float(string cmd) CSQC_ConsoleCommand =
     if (fb_bend_command()) return TRUE;
     if (fb_array_command()) return TRUE;
     if (fb_generator_command()) return TRUE;
+    if(argv(0)=="ftebroom_tour_prepare"){
+        fb_cancel();fb_tool_deactivate();fb_selection_clear();if(stoi(argv(1))>=2)fb_createbox('0 0 32','96 96 64');return TRUE;
+    }
+    if (fb_plugin_surfaces_command()) return TRUE;
     if (fb_plugin_batch_command()) return TRUE;
     if (fb_settle_command()) return TRUE;
     if (fb_land_command()) return TRUE;
@@ -828,6 +838,8 @@ void(float prevprogs) init =
     registercommand("ftebroom_entity_definitions_loaded");
     registercommand("ftebroom_plugin_batch");
     registercommand("ftebroom_plugin_selection");
+    registercommand("ftebroom_plugin_surfaces");
+    registercommand("ftebroom_tour_prepare");
     registercommand("ftebroom_undo");
     registercommand("ftebroom_redo");
     registercommand("ftebroom_delete");

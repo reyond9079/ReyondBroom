@@ -3,7 +3,7 @@
 static const char* preferenceVariables[] = {
   "v_gamma","v_contrast",
   "ftebroom_tool_opacity",
-  "ftebroom_label_distance","ftebroom_grid_fade_start","ftebroom_grid_fade_end","ftebroom_grid_aa","gl_texture_anisotropy","gl_texturemode","vid_multisample",
+  "ftebroom_label_size","ftebroom_coordinate_size","ftebroom_label_distance","ftebroom_grid_fade_start","ftebroom_grid_fade_end","ftebroom_grid_aa","gl_texture_anisotropy","gl_texturemode","vid_multisample",
   "ftebroom_autosave_interval","ftebroom_autosave_count","ftebroom_drag_mode",
   "ftebroom_wheel_grid","ftebroom_wheel_invert","ftebroom_hover_highlight",
   "ftebroom_selection_dimensions","ftebroom_selection_spikes","ftebroom_view_layout",
@@ -149,7 +149,7 @@ static void testPreferences()
   for(auto& a:actions)if(std::string(a.id)=="Menu/Tools/Clip")shortcutApply(a,"Shift+c");
   expect(shortcutConflicts().empty(),"reassignment_resolves_conflict");
   for(auto& a:actions)if(std::string(a.id)=="Menu/Tools/Clip"||std::string(a.id)=="Menu/Tools/Vertex")shortcutOverrides[shortcutVariable(a.id)]=a.shortcutText;
-  cvars->SetFloat("ftebroom_autosave_count",7);expect(preferencesSave(),"preferences_saved");
+  cvars->SetFloat("ftebroom_label_size",26);cvars->SetFloat("ftebroom_coordinate_size",16);cvars->SetFloat("ftebroom_autosave_count",7);expect(preferencesSave(),"preferences_saved");
   std::ifstream saved(documentPath("ftebroom-preferences.cfg"));std::string text((std::istreambuf_iterator<char>(saved)),{});
   expect(text.find("seta ftebroom_autosave_count \"7\"")!=std::string::npos && text.find("Shift+c")!=std::string::npos,"preferences_file_contains_values");
   preferencesRequest=true;
@@ -158,5 +158,5 @@ static void testPreferencesReload()
 {
   if(!cvars->GetFloat("ftebroom_skip_setup"))return;initActions();bool clip=false,vertex=false;
   for(const auto& a:actions){if(std::string(a.id)=="Menu/Tools/Clip")clip=a.shortcutText=="Shift+c";if(std::string(a.id)=="Menu/Tools/Vertex")vertex=a.shortcutText=="c";}
-  core->Print(clip&&vertex&&cvars->GetFloat("ftebroom_autosave_count")==7?"FTEBROOM_PREFS_PASS restart_restores_preferences\n":"FTEBROOM_PREFS_FAIL restart_restores_preferences\n");
+  core->Print(clip&&vertex&&cvars->GetFloat("ftebroom_autosave_count")==7&&cvars->GetFloat("ftebroom_label_size")==26&&cvars->GetFloat("ftebroom_coordinate_size")==16?"FTEBROOM_PREFS_PASS restart_restores_preferences\n":"FTEBROOM_PREFS_FAIL restart_restores_preferences\n");
 }

@@ -7,6 +7,7 @@ archive=a.output/f'ReyondBroom-{a.version}-Plugin-SDK.zip'
 names=['sdk/reyondbroom_plugin.h','sdk/LICENSE.txt','plugins/rubble/rubble.cpp','plugins/rubble/feasibility.h',
        'plugins/rubble/plugin.ini','plugins/rubble/CMakeLists.txt',
        'scripts/build-plugins.py','docs/plugins.md','GPL-3.0-LICENSE.txt']
+names += [p.relative_to(src).as_posix() for folder in ('plugins/common','plugins/levelgen','plugins/ivy') for p in (src/folder).rglob('*') if p.is_file()]
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
     for name in names:z.write(src/name,'ReyondBroom-Plugin-SDK/'+name)
 archive.with_suffix('.zip.sha256').write_text(hashlib.sha256(archive.read_bytes()).hexdigest()+'  '+archive.name+'\n',encoding='ascii')

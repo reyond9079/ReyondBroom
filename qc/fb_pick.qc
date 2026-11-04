@@ -1,4 +1,5 @@
 var float autocvar_ftebroom_label_distance=768;
+var float autocvar_ftebroom_label_size=13;
 float fb_label_alpha(vector point,int selected,int ortho)
 {
     if(ortho || selected || autocvar_ftebroom_label_distance<=0)return 1;
@@ -13,17 +14,18 @@ void fb_label_font_prepare(){
 void fb_label_draw(vector anchor,string text,int selected,int group,float alpha){
     if(alpha<=0)return;
     float previous=drawfont;fb_label_font_prepare();drawfont=fb_label_font;
-    float width=stringwidth(text,TRUE,'13 13 0');
-    vector pos=anchor-[width*.5,17,0],bg=selected?'1 0 0':'0 0 0';
+    float size=bound(8,autocvar_ftebroom_label_size,40),scale=size/13;
+    float width=stringwidth(text,TRUE,[size,size,0]);
+    vector pos=anchor-[width*.5,17*scale,0],bg=selected?'1 0 0':'0 0 0';
     pos_x=floor(pos_x);pos_y=floor(pos_y);
     // Three-pixel corners and four-pixel padding, like TrenchBroom overlays.
-    drawfill(pos+'-1 -4 0',[width+2,1,0],bg,.6*alpha,0);
-    drawfill(pos+'-3 -3 0',[width+6,2,0],bg,.6*alpha,0);
-    drawfill(pos+'-4 -1 0',[width+8,15,0],bg,.6*alpha,0);
-    drawfill(pos+'-3 14 0',[width+6,2,0],bg,.6*alpha,0);
-    drawfill(pos+'-1 16 0',[width+2,1,0],bg,.6*alpha,0);
+    drawfill(pos+'-1 -4 0'*scale,[width+2*scale,scale,0],bg,.6*alpha,0);
+    drawfill(pos+'-3 -3 0'*scale,[width+6*scale,2*scale,0],bg,.6*alpha,0);
+    drawfill(pos+'-4 -1 0'*scale,[width+8*scale,15*scale,0],bg,.6*alpha,0);
+    drawfill(pos+'-3 14 0'*scale,[width+6*scale,2*scale,0],bg,.6*alpha,0);
+    drawfill(pos+'-1 16 0'*scale,[width+2*scale,scale,0],bg,.6*alpha,0);
     vector foreground='1 1 1';if(group && !selected)foreground='0.7 0.4 1';
-    drawstring(pos,text,'13 13 0',foreground,alpha,0);
+    drawstring(pos,text,[size,size,0],foreground,alpha,0);
     drawfont=previous;
 }
 var float autocvar_ftebroom_label_cache=1;

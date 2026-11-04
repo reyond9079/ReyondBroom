@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 static bool uiLoaded = false, uiReset = false, uiLocked = false;
+static bool preferencesSave();
 static bool uiHasScene = false;
 static ImVec2 uiScenePos, uiSceneSize;
 static ImGuiID uiDockId;
@@ -65,7 +66,7 @@ static void uiLoad()
     {
       uiScaleChoice = std::clamp(scale, 0, 4);
       uiLocked = locked != 0;
-      int theme=0;if(appearance>>theme)uiTheme=std::clamp(theme,0,4);
+      int theme=0;if(appearance>>theme)uiTheme=std::clamp(theme,0,5);
       int language=0;if(appearance>>language)uiLanguage=std::clamp(language,0,6);
       int cursor=uiDefaultCursorPercent;
       uiCursorPercent=(appearance>>cursor)?std::clamp(cursor,50,250):uiDefaultCursorPercent;
@@ -181,6 +182,13 @@ static ImGuiWindowFlags uiPanelFlags()
 static void uiPreferences()
 {
   ImGui::SeparatorText("Appearance and workspace");
+  if(ImGui::Combo("Interface theme",&uiTheme,uiThemeNames,6))uiSaveAppearance();
+  float labelSize=cvars->GetFloat("ftebroom_label_size"),coordinateSize=cvars->GetFloat("ftebroom_coordinate_size");
+  if(labelSize<8)labelSize=13;if(coordinateSize<8)coordinateSize=8;
+  if(ImGui::SliderFloat("Entity / group label size",&labelSize,8,40,"%.0f px",ImGuiSliderFlags_AlwaysClamp))cvars->SetFloat("ftebroom_label_size",std::round(labelSize));
+  if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
+  if(ImGui::SliderFloat("Coordinate label size",&coordinateSize,8,40,"%.0f px",ImGuiSliderFlags_AlwaysClamp))cvars->SetFloat("ftebroom_coordinate_size",std::round(coordinateSize));
+  if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
   if (
     ImGui::Combo(
       "UI / font scale",

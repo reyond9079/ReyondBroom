@@ -1,5 +1,7 @@
 # ReyondBroom FTE-native map editor
 
+**Alpha 113:** adjustable viewport labels, the Shader Pack island sample, a Quake theme, procedural level and ivy plugins, and optional interactive onboarding. [New tools, lessons and Sculpt instructions](docs/features113.md).
+
 **Alpha 112:** readable entity/group labels, a clear sky and Unreal-like studio preview for FTE Custom game, optional [Reyond's GLSL Shader Pack](docs/shader-pack.md), and clearer first-time setup. [Release guide](docs/alpha112.md) · [Viewport appearance](docs/studio-preview.md).
 
 [**Join our Discord**](https://discord.gg/eDMf53Kny)
@@ -9,13 +11,13 @@
 Automatic Blender download: [English](docs/alpha62.md).
 Model import, texture transfer and skin preview: [guide](docs/model-import64.md). Tools adapt to horizontal and vertical panels.
 
-[**Illustrated user manual**](docs/manual.md) · [**Linux x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.112/ReyondBroom-0.5.0-alpha.112-Linux-x64.tar.gz) · [**Linux SDL2 x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.112/ReyondBroom-0.5.0-alpha.112-Linux-SDL2-x64.tar.gz) · [Linux requirements](docs/linux.md)
+[**Illustrated user manual**](docs/manual.md) · [**Linux x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.113/ReyondBroom-0.5.0-alpha.113-Linux-x64.tar.gz) · [**Linux SDL2 x64 download**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.113/ReyondBroom-0.5.0-alpha.113-Linux-SDL2-x64.tar.gz) · [Linux requirements](docs/linux.md)
 
 [Quake 1 / LibreQuake / PAK / entity models](docs/alpha29.md)
 
 [FTE Custom game — game profile](docs/when-the-sky-went-dark.md)
 
-[**Download Windows x64 - 0.5.0-alpha.112**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.112/ReyondBroom-0.5.0-alpha.112-Windows-x64.zip)
+[**Download Windows x64 - 0.5.0-alpha.113**](https://github.com/reyond9079/ReyondBroom/releases/download/v0.5.0-alpha.113/ReyondBroom-0.5.0-alpha.113-Windows-x64.zip)
 
 An independent map editor built on FTE Quake, csaddon and Dear ImGui. Menus and tools surround a live engine viewport, with a persistent inspector and one to four perspective/orthographic panes. Profiles support Quake 1, Quake II, Quake III Arena, Half-Life and FTE Custom game. Quake 1 supports standard and Valve 220 MAP; Quake 3 retains its shaders and patches.
 

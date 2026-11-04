@@ -369,6 +369,7 @@ static bool dispatchAction(int key, bool down, bool inScene)
       }
     }
   }
+  if(tourActive)return false;
   for (auto& a : actions)
   {
     if (!actionMatches(a.context, currentActionContext()))
@@ -471,6 +472,7 @@ static void actionMenus()
     if (ImGui::BeginMenu(group))
     {
       actionMenuGroup(group);
+      if(std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
       if(std::string(group)=="Edit") {
         if(ImGui::BeginMenu("Symmetry")){
           actionMenuGroup("Edit/Symmetry");ImGui::Separator();
@@ -504,7 +506,7 @@ static void actionMenus()
         ImGui::EndMenu();
       }
       if(std::string(group)=="View" && ImGui::BeginMenu("Interface theme")) {
-        for(int t=0;t<5;t++)if(ImGui::MenuItem(uiThemeNames[t],nullptr,uiTheme==t)){uiTheme=t;uiSaveAppearance();}
+        for(int t=0;t<6;t++)if(ImGui::MenuItem(uiThemeNames[t],nullptr,uiTheme==t)){uiTheme=t;uiSaveAppearance();}
         ImGui::EndMenu();
       }
       if (std::string(group) == "View" && ImGui::BeginMenu("Grid"))

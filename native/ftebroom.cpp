@@ -174,6 +174,8 @@ static bool safeName(const char* name)
   return true;
 }
 
+static bool tourActive=false,tourOfferPending=false;
+static void tourBegin();
 static bool inspector = true, sceneDrag = false, sceneLook = false, altHeld = false;
 static bool selectMapTab = false, selectMaterialTab = false;
 static bool ctrlHeld = false, shiftHeld = false;
@@ -271,6 +273,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_actions.h"
 #include "ftebroom_preferences.h"
 #include "ftebroom_shapes.h"
+#include "ftebroom_tutorial.h"
 static void gridControl(const char* label)
 {
   const char* values[] = {
@@ -297,11 +300,18 @@ static void panel(float w, float h)
   io.MouseDrawCursor = false;
 #endif
   ImGui::NewFrame();
+  if(tourActive){
+    uiHasScene=true;uiScenePos={0,0};uiSceneSize={w,h};popupOpen=false;viewCompute(w,h);
+    if(io.WantTextInput||sceneDrag)std::fill(std::begin(moveHeld),std::end(moveHeld),false);
+    cvars->SetFloat("ftebroom_forward",float(moveHeld[0])-float(moveHeld[1]));cvars->SetFloat("ftebroom_right",float(moveHeld[3])-float(moveHeld[2]));cvars->SetFloat("ftebroom_up",float(moveHeld[4])-float(moveHeld[5]));
+    tourPanel(w,h);uiCursorUpdate(sceneLook,uiCursorPercent/100.f);render();return;
+  }
   const float menuHeight = ImGui::GetFrameHeight();
   const float toolbarHeight = ImGui::GetFrameHeight() + 18 * uiScale();
   const float statusHeight = ImGui::GetTextLineHeight() + 16 * uiScale();
   uiWorkspace(w, h, menuHeight + toolbarHeight, statusHeight);
   projectSetup();
+  tourOfferPanel();
   modPreviewPanel();
   viewCompute(w, h);
   viewOverlay();
@@ -448,7 +458,7 @@ static void panel(float w, float h)
         uiReset = true;
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 112");
+    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 113");
     ImGui::EndMainMenuBar();
   }
   const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
@@ -794,7 +804,9 @@ static void panel(float w, float h)
     if(ImGui::DragFloat(toolOptionLabel(horizontalTools,"Intensity"),&intensity,.1f,.1f,1024,"%.1f"))cvars->SetFloat("ftebroom_sculpt_intensity",std::clamp(intensity,.1f,1024.f));
     bool protect=cvars->GetFloat("ftebroom_sculpt_prevent_collapse")!=0;
     if(ImGui::Checkbox("Prevent collapse",&protect))cvars->SetFloat("ftebroom_sculpt_prevent_collapse",protect);
-    if(horizontalTools)ImGui::SameLine();ImGui::TextWrapped("Drag over brush surfaces | Esc: cancel stroke");
+    if(horizontalTools)ImGui::SameLine();ImGui::TextWrapped("Drag over existing vertices | Esc: cancel stroke");
+    ImGui::TextWrapped("A large flat face has no vertices in its middle. Increase Radius to reach its corners, or select it and subdivide it first.");
+    if(ImGui::Button("Subdivide selected brushes...")){generatorWindow=6;generatorPreview=false;}
   }
   else if(currentTool==4)
   {
@@ -1109,7 +1121,7 @@ static void panel(float w, float h)
     if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
-      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 112");
+      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 113");
       ImGui::TextLinkOpenURL("Check published releases","https://github.com/reyond9079/ReyondBroom/releases");
       updatePanel();
       ImGui::EndTabItem();
@@ -1132,7 +1144,7 @@ static void panel(float w, float h)
   shaderPackPanel();
   modFilesPanel();
   modelViewerPanel();
-  pluginsPanel();
+  pluginsPanel();pluginPreviewDraw();
   symmetryPanel();generatorPanel();arrayPanel();settlePanel();spawnMasterPanel();unityPanel();textureFolderPanel();prefabPanel();entityListPanel();
   importDialog();
   desktopAttach();
@@ -1142,6 +1154,7 @@ static void panel(float w, float h)
   linuxPlatformTestPanel();
 #endif
   uiCursorUpdate(sceneLook||modelEditCameraCaptured||modCaptured,uiCursorPercent/100.f);
+  uiReachableWindows();
   render();
   modEmbedTick(w,h);
   uiSaveLayout();
@@ -1276,6 +1289,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
       io.AddKeyEvent(ImGuiMod_Alt, down);
       cvars->SetFloat("ftebroom_alt", down);
     }
+    if(tourActive&&(tourDemo||ImGui::GetTime()<tourInputReady))return qtrue;
     if (preferencesCaptureKey(key,down)) return qtrue;
     if (modEmbedded && inScene && key == mouseKeys[0])return qtrue;
     if (key == mouseKeys[0])
@@ -1490,6 +1504,7 @@ static void mapReady()
                                         : documentPath("maps/" + name + ".map");
       if(loadedAlias!=name)++documentGeneration;
       loadedAlias=name;
+      if(name=="reyond-island-sample"&&gameProfile==1)command("in 0.35 ftebroom_camera_restore 0 -300 180 6 90 0 90\n");
       if(!documentFile.empty())documentName=documentFile.stem().u8string();
       pendingDocumentFile.clear();
       pendingDocumentAlias.clear();
@@ -1503,6 +1518,7 @@ static void mapReady()
     }
     std::snprintf(mapName, sizeof mapName, "%s", documentName.c_str());
   }
+  if(tourActive){documentUntitled=true;documentFile.clear();documentName="untitled";tourMapReady();}
   documentIndexLines(documentFile);
   if(!documentUntitled){recentRemember(documentFile,gameProfile);cacheProjectRemember();}
   if(!documentFile.empty())fileBrowserFolder=documentFile.parent_path();

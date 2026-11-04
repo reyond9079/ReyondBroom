@@ -382,7 +382,7 @@ static void projectSetup()
         bool finish=ImGui::Button("Start editing",{buttonWidth,0});
         auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
         setupFinishCenter={(a.x+b.x)*.5f,(a.y+b.y)*.5f};
-        if(finish){uiSaveAppearance();firstSetupStep=-1;ImGui::CloseCurrentPopup();}
+        if(finish){uiSaveAppearance();firstSetupStep=-1;tourOfferPending=!cvars->GetFloat("ftebroom_skip_setup");ImGui::CloseCurrentPopup();}
       }
       ImGui::EndDisabled();
       if(firstSetupStep==4&&projectLoadRequested(loadRequested)) {

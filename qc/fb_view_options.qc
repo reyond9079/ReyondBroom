@@ -211,7 +211,18 @@ string fb_editor_sky_material(){
 // Every editable preview keeps masked WAD texels, including selection/drag layers.
 string fb_surface_preview_shader(string source,float alpha)
 {
-    if(cvar("ftebroom_game_profile")==1 && cvar("ftebroom_shader_pack_enabled") && (substring(source,0,19)=="textures/reyondpack/" || substring(source,0,11)=="reyondpack/"))return substring(source,0,9)=="textures/"?source:strcat("textures/",source);
+    if(cvar("ftebroom_game_profile")==1 && cvar("ftebroom_shader_pack_enabled")){
+        string packName=fb_material_key(source);
+        if(packName=="reyondpack/sky"){
+            string skyName=strcat("ftebroom/pack-sky#",cvar_string("ftebroom_material_tag_epoch"));
+            shaderforname(skyName,"{\ncull none\n{\nprogram glsl/reyondpack/sky.glsl\nmap $whiteimage\nmap $linear:$nosrgb:$3d:textures/reyondpack/cloud-volume.ktx\ndepthwrite\n}\n}\n");return skyName;
+        }
+        if(packName=="reyondpack/ocean"){
+            string waterName=strcat("ftebroom/pack-water#",cvar_string("ftebroom_material_tag_epoch"));
+            shaderforname(waterName,"{\ncull none\nsort blend\n{\nprogram glsl/ftebroom_pack_ocean.glsl\nmap $whiteimage\nmap $linear:$nosrgb:$3d:textures/reyondpack/cloud-volume.ktx\nblendfunc blend\ndepthwrite\n}\n}\n");return waterName;
+        }
+        if(substring(source,0,19)=="textures/reyondpack/" || substring(source,0,11)=="reyondpack/")return substring(source,0,9)=="textures/"?source:strcat("textures/",source);
+    }
     if(cvar("ftebroom_game_profile")==1 && fb_sky_material(source))return cvar("ftebroom_clear_sky")?fb_editor_sky_material():source;
     string material=fb_material_key(source),preview="";
     string lookup=fb_material_preview_key(material);

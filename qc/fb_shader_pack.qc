@@ -83,6 +83,11 @@ void fb_shader_pack_finish(){RSPFinish();}
 // Cloudless, editor-only background. Explicit map sky surfaces draw over it.
 void fb_editor_clear_sky(){
  if(cvar("ftebroom_game_profile")!=1 || !cvar("ftebroom_clear_sky") || cvar("ca_brush_view"))return;
+ // A MAP sky shell is responsible for its own complete atmosphere. Do not
+ // place a second editor backdrop in front of that shell or its water pass.
+ static int skyEpoch=-1,hasPackSky;
+ if(skyEpoch!=fb_face_upload_epoch){skyEpoch=fb_face_upload_epoch;hasPackSky=FALSE;for(int f=0;f<fb_render_face_count;f++)if(strstrofs(fb_render_faces[f].shader,"ftebroom/pack-sky#",0)==0){hasPackSky=TRUE;break;}}
+ if(hasPackSky&&cvar("ftebroom_shader_pack_enabled"))return;
  string sky=fb_editor_sky_material();
  vector center=getproperty(VF_ORIGIN);
  for(int axis=0;axis<3;axis++)for(int side=0;side<2;side++){

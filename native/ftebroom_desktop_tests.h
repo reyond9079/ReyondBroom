@@ -9,6 +9,28 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode)=="models116compile"){
+    firstSetupStep=-1;setupNeeded=false;recentWindow=false;gamePreviewAfterBuild=false;runLoad();buildLoadSettings();buildGeometry=buildVis=buildLight=true;buildArguments[0]="";buildArguments[1]="-fast";buildArguments[2]="";buildBegin();runMissingDecision=1;expect(buildRunning,"models116_build_started");
+  }
+  if(std::string(mode)=="models116compiled"){
+    expect(!buildRunning&&!runHadError&&!buildResult.empty(),"models116_compile_complete");
+    auto source=q1Read(documentFile);expect(source.find("\"classname\" \"func_model\"")!=source.npos,"models116_original_map_class_unchanged");
+    auto compiled=q1Read(buildResult);size_t at=ftebroom::quake1::word(compiled,4),length=ftebroom::quake1::word(compiled,8);auto entities=compiled.substr(at,length);
+    expect(entities.find("misc_model")!=entities.npos&&entities.find("ivy-runtime116.mdl")!=entities.npos,"models116_bsp_keeps_runtime_model");
+    expect(std::filesystem::exists(buildResult.parent_path()/"models/reyond-plugins/ivy-runtime116.mdl"),"models116_model_staged_with_build");
+    std::ofstream(documentPath("models116-result.txt"))<<buildResult.generic_u8string()<<'\n'<<documentFile.generic_u8string()<<'\n';
+    command("ftebroom_camera_restore 0 -180 100 0 90 0 90\n");
+  }
+  if(std::string(mode)=="models116visible")expect(cvars->GetFloat("ftebroom_bsp_preview")&&cvars->GetFloat("ftebroom_bsp_entities")>=2,"models116_external_model_in_compiled_view");
+  if(std::string(mode)=="models116mod"){
+    buildEdit();modLaunch(buildResult,false);expect(runActive&&!runHadError,"models116_real_librequake_preview_started");
+  }
+  if(std::string(mode)=="models116modcheck"){
+    expect(runActive&&!runHadError,"models116_mod_preview_alive");
+    expect(runLog.find("Couldn't find spawn function for func_model")==runLog.npos,"models116_no_unknown_model_spawn");
+    expect(std::filesystem::exists(buildResult.parent_path()/"mod-preview/home/id1/models/reyond-plugins/ivy-runtime116.mdl"),"models116_runtime_model_staged");
+    std::ofstream(documentPath("models116-mod.log"))<<runLog;modEmbedEnd();runStop();
+  }
   if(std::string(mode)=="fixes115setup"){
     char step[32]{},scale[32]{},profile[32]{};commands->Argv(2,step,sizeof step);commands->Argv(3,scale,sizeof scale);commands->Argv(4,profile,sizeof profile);
     recentWindow=false;setupNeeded=false;setupInitialized=true;gameProfileLocked=false;uiLanguage=1;uiScaleChoice=std::clamp(std::atoi(scale),0,4);gameProfile=std::clamp(std::atoi(profile),0,4);firstSetupStep=std::clamp(std::atoi(step),0,5);frame();frame();

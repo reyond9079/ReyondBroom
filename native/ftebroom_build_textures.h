@@ -23,6 +23,7 @@ static void resetBuildPlaceholders(){
 static void buildWriteTexture(const std::filesystem::path& path,const std::string& bytes){
   std::filesystem::create_directories(path.parent_path());std::ofstream out(path,std::ios::binary);out.write(bytes.data(),bytes.size());out.close();if(!out)throw std::runtime_error("Cannot stage compile texture: "+path.u8string());
 }
+#include "ftebroom_static_model_assets.h"
 static void buildRegisterMaterialAlias(const std::string& name,const std::string& image){
   auto material="textures/"+name;if(buildAliasImages[material]==image)return;buildAliasImages[material]=image;
   auto alias="ftebroom/build-placeholder/"+std::filesystem::u8path(image).stem().u8string();
@@ -41,6 +42,9 @@ static bool runPrepareExport(const std::filesystem::path& target){
     std::filesystem::create_directories(target.parent_path());
     std::filesystem::copy_file(documentPath("data/export-map.map"),target,std::filesystem::copy_options::overwrite_existing);
     auto source=q1Read(target);runMissingNames.clear();runPlaceholderNames.clear();
+    size_t migratedModels=0;source=ftebroom::prepareStaticModels(source,gameProfile,migratedModels);
+    if(migratedModels){buildWriteTexture(target,source);runAppend("Quake 1: migrated "+std::to_string(migratedModels)+" static ivy entities to FTE misc_model in the build copy; original MAP and progs.dat unchanged.\n");}
+    stageGeneratedModels(source,target.parent_path());
     shaderPackStage(target.parent_path());
     if(gameProfile==3){size_t corrected=0;auto prepared=ftebroom::q2CompileContents(source,corrected);if(corrected){source=std::move(prepared);buildWriteTexture(target,source);runAppend("Quake II: removed legacy inferred SOLID alongside one explicit non-solid visible type (WINDOW/AUX/LAVA/SLIME/WATER/MIST) on "+std::to_string(corrected)+" faces in the compile copy; source MAP unchanged.\n");}}
 

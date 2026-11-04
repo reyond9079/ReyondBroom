@@ -33,21 +33,34 @@ void fb_build_preview_enter(string path)
     path=strzone(path);int entityCount=0;
     getentitytoken("");
     while(getentitytoken()=="{") {
-        string modelPath="",positionText="",anglesText="",yawText="",key;
+        string modelPath="",positionText="",anglesText="",yawText="",className="",key;
+        float modelScale=1,modelSkin=0,modelFrame=0;
         while((key=getentitytoken())!="}" && key!="") {
             key=strzone(key);string value=getentitytoken();
             if(key=="model")modelPath=strzone(value);
             if(key=="origin")positionText=strzone(value);
             if(key=="angles")anglesText=strzone(value);
             if(key=="angle")yawText=strzone(value);
+            if(key=="classname")className=strzone(value);
+            if(key=="scale")modelScale=stof(value);
+            if(key=="skin")modelSkin=stof(value);
+            if(key=="frame")modelFrame=stof(value);
             strunzone(key);
         }
-        if(substring(modelPath,0,1)=="*") {
-            entity item=spawn();setmodel(item,strcat(modelPath,":",path));item.origin=stov(positionText);entityCount++;
-            item.angles=stov(anglesText);if(anglesText=="" && !cvar("ftebroom_quake1"))item.angles_y=stof(yawText);
+        int submodel=substring(modelPath,0,1)=="*";
+        int external=FALSE;
+        if(modelPath!=""&&!submodel)if(className=="func_model"||className=="misc_model"||className=="cycler")external=TRUE;
+        // q3map2 bakes misc_model into the world: drawing it again doubles it.
+        if(className=="misc_model"&&cvar("ftebroom_game_profile")<2)external=FALSE;
+        if(submodel||external) {
+            entity item=spawn();setmodel(item,submodel?strcat(modelPath,":",path):modelPath);
+            if(!item.modelindex){remove(item);strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);continue;}
+            item.origin=stov(positionText);entityCount++;
+            item.angles=stov(anglesText);if(anglesText=="")if(external||!cvar("ftebroom_quake1"))item.angles_y=stof(yawText);
+            if(external){if(modelScale>0)item.scale=modelScale;item.skin=modelSkin;item.frame=modelFrame;}
             item.fb_build_next=fb_build_entities;fb_build_entities=item;
         }
-        strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);
+        strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);
     }
     strunzone(path);cvar_set("ftebroom_bsp_entities",itos(entityCount));
 }

@@ -12,7 +12,7 @@ static bool pluginManagerOpen=false,pluginsScanned=false;
 static std::string pluginManagerError;
 static std::map<std::string,ImVec2> pluginButtonPositions;
 static double pluginNumber(const char* name){if(name&&!std::strcmp(name,"rb.profile"))return gameProfile;if(name&&!std::strcmp(name,"rb.document_generation"))return organizationMapEpoch;return name?cvars->GetFloat(name):0;}
-static int pluginString(const char* name,char* out,size_t size){if(!name||!out||!size)return 0;out[0]=0;if(!std::strcmp(name,"rb.last_error"))return std::snprintf(out,size,"%s",pluginManagerError.c_str());if(!std::strcmp(name,"rb.model_class"))return std::snprintf(out,size,"%s",gameProfile==3?"misc_model":gameProfile==4?"cycler":gameProfile==0?"misc_model":"func_model");return cvars->GetString(name,out,int(std::min<size_t>(size,1048576)));}
+static int pluginString(const char* name,char* out,size_t size){if(!name||!out||!size)return 0;out[0]=0;if(!std::strcmp(name,"rb.last_error"))return std::snprintf(out,size,"%s",pluginManagerError.c_str());if(!std::strcmp(name,"rb.model_class"))return std::snprintf(out,size,"%s",gameProfile==4?"cycler":gameProfile==1?"func_model":"misc_model");return cvars->GetString(name,out,int(std::min<size_t>(size,1048576)));}
 static void pluginSetNumber(const char* name,double value){if(name&&std::isfinite(value))cvars->SetFloat(name,float(value));}
 static void pluginSetString(const char* name,const char* value){if(name&&value)cvars->SetString(name,value);}
 static void pluginCommand(const char* value){if(value&&std::strlen(value)<=65536)command(value);}

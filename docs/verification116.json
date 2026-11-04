@@ -1,0 +1,25 @@
+{
+  "scenario": "Native Ivy Grower Quake MDL; sealed room; real LibreQuake v0.09 PAKs",
+  "platforms": {
+    "windows": {
+      "editor_checks_passed": 10,
+      "separate_fte_original_failure_reproduced": true,
+      "separate_fte_fixed_model_precached": true
+    },
+    "linux-native": {
+      "editor_checks_passed": 10,
+      "separate_fte_original_failure_reproduced": true,
+      "separate_fte_fixed_model_precached": true
+    },
+    "linux-sdl2": {
+      "editor_checks_passed": 10,
+      "separate_fte_original_failure_reproduced": true,
+      "separate_fte_fixed_model_precached": true
+    }
+  },
+  "originals_unchanged": true,
+  "environments": {
+    "windows": "Windows / NVIDIA RTX 4060 Laptop GPU",
+    "linux": "WSL / Xvfb / software OpenGL; native and SDL2, not an Arch Wayland test"
+  }
+}

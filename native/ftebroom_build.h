@@ -121,6 +121,8 @@ static void buildShow()
     std::copy(std::begin(viewTypes),std::end(viewTypes),buildSavedTypes);buildWasPreview=true;}
   viewLayout=1;viewFocus=0;viewMax=-1;viewTypes[0]=0;cvars->SetFloat("ftebroom_view_layout",1);viewActivate(0);
   try {
+    auto snapshot=buildResult.parent_path()/"snapshot.map";
+    if(std::filesystem::is_regular_file(snapshot))stageGeneratedModels(buildRead(snapshot),documentPath("ftebroom.cfg").parent_path(),buildResult.parent_path());
     auto cache=documentPath(buildResultModel).parent_path();std::filesystem::create_directories(cache);
     for(const auto& file:std::filesystem::directory_iterator(buildResult.parent_path()))
       if(file.path().extension()!=".map" && file.path().extension()!=".log")

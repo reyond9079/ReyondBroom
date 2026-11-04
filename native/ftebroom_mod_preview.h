@@ -71,9 +71,12 @@ static void modLaunch(const std::filesystem::path& source,bool raw)
     if(!raw)for(const auto& file:std::filesystem::directory_iterator(source.parent_path())) {
       auto ext=file.path().extension();
       if(file.path()==root || ext==".map" || ext==".log" || ext==".prt")continue;
+      if(file.is_directory()&&(file.path().filename()=="models"||file.path().filename()=="textures"||file.path().filename()=="scripts")){std::filesystem::copy(file.path(),home/mod.filename()/file.path().filename(),std::filesystem::copy_options::overwrite_existing|std::filesystem::copy_options::recursive);continue;}
       std::filesystem::copy(file.path(),maps/file.path().filename(),std::filesystem::copy_options::overwrite_existing|std::filesystem::copy_options::recursive);
     }
     std::filesystem::copy_file(source,maps/(name+(raw?".map":".bsp")),std::filesystem::copy_options::overwrite_existing);
+    auto modelSource=raw?source:source.parent_path()/"snapshot.map";
+    if(std::filesystem::is_regular_file(modelSource))stageGeneratedModels(q1Read(modelSource),home/mod.filename(),source.parent_path());
     if(raw)modRawMaterials(source,home/mod.filename());
     shaderPackStage(home/mod.filename());
     auto lightSource=raw?source:source.parent_path()/"snapshot.map";
@@ -171,7 +174,7 @@ static void modPreviewTick(){
     if(status!=1)throw std::runtime_error("Cannot export the current MAP for Play mod.");
     auto stamp=std::chrono::high_resolution_clock::now().time_since_epoch().count();
     auto source=documentPath("data/mod-preview")/std::to_string(stamp)/"current.map";std::filesystem::create_directories(source.parent_path());
-    auto bytes=ftebroom::rawPreviewMap(q1Read(documentPath("data/export-map.map")));
+    size_t migrated=0;auto bytes=ftebroom::prepareStaticModels(ftebroom::rawPreviewMap(q1Read(documentPath("data/export-map.map"))),gameProfile,migrated);
     std::ofstream output(source,std::ios::binary);output.write(bytes.data(),bytes.size());output.close();
     if(!output)throw std::runtime_error("Cannot write the MAP preview snapshot.");
     modRawExporting=runExclusive=gameProfileLocked=false;modLaunch(source,true);

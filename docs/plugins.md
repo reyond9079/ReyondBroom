@@ -152,3 +152,25 @@ dropped and mean-drop diagnostics without changing SDK API v1.
 Native plugin crashes can still crash the editor. API mismatch and loader errors
 are reported before callbacks run, but this is not process isolation. Save work
 before testing third-party development builds.
+
+## Viewport optional tail (API v1)
+
+Check `struct_size >= offsetof(RBHostV1, field) + sizeof(host->field)` and a
+non-null callback before reading **each** optional field. Existing field offsets
+and API version are unchanged. `preview_colored_lines`, `preview_boxes` and
+`preview_labels` copy bounded arrays and draw in all visible perspective and
+orthographic views. Box overlays are transparent and sorted back to front;
+they are editor gizmos without scene depth testing.
+
+`viewport_state` returns a normalized world ray, camera, held/pressed/released
+mouse buttons, modifiers and digit keys. Set the output `struct_size` first.
+`viewport_capture(1)` reserves viewport clicks for the open plugin; Alt+RMB still
+moves the camera. It automatically releases on Escape, window close, document
+switch and unload. A return of zero means the plugin must exit its interactive
+mode; call `viewport_capture(0)` to acknowledge that release.
+`selection_bounds` reads the selection AABB without filesystem capture.
+
+Selection geometry capture accepts `ftebroom_plugin_surfaces block plugin-*.map`
+(up to 512 whole brushes, without arbitrary paths). The omitted filename keeps
+the old `plugin-levelgen-capture.map` behavior. Patches are not supported by this
+plane-brush capture operation.

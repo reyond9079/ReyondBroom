@@ -1230,6 +1230,16 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
   int hit = viewHit(x, y);
   bool inScene = hit >= 0 && !popupOpen && !viewSplitDrag
                  && !uiBlocksScene(x, y, type == 2 && key == mouseKeys[0]);
+  if(type==1||type==2){
+    bool down=type==1;int mask=key==mouseKeys[0]?1:key==mouseKeys[1]?2:key==mouseKeys[2]?4:0;
+    if(mask){if(down){pluginButtonsDown|=mask;pluginButtonsPressed|=mask;}else{pluginButtonsDown&=~mask;pluginButtonsReleased|=mask;}}
+    for(int digit=0;digit<10;digit++){char name[2]={char('0'+digit),0};if(key==input->GetKeyCode(name,nullptr)){if(down)pluginDigitKeys|=1u<<digit;else pluginDigitKeys&=~(1u<<digit);}}
+    if(pluginViewportCapture&&key==input->GetKeyCode("escape",nullptr)){if(down)pluginViewportRelease(true);return qtrue;}
+    if(pluginViewportCapture&&inScene&&!io.WantTextInput){
+      if((mask==1||mask==2)&&!(mask==2&&altHeld)){io.AddMouseButtonEvent(mask==1?0:1,down);return qtrue;}
+      if(key==input->GetKeyCode("1",nullptr)||key==input->GetKeyCode("3",nullptr))return qtrue;
+    }
+  }
   if(type==1 && key==input->GetKeyCode("escape",nullptr)
      && cvars->GetFloat("ftebroom_bsp_preview") && !popupOpen && !io.WantTextInput && captureShortcut.empty()) {
     cameraEnd();buildEdit();return qtrue;

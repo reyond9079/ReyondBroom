@@ -51,12 +51,19 @@ int fb_plugin_root_pointer(string action,vector pixel,int view){
  }return TRUE;
 }
 int fb_plugin_surfaces_command(){
+    if(argv(0)=="ftebroom_plugin_workbench_remove"){
+        string uid=strzone(argv(1));fb_tool_refresh();fb_document_tick();fb_tx_begin("Remove AutoLevel workbench");fb_selection_clear();
+        for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_GROUP&&fb_nodes[n].fields["_al_workbench"]==uid)fb_selection_set(n,TRUE);
+        fb_delete_selection();fb_tx_commit();strunzone(uid);return TRUE;
+    }
     if(argv(0)!="ftebroom_plugin_surfaces")return FALSE;
     if(argv(1)=="root"){fb_plugin_root_pending=TRUE;fb_plugin_root_consuming=FALSE;fb_plugin_root_result("WAIT\n");return TRUE;}
     if(argv(1)=="cancel_root"){fb_plugin_root_cancel();return TRUE;}
     if(argv(1)=="block"){
-        filestream block=fopen("plugin-levelgen-capture.map",FILE_WRITE);if((float)block<0)return TRUE;
-        if(selectedbrushcount<1||selectedbrushcount>64||fb_faces_count()){fputs(block,"ERROR Select 1..64 whole brushes.\n");fclose(block);return TRUE;}
+        string captureName=argv(2);if(captureName=="")captureName="plugin-levelgen-capture.map";
+        if(substring(captureName,0,7)!="plugin-"||strstrofs(captureName,"/",0)>=0||strstrofs(captureName,"\\",0)>=0||strstrofs(captureName,":",0)>=0||substring(captureName,strlen(captureName)-4,4)!=".map")return TRUE;
+        filestream block=fopen(captureName,FILE_WRITE);if((float)block<0)return TRUE;
+        if(selectedbrushcount<1||selectedbrushcount>512||fb_faces_count()){fputs(block,"ERROR Select 1..512 whole brushes.\n");fclose(block);return TRUE;}
         static vector bounds[2];vector low='131072 131072 131072',high='-131072 -131072 -131072';
         for(int b=0;b<selectedbrushcount;b++){if(brush_getfacepoints(selectedbrushes[b].model,selectedbrushes[b].id,0,bounds,2)!=2)continue;for(int a=0;a<3;a++){low[a]=min(low[a],bounds[0][a]);high[a]=max(high[a],bounds[1][a]);}}
         fputs(block,sprintf("BOUNDS %.9g %.9g %.9g %.9g %.9g %.9g\n",low_x,low_y,low_z,high_x,high_y,high_z));fputs(block,"{\n\"classname\" \"worldspawn\"\n");

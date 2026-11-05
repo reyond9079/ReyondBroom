@@ -15,6 +15,14 @@ typedef struct RBSettleOptionsV1 {
     double friction, bounce, impulse, seconds;
     uint32_t seed;
 } RBSettleOptionsV1;
+typedef struct RBViewportStateV1 {
+    uint32_t struct_size;
+    int hovered, view_type; // 0 perspective, 1 XY, 2 XZ, 3 YZ
+    float ray_origin[3], ray_dir[3], camera_pos[3], camera_forward[3];
+    int buttons_down, buttons_pressed, buttons_released; // 1 LMB, 2 RMB, 4 MMB
+    int modifiers; // 1 Shift, 2 Ctrl, 4 Alt
+    uint32_t digit_keys; // bit n = digit n held
+} RBViewportStateV1;
 typedef struct RBHostV1 {
     uint32_t api_version, struct_size;
     double (*number)(const char *name);
@@ -57,6 +65,18 @@ typedef struct RBHostV1 {
     int (*write_data)(const char *path, const char *bytes, size_t length);
     // Explicit replacement of the current selection in one Undo transaction.
     int (*replace_selection)(const char *text, size_t length);
+    // Further optional tail fields. All buffers are copied before return.
+    // Lines: 6 floats + one 0xAABBGGRR color per segment, maximum 16384.
+    void (*preview_colored_lines)(const float *xyz, const uint32_t *rgba, size_t segments);
+    // Translucent AABBs, 6 floats min/max + color per box, maximum 32768.
+    void (*preview_boxes)(const float *minmax, const uint32_t *rgba, size_t count);
+    // World labels, maximum 4096, each text at most 1024 bytes.
+    void (*preview_labels)(const float *xyz, const char *const *texts, size_t count);
+    int (*viewport_state)(RBViewportStateV1 *out);
+    // Captures viewport LMB/RMB; Alt+RMB continues camera look. Escape, window
+    // close and unload release capture. Returns 0 if unavailable or released.
+    int (*viewport_capture)(int enable);
+    int (*selection_bounds)(float out_minmax[6]);
 } RBHostV1;
 typedef struct RBPluginV1 {
     uint32_t api_version, struct_size;

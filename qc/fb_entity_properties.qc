@@ -73,6 +73,8 @@ string ReyondBroom_UIQuery(float operation,float cursor)
     if(fb_node_count<2)return "";
     fb_ui_attached=TRUE;
     if(operation==0)return sprintf("RBUI1 %i %i %i %i %i %i",fb_property_epoch,fb_property_entity_count,fb_node_count,fb_grid_geometry_epoch,fb_entity_render_epoch,fb_ui_linked);
+    if(operation==5) {int view=bound(1,(int)cursor,3);return sprintf("RBVIEW1 %.9g %.9g %.9g",fb_view_centers[view][0],fb_view_centers[view][1],fb_view_centers[view][2]);}
+    if(operation==6) {if(!fb_visual_has_bounds)return "";return sprintf("RBBOUNDS1 %.9g %.9g %.9g %.9g %.9g %.9g",fb_visual_min_x,fb_visual_min_y,fb_visual_min_z,fb_visual_max_x,fb_visual_max_y,fb_visual_max_z);}
     if(operation==4) {
         int content=history_base_revision;
         for(int record=history-1;record>=history_min;record--) {

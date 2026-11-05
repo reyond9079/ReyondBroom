@@ -82,16 +82,8 @@ static void pluginPreview(const float* xyz,size_t segments){
   for(size_t i=0;i<segments*6;i++)if(!std::isfinite(xyz[i])||std::abs(xyz[i])>131072)return;
   pluginPreviewLines.assign(xyz,xyz+segments*6);
 }
-static void pluginPreviewDraw(){
-  if(pluginPreviewLines.empty()||modEmbedded||cvars->GetFloat("ftebroom_bsp_preview"))return;
-  char state[512]{};cvars->GetString("ftebroom_camera_state",state,sizeof state);float v[7];if(!cameraParse(state,v))return;
-  const float pitch=v[3]*.01745329252f,yaw=v[4]*.01745329252f;
-  const std::array<float,3> forward{std::cos(pitch)*std::cos(yaw),std::cos(pitch)*std::sin(yaw),-std::sin(pitch)},right{std::sin(yaw),-std::cos(yaw),0},up{std::sin(pitch)*std::cos(yaw),std::sin(pitch)*std::sin(yaw),std::cos(pitch)};
-  auto rect=viewRects[viewFocus];if(rect.type)return;auto draw=ImGui::GetForegroundDrawList();draw->PushClipRect({rect.x,rect.y},{rect.x+rect.w,rect.y+rect.h},true);
-  auto project=[&](const float* p,ImVec2& pixel){float depth=0,x=0,y=0;for(int a=0;a<3;a++){float delta=p[a]-v[a];depth+=delta*forward[a];x+=delta*right[a];y+=delta*up[a];}if(depth<1)return false;float scale=rect.w*.5f/std::tan(v[6]*.00872664626f)/depth;pixel={rect.x+rect.w*.5f+x*scale,rect.y+rect.h*.5f-y*scale};return true;};
-  for(size_t i=0;i<pluginPreviewLines.size();i+=6){ImVec2 a,b;if(project(&pluginPreviewLines[i],a)&&project(&pluginPreviewLines[i+3],b))draw->AddLine(a,b,IM_COL32(99,232,143,220),1.5f);}
-  draw->PopClipRect();
-}
+#include "ftebroom_plugin_viewport.h"
+static void pluginPreviewDraw(){pluginViewportDraw();}
 static int pluginSection(const char* label,int open){return ImGui::CollapsingHeader(label,open?ImGuiTreeNodeFlags_DefaultOpen:0);}
 static int pluginMaterialPicker(const char* label,char* value,size_t size){
   if(!label||!value||!size)return 0;int changed=0;ImGui::PushID(label);
@@ -141,9 +133,9 @@ static int pluginWriteModel(const char* path,const char* text,size_t length){
     command("fs_flush\n");modFilesRefresh=true;return 1;
   }catch(const std::exception& e){pluginManagerError=e.what();return 0;}
 }
-static const RBHostV1 pluginHost{RB_PLUGIN_API_VERSION,sizeof(RBHostV1),pluginNumber,pluginString,pluginSetNumber,pluginSetString,pluginCommand,pluginLog,pluginImportMap,pluginSettle,pluginText,pluginSeparator,pluginInt,pluginFloat,pluginBool,pluginCombo,pluginButton,pluginSameLine,pluginDisabled,pluginProgress,pluginReadData,pluginWriteAsset,pluginInputText,pluginPreview,pluginSection,pluginMaterialPicker,pluginWriteModel,pluginWriteData,pluginReplaceSelection};
+static const RBHostV1 pluginHost{RB_PLUGIN_API_VERSION,sizeof(RBHostV1),pluginNumber,pluginString,pluginSetNumber,pluginSetString,pluginCommand,pluginLog,pluginImportMap,pluginSettle,pluginText,pluginSeparator,pluginInt,pluginFloat,pluginBool,pluginCombo,pluginButton,pluginSameLine,pluginDisabled,pluginProgress,pluginReadData,pluginWriteAsset,pluginInputText,pluginPreview,pluginSection,pluginMaterialPicker,pluginWriteModel,pluginWriteData,pluginReplaceSelection,pluginColoredPreview,pluginBoxPreview,pluginLabelPreview,pluginViewportState,pluginCaptureViewport,pluginSelectionBounds};
 static void pluginUnload(EditorPlugin& p){
-  pluginPreviewLines.clear();
+  pluginPreviewClear();
   if(p.api&&p.api->shutdown)try{p.api->shutdown();}catch(...){p.error="Plugin shutdown failed.";}
   p.api=nullptr;
 #ifdef _WIN32
@@ -199,9 +191,10 @@ static void pluginsScan(){
   }catch(const std::exception& e){pluginManagerError=e.what();}
 }
 static void pluginsTick(){
-  static int previewDocument=organizationMapEpoch;if(previewDocument!=organizationMapEpoch){pluginPreviewLines.clear();previewDocument=organizationMapEpoch;}
+  static int previewDocument=organizationMapEpoch;if(previewDocument!=organizationMapEpoch){pluginPreviewClear();previewDocument=organizationMapEpoch;}
   if(!pluginsScanned)pluginsScan();
-  for(auto& p:editorPlugins)if(p.api&&p.api->tick)try{p.api->tick();}catch(...){p.error="Plugin tick failed; disabled.";pluginUnload(p);}
+  for(auto& p:editorPlugins)if(p.api&&p.api->tick)try{pluginCurrentId=p.id;pluginViewportAllowed=p.open;if(!p.open&&pluginCaptureOwner==p.id)pluginPreviewClear();p.api->tick();pluginCurrentId.clear();pluginViewportAllowed=false;}catch(...){p.error="Plugin tick failed; disabled.";pluginUnload(p);}
+  pluginButtonsPressed=pluginButtonsReleased=0;
   cvars->SetFloat("ftebroom_plugins_loaded",std::count_if(editorPlugins.begin(),editorPlugins.end(),[](auto& p){return p.api!=nullptr;}));
 }
 static void pluginsMenu(){
@@ -221,6 +214,6 @@ static void pluginsPanel(){
       bool on=p.enabled;ImGui::BeginDisabled(pluginBusy(p));if(ImGui::Checkbox("Enabled",&on)){if(on)pluginLoad(p);else pluginUnload(p);pluginsSave();}ImGui::EndDisabled();
       if(p.api){ImGui::SameLine();if(ImGui::Button("Open"))p.open=true;}if(!p.error.empty())ImGui::TextWrapped("%s",p.error.c_str());ImGui::PopID();}
   }ImGui::End();}
-  for(auto& p:editorPlugins)if(p.api&&p.open){ImGui::SetNextWindowSize({480*uiScale(),650*uiScale()},ImGuiCond_FirstUseEver);if(ImGui::Begin(p.name.c_str(),&p.open)){ImGui::PushID(p.id.c_str());try{p.api->draw();}catch(...){p.error="Plugin drawing failed.";}ImGui::PopID();}ImGui::End();}
+  for(auto& p:editorPlugins)if(p.api&&p.open){ImGui::SetNextWindowSize({480*uiScale(),650*uiScale()},ImGuiCond_FirstUseEver);if(ImGui::Begin(p.name.c_str(),&p.open)){ImGui::PushID(p.id.c_str());try{pluginCurrentId=p.id;pluginViewportAllowed=true;p.api->draw();pluginCurrentId.clear();pluginViewportAllowed=false;}catch(...){p.error="Plugin drawing failed.";}ImGui::PopID();}ImGui::End();if(!p.open&&pluginCaptureOwner==p.id)pluginPreviewClear();}
 }
 static void pluginsShutdown(){for(auto& p:editorPlugins)pluginUnload(p);editorPlugins.clear();pluginsScanned=false;}

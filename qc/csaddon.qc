@@ -840,6 +840,7 @@ void(float prevprogs) init =
     registercommand("ftebroom_plugin_batch");
     registercommand("ftebroom_plugin_selection");
     registercommand("ftebroom_plugin_surfaces");
+    registercommand("ftebroom_plugin_workbench_remove");
     registercommand("ftebroom_tour_prepare");
     registercommand("ftebroom_undo");
     registercommand("ftebroom_redo");

@@ -31,6 +31,7 @@ they are not a claim of a native Arch/Wayland desktop test.
 - [Physical geometry results, seeds 1–30](autolevel-acceptance/geometry-windows.txt)
 - [Windows UI lifecycle checks](autolevel-acceptance/ui-windows.txt) and [Linux UI checks](autolevel-acceptance/ui-linux.txt)
 - [Actual Windows editor assertions](autolevel-acceptance/runtime-windows.txt)
+- [Packaged Windows](autolevel-acceptance/runtime-windows-results.json), [Linux native](autolevel-acceptance/runtime-linux-results.json), and [Linux SDL2](autolevel-acceptance/runtime-linux-sdl2-results.json) runtime results
 
 Default 8×8×3, single-threaded, seeds **1–30**:
 
@@ -64,11 +65,14 @@ Move/Scale/Rect, snapping and RMB restoration, fill corners, connections, ban/
 exclusive keys, lower-layer dependencies, Big Block cell picking, Escape and old-host
 fallback. Projection round trips cover perspective and all three orthographic views.
 
-Automated Windows editor execution loads the actual external DLL, generates and
+Automated packaged Windows, Linux native and Linux SDL2 editor execution loads
+the actual external plugin, generates and
 exports a level, imports over 1000 editable grouped brushes, and verifies that one
 Undo restores the original brush count and Redo restores the entire result. It
 also checks that plugin clicks/keys do not reach ordinary brush tools and that
-Escape/window close releases capture. Import remains synchronous in the existing
+Escape/window close releases capture. Each runtime passes Standard/Valve parser
+regressions and captures both a selected brush and its selected point light.
+Linux runtime execution uses Xvfb/software OpenGL. Import remains synchronous in the existing
 editor; the old quadratic string assembly/character scanning was removed so these
 multi-megabyte fragments complete instead of appearing indefinitely hung.
 

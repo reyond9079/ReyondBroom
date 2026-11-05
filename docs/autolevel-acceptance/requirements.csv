@@ -19,7 +19,7 @@ Specification,Requirement,Implementation,Automated evidence
 8,"Builder inspector, bounds/selection, painting, presets, boundaries, layers and export",plugins/autolevel/al_ui_builder.cpp; al_viewport_tools.cpp,ui; viewport Move/Scale/Rect; defaults
 9.1-9.4,"Repo/block/big-block editors, workbench, capture and layered assets",plugins/autolevel/al_ui_repo.cpp; al_app.cpp receiveCapture; al_build_map.cpp buildWorkbench,ui; repo; storage; migration; runtime selected-point capture
 9 MakeConnection,All four source/destination connection cases and smallest free IDs,plugins/autolevel/al_repo_compile.cpp makeConnection/IDGenerator,"repo four cases and {1,2,4} ID fixture"
-9.5,"Connected builder groups, layers, parallel independent builders and one group import",plugins/autolevel/al_group_solver.cpp; al_ui_repo.cpp drawBuilders; al_job.cpp,solver group success/failure/parallel; ui
+9.5,"Connected builder groups, layers, parallel independent builders and one group import",plugins/autolevel/al_group_solver.cpp; al_ui_builder.cpp drawBuilders; al_job.cpp,solver group success/failure/parallel; ui
 10,"Optional SDK overlays, rays, all views and input capture/release",sdk/reyondbroom_plugin.h; native/ftebroom_plugin_viewport.h; al_viewport_tools.cpp,host projection round trips; viewport; runtime input; v1 binary compatibility
 11-12,"Default dungeon modules, stairs/atria, lights, seeds, presets and quality",plugins/autolevel/al_default_repo.cpp; al_ui_builder.cpp,defaults 30 seeds; geometry 30 seeds; ui Tower multiplier
 13,"Versioned quoted text, nested records, RLE, 8 MiB limit and safe corrupt-file handling",plugins/autolevel/al_storage.cpp; al_app.cpp loadAll/saveAll,storage; ui corrupt/autosave/shutdown cases

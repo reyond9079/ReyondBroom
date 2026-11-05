@@ -1,0 +1,20 @@
+{
+  "platform": "posix",
+  "headless": true,
+  "tests": [
+    {
+      "test": "autolevel119",
+      "passed": true,
+      "seconds": 26.378
+    },
+    {
+      "test": "autolevel119-parser",
+      "passed": true,
+      "seconds": 14.975
+    },
+    {
+      "test": "selected brush plus point-light capture",
+      "passed": true
+    }
+  ]
+}

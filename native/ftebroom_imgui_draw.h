@@ -76,10 +76,19 @@ static void triangle(std::array<Vertex, 8> polygon, const ImVec4& clip, qhandle_
     draw->Image2dQuad(xy, uv, color, image);
   }
 }
+static double imguiRenderMs = 0;
+struct IndexedUIAPI {
+  int (*draw)(const void*, unsigned, const void*, unsigned, unsigned, int, const float*);
+};
 static void render()
 {
+  auto renderBegan = std::chrono::steady_clock::now();
   ImGui::Render();
   auto data = ImGui::GetDrawData();
+  auto bulk = static_cast<IndexedUIAPI*>(
+    core->GetEngineInterface("ReyondBroomIndexedUIV1", sizeof(IndexedUIAPI)));
+  static_assert(sizeof(ImDrawVert) == 20 && offsetof(ImDrawVert, uv) == 8 &&
+    offsetof(ImDrawVert, col) == 16, "Indexed UI ABI layout");
   draw->Colour4f(1, 1, 1, 1);
   for (int n = 0; n < data->CmdListsCount; ++n)
   {
@@ -92,6 +101,16 @@ static void render()
           cmd.UserCallback(list, &cmd);
         continue;
       }
+      // Submit indexed geometry once per material/clip command. The engine
+      // applies scissoring, with the triangle path retained for older engines.
+      const float clip[] = {cmd.ClipRect.x, cmd.ClipRect.y, cmd.ClipRect.z, cmd.ClipRect.w};
+      if (bulk && cmd.VtxOffset < unsigned(list->VtxBuffer.Size) &&
+          cmd.IdxOffset + cmd.ElemCount <= unsigned(list->IdxBuffer.Size) &&
+          bulk->draw(list->VtxBuffer.Data + cmd.VtxOffset,
+            std::min(65536u, unsigned(list->VtxBuffer.Size) - cmd.VtxOffset),
+            list->IdxBuffer.Data + cmd.IdxOffset, cmd.ElemCount, sizeof(ImDrawIdx),
+            (qhandle_t)cmd.GetTexID(), clip))
+        continue;
       for (unsigned int i = 0; i + 2 < cmd.ElemCount; i += 3)
       {
         std::array<Vertex, 8> p{};
@@ -106,4 +125,6 @@ static void render()
       }
     }
   }
+  imguiRenderMs = std::chrono::duration<double, std::milli>(
+    std::chrono::steady_clock::now() - renderBegan).count();
 }

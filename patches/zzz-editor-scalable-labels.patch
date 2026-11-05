@@ -1,5 +1,5 @@
---- a/client/pr_csqc.c
-+++ b/client/pr_csqc.c
+--- a/engine/client/pr_csqc.c
++++ b/engine/client/pr_csqc.c
 @@ -3269,22 +3269,23 @@
   G_INT(OFS_RETURN)=trace.fraction>=.999f;
  }

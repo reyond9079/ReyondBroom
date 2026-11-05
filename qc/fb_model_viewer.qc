@@ -20,6 +20,7 @@ void fb_modeleditor_guides(vector eye)
     int lines=0;
     if(cvar("ftebroom_modeleditor_floor")){
         float step=max(1,fb_grid()),extent=max(1024,fabs(eye_z)*2);extent=min(extent,1000000);
+        if(cvar("ftebroom_bb_active")){step=1;extent=64;}
         while(extent/step>64)step*=2;
         vector center=[floor(eye_x/step)*step,floor(eye_y/step)*step,0];
         extent=ceil(extent/step)*step;
@@ -29,13 +30,13 @@ void fb_modeleditor_guides(vector eye)
         R_PolygonVertex(center+[extent,extent,-.05],'0 0','0.18 0.20 0.24',.18);
         R_PolygonVertex(center+[-extent,extent,-.05],'0 0','0.18 0.20 0.24',.18);R_EndPolygon();
         for(float offset=-extent;offset<=extent;offset+=step){
-            R_BeginPolygon(line);R_PolygonVertex(center+[offset,-extent,0],'0 0','0.38 0.42 0.48',.45);R_PolygonVertex(center+[offset,extent,0],'0 0','0.38 0.42 0.48',.45);R_EndPolygon();
-            R_BeginPolygon(line);R_PolygonVertex(center+[-extent,offset,0],'0 0','0.38 0.42 0.48',.45);R_PolygonVertex(center+[extent,offset,0],'0 0','0.38 0.42 0.48',.45);R_EndPolygon();lines+=2;
+            R_BeginPolygon(line);R_PolygonVertex(center+[offset,-extent,0],'0 0','0.38 0.42 0.48',cvar("ftebroom_bb_active")?(mod(offset,16)==0?.65:.18):.45);R_PolygonVertex(center+[offset,extent,0],'0 0','0.38 0.42 0.48',cvar("ftebroom_bb_active")?(mod(offset,16)==0?.65:.18):.45);R_EndPolygon();
+            R_BeginPolygon(line);R_PolygonVertex(center+[-extent,offset,0],'0 0','0.38 0.42 0.48',cvar("ftebroom_bb_active")?(mod(offset,16)==0?.65:.18):.45);R_PolygonVertex(center+[extent,offset,0],'0 0','0.38 0.42 0.48',cvar("ftebroom_bb_active")?(mod(offset,16)==0?.65:.18):.45);R_EndPolygon();lines+=2;
         }
     }
     if(cvar("ftebroom_modeleditor_axes"))for(int axis=0;axis<3;axis++){
         vector start='0 0 0',end='0 0 0',colour='0.25 0.5 1';start[axis]=-10000000;end[axis]=10000000;
-        if(axis==0)colour='1 .18 .15';else if(axis==1)colour='.15 1 .25';
+        if(cvar("ftebroom_bb_active")){if(axis==1)colour='1 .18 .15';else if(axis==2)colour='.15 1 .25';}else{if(axis==0)colour='1 .18 .15';else if(axis==1)colour='.15 1 .25';}
         R_BeginPolygon(line);R_PolygonVertex(start,'0 0',colour,1);R_PolygonVertex(end,'0 0',colour,1);R_EndPolygon();
     }
     cvar_set("ftebroom_modeleditor_grid_lines",itos(lines));
@@ -47,6 +48,7 @@ void fb_modelviewer_draw()
         if(fb_modelviewer_skeleton){skel_delete(fb_modelviewer_skeleton);fb_modelviewer_skeleton=0;}
         return;
     }
+    if(cvar("ftebroom_bb_active")){fb_bb_render();return;}
     string path=cvar_string("ftebroom_modelviewer_path");int bsp=strtolower(substring(path,max(0,strlen(path)-4),-1))==".bsp";
     if(strcmp(path,fb_modelviewer_path) || !fb_modelviewer_entity) {
         if(fb_modelviewer_entity)remove(fb_modelviewer_entity);

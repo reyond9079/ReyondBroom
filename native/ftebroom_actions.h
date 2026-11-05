@@ -28,6 +28,7 @@ enum ActionContext : uint32_t
   CtxPolygonCutTool = 1 << 18,
   CtxPolygonSpawnTool = 1 << 19,
   CtxSpinTool = 1 << 20,
+  CtxModelEditor = 1 << 21,
   CtxAnyHandleTool = CtxVertexTool | CtxEdgeTool | CtxFaceTool | CtxControlPointTool,
   CtxAnyTool = 0x1fffc0,
   CtxAnyOrNoTool = 0x1fffe0
@@ -138,6 +139,7 @@ static void initActions()
 }
 static uint32_t currentActionContext()
 {
+  if(bbActive&&bbFocused)return CtxModelEditor;
   uint32_t ctx = cvars->GetFloat("ftebroom_ctx_view") == 0 ? CtxView3D : CtxView2D;
   int selection = (int)cvars->GetFloat("ftebroom_ctx_selection");
   ctx |= selection == 2   ? CtxFaceSelection
@@ -161,6 +163,7 @@ static uint32_t currentActionContext()
 }
 static bool actionMatches(uint32_t required, uint32_t current)
 {
+  if(bool(required&CtxModelEditor)!=bool(current&CtxModelEditor))return false;
   for (uint32_t group :
        {uint32_t(CtxAnyView), uint32_t(CtxAnyOrNoSelection), uint32_t(CtxAnyOrNoTool)})
     if ((required & group) && !(required & current & group))
@@ -189,6 +192,7 @@ static void executeAction(const Action& a, bool down = true)
     return;
   }
   std::string cmd = a.command;
+  if(cmd.rfind("bb ",0)==0){if(down)bbAction(cmd.substr(3));return;}
   if (cmd.rfind("ftebroom_hold ", 0) == 0)
   {
     const char* keys = "wsadqx";

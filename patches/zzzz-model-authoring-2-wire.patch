@@ -1,0 +1,26 @@
+--- a/engine/client/pr_csqc.c
++++ b/engine/client/pr_csqc.c
+@@ -8506,18 +8506,18 @@
+ }
+ static void QCBUILTIN PF_editor_dynmesh_draw(pubprogfuncs_t *prinst,struct globalvars_s *pr_globals)
+ {
+- const unsigned char *p;unsigned count,s;double start=Sys_DoubleTime();unsigned tris=0;
++ const unsigned char *p;unsigned count,s;double start=Sys_DoubleTime();unsigned tris=0;int mode=Cvar_Get("ftebroom_bb_display","0",0,"")->ival;
+  if(!rb_dynmesh)return;if(R2D_Flush)R2D_Flush();p=rb_dynmesh+8;count=rb_read32(rb_dynmesh+4);
+  for(s=0;s<count;s++){
+   unsigned nv=rb_read32(p),ni=rb_read32(p+4),i;scenetris_t *t;const char *name=(const char*)p+8;p+=136;
+   if(cl_numstris==cl_maxstris){cl_maxstris+=8;cl_stris=BZ_Realloc(cl_stris,sizeof(*cl_stris)*cl_maxstris);}
+   t=&cl_stris[cl_numstris++];memset(t,0,sizeof(*t));
+-  t->shader=R_RegisterShader(name,SUF_NONE,va("{\n cull none\n program default2d\n sort opaque\n {\n map %s\n depthwrite\n alphafunc GE128\n rgbgen vertex\n alphagen vertex\n }\n }\n",name));
+-  t->flags=BEF_NOSHADOWS|BEF_FORCETWOSIDED;t->firstidx=cl_numstrisidx;t->firstvert=cl_numstrisvert;t->numvert=nv;t->numidx=ni;
+-  if(cl_numstrisidx+ni>cl_maxstrisidx){cl_maxstrisidx=cl_numstrisidx+ni;cl_strisidx=BZ_Realloc(cl_strisidx,sizeof(*cl_strisidx)*cl_maxstrisidx);}
++  t->shader=R_RegisterShader(va("bbmat/%s",name),SUF_NONE,va("{\n cull none\n program default2d\n sort opaque\n {\n map %s\n depthwrite\n alphafunc GE128\n rgbgen vertex\n alphagen vertex\n }\n }\n",name));
++  t->flags=BEF_NOSHADOWS|BEF_FORCETWOSIDED|(mode==2?BEF_LINES:0);t->firstidx=cl_numstrisidx;t->firstvert=cl_numstrisvert;t->numvert=nv;t->numidx=ni*(mode==2?2:1);
++  if(cl_numstrisidx+t->numidx>cl_maxstrisidx){cl_maxstrisidx=cl_numstrisidx+t->numidx;cl_strisidx=BZ_Realloc(cl_strisidx,sizeof(*cl_strisidx)*cl_maxstrisidx);}
+   if(cl_numstrisvert+nv>cl_maxstrisvert)cl_stris_ExpandVerts(cl_numstrisvert+nv);
+   for(i=0;i<nv;i++){float v[9];memcpy(v,p,36);p+=36;VectorCopy(v,cl_strisvertv[t->firstvert+i]);Vector2Copy(v+3,cl_strisvertt[t->firstvert+i]);Vector4Copy(v+5,cl_strisvertc[t->firstvert+i]);}
+-  for(i=0;i<ni;i++){cl_strisidx[cl_numstrisidx++]=rb_read32(p);p+=4;}
++  if(mode==2){for(i=0;i<ni;i+=3){unsigned a=rb_read32(p+i*4),b=rb_read32(p+(i+1)*4),c=rb_read32(p+(i+2)*4);cl_strisidx[cl_numstrisidx++]=a;cl_strisidx[cl_numstrisidx++]=b;cl_strisidx[cl_numstrisidx++]=b;cl_strisidx[cl_numstrisidx++]=c;cl_strisidx[cl_numstrisidx++]=c;cl_strisidx[cl_numstrisidx++]=a;}p+=ni*4;}else for(i=0;i<ni;i++){cl_strisidx[cl_numstrisidx++]=rb_read32(p);p+=4;}
+   cl_numstrisvert+=nv;tris+=ni/3;
+  }
+  rb_dynstats[1]=(Sys_DoubleTime()-start)*1000;rb_dynstats[2]=tris;rb_dynstats[3]++;

@@ -134,6 +134,7 @@ fb_patch_tests.qc
 fb_sweep_tests.qc
 fb_uv_tests.qc
 fb_repeat_tests.qc
+fb_bb_render.qc
 fb_model_viewer.qc
 fb_terrain_history.qc
 fb_export_tests.qc

@@ -35,3 +35,16 @@ Polygon Cut/Spawn and symmetry behavior were studied against UltimateTrenchBroom
 - `runtime/halflife.fgd` and `runtime/quake2.fgd` retain their original entity-definition notices from the TrenchBroom game resource collection. `runtime/counterstrike.fgd` adds editor-side CS1.5 descriptions. `halflife-editor.wad` and `textures/fb_grey.wal` are generated original editor artwork.
 
 - AutoLevel algorithm/model design: Al-Asl, MIT, revision f27c97ecab604168f7e4dad1d6a4669481edee36. Independent C++17 plugin implementation in `plugins/autolevel`; original MIT notice in `plugins/autolevel/LICENSE.AutoLevel.txt`. No Unity application or proprietary art is distributed.
+
+
+- Model authoring geometry, box UV, animation and codec behavior was studied
+  against Blockbench 5.2.2, commit ec0b2827104d0799c153bfb5f867579c0c44652f,
+  Copyright JannisX11 and contributors, GPL-3.0. New authoring headers and tests
+  are GPL-3.0-or-later. The C++ implementation is native to ReyondBroom. No
+  upstream application, icons, branding or themes are bundled. Reference
+  fixtures use original test geometry and bitmap content; their generation
+  scripts require a separately obtained upstream checkout.
+- `native/third_party/json.hpp`: nlohmann/json 3.12.0, Copyright Niels Lohmann,
+  MIT license, retained in the header.
+- `native/third_party/stb_image_write.h`: stb contributors, public-domain/MIT
+  dual license, retained in the header. Existing stb_image notices also apply.

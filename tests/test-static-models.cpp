@@ -11,6 +11,9 @@ int main(){try{
  for(int p:{0,1,3,4})check(ftebroom::prepareStaticModels(source,p,n)==source&&n==0,"other_profiles_unchanged");
  check(ftebroom::prepareStaticModels(copy,2,n)==copy&&n==0,"migration_idempotent");
  check(ftebroom::generatedIvyModels(copy).size()==1&&!ftebroom::generatedIvyPath("models/reyond-plugins/ivy-x/../../escape.mdl"),"generated_resource_paths_scoped");
+ std::string authoring="{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \"func_model\"\n\"model\" \"models/monster.mdl\"\n\"_reyondbroom_authoring\" \"1\"\n\"origin\" \"0 0 24\"\n}\n";
+ auto authoringCopy=ftebroom::prepareStaticModels(authoring,2,n);check(n==1&&authoringCopy.find("misc_model")!=authoringCopy.npos,"authoring_model_uses_native_q1_runtime_fallback");check(authoring.find("misc_model")==authoring.npos&&ftebroom::generatedIvyModels(authoringCopy).count("models/monster.mdl"),"authoring_model_staged_without_source_change");
+ check(!ftebroom::generatedAuthoringPath("../outside.mdl")&&!ftebroom::generatedAuthoringPath("C:/outside.mdl")&&ftebroom::generatedAuthoringPath("progs/monster.mdl"),"authoring_staging_rejects_external_paths");
  ftebroom::modelExport::Mesh mesh;mesh.frames=1;ftebroom::modelExport::Surface s;s.material="textures/reyond-plugins/ivy_leaf_v2.tga";s.triangles={{0,1,2}};s.frames={{{{-16,0,0},{0,-1,0},{0,0}},{{16,0,0},{0,-1,0},{1,0}},{{0,0,32},{0,-1,0},{.5,1}}}};mesh.surfaces={s};
  auto md3=ftebroom::modelExport::md3(mesh);auto deps=ftebroom::generatedModelDependencies(md3);check(deps.size()==1&&deps[0]==s.material,"md3_texture_dependencies");
  std::string md2(132,0),skin="models/reyond-plugins/ivy-skin.pcx";md2.replace(0,4,"IDP2");md2[20]=1;md2[44]=68;md2.replace(68,skin.size(),skin);

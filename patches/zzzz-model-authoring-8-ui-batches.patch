@@ -1,0 +1,15 @@
+diff --git a/engine/client/r_2d.c b/engine/client/r_2d.c
+--- a/engine/client/r_2d.c
++++ b/engine/client/r_2d.c
+@@ -30,7 +30,10 @@
+ shader_t *shader_polyblend;
+ shader_t *shader_menutint;
+ 
+-#define DRAW_QUADS 128
++/* This is a vertex budget, not a quad count. Detailed UV and wire overlays
++ * otherwise flush every 32 quads. Keep the same ordered geometry and shaders,
++ * but batch up to 2048 quads; still safely below the 16-bit index limit. */
++#define DRAW_QUADS 8192
+ static int		draw_active_flags;
+ static shader_t *draw_active_shader;
+ static avec4_t	draw_active_colour;

@@ -14,7 +14,8 @@ checkout https://github.com/ocornut/imgui.git "$deps/imgui" 4806a1924ff6181180bf
 checkout https://github.com/bulletphysics/bullet3.git "$deps/bullet3-3.25" 2c204c49e56ed15ec5fcfa71d199ab6d6570b3f5
 cmake -S "$deps/bullet3-3.25" -B "$deps/bullet-build" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
 cmake --build "$deps/bullet-build" -j4 --target BulletDynamics BulletCollision LinearMath
-for pair in 'fteqw patches' 'imgui imgui-patches'; do
+python3 "$src/scripts/apply-engine-patches.py" "$deps/fteqw"
+for pair in 'imgui imgui-patches'; do
   read -r directory patches <<< "$pair"
   for patch in "$src/$patches/"*.patch; do
     if ! git -C "$deps/$directory" apply --reverse --check --ignore-whitespace "$patch" 2>/dev/null; then

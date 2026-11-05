@@ -40,6 +40,14 @@
     "gesture": ""
   },
   {
+    "id": "Menu/File/Key X",
+    "label": "Key X",
+    "keys": "x",
+    "context": "CtxAny",
+    "command": null,
+    "gesture": ""
+  },
+  {
     "id": "Menu/File/Reload Material Collections",
     "label": "Reload Material Collections",
     "keys": "",
@@ -345,7 +353,7 @@
   },
   {
     "id": "Menu/Edit/CSG Convex Merge",
-    "label": "CSG Convex Merge",
+    "label": "CSG Convex Merge (Union)",
     "keys": "Ctrl+j",
     "context": "CtxNodeSelection",
     "command": "ftebroom_csg merge",
@@ -353,7 +361,7 @@
   },
   {
     "id": "Menu/Edit/CSG Subtract",
-    "label": "CSG Subtract",
+    "label": "CSG Subtract (Difference)",
     "keys": "Ctrl+k",
     "context": "CtxNodeSelection",
     "command": "ftebroom_csg subtract",
@@ -1042,7 +1050,7 @@
   {
     "id": "Menu/View/Grid/Show Grid",
     "label": "Show Grid",
-    "keys": "0",
+    "keys": "0;kp_ins",
     "context": "CtxAny",
     "command": "ftebroom_grid visible",
     "gesture": ""
@@ -1050,7 +1058,7 @@
   {
     "id": "Menu/View/Grid/Snap to Grid",
     "label": "Snap to Grid",
-    "keys": "Alt+0",
+    "keys": "Alt+0;Alt+kp_ins",
     "context": "CtxAny",
     "command": "ftebroom_grid snap",
     "gesture": ""
@@ -1218,7 +1226,7 @@
   {
     "id": "Menu/View/Grid/Grid 1",
     "label": "Grid 1",
-    "keys": "1",
+    "keys": "1;kp_end",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 1",
     "gesture": ""
@@ -1226,7 +1234,7 @@
   {
     "id": "Menu/View/Grid/Grid 2",
     "label": "Grid 2",
-    "keys": "2",
+    "keys": "2;kp_downarrow",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 2",
     "gesture": ""
@@ -1234,7 +1242,7 @@
   {
     "id": "Menu/View/Grid/Grid 4",
     "label": "Grid 4",
-    "keys": "3",
+    "keys": "3;kp_pgdn",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 4",
     "gesture": ""
@@ -1242,7 +1250,7 @@
   {
     "id": "Menu/View/Grid/Grid 8",
     "label": "Grid 8",
-    "keys": "4",
+    "keys": "4;kp_leftarrow",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 8",
     "gesture": ""
@@ -1250,7 +1258,7 @@
   {
     "id": "Menu/View/Grid/Grid 16",
     "label": "Grid 16",
-    "keys": "5",
+    "keys": "5;kp_5",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 16",
     "gesture": ""
@@ -1258,7 +1266,7 @@
   {
     "id": "Menu/View/Grid/Grid 32",
     "label": "Grid 32",
-    "keys": "6",
+    "keys": "6;kp_rightarrow",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 32",
     "gesture": ""
@@ -1266,7 +1274,7 @@
   {
     "id": "Menu/View/Grid/Grid 64",
     "label": "Grid 64",
-    "keys": "7",
+    "keys": "7;kp_home",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 64",
     "gesture": ""
@@ -1274,7 +1282,7 @@
   {
     "id": "Menu/View/Grid/Grid 128",
     "label": "Grid 128",
-    "keys": "8",
+    "keys": "8;kp_uparrow",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 128",
     "gesture": ""
@@ -1282,7 +1290,7 @@
   {
     "id": "Menu/View/Grid/Grid 256",
     "label": "Grid 256",
-    "keys": "9",
+    "keys": "9;kp_pgup",
     "context": "CtxAnyView",
     "command": "ftebroom_grid set 256",
     "gesture": ""
@@ -1393,7 +1401,7 @@
   },
   {
     "id": "Menu/Run/Build",
-    "label": "Build",
+    "label": "Compile",
     "keys": "Ctrl+Shift+b",
     "context": "CtxAny",
     "command": "ftebroom_ui buildnow",
@@ -1409,7 +1417,7 @@
   },
   {
     "id": "Menu/Run/Build map...",
-    "label": "Build map...",
+    "label": "Setup compile",
     "keys": "",
     "context": "CtxAny",
     "command": "ftebroom_ui build",
@@ -2173,6 +2181,470 @@
     "keys": "",
     "context": "CtxAny",
     "command": "ftebroom_filter_tag 256",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/File/New model...",
+    "label": "New model...",
+    "keys": "",
+    "context": "CtxAny",
+    "command": "bb new",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Move",
+    "label": "Move",
+    "keys": "v",
+    "context": "CtxModelEditor",
+    "command": "bb Move",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Resize",
+    "label": "Resize",
+    "keys": "s;t",
+    "context": "CtxModelEditor",
+    "command": "bb Resize",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Rotate",
+    "label": "Rotate",
+    "keys": "r",
+    "context": "CtxModelEditor",
+    "command": "bb Rotate",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Pivot",
+    "label": "Pivot",
+    "keys": "p",
+    "context": "CtxModelEditor",
+    "command": "bb Pivot",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Vertex Snap",
+    "label": "Vertex Snap",
+    "keys": "n",
+    "context": "CtxModelEditor",
+    "command": "bb Vertex Snap",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Brush",
+    "label": "Brush",
+    "keys": "b",
+    "context": "CtxModelEditor",
+    "command": "bb Brush",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Key E",
+    "label": "Key E",
+    "keys": "e",
+    "context": "CtxModelEditor",
+    "command": "bb Key E",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Fill",
+    "label": "Fill",
+    "keys": "g",
+    "context": "CtxModelEditor",
+    "command": "bb Fill",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Key I",
+    "label": "Key I",
+    "keys": "i",
+    "context": "CtxModelEditor",
+    "command": "bb Key I",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Key M",
+    "label": "Key M",
+    "keys": "m",
+    "context": "CtxModelEditor",
+    "command": "bb Key M",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Add Cube",
+    "label": "Add Cube",
+    "keys": "Ctrl+n",
+    "context": "CtxModelEditor",
+    "command": "bb Add Cube",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Add Group",
+    "label": "Add Group",
+    "keys": "Ctrl+g",
+    "context": "CtxModelEditor",
+    "command": "bb Add Group",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Duplicate",
+    "label": "Duplicate",
+    "keys": "Ctrl+d",
+    "context": "CtxModelEditor",
+    "command": "bb Duplicate",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Delete",
+    "label": "Delete",
+    "keys": "del;backspace",
+    "context": "CtxModelEditor",
+    "command": "bb Delete",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Copy",
+    "label": "Copy",
+    "keys": "Ctrl+c",
+    "context": "CtxModelEditor",
+    "command": "bb Copy",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Cut",
+    "label": "Cut",
+    "keys": "Ctrl+x",
+    "context": "CtxModelEditor",
+    "command": "bb Cut",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Paste",
+    "label": "Paste",
+    "keys": "Ctrl+v",
+    "context": "CtxModelEditor",
+    "command": "bb Paste",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Select all",
+    "label": "Select all",
+    "keys": "Ctrl+a",
+    "context": "CtxModelEditor",
+    "command": "bb Select all",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Invert selection",
+    "label": "Invert selection",
+    "keys": "Ctrl+i",
+    "context": "CtxModelEditor",
+    "command": "bb Invert selection",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Undo",
+    "label": "Undo",
+    "keys": "Ctrl+z",
+    "context": "CtxModelEditor",
+    "command": "bb Undo",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Redo",
+    "label": "Redo",
+    "keys": "Ctrl+y;Ctrl+Shift+z",
+    "context": "CtxModelEditor",
+    "command": "bb Redo",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Save",
+    "label": "Save",
+    "keys": "Ctrl+s",
+    "context": "CtxModelEditor",
+    "command": "bb Save",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Save as",
+    "label": "Save as",
+    "keys": "Ctrl+Shift+s",
+    "context": "CtxModelEditor",
+    "command": "bb Save as",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Edit",
+    "label": "Edit",
+    "keys": "Ctrl+1",
+    "context": "CtxModelEditor",
+    "command": "bb Edit",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Paint",
+    "label": "Paint",
+    "keys": "Ctrl+2",
+    "context": "CtxModelEditor",
+    "command": "bb Paint",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Animate",
+    "label": "Animate",
+    "keys": "Ctrl+3",
+    "context": "CtxModelEditor",
+    "command": "bb Animate",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Focus",
+    "label": "Focus",
+    "keys": ".",
+    "context": "CtxModelEditor",
+    "command": "bb Focus",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Play",
+    "label": "Play",
+    "keys": "space",
+    "context": "CtxModelEditor",
+    "command": "bb Play",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Object selection",
+    "label": "Object selection",
+    "keys": "1",
+    "context": "CtxModelEditor",
+    "command": "bb Object selection",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Face selection",
+    "label": "Face selection",
+    "keys": "2",
+    "context": "CtxModelEditor",
+    "command": "bb Face selection",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Edge selection",
+    "label": "Edge selection",
+    "keys": "3",
+    "context": "CtxModelEditor",
+    "command": "bb Edge selection",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Vertex selection",
+    "label": "Vertex selection",
+    "keys": "4",
+    "context": "CtxModelEditor",
+    "command": "bb Vertex selection",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Front view",
+    "label": "Front view",
+    "keys": "kp_end;Ctrl+kp_end",
+    "context": "CtxModelEditor",
+    "command": "bb Front view",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Right view",
+    "label": "Right view",
+    "keys": "kp_pgdn;Ctrl+kp_pgdn",
+    "context": "CtxModelEditor",
+    "command": "bb Right view",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Top view",
+    "label": "Top view",
+    "keys": "kp_home;Ctrl+kp_home",
+    "context": "CtxModelEditor",
+    "command": "bb Top view",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Toggle ortho",
+    "label": "Toggle ortho",
+    "keys": "kp_5",
+    "context": "CtxModelEditor",
+    "command": "bb Toggle ortho",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Hide",
+    "label": "Hide",
+    "keys": "h",
+    "context": "CtxModelEditor",
+    "command": "bb Hide",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Unhide all",
+    "label": "Unhide all",
+    "keys": "Alt+h",
+    "context": "CtxModelEditor",
+    "command": "bb Unhide all",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Move left",
+    "label": "Move left",
+    "keys": "leftarrow",
+    "context": "CtxModelEditor",
+    "command": "bb Move left",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Move right",
+    "label": "Move right",
+    "keys": "rightarrow",
+    "context": "CtxModelEditor",
+    "command": "bb Move right",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Move up",
+    "label": "Move up",
+    "keys": "pgup",
+    "context": "CtxModelEditor",
+    "command": "bb Move up",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Move down",
+    "label": "Move down",
+    "keys": "pgdn",
+    "context": "CtxModelEditor",
+    "command": "bb Move down",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Move forth",
+    "label": "Move forth",
+    "keys": "uparrow",
+    "context": "CtxModelEditor",
+    "command": "bb Move forth",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Move back",
+    "label": "Move back",
+    "keys": "downarrow",
+    "context": "CtxModelEditor",
+    "command": "bb Move back",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Loop Cut",
+    "label": "Loop Cut",
+    "keys": "Ctrl+r",
+    "context": "CtxModelEditor",
+    "command": "bb Loop Cut",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Key F",
+    "label": "Key F",
+    "keys": "f",
+    "context": "CtxModelEditor",
+    "command": "bb Key F",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Stretch",
+    "label": "Stretch",
+    "keys": "Shift+t",
+    "context": "CtxModelEditor",
+    "command": "bb Stretch",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Timeline start",
+    "label": "Timeline start",
+    "keys": "home",
+    "context": "CtxModelEditor",
+    "command": "bb Timeline start",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Timeline end",
+    "label": "Timeline end",
+    "keys": "end",
+    "context": "CtxModelEditor",
+    "command": "bb Timeline end",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Previous frame",
+    "label": "Previous frame",
+    "keys": "Alt+leftarrow",
+    "context": "CtxModelEditor",
+    "command": "bb Previous frame",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Next frame",
+    "label": "Next frame",
+    "keys": "Alt+rightarrow",
+    "context": "CtxModelEditor",
+    "command": "bb Next frame",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Open",
+    "label": "Open",
+    "keys": "Ctrl+o",
+    "context": "CtxModelEditor",
+    "command": "bb Open",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Close",
+    "label": "Close",
+    "keys": "Ctrl+w",
+    "context": "CtxModelEditor",
+    "command": "bb Close",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Model editor/Key X",
+    "label": "Key X",
+    "keys": "x",
+    "context": "CtxModelEditor",
+    "command": "bb Key X",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/View/Prefab collections",
+    "label": "Prefab collections",
+    "context": "CtxAny",
+    "keys": "",
+    "command": "ftebroom_ui prefabs",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/View/Entity list",
+    "label": "Entity list",
+    "context": "CtxAny",
+    "keys": "",
+    "command": "ftebroom_ui entitylist",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Tools/Rotate Grid",
+    "label": "Rotate Grid",
+    "context": "CtxAnyView",
+    "keys": "",
+    "command": "ftebroom_tool_toggle gridrotate",
     "gesture": ""
   }
 ]

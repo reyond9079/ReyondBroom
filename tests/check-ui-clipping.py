@@ -2,9 +2,9 @@
 from pathlib import Path
 import subprocess, tempfile, os
 root = Path(__file__).resolve().parents[1]
-source = (root/'native/ftebroom.cpp').read_text()
+source = (root/'native/ftebroom_imgui_draw.h').read_text()
 vertex = source[source.index('struct Vertex'):source.index('// Clip triangles')]
-clip = source[source.index('static void triangle('):source.index('static void render()')]
+clip = source[source.index('static void triangle('):source.index('static double imguiRenderMs')]
 reference = (root/'tests/reference-imgui-clip.h').read_text()
 fixture = r"""
 #include <algorithm>

@@ -80,9 +80,14 @@ static const ImVec2 points_16_1[] = {{12.00000f,16.00000f},{12.00000f,22.00000f}
 static const ImVec2 points_16_2[] = {{9.00000f,9.00000f},{15.00000f,9.00000f}};
 static const ImVec2 points_16_3[] = {{12.00000f,6.00000f},{12.00000f,12.00000f}};
 static const Stroke icon_16[] = {{points_16_0,10},{points_16_1,2},{points_16_2,2},{points_16_3,2}};
+static const ImVec2 points_17_0[]={{7,3},{21,12},{7,21},{7,3}};
+static const Stroke icon_17[]={{points_17_0,4}};
+static const ImVec2 points_18_0[]={{7,3},{7,21}},points_18_1[]={{17,3},{17,21}};
+static const Stroke icon_18[]={{points_18_0,2},{points_18_1,2}};
 struct Icon { const Stroke* strokes; int count; };
-static const Icon icons[] = {{icon_0,int(sizeof(icon_0)/sizeof(Stroke))},{icon_1,int(sizeof(icon_1)/sizeof(Stroke))},{icon_2,int(sizeof(icon_2)/sizeof(Stroke))},{icon_3,int(sizeof(icon_3)/sizeof(Stroke))},{icon_4,int(sizeof(icon_4)/sizeof(Stroke))},{icon_5,int(sizeof(icon_5)/sizeof(Stroke))},{icon_6,int(sizeof(icon_6)/sizeof(Stroke))},{icon_7,int(sizeof(icon_7)/sizeof(Stroke))},{icon_8,int(sizeof(icon_8)/sizeof(Stroke))},{icon_9,int(sizeof(icon_9)/sizeof(Stroke))},{icon_10,int(sizeof(icon_10)/sizeof(Stroke))},{icon_11,int(sizeof(icon_11)/sizeof(Stroke))},{icon_12,int(sizeof(icon_12)/sizeof(Stroke))},{icon_13,int(sizeof(icon_13)/sizeof(Stroke))},{icon_14,int(sizeof(icon_14)/sizeof(Stroke))},{icon_15,int(sizeof(icon_15)/sizeof(Stroke))},{icon_16,int(sizeof(icon_16)/sizeof(Stroke))}};
+static const Icon icons[] = {{icon_0,int(sizeof(icon_0)/sizeof(Stroke))},{icon_1,int(sizeof(icon_1)/sizeof(Stroke))},{icon_2,int(sizeof(icon_2)/sizeof(Stroke))},{icon_3,int(sizeof(icon_3)/sizeof(Stroke))},{icon_4,int(sizeof(icon_4)/sizeof(Stroke))},{icon_5,int(sizeof(icon_5)/sizeof(Stroke))},{icon_6,int(sizeof(icon_6)/sizeof(Stroke))},{icon_7,int(sizeof(icon_7)/sizeof(Stroke))},{icon_8,int(sizeof(icon_8)/sizeof(Stroke))},{icon_9,int(sizeof(icon_9)/sizeof(Stroke))},{icon_10,int(sizeof(icon_10)/sizeof(Stroke))},{icon_11,int(sizeof(icon_11)/sizeof(Stroke))},{icon_12,int(sizeof(icon_12)/sizeof(Stroke))},{icon_13,int(sizeof(icon_13)/sizeof(Stroke))},{icon_14,int(sizeof(icon_14)/sizeof(Stroke))},{icon_15,int(sizeof(icon_15)/sizeof(Stroke))},{icon_16,int(sizeof(icon_16)/sizeof(Stroke))},{icon_17,1},{icon_18,2}};
 static bool button(const char* id,int index,ImVec2 size) {
+  if(index<0||index>=int(sizeof(icons)/sizeof(icons[0])))index=0;
   const auto p=ImGui::GetCursorScreenPos();bool clicked=ImGui::Button(id,size);
   const float extent=std::min(size.x,size.y)*.68f,scale=extent/24.f;
   const ImVec2 origin{p.x+(size.x-extent)*.5f,p.y+(size.y-extent)*.5f};

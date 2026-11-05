@@ -1,0 +1,231 @@
+{
+  "meta": {
+    "format_version": "5.0",
+    "model_format": "free",
+    "box_uv": false
+  },
+  "name": "",
+  "model_identifier": "",
+  "visible_box": [
+    1,
+    1,
+    0
+  ],
+  "variable_placeholders": "",
+  "multi_file_ruleset": "",
+  "variable_placeholder_buttons": [],
+  "timeline_setups": [],
+  "unhandled_root_fields": {},
+  "resolution": {
+    "width": 64,
+    "height": 64
+  },
+  "editor_state": {
+    "save_path": "",
+    "export_path": "",
+    "saved": true,
+    "added_models": 0,
+    "mode": "edit",
+    "tool": "",
+    "exploded_view": false,
+    "uv_viewport": {
+      "zoom": 1,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "previews": {
+      "media": {
+        "position": [
+          -40,
+          32,
+          -40
+        ],
+        "target": [
+          0,
+          12,
+          0
+        ],
+        "orthographic": false,
+        "zoom": 0.5,
+        "angle": null
+      },
+      "no_aa_media": {
+        "position": [
+          -40,
+          32,
+          -40
+        ],
+        "target": [
+          0,
+          12,
+          0
+        ],
+        "orthographic": false,
+        "zoom": 0.5,
+        "angle": null
+      },
+      "main": {
+        "position": [
+          -40.00000000000001,
+          31.999999999999996,
+          -40
+        ],
+        "target": [
+          0,
+          12,
+          0
+        ],
+        "orthographic": false,
+        "zoom": 0.5,
+        "angle": null
+      }
+    },
+    "selected_elements": [],
+    "selected_groups": [],
+    "mesh_selection": {}
+  },
+  "elements": [
+    {
+      "name": "mixed",
+      "color": 0,
+      "origin": [
+        2,
+        1,
+        3
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "shading": "flat",
+      "export": true,
+      "visibility": true,
+      "locked": false,
+      "render_order": "default",
+      "scope": 0,
+      "allow_mirror_modeling": true,
+      "vertices": {
+        "a": [
+          0,
+          0,
+          0
+        ],
+        "b": [
+          8,
+          0,
+          0
+        ],
+        "c": [
+          8,
+          8,
+          0
+        ],
+        "d": [
+          0,
+          8,
+          0
+        ],
+        "e": [
+          4,
+          4,
+          5
+        ]
+      },
+      "faces": {
+        "PxW9PNUo": {
+          "uv": {
+            "d": [
+              0,
+              8
+            ],
+            "c": [
+              8,
+              8
+            ],
+            "b": [
+              8,
+              0
+            ],
+            "a": [
+              0,
+              0
+            ]
+          },
+          "texture": 0,
+          "vertices": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ]
+        },
+        "MpDMKt1n": {
+          "uv": {
+            "b": [
+              8,
+              0
+            ],
+            "e": [
+              4,
+              4
+            ],
+            "a": [
+              0,
+              0
+            ]
+          },
+          "texture": 0,
+          "vertices": [
+            "a",
+            "e",
+            "b"
+          ]
+        }
+      },
+      "type": "mesh",
+      "uuid": "c22e611c-c299-ea63-f8bd-baba12afc595"
+    }
+  ],
+  "groups": [],
+  "outliner": [
+    "c22e611c-c299-ea63-f8bd-baba12afc595"
+  ],
+  "textures": [
+    {
+      "name": "fixture.png",
+      "path": "",
+      "folder": "",
+      "namespace": "",
+      "id": "0",
+      "group": "",
+      "scope": 0,
+      "width": 64,
+      "height": 64,
+      "uv_width": 64,
+      "uv_height": 64,
+      "particle": false,
+      "use_as_default": false,
+      "layers_enabled": false,
+      "sync_to_project": "",
+      "file_format": "png",
+      "render_mode": "default",
+      "render_sides": "auto",
+      "wrap_mode": "limited",
+      "pbr_channel": "color",
+      "fps": 7,
+      "force_translucent": false,
+      "frame_time": 1,
+      "frame_order_type": "loop",
+      "frame_order": "",
+      "frame_interpolate": false,
+      "visible": true,
+      "internal": true,
+      "saved": false,
+      "uuid": "4fa02be3-611f-6d9e-e950-67dc9f1a39f7",
+      "source": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABx0lEQVR4AeyTMSiEYRjHf12XJEmSJEmSJEmSJEmSJEm6dOnSpUuXLl26dOmSwWAwGAwGg8FgMBgMBoPBYDAYDAaDwWAwGAwG9edbv+Xry+R9n+Ednp5n+P6//+9LAEqSUDVJ1VKleqrVSI2aqVUrdWqnXp00qJtG9dKkfpo1SIuGadUobRqnXZN0aJpOzdKlebqVokdpepWhT1n6lWNAeQZVYEhFhlViRGVGVWFMO4xrlwntMal9pnTAtA6Z0RGzOmZOJ8zrlAWdkdI5i7ogrUuWdEVG1yzrhqxuWdEdOd2zqgfyemRNTxT0zLpeKOqVDb1R0jub+qCsT7b0RUXfbCtB8peBx88AmAEe6x+Ub79AQMHnZwb43H6Q3QwIKPj8zACf2w+ymwEBBZ+fdwaEyzYAYSK+zWaAb42H85oBYSK+zWaAb42H85oBYSK+zWaAb42H85oBYSK+zWaA641H5TMDogi5vjcDXG84Kp8ZEEXI9b0Z4HrDUfnMgChCru/NANcbjspnBkQRcn1vBrjWcNw8ZkBcYq7dmwGuNRo3jxkQl5hr92aAa43GzWMGxCXm2r0Z4FqjcfOYAXGJuXZvBvz3Rv/6/T8AAAD//30DMCUAAAAGSURBVAMAIBXOAS7Db50AAAAASUVORK5CYII="
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "meta": {
+    "format_version": "5.0",
+    "model_format": "free",
+    "box_uv": false
+  },
+  "name": "",
+  "model_identifier": "",
+  "visible_box": [
+    1,
+    1,
+    0
+  ],
+  "variable_placeholders": "",
+  "multi_file_ruleset": "",
+  "variable_placeholder_buttons": [],
+  "timeline_setups": [],
+  "unhandled_root_fields": {},
+  "resolution": {
+    "width": 64,
+    "height": 64
+  },
+  "editor_state": {
+    "save_path": "",
+    "export_path": "",
+    "saved": true,
+    "added_models": 0,
+    "mode": "edit",
+    "tool": "",
+    "exploded_view": false,
+    "uv_viewport": {
+      "zoom": 1,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "previews": {
+      "media": {
+        "position": [
+          -40,
+          32,
+          -40
+        ],
+        "target": [
+          0,
+          12,
+          0
+        ],
+        "orthographic": false,
+        "zoom": 0.5,
+        "angle": null
+      },
+      "no_aa_media": {
+        "position": [
+          -40,
+          32,
+          -40
+        ],
+        "target": [
+          0,
+          12,
+          0
+        ],
+        "orthographic": false,
+        "zoom": 0.5,
+        "angle": null
+      },
+      "main": {
+        "position": [
+          -40.00000000000001,
+          31.999999999999996,
+          -40
+        ],
+        "target": [
+          0,
+          12,
+          0
+        ],
+        "orthographic": false,
+        "zoom": 0.5,
+        "angle": null
+      }
+    },
+    "selected_elements": [],
+    "selected_groups": [],
+    "mesh_selection": {}
+  },
+  "elements": [
+    {
+      "name": "box",
+      "box_uv": true,
+      "render_order": "default",
+      "locked": false,
+      "export": true,
+      "scope": 0,
+      "allow_mirror_modeling": true,
+      "from": [
+        -4,
+        0,
+        -3
+      ],
+      "to": [
+        4,
+        12,
+        3
+      ],
+      "autouv": 0,
+      "color": 6,
+      "mirror_uv": true,
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "uv_offset": [
+        2,
+        4
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            16,
+            10,
+            8,
+            22
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            22,
+            10,
+            16,
+            22
+          ],
+          "texture": 0,
+          "rotation": 90
+        },
+        "south": {
+          "uv": [
+            30,
+            10,
+            22,
+            22
+          ],
+          "texture": 0,
+          "rotation": 180
+        },
+        "west": {
+          "uv": [
+            8,
+            10,
+            2,
+            22
+          ],
+          "texture": 0,
+          "rotation": 270
+        },
+        "up": {
+          "uv": [
+            8,
+            10,
+            16,
+            4
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            16,
+            4,
+            24,
+            10
+          ],
+          "texture": 0,
+          "rotation": 90
+        }
+      },
+      "type": "cube",
+      "uuid": "06d5bc17-ec69-8456-3931-2d9eca7fab12"
+    }
+  ],
+  "groups": [],
+  "outliner": [
+    "06d5bc17-ec69-8456-3931-2d9eca7fab12"
+  ],
+  "textures": [
+    {
+      "name": "fixture.png",
+      "path": "",
+      "folder": "",
+      "namespace": "",
+      "id": "0",
+      "group": "",
+      "scope": 0,
+      "width": 64,
+      "height": 64,
+      "uv_width": 64,
+      "uv_height": 64,
+      "particle": false,
+      "use_as_default": false,
+      "layers_enabled": false,
+      "sync_to_project": "",
+      "file_format": "png",
+      "render_mode": "default",
+      "render_sides": "auto",
+      "wrap_mode": "limited",
+      "pbr_channel": "color",
+      "fps": 7,
+      "force_translucent": false,
+      "frame_time": 1,
+      "frame_order_type": "loop",
+      "frame_order": "",
+      "frame_interpolate": false,
+      "visible": true,
+      "internal": true,
+      "saved": false,
+      "uuid": "a580c99b-4547-dd49-7165-3cbe0dbd334d",
+      "source": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABx0lEQVR4AeyTMSiEYRjHf12XJEmSJEmSJEmSJEmSJEm6dOnSpUuXLl26dOmSwWAwGAwGg8FgMBgMBoPBYDAYDAaDwWAwGAwG9edbv+Xry+R9n+Ednp5n+P6//+9LAEqSUDVJ1VKleqrVSI2aqVUrdWqnXp00qJtG9dKkfpo1SIuGadUobRqnXZN0aJpOzdKlebqVokdpepWhT1n6lWNAeQZVYEhFhlViRGVGVWFMO4xrlwntMal9pnTAtA6Z0RGzOmZOJ8zrlAWdkdI5i7ogrUuWdEVG1yzrhqxuWdEdOd2zqgfyemRNTxT0zLpeKOqVDb1R0jub+qCsT7b0RUXfbCtB8peBx88AmAEe6x+Ub79AQMHnZwb43H6Q3QwIKPj8zACf2w+ymwEBBZ+fdwaEyzYAYSK+zWaAb42H85oBYSK+zWaAb42H85oBYSK+zWaAb42H85oBYSK+zWaA641H5TMDogi5vjcDXG84Kp8ZEEXI9b0Z4HrDUfnMgChCru/NANcbjspnBkQRcn1vBrjWcNw8ZkBcYq7dmwGuNRo3jxkQl5hr92aAa43GzWMGxCXm2r0Z4FqjcfOYAXGJuXZvBvz3Rv/6/T8AAAD//30DMCUAAAAGSURBVAMAIBXOAS7Db50AAAAASUVORK5CYII="
+    }
+  ]
+}

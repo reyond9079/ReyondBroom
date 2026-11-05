@@ -16,6 +16,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--output',required=True)
 parser.add_argument('--deps',required=True)
 parser.add_argument('--windows-plugin')
+parser.add_argument('--engine',type=Path,help='Explicit tested engine executable')
 parser.add_argument('--mod',help='Use an actual Quake 1 mod archive set in the disposable fixture')
 args=parser.parse_args();root=Path(args.output).resolve();root.mkdir(parents=True,exist_ok=False);deps=Path(args.deps).resolve()
 old_args=sys.argv;sys.argv=['make-quake1-fixture.py',str(root)];os.chdir(src)
@@ -45,7 +46,7 @@ shutil.copytree(src/'runtime',editor/'ftebroom',dirs_exist_ok=True,ignore=shutil
 for name in ('default.fmf','installed.lst'):shutil.copy2(src/'runtime'/name,editor/name)
 shutil.copy2(src/'csaddon.dat',editor/'ftebroom/csaddon.dat')
 if os.name=='nt':
-    engine=editor/'fteqw64.exe';shutil.copy2(deps/'engine/release-ftebroom/fteglqw64.exe',engine)
+    engine=editor/'fteqw64.exe';shutil.copy2(args.engine or deps/'engine/release-ftebroom/fteglqw64.exe',engine)
     shutil.copy2(args.windows_plugin,editor/'fteplug_ftebroom_x64.dll')
     for name in ('zlib1.dll','libpng16-16.dll'):
         if Path('C:/msys64/mingw64/bin',name).exists():shutil.copy2(Path('C:/msys64/mingw64/bin',name),editor/name)
@@ -53,13 +54,13 @@ if os.name=='nt':
     startup=subprocess.STARTUPINFO();startup.dwFlags=subprocess.STARTF_USESHOWWINDOW;startup.wShowWindow=0
     options=dict(startupinfo=startup,creationflags=subprocess.CREATE_NO_WINDOW)
 else:
-    engine=editor/'fteqw-gl64';shutil.copy2(deps/'fteqw/engine/release-sdl2/fteqw-glsdl2_64',engine)
+    engine=editor/'fteqw-gl64';shutil.copy2(args.engine or deps/'fteqw/engine/release-sdl2/fteqw-glsdl2_64',engine)
     shutil.copy2(deps/'fteplug_ftebroom_amd64.so',editor/'fteplug_ftebroom_amd64.so');options={}
 cfg=f'''exec ftebroom.cfg
 set ftebroom_skip_setup 1
 set ftebroom_test_import_root "{game.as_posix()}"
 in 5 ftebroom_test_desktop external69load
-in 7 ftebroom_test_entities player72
+in 10 ftebroom_test_entities player72
 in 8 ftebroom_test_desktop medit71open
 in 11 ftebroom_test_desktop medit71check
 in 12 ftebroom_test_desktop medit71pixels
@@ -118,9 +119,9 @@ print('PASS actual editor: hierarchy, transforms, rendered modes, skeletal anima
 restart='''exec ftebroom.cfg
 set ftebroom_skip_setup 1
 in 6 ftebroom_camera_restore -40 -200 110 5 90 0 90
-in 7 ftebroom_test_entities player72
-in 9 screenshot player-after-restart.png
-in 10 quit force
+in 10 ftebroom_test_entities player72
+in 12 screenshot player-after-restart.png
+in 13 quit force
 '''
 (editor/'ftebroom/restart-test.cfg').write_text(restart)
 old_log=(editor/'ftebroom/qconsole.log').read_text(errors='replace') if os.name=='nt' else ''

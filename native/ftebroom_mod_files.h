@@ -71,6 +71,7 @@ static void lmpShow(const std::filesystem::path& path);
 #include "ftebroom_model_converter.h"
 #include "ftebroom_bsp_uv_panel.h"
 #include "ftebroom_model_editor.h"
+#include "ftebroom_bb_ui.h"
 static std::filesystem::path modFileCopy(const std::filesystem::path& source,const std::filesystem::path& folder) {
   modFileValidate(folder);
   if(wadBrowseFolder(folder))throw std::runtime_error("Use the texture importer to add images to a WAD.");
@@ -308,6 +309,7 @@ static void modFilesPanel() {
           if(!directory&&entityLower(path.extension().u8string())==".lmp"&&ImGui::MenuItem("Open LMP viewer"))lmpShow(path);
           if(directory&&!wadBrowseFolder(path)&&ImGui::MenuItem("New WAD..."))newWadShow(path);
           if(!directory&&modelViewableFile(path)&&ImGui::MenuItem("Open in model editor"))modelEditorShow(modFileModelPath(path));
+          if(directory&&ImGui::MenuItem("New model here"))bbNew(path);
           if(!directory&&modelFile(path)&&ImGui::MenuItem("Convert..."))modelConverterShow(modFileModelPath(path));
           if(ImGui::MenuItem("Copy")){modFilesClipboard=path;modFilesCut=false;}
           ImGui::BeginDisabled(wadBrowseMember(path));
@@ -340,7 +342,7 @@ static void modFilesPanel() {
         modFilesFolder=navigate;modFilesRefresh=true;
       }
     }catch(const std::exception& e){modFilesError=e.what();ImGui::TextWrapped("%s",modFilesError.c_str());}
-    if(ImGui::BeginPopupContextWindow("mod_files_context",ImGuiPopupFlags_MouseButtonRight|ImGuiPopupFlags_NoOpenOverItems)){if(!wadBrowseFolder(modFilesFolder)&&ImGui::MenuItem("New WAD..."))newWadShow(modFilesFolder);if(ImGui::MenuItem("Paste",nullptr,false,!modFilesClipboard.empty()))try{modFilesPaste();}catch(const std::exception& e){modFilesError=e.what();}if(ImGui::MenuItem("Reload engine resources"))command("fs_restart fresh\nftebroom_assets_ready\n");if(ImGui::MenuItem("Open this directory in OS file manager"))modFilesExplorer();ImGui::EndPopup();}
+    if(ImGui::BeginPopupContextWindow("mod_files_context",ImGuiPopupFlags_MouseButtonRight|ImGuiPopupFlags_NoOpenOverItems)){if(ImGui::MenuItem("New model here"))bbNew(modFilesFolder);if(!wadBrowseFolder(modFilesFolder)&&ImGui::MenuItem("New WAD..."))newWadShow(modFilesFolder);if(ImGui::MenuItem("Paste",nullptr,false,!modFilesClipboard.empty()))try{modFilesPaste();}catch(const std::exception& e){modFilesError=e.what();}if(ImGui::MenuItem("Reload engine resources"))command("fs_restart fresh\nftebroom_assets_ready\n");if(ImGui::MenuItem("Open this directory in OS file manager"))modFilesExplorer();ImGui::EndPopup();}
     if(!modFilesRename.empty()) {
       ImGui::SeparatorText("Rename file / folder");ImGui::InputText("New name",modFilesRenameName,sizeof modFilesRenameName);
       if(ImGui::Button("Rename"))try {

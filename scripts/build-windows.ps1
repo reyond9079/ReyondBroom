@@ -34,13 +34,7 @@ foreach ($patch in Get-ChildItem "$src/imgui-patches/*.patch") {
     & git -C $imgui apply --reverse --check --ignore-whitespace $patch.FullName 2>$null
     if ($LASTEXITCODE -ne 0) { Run git @('-C', $imgui, 'apply', '--ignore-whitespace', $patch.FullName) }
 }
-foreach ($patch in Get-ChildItem "$src/patches/*.patch") {
-    & git -C $fte apply --reverse --check --ignore-whitespace $patch.FullName 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Run git @('-C', $fte, 'apply', '--check', '--ignore-whitespace', $patch.FullName)
-        Run git @('-C', $fte, 'apply', '--ignore-whitespace', $patch.FullName)
-    }
-}
+Run 'python' @("$src/scripts/apply-engine-patches.py", $fte)
 if (!$enginePath) {
     # Dependency generation is disabled below; included engine patches need rebuilding.
     (Get-Item "$fte/engine/common/plugin.c").LastWriteTime = Get-Date

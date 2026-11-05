@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "ftebroom_model_export.h"
+#include "ftebroom_palette_quantize.h"
 #include <cstdint>
 namespace ftebroom::modelExport {
 struct Skin {unsigned width=0,height=0;std::vector<unsigned char> rgba;};
@@ -15,7 +16,7 @@ inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std
   if(nv>2048||nt>4096||mesh.surfaces.size()>16)throw std::runtime_error("Quake MDL export limit: 2048 vertices, 4096 triangles and 16 materials. Simplify the source explicitly; automatic resizing/decimation is disabled.");
   const unsigned tile=256,columns=unsigned(std::ceil(std::sqrt(double(skins.size())))),rows=(skins.size()+columns-1)/columns,w=columns*tile,h=rows*tile;
   std::vector<unsigned char> pixels(w*h,0);std::vector<std::array<int,2>> uv;
-  std::array<int,32768> colourCache;colourCache.fill(-1);
+  ftebroom::PaletteQuantizer quantizer(palette,224);
   for(size_t i=0;i<skins.size();i++){
     const auto& image=skins[i];if(!image.width||!image.height||image.rgba.size()!=size_t(image.width)*image.height*4)throw std::runtime_error("Missing or invalid surface texture.");
     float u0=1e30f,v0=1e30f,u1=-1e30f,v1=-1e30f;
@@ -27,11 +28,8 @@ inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std
     for(unsigned y=0;y<tile;y++)for(unsigned x=0;x<tile;x++){
       float u=u0+std::clamp((float(x)-1)/(tile-3),0.f,1.f)*du,v=v0+std::clamp((float(y)-1)/(tile-3),0.f,1.f)*dv;
       unsigned sx=std::min(image.width-1,unsigned((u-std::floor(u))*image.width)),sy=std::min(image.height-1,unsigned((v-std::floor(v))*image.height));
-      auto p=&image.rgba[(sy*image.width+sx)*4];unsigned key=((p[0]>>3)<<10)|((p[1]>>3)<<5)|(p[2]>>3);
-      if(colourCache[key]<0){unsigned best=0;int distance=INT32_MAX;
-        for(unsigned c=0;c<224;c++){int d=0;for(int a=0;a<3;a++){int delta=int((p[a]&248)+4)-int((unsigned char)palette[c*3+a]);d+=delta*delta;}if(d<distance){distance=d;best=c;}}colourCache[key]=best;
-      }
-      pixels[(oy+y)*w+ox+x]=colourCache[key];
+      auto p=&image.rgba[(sy*image.width+sx)*4];
+      pixels[(oy+y)*w+ox+x]=quantizer.nearest(p[0],p[1],p[2]);
     }
   }
   for(int a=0;a<3;a++)scale[a]=high[a]>low[a]?(high[a]-low[a])/255.f:1.f;
@@ -45,7 +43,7 @@ inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std
 #include "third_party/quake_anorms.h"
   };
   for(unsigned f=0;f<mesh.frames;f++){
-    out.u32(0);out.bytes.append(4,'\0');out.bytes.append(3,char(255));out.bytes+='\0';out.text("frame"+std::to_string(f),16);
+    out.u32(0);out.bytes.append(4,'\0');out.bytes.append(3,char(255));out.bytes+='\0';out.text(f<mesh.frameNames.size()?mesh.frameNames[f]:"frame"+std::to_string(f),16);
     for(const auto& s:mesh.surfaces)for(const auto& v:s.frames[f]){
       for(int a=0;a<3;a++)out.bytes+=char(std::clamp(int(std::round((v.position[a]-low[a])/scale[a])),0,255));
       unsigned normal=0;float best=-1e30f;for(unsigned n=0;n<162;n++){float d=0;for(int a=0;a<3;a++)d+=v.normal[a]*normals[n][a];if(d>best){best=d;normal=n;}}out.bytes+=char(normal);

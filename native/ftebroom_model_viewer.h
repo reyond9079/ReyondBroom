@@ -27,7 +27,7 @@ static double modelViewerClock=0;
 static bool modelFile(const std::filesystem::path& path) {
   auto ext=entityLower(path.extension().u8string());return ext==".mdl"||ext==".md3"||ext==".md2"||ext==".iqm"||ext==".md5mesh"||ext==".mdx"||ext==".zym"||ext==".dpm"||ext==".psk"||ext==".obj";
 }
-static bool modelViewableFile(const std::filesystem::path& path){auto ext=entityLower(path.extension().u8string());return modelFile(path)||ext==".bsp"||ext==".sp2"||ext==".spr";}
+static bool modelViewableFile(const std::filesystem::path& path){auto ext=entityLower(path.extension().u8string());return modelFile(path)||ext==".bbmodel"||ext==".bsp"||ext==".sp2"||ext==".spr";}
 static bool modelViewerIsBsp(){return entityLower(std::filesystem::u8path(modelViewerPath).extension().u8string())==".bsp";}
 static void modelViewerLoad(const std::string& path) {
   modelEditorActive=false;cvars->SetFloat("ftebroom_modeleditor_active",0);
@@ -43,6 +43,7 @@ static void modelViewerLoad(const std::string& path) {
   cvars->SetString("ftebroom_modelviewer_path",path.c_str());cvars->SetFloat("ftebroom_modelviewer_count",0);cvars->SetFloat("ftebroom_modelviewer_poses",0);
 }
 static void modelViewerPanel() {
+  bbNewDialog();if(bbActive){bbPanel();return;}
   if(modelEditorActive)modelEditorCameraStep();
   cvars->SetFloat("ftebroom_modelviewer_open",0);cvars->SetFloat("ftebroom_modeleditor_active",modelEditorActive&&modelViewerOpen);if(!modelViewerOpen){bspUVPanel();return;}
   ImGui::SetNextWindowSize(modelEditorActive?ImVec2(1100*uiScale(),760*uiScale()):ImVec2(760,650),ImGuiCond_FirstUseEver);

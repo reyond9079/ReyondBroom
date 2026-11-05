@@ -1,6 +1,11 @@
 # Model editor
 
 In the Mod file manager, right-click a model and choose **Open in model editor**.
+For cubes/meshes, UV painting and keyframe animation, see the
+[authoring workflow](model-authoring.md). Choose **File > New model** or
+**File > Convert to editable project**. The workflow below remains available
+for native models.
+
 The preview is on the left and the inspector is on the right. Drag the divider
 to change their widths. This editor belongs to the ordinary desktop version;
 it does not require an online server.

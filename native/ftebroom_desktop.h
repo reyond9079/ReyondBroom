@@ -9,6 +9,7 @@ static const char* modelDropClass(const std::filesystem::path& path){
  if(gameProfile==4){auto ext=entityLower(path.extension().u8string());if(ext==".spr")return "cycler_sprite";if(ext!=".mdl")throw std::runtime_error("Half-Life model placement needs a GoldSrc studio MDL or sprite. Other FTE model formats can be inspected but are not native Half-Life entities.");return "cycler";}
  return gameProfile==0?"misc_model":"func_model";
 }
+static std::string modelDropText(const std::filesystem::path& path,float x,float y){auto relative=modFileModelPath(path);if(relative.empty())relative=path.lexically_relative(modFileRoot()).generic_u8string();std::string command="ftebroom_model_drop "+organizationQuote(relative)+" "+std::to_string(x)+" "+std::to_string(y)+" "+organizationQuote(modelDropClass(path));auto metadata=path;metadata+=".reyond.json";if(ftebroom::pak::exists(metadata)){auto data=bb::Json::parse(modFileBytes(metadata));if(data.value("kind","")=="reyondbroom-authoring-model"){auto low=bb::getv(data,"low"),high=bb::getv(data,"high");for(double value:low)if(!std::isfinite(value)||std::abs(value)>1e7)throw std::runtime_error("Invalid authoring-model bounds");for(double value:high)if(!std::isfinite(value)||std::abs(value)>1e7)throw std::runtime_error("Invalid authoring-model bounds");auto vector=[](bb::Vec3 v){std::ostringstream out;out.imbue(std::locale::classic());out<<v[0]<<' '<<v[1]<<' '<<v[2];return out.str();};command+=" authoring "+organizationQuote(vector(low))+" "+organizationQuote(vector(high));}}return command+"\n";}
 static void textureFolderShow();
 static void importAddWads(const std::vector<std::filesystem::path>& paths){
  if(paths.empty())return;
@@ -144,7 +145,7 @@ static void importDialog(){
   if(!drop.folder.empty()){if(modelImportSource(drop.path))modelImportEnqueue(drop.path,drop.folder);else modFileCopy(drop.path,drop.folder);continue;}
   auto folder=modFileRoot()/"models"/"imported";modFileValidate(folder);std::filesystem::create_directories(folder);
   auto target=modFileCopy(drop.path,folder);mountAssets();
-  if(drop.scene){auto relative=target.lexically_relative(modFileRoot()).generic_u8string();command(("ftebroom_model_drop "+organizationQuote(relative)+" "+std::to_string(drop.point.x)+" "+std::to_string(drop.point.y)+" "+organizationQuote(modelDropClass(target))+"\n").c_str());}
+  if(drop.scene){auto relative=target.lexically_relative(modFileRoot()).generic_u8string();command(modelDropText(target,drop.point.x,drop.point.y).c_str());}
   importNotice="Model copied to "+target.u8string();
  }catch(const std::exception& e){importError=e.what();}desktopFileDrops.clear();
  if(!desktopDrops.empty())selectMaterialTab=true;

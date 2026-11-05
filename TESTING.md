@@ -1,5 +1,26 @@
 # Prototype checks
 
+## Alpha 121 model authoring
+
+`python tests/run-bb-tests.py --compiler g++ --output /tmp/reyond-model-tests`
+builds nine standalone suites. They cover reference geometry/UVs, legacy and
+current project IO, actual reference animation poses, primitives/topology,
+transforms/pivots, paint/palettes, mixed history and native export formats.
+
+`tests/test-bb-desktop.py` runs actual ImGui input and renderer tests in a
+disposable runtime. Pass `--engine`, `--plugin` and a new `--output` directory.
+An existing managed `--blender-root` enables the asynchronous glTF import test.
+On Linux, run under `xvfb-run`; software rendering is suitable for functional
+checks only. `--benchmark` measures native versus QC submissions and the full
+5K/20K authoring UI; use a real GPU, uncapped frame rate and an unoccluded
+window for performance measurements. Captures and console logs are retained.
+
+`tests/test-model-editor.py` separately checks the existing native transform
+workflow, exported files, source hashes, bones, player view and renderer restart.
+`tests/reference-bb/check-roundtrip.cjs` validates a saved project with the actual
+upstream codec. See `docs/model-authoring-validation.md` for measured results
+and `docs/model-authoring-coverage.csv` for requirement-to-test mapping.
+
 ## Linux native cursor, 2026-10-25
 
 - Wayland with `WAYLAND_DEBUG=1` shows `wp_cursor_shape_device_v1.set_shape` calls with the pointer-enter serial for arrow, text, hand and resize cursors. No `unknown cursor shape` or other protocol errors appeared; the compositor drew the themed pointer.

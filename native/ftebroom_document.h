@@ -361,6 +361,7 @@ static void documentSaveFinished()
 }
 static void documentRequest(const std::string& next)
 {
+  if(bbBeforeDocument(next))return;
   if (savingDocument)
     return;
   if (next.rfind("@", 0) == 0)

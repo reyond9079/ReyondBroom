@@ -12,7 +12,7 @@
 namespace ftebroom::modelExport {
 struct Vertex {std::array<float,3> position,normal;std::array<float,2> uv;};
 struct Surface {std::string material;std::vector<std::array<unsigned,3>> triangles;std::vector<std::vector<Vertex>> frames;};
-struct Mesh {std::vector<Surface> surfaces;unsigned frames=0;};
+struct Mesh {std::vector<Surface> surfaces;unsigned frames=0;std::vector<std::string> frameNames;};
 inline Mesh parse(const std::string& bytes) {
   std::istringstream input(bytes);input.imbue(std::locale::classic());Mesh mesh;std::string magic;
   unsigned version=0,surfaces=0;input>>magic>>version>>mesh.frames>>surfaces;
@@ -65,7 +65,7 @@ inline std::string md3(const Mesh& mesh) {
   for(unsigned frame=0;frame<mesh.frames;frame++) {
     std::array<float,3> low{1e30f,1e30f,1e30f},high{-1e30f,-1e30f,-1e30f};float radius=0;
     for(const auto& surface:mesh.surfaces)for(const auto& v:surface.frames[frame]){float r=0;for(int a=0;a<3;a++){low[a]=std::min(low[a],v.position[a]);high[a]=std::max(high[a],v.position[a]);r+=v.position[a]*v.position[a];}radius=std::max(radius,std::sqrt(r));}
-    for(float n:low)out.real(n);for(float n:high)out.real(n);for(int a=0;a<3;a++)out.real(0);out.real(radius);out.text("frame"+std::to_string(frame),16);
+    for(float n:low)out.real(n);for(float n:high)out.real(n);for(int a=0;a<3;a++)out.real(0);out.real(radius);out.text(frame<mesh.frameNames.size()?mesh.frameNames[frame]:"frame"+std::to_string(frame),16);
   }
   out.bytes+=surfaces.bytes;return out.bytes;
 }

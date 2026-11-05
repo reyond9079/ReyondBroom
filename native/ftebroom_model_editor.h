@@ -41,7 +41,7 @@ static bool modelEditorInput(int type,int key,float x,float y){
   auto code=[&](const char* name){return input->GetKeyCode(name,nullptr);};bool down=type==1;
   bool inside=x>=modelEditViewMin.x&&y>=modelEditViewMin.y&&x<modelEditViewMin.x+modelEditViewSize.x&&y<modelEditViewMin.y+modelEditViewSize.y;
   ImGuiWindow *hovered=nullptr,*underMoving=nullptr;ImGui::FindHoveredWindowEx({x,y},true,&hovered,&underMoving);auto editorWindow=ImGui::FindWindowByName("Model editor");
-  inside=inside&&hovered&&editorWindow&&hovered->RootWindow==editorWindow->RootWindow;
+  inside=inside&&bbCameraVisible()&&hovered&&((bbActive&&std::string(hovered->Name).rfind("Model viewport",0)==0)||(editorWindow&&hovered->RootWindow==editorWindow->RootWindow));
   if(key==code("shift"))modelEditCameraShift=down;if(key==code("alt"))modelEditCameraAlt=down;
   const char* names[]={"w","s","a","d","q","x"};
   if(!modelEditCameraCaptured&&!modelEditPlayer)for(int i=0;i<6;i++)if(key==code(names[i])&&((!down&&modelEditCameraKeys[i])||(down&&inside&&!ImGui::GetIO().WantTextInput&&!ImGui::GetIO().KeyCtrl&&!ImGui::IsPopupOpen(nullptr,ImGuiPopupFlags_AnyPopupId)))){
@@ -90,6 +90,8 @@ static void modelEditBounds(){
 static ModelEditV modelEditPivot(){return modelEditWorld(modelEditSelected).point(modelEditNodes[modelEditSelected].pivot);}
 static void modelEditMoveTo(ModelEditV target){auto& n=modelEditNodes[modelEditSelected];auto p=ftebroom::modelEdit::inverse(modelEditWorld(n.parent)).point(target);for(int a=0;a<3;a++)n.position[a]=p[a]-n.pivot[a];modelEditChanged=modelEditDirty=true;}
 static void modelEditorShow(const std::string& path){
+  if(entityLower(std::filesystem::u8path(path).extension().u8string())==".bbmodel"){bbOpen(path);return;}
+  if(bbActive){bbLeave([path]{bbReleaseImages();if(auto api=bbAPI())api->clear();bbActive=false;cvars->SetFloat("ftebroom_bb_active",0);modelEditorShow(path);});return;}
   modelEditorCameraEnd();modelViewerLoad(path);modelEditorActive=true;modelEditLoaded=false;modelEditNodes.clear();modelEditChanged=true;modelEditDirty=false;modelEditSelected=0;modelEditDrag=-1;modelEditMessage.clear();
   auto name=entityLower(std::filesystem::u8path(path).filename().u8string());modelEditPlayer=name.rfind("v_",0)==0;
   modelEditCameraFree=false;cvars->SetFloat("ftebroom_modeleditor_freecamera",0);modelEditDisplay=0;modelEditTool=0;cvars->SetFloat("ftebroom_modeleditor_meshes",0);cvars->SetFloat("ftebroom_modeleditor_active",1);cvars->SetFloat("ftebroom_modeleditor_count",0);
@@ -145,7 +147,7 @@ static void modelEditorCloseCheck(bool open){
 }
 static void modelEditorMenus(){
   if(ImGui::BeginMenuBar()){
-    if(ImGui::BeginMenu("File")){if(ImGui::MenuItem("Export model as...",nullptr,false,!modelViewerIsBsp()))modelEditExport();ImGui::EndMenu();}
+    if(ImGui::BeginMenu("File")){if(ImGui::MenuItem("Convert to editable project",nullptr,false,!modelViewerIsBsp()))bbConvertNative(modelViewerPath);if(ImGui::MenuItem("Export model as...",nullptr,false,!modelViewerIsBsp()))modelEditExport();ImGui::EndMenu();}
     if(ImGui::BeginMenu("View")){
       if(modelViewerIsBsp()&&ImGui::MenuItem("BSP UV / texture..."))bspUVShow();
       ImGui::MenuItem("View from player perspective",nullptr,&modelEditPlayer);ImGui::MenuItem("View bones",nullptr,&modelViewerBones,!modelViewerIsBsp());

@@ -1,0 +1,27 @@
+--- a/engine/client/pr_csqc.c
++++ b/engine/client/pr_csqc.c
+@@ -8499,20 +8499,20 @@
+ }
+ static void rb_dyn_clear(void){if(rb_dynmesh)BZ_Free(rb_dynmesh);rb_dynmesh=NULL;rb_dynsize=0;}
+ static void rb_dyn_stats(double *out){memcpy(out,rb_dynstats,sizeof(rb_dynstats));}
+-static image_t *rb_author_images[65];static unsigned rb_author_imagecount;
++static char rb_author_images[65][128];static unsigned rb_author_imagecount;
+ static int rb_image_upload(const char *name,const void *rgba,unsigned width,unsigned height)
+ {
+  image_t *image;shader_t *shader;unsigned flags=IF_NOMIPMAP|IF_NEAREST|IF_CLAMP,i;
+  if(!name||strncmp(name,"bbtex/",6)||strlen(name)>127||!rgba||!width||!height||width>2048||height>2048||qrenderer==QR_NONE)return 0;
+  image=Image_FindTexture(name,NULL,flags);if(!TEXVALID(image))image=Image_CreateTexture(name,NULL,flags);if(!TEXVALID(image))return 0;
+- for(i=0;i<rb_author_imagecount;i++)if(rb_author_images[i]==image)break;
+- if(i==rb_author_imagecount){if(i>=65)return 0;rb_author_images[rb_author_imagecount++]=image;}
++ for(i=0;i<rb_author_imagecount;i++)if(!strcmp(rb_author_images[i],name))break;
++ if(i==rb_author_imagecount){if(i>=65)return 0;Q_strncpyz(rb_author_images[rb_author_imagecount++],name,128);}
+  Image_Upload(image,TF_RGBA32,rgba,NULL,width,height,1,flags);
+  shader=R_RegisterShader(va("bbui/%s",name),SUF_NONE,"{\n program default2d\n {\n map $whiteimage\n blendfunc blend\n rgbgen vertex\n alphagen vertex\n }\n }\n");
+  shader->defaulttextures->base=image;shader->passes[0].anim_frames[0]=image;
+  return shader->id+1;
+ }
+-static void rb_image_clear(void){unsigned i;for(i=0;i<rb_author_imagecount;i++)Image_UnloadTexture(rb_author_images[i]);rb_author_imagecount=0;}
++static void rb_image_clear(void){unsigned i;for(i=0;i<rb_author_imagecount;i++){image_t *image=Image_FindTexture(rb_author_images[i],NULL,IF_NOMIPMAP|IF_NEAREST|IF_CLAMP);if(TEXVALID(image))Image_UnloadTexture(image);}rb_author_imagecount=0;}
+ void *RB_DynamicImageInterface(size_t size){static struct {int(*upload)(const char*,const void*,unsigned,unsigned);void(*clear)(void);} api={rb_image_upload,rb_image_clear};return size==sizeof(api)?&api:NULL;}
+ void *RB_DynamicMeshInterface(size_t size)
+ {

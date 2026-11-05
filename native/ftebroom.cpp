@@ -229,6 +229,7 @@ static void action(const char* cmd)
 static void cacheProjectIndexed();
 static void cacheProjectRemember();
 #include "ftebroom_assets.h"
+static bool bbBeforeDocument(const std::string& next);
 #include "ftebroom_document.h"
 #include "ftebroom_wall_browser.h"
 // Camera persistence depends on document paths and platform file helpers.
@@ -251,6 +252,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_run.h"
 #include "ftebroom_build.h"
 #include "ftebroom_terrain.h"
+#include "ftebroom_bb_host.h"
 #include "ftebroom_model_viewer.h"
 #include "ftebroom_mod_files.h"
 #include "ftebroom_desktop.h"
@@ -458,7 +460,7 @@ static void panel(float w, float h)
         uiReset = true;
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 120");
+    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 121");
     ImGui::EndMainMenuBar();
   }
   const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
@@ -1124,7 +1126,7 @@ static void panel(float w, float h)
     if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
-      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 120");
+      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 121");
       ImGui::TextLinkOpenURL("Check published releases","https://github.com/reyond9079/ReyondBroom/releases");
       updatePanel();
       ImGui::EndTabItem();
@@ -1146,7 +1148,7 @@ static void panel(float w, float h)
   terrainPanel();
   shaderPackPanel();
   modFilesPanel();
-  modelViewerPanel();
+  modelViewerPanel();bbBenchTick();
   pluginsPanel();pluginPreviewDraw();
   symmetryPanel();generatorPanel();arrayPanel();settlePanel();spawnMasterPanel();unityPanel();textureFolderPanel();prefabPanel();entityListPanel();
   importDialog();
@@ -1325,7 +1327,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         try {
           auto path=std::filesystem::u8path((const char*)payload->Data);modFileValidate(path);auto ext=path.extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);
           if(ext==".map"){viewActivate(hit);modFileImportMap(path,x,y);}
-          if(modelFile(path)||ext==".bsp") {viewActivate(hit);auto relative=modFileModelPath(path);command(("ftebroom_model_drop "+organizationQuote(relative)+" "+std::to_string(x)+" "+std::to_string(y)+" "+organizationQuote(modelDropClass(path))+"\n").c_str());}
+          if(ext==".bbmodel"){bbOpen(path.u8string());}else if(modelFile(path)||ext==".bsp") {viewActivate(hit);auto relative=modFileModelPath(path);command(modelDropText(path,x,y).c_str());}
         }catch(const std::exception& e){modFilesError=e.what();}return qtrue;
       }
       if (!down && inScene)
@@ -1560,7 +1562,7 @@ static void QDECL actionFocusTick(int)
   clipboardPump();
   documentTick();
   // Compiler jobs must advance even while the UI is occluded or another menu owns focus.
-  if(ready){runTick();buildTick();modPreviewTick();pluginsTick();}
+  if(ready){runTick();buildTick();modPreviewTick();pluginsTick();bbImportTick();}
   if (!ready || input->HasMenuFocus())
     return;
   modelEditorCameraEnd(false);
@@ -1969,6 +1971,7 @@ static void QDECL videoChanged(int width,int height,qboolean restarted)
   if(!ready || !restarted)return;
   // Renderer handles have expired; do not unload them in the new renderer.
   thumbnailCache.clear();entityPreviews.clear();fileImages.clear();++fileImageGeneration;
+  bbImages.clear();bbImageRevisions.clear();bbImageTimes.clear();bbCheckerReady=false;bbRenderRevision=0;
   modelViewerImage=0;modelViewerSkinTexture=0;modelViewerSkinTextureIndex=-1;
   uploadFontAtlas();
   ImGui::GetIO().DisplaySize={float(width),float(height)};

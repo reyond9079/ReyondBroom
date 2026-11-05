@@ -8,18 +8,23 @@ inline bool generatedIvyPath(const std::string& name){
  for(auto& part:std::filesystem::u8path(name))if(part==".."||part==".")return false;
  return true;
 }
+inline bool generatedAuthoringPath(const std::string& name){
+ if(name.empty()||name.find_first_of("\\:\r\n")!=name.npos||std::filesystem::u8path(name).is_absolute())return false;
+ for(auto& part:std::filesystem::u8path(name))if(part==".."||part==".")return false;
+ return true;
+}
 // FTE supplies a native misc_model fallback for classic Quake progs. The
 // ordinary LibreQuake progs has no func_model spawn function. Migrate only the
 // known static ivy class in disposable build/preview copies, never the MAP.
 inline std::string prepareStaticModels(const std::string& bytes,int profile,size_t& changed){
  changed=0;if(profile!=2)return bytes;auto entities=rawPreviewEntities(bytes);
- for(auto& e:entities)if(e.geometry.empty()&&e.get("classname")=="func_model"&&generatedIvyPath(e.get("model"))){e.fields["classname"]="misc_model";changed++;}
+ for(auto& e:entities)if(e.geometry.empty()&&e.get("classname")=="func_model"&&(generatedIvyPath(e.get("model"))||(e.get("_reyondbroom_authoring")=="1"&&generatedAuthoringPath(e.get("model"))))){e.fields["classname"]="misc_model";changed++;}
  if(!changed)return bytes;std::string result;
  for(auto& e:entities){result+="{\n";for(auto& f:e.fields)result+=prefab::quote(f.first)+" "+prefab::quote(f.second)+"\n";result+=e.geometry+"}\n";}
  return result;
 }
 inline std::set<std::string> generatedIvyModels(const std::string& bytes){
- std::set<std::string> result;for(auto& e:rawPreviewEntities(bytes))if(generatedIvyPath(e.get("model")))result.insert(e.get("model"));return result;
+ std::set<std::string> result;for(auto& e:rawPreviewEntities(bytes))if(generatedIvyPath(e.get("model"))||(e.get("_reyondbroom_authoring")=="1"&&generatedAuthoringPath(e.get("model"))))result.insert(e.get("model"));return result;
 }
 inline std::vector<std::string> generatedModelDependencies(const std::string& bytes){
  using namespace quake1;std::vector<std::string> result;

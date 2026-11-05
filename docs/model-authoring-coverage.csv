@@ -1,0 +1,39 @@
+Area,Requirement,Implementation,Verification
+Architecture,"Engine-independent math, document and history",native/ftebroom_bb_math.h; ftebroom_bb_model.h; ftebroom_bb_undo.h,run-bb-tests.py: all standalone suites
+Coordinate system,"Y-up document, proper Quake basis, scale/front","native/ftebroom_bb_math.h: bbToQuake, quakeToBb","test-bb-geometry.cpp: determinant, axes, roundtrip"
+Reference data,Actual Generic codec OBJ/PNG/glTF/legacy fixtures,tests/reference-bb; tests/fixtures/bb,"geometry, io, anim and actual codec check-roundtrip"
+Rendering,"Native in-memory scene batches, no temporary model per edit",ftebroom_bb_render.h; patches/zzzz-model-authoring-*.patch; qc/fb_bb_render.qc,test-bb-desktop.py --benchmark: 5K/20K A/B
+Rendering,Raw RGBA texture updates and restart lifetime,"ftebroom_bb_ui.h: bbImage, bbReleaseImages; engine image API","desktop: real paint, renderer restart"
+Document,Cubes/meshes/groups/locators and preserved unsupported data,ftebroom_bb_model.h; ftebroom_bb_io.h,test-bb-io.cpp
+Geometry,"Euler hierarchy, cube faces, box/mirror UV and winding",ftebroom_bb_geometry.h,test-bb-geometry.cpp: real OBJ fixtures
+Validation,"UUIDs, dimensions, malformed input and bounded allocations",ftebroom_bb_model.h: validate; ftebroom_bb_io.h: parseProject,test-bb-io.cpp: rejected malformed inputs
+History,"Independent Undo/Redo, changed image rectangles, drag cancel",ftebroom_bb_undo.h,test-bb-history.cpp: 50 mixed edits; paint and desktop drag tests
+Edit,Move/Resize/Rotate/Pivot in editable preview,ftebroom_bb_ui_viewport.h; ftebroom_bb_tools.h,"desktop: four actual mouse gizmos, one history record each"
+Edit,"Global/local/parent transforms, locks, preserving pivots",ftebroom_bb_tools.h; ftebroom_bb_edit.h,"test-bb-tools.cpp: rotated parents, locks, pivots, reparent"
+Edit,Vertex Snap Move/Scale and Stretch,ftebroom_bb_ui_viewport.h; ftebroom_bb_tools.h,tools math and coordinate tests; viewport integration
+Edit,"Mesh selection, box selection, loop and seam selection",ftebroom_bb_ui_viewport.h; ftebroom_bb_unwrap.h,test-bb-tools.cpp; native viewport input regression
+Mesh,"Eleven primitives, nondegenerate surfaces and closed winding",ftebroom_bb_mesh_ops.h: primitive,test-bb-edit.cpp: manifold and signed-volume checks
+Mesh,Extrude/Inset/Loop Cut/merge/split/solidify/dissolve/create/delete,ftebroom_bb_mesh_ops.h; ftebroom_bb_edit.h; ftebroom_bb_tools.h,test-bb-mesh.cpp
+Outliner,"Groups, reparent, duplicate, flags, range, rename, collapse",ftebroom_bb_ui_panels.h; ftebroom_bb_edit.h,tools/history tests; real-ImGui desktop dialogs
+Properties,"Mixed XYZ expressions, cube/mesh size, pivot and flags","ftebroom_bb_ui_panels.h: bbVecField, bbInspector",test-bb-tools.cpp: expressions; desktop gizmos
+UV,"Per-face cube rectangles, mesh corners and numeric bounds",ftebroom_bb_ui_viewport.h: bbUVPanel,desktop: cursor-to-texel UV move and undo
+UV,Auto/relative/project/mirror/rotate/reset/snap/connect/unwrap,ftebroom_bb_uv.h; ftebroom_bb_unwrap.h,geometry UV fixtures; tools unfolding; mesh UV quarter-turn test
+Textures,Import/material assignment/template/save/refresh/resize,ftebroom_bb_ui_panels.h; ftebroom_bb_uv.h; ftebroom_bb_io.h,io PNG byte roundtrip; template tests; refreshed-path regression
+Paint,"2D/3D strokes, eraser, fill, picker, shapes, gradient, clone",ftebroom_bb_paint.h; ftebroom_bb_ui_viewport.h,test-bb-paint.cpp; desktop actual 2D/3D strokes and undo
+Paint,"Eight blends, clipping, softness, alpha lock and mirror",ftebroom_bb_paint.h; ftebroom_bb_ui_viewport.h,known-color blend pairs; UV clip; 3D center-hit paint
+Palette,GPL/HEX/LMP and exact Quake non-fullbright palette,ftebroom_bb_ui_actions.h; ftebroom_bb_paint.h; ftebroom_model_mdl_export.h,1000 paint/MDL quantizer comparisons; export first-224 checks
+Image editing,"Pixel selection, move/copy/cut/paste/crop and adjustments",ftebroom_bb_image_ops.h; ftebroom_bb_ui_actions.h,test-bb-tools.cpp; paint/history suites
+Animation,Group TRS and four interpolation modes,ftebroom_bb_anim.h,test-bb-anim.cpp: actual channels and 44 glTF sampled poses
+Timeline,"Play, frames, scrubbing, key drag/select/copy, markers, auto key",ftebroom_bb_ui_viewport.h: bbTimeline; ftebroom_bb_ui_panels.h,desktop: actual timeline key drag; animate playback
+Animation,"Clip settings, speed, merge, pose and vertex-frame baking",ftebroom_bb_anim.h; ftebroom_bb_ui_actions.h,"anim/export tests: monster40, weapon8"
+Templates,"Empty, monster, weapon, item, prop",ftebroom_bb_anim.h: makeTemplate,geometry/edit/export suites; visible monster template
+Export,MDL/MD2/MD3/GoldSrc and static OBJ/IQM/MD5MESH,ftebroom_bb_export.h; existing native writers,test-bb-export.cpp; old native viewer regression
+Export,"Frame names/ranges, limits and precision/loss warnings",ftebroom_bb_anim.h: frameList; ftebroom_bb_ui_actions.h,"all template native headers, frames, bounds, original project hashes"
+Placement,"Profile model entity, floor support and build-copy assets",qc/fb_context.qc; ftebroom_desktop.h; ftebroom_static_models.h,test-static-models.cpp; standalone Quake game demo
+Import,Native first pose/skin; direct OBJ; managed Blender glTF,ftebroom_bb_obj.h; ftebroom_bb_ui_actions.h,tools OBJ test; desktop native+glTF dimensions/skin
+UI integration,"Docking/theme/font, model context and remappable shortcuts",ftebroom_bb_ui_actions.h; ftebroom_actions.h; actions.inc,generate-actions.py catalogue; real-ImGui desktop regression
+Storage,"Project save, autosave, close guard and persistent settings",ftebroom_bb_io.h; ftebroom_bb_ui.h; ui_actions.h,desktop save/autosave/guard; io roundtrip
+Compatibility,Native transform/editor workflow remains available,ftebroom_model_editor.h; ftebroom_model_viewer.h,test-model-editor.cpp; test-model-editor.py
+Build,Fresh and repeatable engine patch application,scripts/apply-engine-patches.py; build-windows.ps1; build-linux.sh,82 ordered patches: fresh tree and repeat invocation
+Documentation,"Quick start, controls, limits and declared differences",docs/model-authoring.md; model-editor.md; THIRD-PARTY.md,actual codec and runtime evidence linked in validation report
+Visibility,"Hidden overlay points and transparent texels",ftebroom_bb_pick.h: VisibilityTree; ftebroom_bb_ui_viewport.h,test-bb-paint.cpp: six spatial visibility cases on Windows/Linux

@@ -1,0 +1,38 @@
+diff --git a/engine/client/pr_csqc.c b/engine/client/pr_csqc.c
+--- a/engine/client/pr_csqc.c
++++ b/engine/client/pr_csqc.c
+@@ -8497,7 +8497,15 @@
+  rb_dynmesh=BZ_Realloc(rb_dynmesh,size);memcpy(rb_dynmesh,bytes,size);rb_dynsize=size;
+  rb_dynstats[0]=(Sys_DoubleTime()-start)*1000;return 1;
+ }
+-static void rb_dyn_clear(void){if(rb_dynmesh)BZ_Free(rb_dynmesh);rb_dynmesh=NULL;rb_dynsize=0;}
++static void rb_dyn_clear(void){
++ if(rb_dynmesh&&qrenderer!=QR_NONE){const unsigned char *p=rb_dynmesh+8;unsigned n;
++  for(n=0;n<rb_read32(rb_dynmesh+4);n++){unsigned nv=rb_read32(p),ni=rb_read32(p+4);char name[256];int cull;
++   for(cull=0;cull<2;cull++){shader_t *shader;snprintf(name,sizeof(name),"bbmat/%i/%s",cull,(const char*)p+8);shader=R_ShaderFind(name);if(shader)R_UnloadShader(shader);}
++   p+=136+(size_t)nv*36+(size_t)ni*4;
++  }
++ }
++ if(rb_dynmesh)BZ_Free(rb_dynmesh);rb_dynmesh=NULL;rb_dynsize=0;
++}
+ static void rb_dyn_stats(double *out){memcpy(out,rb_dynstats,sizeof(rb_dynstats));}
+ static char rb_author_images[65][128];static unsigned rb_author_imagecount;
+ static int rb_image_upload(const char *name,const void *rgba,unsigned width,unsigned height)
+@@ -8508,7 +8516,7 @@
+  for(i=0;i<rb_author_imagecount;i++)if(!strcmp(rb_author_images[i],name))break;
+  if(i==rb_author_imagecount){if(i>=65)return 0;Q_strncpyz(rb_author_images[rb_author_imagecount++],name,128);}
+  Image_Upload(image,TF_RGBA32,rgba,NULL,width,height,1,flags);
+- shader=R_RegisterShader(va("bbui/%s",name),SUF_NONE,"{\n program default2d\n {\n map $whiteimage\n blendfunc blend\n rgbgen vertex\n alphagen vertex\n }\n }\n");
++ shader=R_ShaderFind(va("bbui/%s",name));if(!shader)shader=R_RegisterShader(va("bbui/%s",name),SUF_NONE,"{\n program default2d\n {\n map $whiteimage\n blendfunc blend\n rgbgen vertex\n alphagen vertex\n }\n }\n");
+  shader->defaulttextures->base=image;shader->passes[0].anim_frames[0]=image;
+  return shader->id+1;
+ }
+@@ -8527,7 +8535,7 @@
+   unsigned nv=rb_read32(p),ni=rb_read32(p+4),i;scenetris_t *t;const char *name=(const char*)p+8;p+=136;
+   if(cl_numstris==cl_maxstris){cl_maxstris+=8;cl_stris=BZ_Realloc(cl_stris,sizeof(*cl_stris)*cl_maxstris);}
+   t=&cl_stris[cl_numstris++];memset(t,0,sizeof(*t));
+-  t->shader=R_RegisterShader(va("bbmat/%d/%s",Cvar_Get("ftebroom_bb_cull","0",0,"")->ival,name),SUF_NONE,va("{\n cull %s\n program default2d\n sort opaque\n {\n map %s\n depthwrite\n alphafunc GE128\n rgbgen vertex\n alphagen vertex\n }\n }\n",Cvar_Get("ftebroom_bb_cull","0",0,"")->ival?"back":"none",name));
++  t->shader=R_ShaderFind(va("bbmat/%d/%s",Cvar_Get("ftebroom_bb_cull","0",0,"")->ival,name));if(!t->shader)t->shader=R_RegisterShader(va("bbmat/%d/%s",Cvar_Get("ftebroom_bb_cull","0",0,"")->ival,name),SUF_NONE,va("{\n cull %s\n program default2d\n sort opaque\n {\n map %s\n depthwrite\n alphafunc GE128\n rgbgen vertex\n alphagen vertex\n }\n }\n",Cvar_Get("ftebroom_bb_cull","0",0,"")->ival?"back":"none",name));
+   if(!strncmp(name,"bbtex/",6)) {
+    image_t *image=Image_FindTexture(name,NULL,IF_NOMIPMAP|IF_NEAREST|IF_CLAMP);
+    if(TEXVALID(image)) {t->shader->defaulttextures->base=image;t->shader->passes[0].anim_frames[0]=image;}

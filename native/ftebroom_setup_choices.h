@@ -112,7 +112,7 @@ static void setupChatMark(ImDrawList* list,ImVec2 center,float size,ImU32 color)
   const float unit=size/32.f;
   list->AddRectFilled({center.x-14*unit,center.y-10*unit},{center.x+14*unit,center.y+8*unit},color,7*unit);
   list->AddTriangleFilled({center.x-8*unit,center.y+5*unit},{center.x-8*unit,center.y+13*unit},{center.x+unit,center.y+5*unit},color);
-  const auto eye=IM_COL32(88,101,242,255);
+  const auto eye=uiChrome(IM_COL32(88,101,242,255),UiTone::Selection);
   list->AddCircleFilled({center.x-5*unit,center.y-unit},1.8f*unit,eye,12);
   list->AddCircleFilled({center.x+5*unit,center.y-unit},1.8f*unit,eye,12);
 }
@@ -131,7 +131,7 @@ static void setupDiscordInvitation(){
   ImGui::Dummy({0,18*scale});
   auto p=ImGui::GetCursorScreenPos();
   auto list=ImGui::GetWindowDrawList();ImVec2 center{p.x+available*.5f,p.y+38*scale};
-  list->AddCircleFilled(center,38*scale,IM_COL32(88,101,242,255),48);
+  list->AddCircleFilled(center,38*scale,uiChrome(IM_COL32(88,101,242,255),UiTone::Selection),48);
   setupChatMark(list,center,44*scale,IM_COL32_WHITE);
   ImGui::Dummy({0,90*scale});
   if(uiBoldFonts[uiScaleChoice])ImGui::PushFont(uiBoldFonts[uiScaleChoice]);
@@ -143,9 +143,9 @@ static void setupDiscordInvitation(){
   const char* label="Join Discord";const char* end=nullptr;FteBroomTranslate(label,end);
   const float width=std::min(available,std::max(300*scale,ImGui::CalcTextSize(label,end).x+112*scale));
   ImGui::SetCursorPosX(std::max(0.f,(available-width)*.5f));
-  ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(88/255.f,101/255.f,242/255.f,1));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(71/255.f,82/255.f,196/255.f,1));
-  ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(60/255.f,69/255.f,165/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_Button,uiSoftLight()?SoftLight::focus:ImVec4(88/255.f,101/255.f,242/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiSoftLight()?SoftLight::teal:ImVec4(71/255.f,82/255.f,196/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive,uiSoftLight()?SoftLight::focus:ImVec4(60/255.f,69/255.f,165/255.f,1));
   ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1,1,1,1));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,10*scale);
   ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign,ImVec2(.6f,.5f));

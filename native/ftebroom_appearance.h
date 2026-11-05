@@ -20,6 +20,7 @@ static ImVec4 uiColor(int r, int g, int b)
 {
   return {r / 255.f, g / 255.f, b / 255.f, 1};
 }
+#include "ftebroom_light_theme.h"
 static void uiStyle()
 {
   // Match the dark palette's panel, button, text and highlight roles.
@@ -88,14 +89,7 @@ static void uiStyle()
     s.WindowRounding=s.ChildRounding=s.FrameRounding=s.GrabRounding=s.PopupRounding=s.TabRounding=s.ScrollbarRounding=0;
     s.FrameBorderSize=2;s.WindowBorderSize=2;s.ChildBorderSize=2;s.TabBorderSize=1;
   }
-  if(uiTheme==3) {
-    ImGui::StyleColorsLight(&s);
-    c[ImGuiCol_WindowBg]=uiColor(240,242,245);c[ImGuiCol_ChildBg]=uiColor(250,251,253);
-    c[ImGuiCol_PopupBg]=uiColor(248,249,252);c[ImGuiCol_Text]=uiColor(28,32,40);
-    c[ImGuiCol_Button]=uiColor(200,214,233);c[ImGuiCol_ButtonHovered]=uiColor(170,199,237);
-    c[ImGuiCol_ButtonActive]=uiColor(140,180,232);c[ImGuiCol_FrameBg]=uiColor(255,255,255);
-    c[ImGuiCol_TextDisabled]=uiColor(110,115,125);
-  }
+  if(uiTheme==3) SoftLight::apply(s);
   if(uiTheme==4) {
     // Original olive/orange palette inspired by classic Half-Life VGUI.
     for(auto slot:{ImGuiCol_WindowBg,ImGuiCol_PopupBg,ImGuiCol_MenuBarBg,ImGuiCol_Tab,ImGuiCol_TabDimmed})c[slot]=uiColor(63,68,52);

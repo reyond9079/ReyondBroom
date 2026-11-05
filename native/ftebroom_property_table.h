@@ -362,7 +362,7 @@ static void entityPropertyTable()
     return;
   const auto& row = rows[selectedIndex];
   auto definition = definitions.find(selected);
-  ImGui::SeparatorText(selected.c_str());
+  uiSectionHeading(selected.c_str());
   if (definition != definitions.end() && definition->second.type == "flags")
   {
     for (const auto& choice : definition->second.choices)

@@ -1519,7 +1519,7 @@ static void bbTimeline() {
     float x = origin.x + labelWidth + frame * bbTimelineZoom / fps;
     dl->AddLine({x, origin.y}, {x, origin.y + 9}, IM_COL32(110, 110, 110, 255));
     if (frame % std::max(1, fps / 2) == 0)
-      dl->AddText({x, origin.y + 11}, IM_COL32(210, 210, 210, 255), std::to_string(frame).c_str());
+      dl->AddText({x, origin.y + 11}, uiChrome(IM_COL32(210, 210, 210, 255),UiTone::Muted), std::to_string(frame).c_str());
   }
   if (cvars->GetFloat("ftebroom_skip_setup"))
     bbTimelineProbe.clear();
@@ -1537,7 +1537,7 @@ static void bbTimeline() {
     float y = origin.y + 36 + rows++ * rowHeight;
     bool collapsed = closed.value(id, false);
     if (y >= clipMin.y - 20 && y < clipMax.y) {
-      dl->AddText({origin.x, y}, IM_COL32(220, 220, 220, 255),
+      dl->AddText({origin.x, y}, uiChrome(IM_COL32(220, 220, 220, 255),UiTone::Ink),
                   ((collapsed ? "> " : "v ") + name).c_str());
       if (io.MousePos.x < origin.x + labelWidth && io.MousePos.y >= y &&
           io.MousePos.y < y + rowHeight && ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered())
@@ -1548,7 +1548,7 @@ static void bbTimeline() {
     for (auto channel : {"rotation", "position", "scale"}) {
       float y = origin.y + 36 + rows++ * rowHeight;
       if (y >= clipMin.y - 20 && y < clipMax.y)
-        dl->AddText({origin.x + 15, y}, IM_COL32(160, 175, 190, 255), channel);
+        dl->AddText({origin.x + 15, y}, uiChrome(IM_COL32(160, 175, 190, 255),UiTone::Muted), channel);
       auto track = animation.value("animators", bb::Json::object()).value(id, bb::Json::object());
       for (auto &key : track.value("keyframes", bb::Json::array()))
         if (key.value("channel", "") == channel) {

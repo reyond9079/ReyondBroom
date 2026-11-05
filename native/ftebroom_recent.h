@@ -29,7 +29,7 @@ static bool recentStar(const char* id,bool& value) {
   bool changed=ImGui::Button(id,{size,size});if(changed)value=!value;
   auto draw=ImGui::GetWindowDrawList();ImVec2 center{pos.x+size*.5f,pos.y+size*.5f},points[10];
   for(int i=0;i<10;++i){float a=-1.570796327f+i*.628318531f,r=size*(i%2?.16f:.36f);points[i]={center.x+std::cos(a)*r,center.y+std::sin(a)*r};}
-  auto color=value?IM_COL32(244,195,67,255):ImGui::GetColorU32(ImGuiCol_TextDisabled);
+  auto color=value?uiChrome(IM_COL32(244,195,67,255),UiTone::Selection):ImGui::GetColorU32(ImGuiCol_TextDisabled);
   if(value)draw->AddConcavePolyFilled(points,10,color);
   draw->AddPolyline(points,10,color,ImDrawFlags_Closed,1.5f);
   return changed;

@@ -137,7 +137,7 @@ static void cameraInput(const char* kind, float dx = 0, float dy = 0, float scro
 }
 static void cameraPreferences()
 {
-  ImGui::SeparatorText("Mouse / 3D camera");
+  uiSectionHeading("Mouse / 3D camera");
   struct Setting
   {
     const char* label;

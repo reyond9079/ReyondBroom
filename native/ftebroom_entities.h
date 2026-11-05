@@ -310,6 +310,7 @@ static void entityProperty(
 }
 static void entityCreate(const ftebroom::EntityDefinition& d, const float* position)
 {
+  cvars->SetFloat("ftebroom_instantiate_defaults",1);
   std::ostringstream point;
   point << position[0] << ' ' << position[1] << ' ' << position[2];
   command(("ftebroom_entity_create " + organizationQuote(d.name) + " "
@@ -317,6 +318,30 @@ static void entityCreate(const ftebroom::EntityDefinition& d, const float* posit
             .c_str());
 }
 #include "ftebroom_property_table.h"
+static bool entityAdvancedSearch=false;
+static int entityThumbnailSize=80;
+static ImVec2 entityFooterMin,entityFooterMax;
+static int entityVisiblePreviewCount=0;
+static bool entityPreviewMarginsValid=true;
+static bool entityBrowserIcon(const char* id,bool filter){
+  float h=ImGui::GetFrameHeight();auto p=ImGui::GetCursorScreenPos();
+  bool clicked=false;if(filter)clicked=ImGui::Button(id,{h,h});else ImGui::Dummy({h,h});
+  auto d=ImGui::GetWindowDrawList();
+  auto c=ImGui::GetColorU32(ImGuiCol_Text);float u=h/24.f;
+  if(filter){for(int row=0;row<3;row++){float y=p.y+(7+row*5)*u,x=p.x+(row==1?15:9)*u;
+    d->AddLine({p.x+5*u,y},{p.x+19*u,y},c,u);d->AddCircleFilled({x,y},2*u,c,12);}}
+  else {d->AddCircle({p.x+10*u,p.y+10*u},5*u,c,16,u);d->AddLine({p.x+14*u,p.y+14*u},{p.x+19*u,p.y+19*u},c,1.5f*u);}
+  return clicked;
+}
+static void entityDefinitionControls(){
+  ImGui::TextWrapped("%s",definitionSource.c_str());
+  if(ImGui::Button("Browse definitions..."))definitionsRequest=true;
+  ImGui::SameLine();if(ImGui::Button("Reload"))command("ftebroom_definitions\n");
+  if(ImGui::Button("Use game defaults")){
+    definitionMapPath.clear();command("ftebroom_entity_definition_path \"\"\nftebroom_definitions\n");
+  }
+  if(!definitionError.empty())ImGui::TextWrapped("%s",definitionError.c_str());
+}
 static void entityPanel()
 {
   entityPropertyFocused = false;
@@ -324,30 +349,11 @@ static void entityPanel()
   cvars->SetString("ftebroom_entity_ghost", "");
   if (selectEntityTab)
     ImGui::SetNextWindowFocus();
-  if (ImGui::Begin("Entity", nullptr, uiPanelFlags()))
+  if (uiSoftPanelBegin("Entity",nullptr,uiPanelFlags()))
   {
     static float propertiesHeight=210;uiInspectorTopBegin("Entity properties",propertiesHeight);
-    if (ImGui::CollapsingHeader("Entity definitions"))
-    {
-      ImGui::TextWrapped("%s", definitionSource.c_str());
-      if (ImGui::Button("Browse definitions..."))
-        definitionsRequest = true;
-      ImGui::SameLine();
-      if (ImGui::Button("Reload"))
-        command("ftebroom_definitions\n");
-      if (ImGui::Button("Use game defaults"))
-      {
-        definitionMapPath.clear();
-        command("ftebroom_entity_definition_path \"\"\nftebroom_definitions\n");
-      }
-      if (!definitionError.empty())
-        ImGui::TextWrapped("%s", definitionError.c_str());
-    }
-    bool instantiateDefaults = cvars->GetFloat("ftebroom_instantiate_defaults") != 0;
-    if (ImGui::Checkbox("Instantiate defaults on creation", &instantiateDefaults))
-      cvars->SetFloat("ftebroom_instantiate_defaults", instantiateDefaults);
     if(cvars->GetFloat("ftebroom_skip_setup")&&cvars->GetFloat("ftebroom_test_model_previews"))ImGui::SetNextItemOpen(false);
-    if (ImGui::CollapsingHeader("Properties", ImGuiTreeNodeFlags_DefaultOpen))
+    if (uiInspectorFold("Properties",ImGuiTreeNodeFlags_DefaultOpen))
     {
       ImGui::Text(
         "Editing %u entit%s",
@@ -357,25 +363,37 @@ static void entityPanel()
       entitySoundPreview();
     }
     uiInspectorTopEnd("Entity browser divider",propertiesHeight);
-    if (ImGui::CollapsingHeader("Entity browser", ImGuiTreeNodeFlags_DefaultOpen))
+    if (uiInspectorFold("Entity browser",ImGuiTreeNodeFlags_DefaultOpen))
     {
       static char filter[256]{};
       if(cvars->GetFloat("ftebroom_skip_setup")){char testFilter[256]={};cvars->GetString("ftebroom_test_entity_filter",testFilter,sizeof testFilter);if(*testFilter)std::snprintf(filter,sizeof filter,"%s",testFilter);}
       static bool used = false, grouped = true;
       static int kind = 0, sort = 0;
       static float position[3] = {0, 0, 64};
-      ImGui::InputTextWithHint("##classfilter", "Filter classes", filter, sizeof filter);
-      ImGui::Checkbox("Used only", &used);
+      float searchWidth=ImGui::GetContentRegionAvail().x-ImGui::GetFrameHeight()-ImGui::GetStyle().ItemSpacing.x;
+      ImGui::SetNextItemWidth(std::max(30.f,searchWidth));
+      uiBrowserSearch("##classfilter","Filter classes",filter,sizeof filter);
       ImGui::SameLine();
+      if(entityBrowserIcon("##entityAdvanced",true))entityAdvancedSearch=!entityAdvancedSearch;
+      entityTestItem("advanced_search");
+      if(ImGui::IsItemHovered())ImGui::SetTooltip("Advanced search");
+      if(entityAdvancedSearch){
+      const float filterWidth=ImGui::GetContentRegionAvail().x;
+      ImGui::Checkbox("Used only", &used);
+      const char* groupedLabel="Group by prefix";const char* groupedEnd=nullptr;
+      FteBroomTranslate(groupedLabel,groupedEnd);
+      const auto& style=ImGui::GetStyle();
+      if(!uiSoftLight()||ImGui::GetItemRectSize().x+style.ItemSpacing.x+ImGui::GetFrameHeight()
+         +style.ItemInnerSpacing.x+ImGui::CalcTextSize(groupedLabel,groupedEnd).x<=filterWidth)
+        ImGui::SameLine();
       ImGui::Checkbox("Group by prefix", &grouped);
       if(ImGui::BeginTable("Entity filters",2,ImGuiTableFlags_SizingStretchSame)){
         ImGui::TableNextColumn();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Type");ImGui::SameLine();ImGui::SetNextItemWidth(-1);ImGui::Combo("##entityType",&kind,"All\0Point\0Brush\0");
         ImGui::TableNextColumn();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Sort");ImGui::SameLine();ImGui::SetNextItemWidth(-1);ImGui::Combo("##entitySort",&sort,"Name\0Usage\0");ImGui::EndTable();
       }
+      }
+      ImGui::SetNextItemWidth(std::max(60.f,ImGui::GetContentRegionAvail().x-ImGui::CalcTextSize("Create at").x-10*uiScale()));
       ImGui::InputFloat3("Create at", position);
-      static int thumbnailSize=80;
-      ImGui::SliderInt("Thumbnail size",&thumbnailSize,48,160);
-      ImGui::TextWrapped("Click: change selected entity class. Double-click: create. Drag a point entity into a viewport to place it.");
       std::vector<const ftebroom::EntityDefinition*> classes;
       std::string query = entityLower(filter);
       for (const auto& item : entityDefinitions)
@@ -395,12 +413,13 @@ static void entityPanel()
       });
       ImGui::BeginChild(
         "Classes",
-        {0, std::max(120.f,ImGui::GetContentRegionAvail().y)},
-        ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
+        {0, std::max(24.f,ImGui::GetContentRegionAvail().y-ImGui::GetFrameHeight()-ImGui::GetStyle().ItemSpacing.y*2)},
+        ImGuiChildFlags_Borders);
+      entityVisiblePreviewCount=0;entityPreviewMarginsValid=true;
       std::string group;
       int column=0;
-      float size=thumbnailSize*uiScale(),rowTop=ImGui::GetCursorPosY();
-      float cellWidth=size+12*uiScale(),cellHeight=size+ImGui::GetTextLineHeightWithSpacing()*2+8;
+      float size=entityThumbnailSize*uiScale(),rowTop=ImGui::GetCursorPosY();
+      float cellWidth=size+12*uiScale(),cellHeight=size+ImGui::GetTextLineHeightWithSpacing()+8*uiScale();
       int columns=std::max(1,int(ImGui::GetContentRegionAvail().x/cellWidth));
       static std::string chosen;
       for (const auto* def : classes)
@@ -408,7 +427,7 @@ static void entityPanel()
         auto prefix=def->name.substr(0,def->name.find('_'));
         if(grouped && prefix!=group) {
           if(column){ImGui::SetCursorPosY(rowTop+cellHeight);column=0;}
-          group=prefix;ImGui::SeparatorText(group.c_str());rowTop=ImGui::GetCursorPosY();
+          group=prefix;uiSectionHeading(group.c_str());rowTop=ImGui::GetCursorPosY();
         }
         ImGui::SetCursorPos({8+column*cellWidth,rowTop});ImGui::PushID(def->name.c_str());
         ImVec2 tile=ImGui::GetCursorScreenPos();
@@ -434,29 +453,56 @@ static void entityPanel()
         }
         auto drawList=ImGui::GetWindowDrawList();
         // Clip every preview path, including the fallback bounds and thick lines.
-        drawList->PushClipRect(tile,{tile.x+size,tile.y+size},true);
-        drawList->AddRectFilled(tile,{tile.x+size,tile.y+size},IM_COL32(55,58,62,255));
-        if(!entityModelTile(*def,tile,size)) {
+        drawList->PushClipRect(tile,{tile.x+size,tile.y+cellHeight-4},true);
+        const ImVec2 tileEnd{tile.x+size,tile.y+cellHeight-4};
+        if(!uiSoftLight()||selected||ImGui::IsItemHovered())
+          drawList->AddRectFilled(tile,tileEnd,uiSoftLight()?ImGui::GetColorU32(
+            selected?SoftLight::active:SoftLight::hover):IM_COL32(55,58,62,255),(uiSoftLight()?8:6)*uiScale());
+        ImVec2 preview{tile.x+size*.15f,tile.y+size*.15f};
+        if(ImGui::IsRectVisible(tile,{tile.x+size,tile.y+size}))++entityVisiblePreviewCount;
+        if(!entityModelTile(*def,preview,size*.70f)) {
         ImVec2 points[8];float extent=1;
         for(int axis=0;axis<3;axis++)extent=std::max(extent,def->maxs[axis]-def->mins[axis]);
         for(int corner=0;corner<8;corner++) {
           float v[3];for(int axis=0;axis<3;axis++)v[axis]=((corner&(1<<axis))?0.5f:-0.5f)*(def->maxs[axis]-def->mins[axis])/extent;
-          points[corner]={tile.x+size*(.5f+.55f*(v[0]-v[1])),tile.y+size*(.5f+.25f*(v[0]+v[1])-.65f*v[2])};
+          points[corner]={tile.x+size*(.5f+.30f*(v[0]-v[1])),tile.y+size*(.5f+.13f*(v[0]+v[1])-.34f*v[2])};
+          entityPreviewMarginsValid &= points[corner].x>=tile.x+size*.19f&&points[corner].x<=tile.x+size*.81f&&points[corner].y>=tile.y+size*.19f&&points[corner].y<=tile.y+size*.81f;
         }
         auto color=ImGui::ColorConvertFloat4ToU32({def->color[0],def->color[1],def->color[2],1});
         for(int corner=0;corner<8;corner++)for(int axis=0;axis<3;axis++)if(!(corner&(1<<axis)))
           drawList->AddLine(points[corner],points[corner|(1<<axis)],color,uiScale());
         }
-        if(selected)drawList->AddRect(tile,{tile.x+size,tile.y+size},IM_COL32(225,95,55,255),0,0,2);
+        if(selected)drawList->AddRect(tile,tileEnd,uiSoftLight()?ImGui::GetColorU32(SoftLight::color(0xFFFFFF,.48f)):
+          IM_COL32(225,95,55,255),uiSoftLight()?8*uiScale():6*uiScale(),0,1.5f*uiScale());
         drawList->PopClipRect();
         drawList->PushClipRect({tile.x,tile.y+size+2},{tile.x+size,tile.y+cellHeight-2},true);
-        drawList->AddText({tile.x,tile.y+size+2},ImGui::GetColorU32(ImGuiCol_Text),def->name.c_str());drawList->PopClipRect();
+        ImVec2 label{tile.x+std::max(0.f,(size-ImGui::CalcTextSize(def->name.c_str()).x)*.5f),tile.y+size+2};
+        ImGui::RenderTextEllipsis(drawList,label,{tile.x+size,tile.y+cellHeight-2},tile.x+size,tile.x+size,def->name.c_str(),nullptr,nullptr);drawList->PopClipRect();
         if(ImGui::IsItemHovered())ImGui::SetTooltip("%s\n%s\n%s",def->name.c_str(),def->brush?"Brush entity: select brushes first":"Point entity",def->description.c_str());
         ImGui::PopID();
         if(++column==columns){column=0;rowTop+=cellHeight;}
       }
       ImGui::SetCursorPosY(rowTop+(column?cellHeight:0));ImGui::Dummy({0,0});
       ImGui::EndChild();
+      entityFooterMin=ImGui::GetCursorScreenPos();
+      const float footerWidth=ImGui::GetContentRegionAvail().x;
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(5*uiScale(),3*uiScale()));
+      float height=ImGui::GetFrameHeight(),sliderWidth=std::min(82*uiScale(),footerWidth*.23f);
+      const char* definitions="Entity definitions";
+      const char* translated=definitions;const char* end=nullptr;FteBroomTranslate(translated,end);
+      float definitionWidth=ImGui::CalcTextSize(translated,end).x+ImGui::GetStyle().FramePadding.x*2;
+      bool compact=definitionWidth+height+sliderWidth+ImGui::GetStyle().ItemSpacing.x*2>footerWidth;
+      if(ImGui::Button(compact?"...##definitions":definitions))ImGui::OpenPopup("Entity definitions menu");
+      entityTestItem("definitions_footer");
+      if(compact&&ImGui::IsItemHovered())ImGui::SetTooltip("Entity definitions");
+      if(ImGui::BeginPopup("Entity definitions menu")){entityDefinitionControls();ImGui::EndPopup();}
+      ImGui::SameLine(std::max(ImGui::GetCursorPosX(),ImGui::GetWindowContentRegionMax().x-sliderWidth-height-ImGui::GetStyle().ItemSpacing.x));
+      entityBrowserIcon("##entityThumbnailMagnify",false);
+      if(ImGui::IsItemHovered())ImGui::SetTooltip("Thumbnail size");
+      ImGui::SameLine();ImGui::SetNextItemWidth(sliderWidth);ImGui::SliderInt("##entityThumbnailSize",&entityThumbnailSize,48,160,"%d");
+      entityTestItem("thumbnail_footer");if(ImGui::IsItemHovered())ImGui::SetTooltip("Thumbnail size");
+      entityFooterMax=ImGui::GetItemRectMax();
+      ImGui::PopStyleVar();
     }
   }
   ImGui::End();

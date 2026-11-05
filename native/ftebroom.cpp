@@ -288,6 +288,23 @@ static void gridControl(const char* label)
   if (ImGui::Combo(label, &selected, values, 12))
     cvars->SetFloat("ca_grid", std::ldexp(1.f, selected - 3));
 }
+static bool softLightGallery=false;
+static void softLightGalleryPanel(){
+  if(!softLightGallery)return;
+  ImGui::SetNextWindowSize({600*uiScale(),590*uiScale()},ImGuiCond_FirstUseEver);
+  if(ImGui::Begin("Interface controls",&softLightGallery)){
+    ImGui::TextUnformatted("Modern Light");ImGui::TextDisabled("Soft surfaces / clear focus / compact controls");
+    uiSectionHeading("Properties");static char name[128]="Stone arch";static float position[3]={16,32,64},amount=.45f,color[3]={.3f,.5f,.47f};static bool checked=true;static int option=0;
+    ImGui::InputText("Name",name,sizeof name);ImGui::InputFloat3("Position",position);ImGui::SliderFloat("Intensity",&amount,0,1);
+    ImGui::Combo("Mode",&option,"Object\0Face\0Vertex\0");ImGui::ColorEdit3("Tint",color);
+    ImGui::Checkbox("Visible",&checked);ImGui::SameLine();ImGui::RadioButton("Selected",true);
+    if(ImGui::BeginTabBar("Tabs")){if(ImGui::BeginTabItem("Materials")){ImGui::TextUnformatted("Material inspector");ImGui::EndTabItem();}if(ImGui::BeginTabItem("Entity")){ImGui::TextUnformatted("Entity inspector");ImGui::EndTabItem();}ImGui::EndTabBar();}
+    if(ImGui::TreeNode("Hierarchy")){ImGui::Selectable("World",true);ImGui::Selectable("Group");ImGui::TreePop();}
+    ImGui::Button("Apply");ImGui::SameLine();ImGui::Button("Cancel");ImGui::SameLine();ImGui::BeginDisabled();ImGui::Button("Unavailable");ImGui::EndDisabled();
+    ImGui::ProgressBar(.65f);ImGui::TextLink("Documentation");
+    if(ImGui::Button("Context menu"))ImGui::OpenPopup("Control menu");if(ImGui::BeginPopup("Control menu")){ImGui::MenuItem("Duplicate");ImGui::MenuItem("Rename");ImGui::Separator();ImGui::MenuItem("Delete");ImGui::EndPopup();}
+  }ImGui::End();
+}
 static void panel(float w, float h)
 {
   auto& io = ImGui::GetIO();
@@ -311,7 +328,12 @@ static void panel(float w, float h)
   const float menuHeight = ImGui::GetFrameHeight();
   const float toolbarHeight = ImGui::GetFrameHeight() + 18 * uiScale();
   const float statusHeight = ImGui::GetTextLineHeight() + 16 * uiScale();
-  uiWorkspace(w, h, menuHeight + toolbarHeight, statusHeight);
+  const bool softChrome=uiSoftLight();
+  const float margin=softChrome?SoftLight::margin*uiScale():0;
+  const float gap=softChrome?SoftLight::gutter*uiScale():0;
+  const float toolbarY=menuHeight+(softChrome?6*uiScale():0);
+  const float statusY=h-statusHeight-margin;
+  uiWorkspace(w,h,toolbarY+toolbarHeight+gap,statusHeight+margin+gap,margin);
   projectSetup();
   tourOfferPanel();
   modPreviewPanel();
@@ -446,7 +468,10 @@ static void panel(float w, float h)
   cvars->SetFloat("ftebroom_up", float(moveHeld[4]) - float(moveHeld[5]));
   cameraTick();
   ImGui::BeginDisabled(modEmbedded);
-  if (ImGui::BeginMainMenuBar())
+  if(softChrome)ImGui::PushStyleColor(ImGuiCol_WindowBg,SoftLight::transparent);
+  const bool mainMenuVisible=ImGui::BeginMainMenuBar();
+  if(softChrome)ImGui::PopStyleColor();
+  if (mainMenuVisible)
   {
     actionMenus();pluginsMenu();shaderPackMenu();
     if (ImGui::BeginMenu("Workspace"))
@@ -460,14 +485,22 @@ static void panel(float w, float h)
         uiReset = true;
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 121");
+    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 122");
     ImGui::EndMainMenuBar();
   }
   const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
                      | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking;
-  ImGui::SetNextWindowPos({0, menuHeight});
-  ImGui::SetNextWindowSize({w, toolbarHeight});
-  ImGui::Begin("##toolbar", nullptr, fixed | ImGuiWindowFlags_HorizontalScrollbar);
+  auto fixedPanel=[&](const char* name,float y,float height,ImGuiWindowFlags flags=0){
+    const ImVec2 pos{margin,y},size{std::max(1.f,w-2*margin),height};
+    if(softChrome){
+      uiSoftSurface(ImGui::GetBackgroundDrawList(),{pos,{pos.x+size.x,pos.y+size.y}},11*uiScale());
+      flags|=ImGuiWindowFlags_NoBackground;
+    }
+    ImGui::SetNextWindowPos(pos);
+    ImGui::SetNextWindowSize(size);
+    ImGui::Begin(name,nullptr,fixed|flags);
+  };
+  fixedPanel("##toolbar",toolbarY,toolbarHeight,ImGuiWindowFlags_HorizontalScrollbar);
   actionButton("Menu/Edit/Undo");
   ImGui::SameLine();
   actionButton("Menu/Edit/Redo");
@@ -496,16 +529,21 @@ static void panel(float w, float h)
     view ? "  View plane / hold Shift during drag: axis" : "  XY plane / Alt: Z");
   ImGui::SameLine();
   ImGui::End();
-  ImGui::Begin("Tools", nullptr, uiPanelFlags());
+  uiSoftPanelBegin("Tools",nullptr,uiPanelFlags());
+  uiToolStripBegin();
+  uiToolStripSurface();
   const auto toolsArea=ImGui::GetContentRegionAvail();
   const bool horizontalTools=toolsArea.x>toolsArea.y;
+  const bool compactRail=softChrome&&!horizontalTools&&toolsArea.x<124*uiScale();
   const float toolsRight=ImGui::GetCursorScreenPos().x+toolsArea.x;
-  const float toolHeight=34*uiScale();
+  const float toolsLeft=ImGui::GetCursorPosX();
+  const float toolHeight=(compactRail?30.f:34.f)*uiScale();
   const ImVec2 toolPadding{ImGui::GetStyle().FramePadding.x,std::max(0.f,(toolHeight-ImGui::GetFontSize())*.5f)};
   bool toolsFirst=true;
   auto toolFlow=[&](float width){
     if(horizontalTools&&!toolsFirst&&ImGui::GetItemRectMax().x+ImGui::GetStyle().ItemSpacing.x+width<=toolsRight)
       ImGui::SameLine();
+    if(softChrome&&!horizontalTools)ImGui::SetCursorPosX(toolsLeft+std::max(0.f,(toolsArea.x-width)*.5f));
     toolsFirst=false;
   };
   const int toolIds[] = {0, 1, 2, 7, 8, 9, 10, 3, 4, 5, 6, 11, 12, 13, 14, 15, 16};
@@ -541,10 +579,10 @@ static void panel(float w, float h)
       if (std::string(a.id) == std::string("Menu/Tools/") + toolNames[i])
         entry = &a;
     if (active)
-      ImGui::PushStyleColor(ImGuiCol_Button, uiColor(62, 112, 205));
+      ImGui::PushStyleColor(ImGuiCol_Button, uiActiveToolColor());
     ImGui::PushID(i);
     toolFlow(32*uiScale());
-    if (FteIcons::button("##tool",i>=15?7:i>=11?i+2:i,{32 * uiScale(), 34 * uiScale()}))
+    if (FteIcons::button("##tool",i>=15?7:i>=11?i+2:i,{32 * uiScale(), toolHeight}))
     {
       sceneDrag = sceneLook = false;
       if (entry)
@@ -576,7 +614,7 @@ static void panel(float w, float h)
     bool uv = std::string(name) == "ftebroom_uv_lock";
     bool on = cvars->GetFloat(name) != 0;
     if (on)
-      ImGui::PushStyleColor(ImGuiCol_Button, uiColor(62, 112, 205));
+      ImGui::PushStyleColor(ImGuiCol_Button, uiActiveToolColor());
     toolFlow(32*uiScale());
     if (FteIcons::button(uv ? "##UV" : "##TL",uv?12:11,{32 * uiScale(), toolHeight}))
       cvars->SetFloat(name, !on);
@@ -590,9 +628,25 @@ static void panel(float w, float h)
   }
   ImGui::PopStyleVar();
   ImGui::EndDisabled();
-  buildToolbar(horizontalTools);
+  buildToolbar(horizontalTools,compactRail);
   ImGui::BeginDisabled(modEmbedded);
   int currentTool = (int)cvars->GetFloat("ftebroom_tool");
+  bool optionsVisible=true;
+  if(compactRail) {
+    uiToolStripEnd(true);
+    ImGui::Dummy({0,8*uiScale()});
+    toolFlow(32*uiScale());
+    uiToolStripBegin();
+    ImGui::PushStyleColor(ImGuiCol_Button,SoftLight::nav);
+    if(compileButton("Tool options",1,true))ImGui::OpenPopup("##rail-tool-options");
+    if(cvars->GetFloat("ftebroom_skip_setup"))entityTestItem("rail_options");
+    ImGui::PopStyleColor();
+    uiToolStripEnd();
+    ImGui::SetNextWindowSizeConstraints({300*uiScale(),0},{390*uiScale(),std::max(100.f,h-80*uiScale())});
+    optionsVisible=ImGui::BeginPopup("##rail-tool-options");
+    if(optionsVisible)uiSectionHeading("Tool options");
+  }
+  if(optionsVisible) {
   if(horizontalTools)toolFlow(190*uiScale());else ImGui::Separator();
   if (currentTool == 2)
   {
@@ -846,7 +900,7 @@ static void panel(float w, float h)
     {
       static int rows=3,columns=3;
       const int currentRows=(int)cvars->GetFloat("ftebroom_patch_rows"),currentColumns=(int)cvars->GetFloat("ftebroom_patch_columns");
-      ImGui::SeparatorText("Patch control grid");
+      uiSectionHeading("Patch control grid");
       ImGui::BeginDisabled(currentRows<3 || currentColumns<3);
       ImGui::InputInt(toolOptionLabel(horizontalTools,"Rows"),&rows,2,2);
       if(ImGui::IsItemDeactivatedAfterEdit())
@@ -879,10 +933,13 @@ static void panel(float w, float h)
     else
       ImGui::TextWrapped("Geometry editing is scheduled in a later task");
   }
+  if(compactRail)ImGui::EndPopup();
+  }
+  if(!compactRail)uiToolStripEnd();
   ImGui::End();
   if (selectMapTab)
     ImGui::SetNextWindowFocus();
-  if (ImGui::Begin("Map", nullptr, uiPanelFlags()))
+  if (uiSoftPanelBegin("Map",nullptr,uiPanelFlags()))
   {
     if (cvars->GetFloat("ftebroom_ctx_selection") == 2)
       ImGui::Text(
@@ -901,7 +958,7 @@ static void panel(float w, float h)
       ImGui::Text("Entity: %s", selectedEntity);
     if ((int)cvars->GetFloat("ftebroom_tool") == 2)
     {
-      ImGui::SeparatorText("Clip / Cut");
+      uiSectionHeading("Clip / Cut");
       int keep = (int)cvars->GetFloat("ftebroom_clip_keep");
       if (ImGui::Combo("Keep", &keep, "Front\0Both sides\0Back\0"))
         cvars->SetFloat("ftebroom_clip_keep", float(keep));
@@ -921,7 +978,7 @@ static void panel(float w, float h)
     }
     organizationPanel();
     viewOptionsPanel();
-    ImGui::SeparatorText("Grid");
+    uiSectionHeading("Grid");
     gridControl("Spacing");
     bool visible = cvars->GetFloat("ftebroom_grid_visible") != 0;
     if (ImGui::Checkbox("Show grid", &visible))
@@ -932,7 +989,7 @@ static void panel(float w, float h)
     float alpha = cvars->GetFloat("ftebroom_grid_alpha");
     if (ImGui::SliderFloat("Grid opacity", &alpha, 0.f, 1.f))
       cvars->SetFloat("ftebroom_grid_alpha", alpha);
-    ImGui::SeparatorText("Document");
+    uiSectionHeading("Document");
     static bool boundsWasOpen = false;
     bool boundsOpen = ImGui::CollapsingHeader("Soft map bounds");
     if (boundsOpen)
@@ -1003,13 +1060,11 @@ static void panel(float w, float h)
 #ifdef _WIN32
   materialDropVisible=false;
 #endif
-  if (ImGui::Begin("Material", nullptr, uiPanelFlags()))
+  if (uiSoftPanelBegin("Material",nullptr,uiPanelFlags()))
     materialBrowser();
   ImGui::End();
   selectMapTab = selectMaterialTab = false;
-  ImGui::SetNextWindowPos({0, h - statusHeight});
-  ImGui::SetNextWindowSize({w, statusHeight});
-  ImGui::Begin("##status", nullptr, fixed);
+  fixedPanel("##status",statusY,statusHeight);
   char selectionStatus[192] = {};
   cvars->GetString("ftebroom_selection_status", selectionStatus, sizeof selectionStatus);
   if (!selectionStatus[0])
@@ -1126,7 +1181,7 @@ static void panel(float w, float h)
     if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
-      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 121");
+      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 122");
       ImGui::TextLinkOpenURL("Check published releases","https://github.com/reyond9079/ReyondBroom/releases");
       updatePanel();
       ImGui::EndTabItem();
@@ -1149,6 +1204,7 @@ static void panel(float w, float h)
   shaderPackPanel();
   modFilesPanel();
   modelViewerPanel();bbBenchTick();
+  softLightGalleryPanel();
   pluginsPanel();pluginPreviewDraw();
   symmetryPanel();generatorPanel();arrayPanel();settlePanel();spawnMasterPanel();unityPanel();textureFolderPanel();prefabPanel();entityListPanel();
   importDialog();

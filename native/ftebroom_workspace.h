@@ -66,6 +66,9 @@ static void uiLoad()
   if (uiLoaded)
     return;
   uiLoaded = true;
+  // Entity creation always instantiates the definition defaults; the old
+  // optional switch is no longer exposed by the compact entity inspector.
+  cvars->SetFloat("ftebroom_instantiate_defaults",1);
   gameProfileLoad(); // Migrate the former custom-profile sky preference once.
   if (!cvars->GetFloat("ftebroom_skip_setup"))
   {
@@ -106,10 +109,11 @@ static void uiSaveLayout()
   }
   io.WantSaveIniSettings = false;
 }
-static void uiWorkspace(float w, float h, float top, float bottom)
+static void uiWorkspace(float w, float h, float top, float bottom, float margin)
 {
-  ImGui::SetNextWindowPos({0, top});
-  ImGui::SetNextWindowSize({w, std::max(1.f, h - top - bottom)});
+  const ImVec2 workspaceSize{std::max(1.f,w-2*margin),std::max(1.f,h-top-bottom)};
+  ImGui::SetNextWindowPos({margin, top});
+  ImGui::SetNextWindowSize(workspaceSize);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
@@ -129,20 +133,20 @@ static void uiWorkspace(float w, float h, float top, float bottom)
   {
     ImGui::DockBuilderRemoveNode(uiDockId);
     ImGui::DockBuilderAddNode(uiDockId, ImGuiDockNodeFlags_DockSpace | flags);
-    ImGui::DockBuilderSetNodeSize(uiDockId, {w, std::max(1.f, h - top - bottom)});
+    ImGui::DockBuilderSetNodeSize(uiDockId, workspaceSize);
     ImGuiID center = uiDockId, right, info, explorer;
     ImGui::DockBuilderSplitNode(
       center,
       ImGuiDir_Right,
-      std::min(.48f, 370 * uiScale() / std::max(1.f, w - 64 * uiScale())),
+      std::min(.48f, 370 * uiScale() / std::max(1.f, workspaceSize.x - 64 * uiScale())),
       &right,
       &center);
-    ImGui::DockBuilderSplitNode(
-      center,
-      ImGuiDir_Up,
-      std::min(.3f, 120 * uiScale() / std::max(1.f, h - top - bottom)),
-      &info,
-      &center);
+    const bool rail=uiSoftLight() && workspaceSize.x>=740*uiScale();
+    const auto* workNode=ImGui::DockBuilderGetNode(center);
+    const float workWidth=workNode?workNode->Size.x:workspaceSize.x;
+    ImGui::DockBuilderSplitNode(center,rail?ImGuiDir_Left:ImGuiDir_Up,
+      rail?std::min(.24f,SoftLight::railWidth*uiScale()/std::max(1.f,workWidth))
+          :std::min(.3f,120*uiScale()/workspaceSize.y),&info,&center);
     ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.34f,&explorer,&center);
     ImGui::DockBuilderDockWindow("Mod file manager",explorer);
     uiExplorerDockChecked=true;
@@ -165,14 +169,50 @@ static void uiWorkspace(float w, float h, float top, float bottom)
     uiExplorerMarkerChecked=true;
     if(!cvars->GetFloat("ftebroom_skip_setup")&&!std::filesystem::exists(documentPath("explorer-layout-v1.cfg")))std::ofstream(documentPath("explorer-layout-v1.cfg"))<<"1\n";
   }
+  const bool soft=uiSoftLight();
+  const ImGuiCol dockColors[]={ImGuiCol_WindowBg,ImGuiCol_Border,ImGuiCol_TitleBg,
+    ImGuiCol_TitleBgActive,ImGuiCol_TitleBgCollapsed};
+  // PassthruCentralNode normally paints WindowBg over the rest of the dock.
+  // Leave that layer transparent so the workspace shows through the dividers.
+  if(soft)for(auto slot:dockColors)ImGui::PushStyleColor(slot,SoftLight::transparent);
   ImGui::DockSpace(uiDockId, {0, 0}, flags);
-  if (auto node = ImGui::DockBuilderGetCentralNode(uiDockId))
+  if(soft)ImGui::PopStyleColor(IM_ARRAYSIZE(dockColors));
+  auto* node=ImGui::DockBuilderGetCentralNode(uiDockId);
+  if(node)
   {
     uiScenePos = node->Pos;
     uiSceneSize = node->Size;
     uiHasScene = true;
   }
   ImGui::End();
+  if(!soft)return;
+
+  const ImRect screen{{0,0},{w,h}};
+  ImRect viewport=screen;
+  if(node) {
+    const float inset=std::min(5*uiScale(),std::max(0.f,(std::min(node->Size.x,node->Size.y)-1)*.5f));
+    viewport={node->Pos,{node->Pos.x+node->Size.x,node->Pos.y+node->Size.y}};
+    uiScenePos={viewport.Min.x+inset,viewport.Min.y+inset};
+    uiSceneSize={node->Size.x-2*inset,node->Size.y-2*inset};
+  }
+  ImRect scene{uiScenePos,{uiScenePos.x+uiSceneSize.x,uiScenePos.y+uiSceneSize.y}};
+  scene.ClipWithFull(screen);
+  auto* draw=ImGui::GetBackgroundDrawList();
+  auto colorAt=[&](float y){
+    const auto base=SoftLight::workspace;
+    const float shade=.13f*y/std::max(1.f,h);
+    return ImGui::GetColorU32(ImVec4{base.x-shade,base.y-shade,base.z-shade,1});
+  };
+  auto fill=[&](const ImRect& bounds){
+    const auto light=colorAt(bounds.Min.y),shade=colorAt(bounds.Max.y);
+    draw->AddRectFilledMultiColor(bounds.Min,bounds.Max,light,light,shade,shade);
+  };
+  if(node) {
+    uiOutsideScene(screen,scene,fill);
+    uiSoftSurface(draw,viewport,SoftLight::panelRadius*uiScale(),false,&scene);
+  } else {
+    fill(screen);
+  }
 }
 static bool uiBlocksScene(float x, float y, bool acceptEntityDrop = false)
 {
@@ -196,7 +236,7 @@ static ImGuiWindowFlags uiPanelFlags()
 }
 static void uiPreferences()
 {
-  ImGui::SeparatorText("Appearance and workspace");
+  uiSectionHeading("Appearance and workspace");
   if(ImGui::Combo("Interface theme",&uiTheme,uiThemeNames,6))uiSaveAppearance();
   float labelSize=cvars->GetFloat("ftebroom_label_size"),coordinateSize=cvars->GetFloat("ftebroom_coordinate_size");
   if(labelSize<8)labelSize=13;if(coordinateSize<8)coordinateSize=8;
@@ -204,7 +244,7 @@ static void uiPreferences()
   if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
   if(ImGui::SliderFloat("Coordinate label size",&coordinateSize,8,40,"%.0f px",ImGuiSliderFlags_AlwaysClamp))cvars->SetFloat("ftebroom_coordinate_size",std::round(coordinateSize));
   if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
-  ImGui::SeparatorText("Viewport sky background");
+  uiSectionHeading("Viewport sky background");
   if(ImGui::Checkbox("Show sky background",&gameClearSky)){uiApplySky();uiSaveAppearance();}
   ImGui::BeginDisabled(!gameClearSky);
   if(ImGui::ColorEdit3("Sky color",uiSkyColor,ImGuiColorEditFlags_NoInputs)){uiApplySky();uiSaveAppearance();}

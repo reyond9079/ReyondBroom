@@ -397,25 +397,30 @@ static float compileButtonWidth(const char* label)
 {
   return ImGui::CalcTextSize(label,nullptr,true).x+54*uiScale();
 }
-static bool compileButton(const char* label,int icon)
+static bool compileButton(const char* label,int icon,bool iconOnly=false)
 {
   const float u=uiScale(),size=20*u;
   const auto p=ImGui::GetCursorScreenPos();
-  bool clicked=ImGui::Button((std::string("##compile-")+label).c_str(),{compileButtonWidth(label),34*u});
+  const float width=iconOnly?32*u:compileButtonWidth(label),height=(iconOnly?30.f:34.f)*u;
+  bool clicked=ImGui::Button((std::string("##compile-")+label).c_str(),{width,height});
   auto list=ImGui::GetWindowDrawList();auto color=ImGui::GetColorU32(ImGuiCol_Text);
-  const float x=p.x+12*u,y=p.y+(ImGui::GetItemRectSize().y-size)*.5f;
+  const float x=p.x+(iconOnly?(width-size)*.5f:12*u),y=p.y+(height-size)*.5f;
   auto point=[&](float a,float b){return ImVec2{x+a*u,y+b*u};};
   auto line=[&](float a,float b,float c,float d){list->AddLine(point(a,b),point(c,d),color,1.7f*u);};
   if(icon==0){line(3,17,12,8);line(1,15,10,6);line(1,15,3,17);line(8,4,12,0);line(12,0,19,7);line(19,7,15,11);line(15,11,8,4);}
   else if(icon==1){for(int row=0;row<3;row++){float v=3+7*row,k=row==1?13:6;line(1,v,k-2,v);line(k+2,v,19,v);list->AddRect(point(k-2,v-2),point(k+2,v+2),color,0,0,1.5f*u);}}
   else if(icon==2){line(2,5,10,1);line(10,1,18,5);line(18,5,18,15);line(18,15,10,19);line(10,19,2,15);line(2,15,2,5);line(2,5,10,9);line(10,9,18,5);line(10,9,10,19);}
   else if(icon==3){list->AddTriangleFilled(point(4,1),point(18,10),point(4,19),color);}
-  else {line(17,10,2,10);line(2,10,8,4);line(2,10,8,16);}
+  else if(icon==4){line(17,10,2,10);line(2,10,8,4);line(2,10,8,16);}
+  else {line(3,18,3,3);line(3,3,17,3);line(17,3,14,7);line(14,7,17,11);line(17,11,3,11);}
   const char* text=label;const char* end=nullptr;FteBroomTranslate(text,end);
-  list->AddText({p.x+38*u,p.y+(34*u-ImGui::GetFontSize())*.5f},color,text,end);
+  if(!iconOnly)
+    list->AddText({p.x+38*u,p.y+(height-ImGui::GetFontSize())*.5f},color,text,end);
+  else if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    ImGui::SetTooltip("%.*s",end?int(end-text):int(std::strlen(text)),text);
   return clicked;
 }
-static void buildToolbar(bool inlineTools=false)
+static void buildToolbar(bool inlineTools=false,bool iconOnly=false)
 {
     if(inlineTools) {
       const float width=compileButtonWidth("Compile");
@@ -423,33 +428,40 @@ static void buildToolbar(bool inlineTools=false)
       if(ImGui::GetItemRectMax().x+ImGui::GetStyle().ItemSpacing.x+width<=right)ImGui::SameLine();
     }
     bool preview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
-    if(modEmbedded){ImGui::TextUnformatted("Mod preview");ImGui::SameLine();
-      if(ImGui::RadioButton("Free camera",!modPlay))modSetPlay(false);ImGui::SameLine();
-      if(ImGui::RadioButton("Play mod",modPlay))modSetPlay(true);
-      ImGui::SameLine();if(ImGui::Button("Back to editing"))modEmbedEnd();
+    if(modEmbedded){if(iconOnly)ImGui::TextWrapped("Mod preview");else {ImGui::TextUnformatted("Mod preview");ImGui::SameLine();}
+      if(ImGui::RadioButton(iconOnly?"Camera":"Free camera",!modPlay))modSetPlay(false);if(!iconOnly)ImGui::SameLine();
+      if(ImGui::RadioButton(iconOnly?"Play":"Play mod",modPlay))modSetPlay(true);
+      if(!iconOnly)ImGui::SameLine();
+      if(iconOnly?compileButton("Back to editing",4,true):ImGui::Button("Back to editing"))modEmbedEnd();
       ImGui::TextWrapped(modPlay?(modCaptured?"Playing | Escape: release mouse":"Click viewport to play | Escape: release mouse"):"RMB: look | WASD: fly | Q/X: up/down | Shift: fast");
       return;}
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,{14*uiScale(),9*uiScale()});
     const float right=ImGui::GetWindowPos().x+ImGui::GetWindowContentRegionMax().x;
     auto next=[&](const char* label){
+      if(iconOnly)return;
       const float width=compileButtonWidth(label);
       if(ImGui::GetItemRectMax().x+ImGui::GetStyle().ItemSpacing.x+width<=right)ImGui::SameLine();
     };
+    auto control=[&](const char* label,int icon){
+      if(iconOnly)ImGui::SetCursorPosX(ImGui::GetCursorPosX()+
+        std::max(0.f,(ImGui::GetContentRegionAvail().x-32*uiScale())*.5f));
+      return compileButton(label,icon,iconOnly);
+    };
     ImGui::BeginDisabled(runActive||buildRunning);
-    ImGui::PushStyleColor(ImGuiCol_Button,uiColor(47,99,160));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiColor(58,122,195));
+    ImGui::PushStyleColor(ImGuiCol_Button,uiSoftLight()?SoftLight::focus:uiColor(47,99,160));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiSoftLight()?SoftLight::teal:uiColor(58,122,195));
     ImGui::PushStyleColor(ImGuiCol_Text,uiColor(255,255,255));
-    if(compileButton("Compile",0))buildBegin();
+    if(control("Compile",0))buildBegin();
     ImGui::PopStyleColor(3);ImGui::EndDisabled();next("Setup compile");
-    if(compileButton("Setup compile",1))buildWindow=true;
+    if(control("Setup compile",1))buildWindow=true;
     next(preview?"Back to editing":"Show BSP");
-    if(preview){if(compileButton("Back to editing",4))buildEdit();}
+    if(preview){if(control("Back to editing",4))buildEdit();}
     else {ImGui::BeginDisabled(buildResult.empty()||(buildResultDocument!=documentFile || buildResultProfile!=gameProfile)||buildRunning);
-      if(compileButton("Show BSP",2))buildShow();ImGui::EndDisabled();}
+      if(control("Show BSP",2))buildShow();ImGui::EndDisabled();}
     gameProfileLoad();
     if(gameProfile!=0&&gameProfile!=3){next("Play mod");ImGui::BeginDisabled(runActive||runExclusive||buildRunning||assetsLoading);
-      if(compileButton("Play mod",3))modPreview();ImGui::EndDisabled();}
-    if(!tracePoints.empty()){next("Leak route");if(ImGui::Button("Leak route"))traceWindow=true;}
+      if(control("Play mod",3))modPreview();ImGui::EndDisabled();}
+    if(!tracePoints.empty()){next("Leak route");if(iconOnly?control("Leak route",5):ImGui::Button("Leak route"))traceWindow=true;}
     ImGui::PopStyleVar();
 }
 static void buildOverlay()
@@ -476,14 +488,14 @@ static void buildOverlay()
       auto end=runLog.find_last_not_of("\r\n");if(end!=std::string::npos){auto start=runLog.find_last_of("\r\n",end);auto line=runLog.substr(start==std::string::npos?0:start+1,end-(start==std::string::npos?0:start+1)+1);ImGui::TextWrapped("%s",line.substr(0,240).c_str());}
       if(ImGui::SmallButton("Cancel build"))runStop();ImGui::SameLine();if(ImGui::SmallButton("Log"))runWindow=true;
     }else if(!buildMessage.empty()){
-      if(documentFile.empty())ImGui::TextColored({1,.75f,.25f,1},"Map not saved");
-      if(runHadError)ImGui::PushStyleColor(ImGuiCol_Text,{1,.35f,.3f,1});
+      if(documentFile.empty())ImGui::TextColored(uiSoftLight()?SoftLight::warning:ImVec4(1,.75f,.25f,1),"Map not saved");
+      if(runHadError)ImGui::PushStyleColor(ImGuiCol_Text,uiSoftLight()?SoftLight::danger:ImVec4(1,.35f,.3f,1));
       ImGui::TextWrapped("%s",buildMessage.c_str());if(runHadError)ImGui::PopStyleColor();
       if(runHadError && ImGui::SmallButton("Show error log"))runWindow=true;
       if(ImGui::SmallButton("Dismiss"))buildMessage.clear();
     }
     if(!buildResult.empty()&&buildResultDocument==documentFile&&buildResultRevision!=(int)cvars->GetFloat("ftebroom_revision"))
-      ImGui::TextColored({1,.75f,.25f,1},"BSP is from an earlier document revision.");
+      ImGui::TextColored(uiSoftLight()?SoftLight::warning:ImVec4(1,.75f,.25f,1),"BSP is from an earlier document revision.");
   }ImGui::End();
 }
 static void testBuild()

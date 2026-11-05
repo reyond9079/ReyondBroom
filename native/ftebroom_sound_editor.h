@@ -113,12 +113,12 @@ static void soundPanel(){
     if(ImGui::RadioButton("Seek / playback",soundTool==0)){soundStop();soundTool=0;}
     ImGui::SameLine();if(ImGui::RadioButton("Trim",soundTool==1)){soundStop();soundTool=1;soundTrim=true;}
     float duration=float(soundPCM.size()/2)/44100;auto p=ImGui::GetCursorScreenPos();ImVec2 sz={std::max(64.f,ImGui::GetContentRegionAvail().x),160*uiScale()};
-    ImGui::InvisibleButton("Waveform",sz);auto d=ImGui::GetWindowDrawList();d->PushClipRect(p,{p.x+sz.x,p.y+sz.y},true);d->AddRectFilled(p,{p.x+sz.x,p.y+sz.y},IM_COL32(25,29,35,255));
-    if(duration>0){float left=p.x+sz.x*soundStart/duration,right=p.x+sz.x*soundEnd/duration;if(soundTrim||soundTool==1)d->AddRectFilled({left,p.y},{right,p.y+sz.y},IM_COL32(55,80,110,180));
-      for(size_t b=0;b<soundPeaks.size();b++){float x=p.x+sz.x*b/soundPeaks.size();d->AddLine({x,p.y+sz.y*(.5f-.45f*std::clamp(soundPeaks[b].y*soundVolume,-1.f,1.f))},{x,p.y+sz.y*(.5f-.45f*std::clamp(soundPeaks[b].x*soundVolume,-1.f,1.f))},IM_COL32(110,200,225,255));}
+    ImGui::InvisibleButton("Waveform",sz);auto d=ImGui::GetWindowDrawList();d->PushClipRect(p,{p.x+sz.x,p.y+sz.y},true);d->AddRectFilled(p,{p.x+sz.x,p.y+sz.y},uiChrome(IM_COL32(25,29,35,255),UiTone::Inset));
+    if(duration>0){float left=p.x+sz.x*soundStart/duration,right=p.x+sz.x*soundEnd/duration;if(soundTrim||soundTool==1)d->AddRectFilled({left,p.y},{right,p.y+sz.y},uiChrome(IM_COL32(55,80,110,180),UiTone::Raised));
+      for(size_t b=0;b<soundPeaks.size();b++){float x=p.x+sz.x*b/soundPeaks.size();d->AddLine({x,p.y+sz.y*(.5f-.45f*std::clamp(soundPeaks[b].y*soundVolume,-1.f,1.f))},{x,p.y+sz.y*(.5f-.45f*std::clamp(soundPeaks[b].x*soundVolume,-1.f,1.f))},uiChrome(IM_COL32(110,200,225,255),UiTone::Selection));}
       static float anchor=0;if(ImGui::IsItemActivated())anchor=std::clamp((ImGui::GetIO().MousePos.x-p.x)/sz.x,0.f,1.f)*duration;
       if(ImGui::IsItemActive()&&(ImGui::IsItemActivated()||ImGui::GetIO().MouseDelta.x!=0)){float current=std::clamp((ImGui::GetIO().MousePos.x-p.x)/sz.x,0.f,1.f)*duration;if(soundTool==1){soundStart=std::min(anchor,current);soundEnd=std::max(anchor,current);soundTrim=true;soundStop();}else soundSeek(current,true);}
-      {float x=p.x+sz.x*float(soundPlayCursor/44100)/duration;d->AddLine({x,p.y},{x,p.y+sz.y},IM_COL32(255,210,75,255),2);}}
+      {float x=p.x+sz.x*float(soundPlayCursor/44100)/duration;d->AddLine({x,p.y},{x,p.y+sz.y},uiChrome(IM_COL32(255,210,75,255),UiTone::Ink),2);}}
     d->PopClipRect();
     ImGui::SliderFloat("Volume",&soundVolume,0,2,"%.2fx");soundVolumeMin=ImGui::GetItemRectMin();soundVolumeMax=ImGui::GetItemRectMax();ImGui::SliderFloat("Speed",&soundSpeed,.25f,4,"%.2fx");
     if(soundTool==1&&ImGui::DragFloatRange2("Selection",&soundStart,&soundEnd,.01f,0,std::max(.01f,duration),"Start %.3f s","End %.3f s"))soundStop();

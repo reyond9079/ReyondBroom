@@ -45,7 +45,7 @@ static void generatorPanel() {
       changed|=ImGui::InputInt("Seed",&seed);changed|=ImGui::Combo("Side",&side,"+Z (top)\0-Z (bottom)\0+X\0-X\0+Y\0-Y\0");
       changed|=ImGui::Checkbox("Triangular grid",&triangles);
       if(!gameClassic()) {
-        ImGui::SeparatorText("Selected patches");
+        uiSectionHeading("Selected patches");
         if(ImGui::SliderInt("Control points U",&pu,3,31)){pu|=1;changed=true;}
         if(ImGui::SliderInt("Control points V",&pv,3,31)){pv|=1;changed=true;}
         ImGui::TextWrapped("Odd point counts only. Reducing the grid approximates the surface.");

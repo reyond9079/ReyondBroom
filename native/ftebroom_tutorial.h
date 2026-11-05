@@ -79,7 +79,7 @@ static void tourPanel(float w,float h){
   if(right>ImGui::GetItemRectMax().x-ImGui::GetWindowPos().x+ImGui::GetStyle().ItemSpacing.x)ImGui::SameLine(right);else ImGui::SetCursorPosX(std::max(ImGui::GetStyle().WindowPadding.x,right));
   if(ImGui::Button("Skip onboarding")){tourFinish(true);}
   auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();tourSkipCenter={(a.x+b.x)*.5f,(a.y+b.y)*.5f};
-  ImGui::SeparatorText(titles[tourStep]);const char* task=tasks[tourStep];const char* end=nullptr;FteBroomTranslate(task,end);ImGui::TextWrapped("%s",task);
+  uiSectionHeading(titles[tourStep]);const char* task=tasks[tourStep];const char* end=nullptr;FteBroomTranslate(task,end);ImGui::TextWrapped("%s",task);
   if(tourDemo)ImGui::TextUnformatted("Watch the demonstration...");else if(tourDone)ImGui::TextColored({.45f,.95f,.55f,1},"Done! Continue when you are ready.");else ImGui::TextUnformatted("Your turn");
   ImGui::ProgressBar((tourStep+(tourDone?1.f:0.f))/7,{-1,3*scale},"");
   ImGui::End();ImGui::PopStyleVar();

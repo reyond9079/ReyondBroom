@@ -184,7 +184,7 @@ static void bbInspector() {
     return;
   }
   ImGui::PushID(id.c_str());
-  ImGui::SeparatorText(bbMode == 2 ? "Animation pose" : "Element");
+  uiSectionHeading(bbMode == 2 ? "Animation pose" : "Element");
   ImGui::TextDisabled(bbQuakeInspector ? "Quake coordinates Z = up" : "Project coordinates Y = up");
   char name[256];
   std::snprintf(name, sizeof name, "%s", e->value("name", "object").c_str());
@@ -417,7 +417,7 @@ static void bbOutlinerNode(const bb::Json &node, int depth = 0) {
       bbOutlinerNode(child, depth + 1);
 }
 static void bbOutliner() {
-  ImGui::SeparatorText("Outliner");
+  uiSectionHeading("Outliner");
   ImGui::InputTextWithHint("##outliner-search", "Search elements", bbOutlinerSearch,
                            sizeof bbOutlinerSearch);
   for (auto label : {"Cube", "Group", "Mesh", "Locator"}) {
@@ -518,7 +518,7 @@ static void bbTextureOperation(const std::string &name) {
          {size_t(bbTexture)});
 }
 static void bbTexturePanel() {
-  ImGui::SeparatorText("Textures");
+  uiSectionHeading("Textures");
   if (ImGui::Button("Import..."))
     bbChoose(false, modFileRoot(), [](auto path) {
       try {
@@ -638,7 +638,7 @@ static void bbTexturePanel() {
   }
 }
 static void bbColorPanel() {
-  ImGui::SeparatorText("Color");
+  uiSectionHeading("Color");
   if (ImGui::ColorPicker4("##paint-color", bbColor,
                           ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_DisplayHex))
     for (int a = 0; a < 4; a++)
@@ -649,7 +649,7 @@ static void bbColorPanel() {
       bbColor[a] = bbBrush.color[a] / 255.f;
   }
   ImGui::Checkbox("Limit to palette while painting", &bbLimitPalette);
-  ImGui::SeparatorText("Palette");
+  uiSectionHeading("Palette");
   if (ImGui::Button("Add to palette"))
     bbPalette.push_back(bbBrush.color);
   ImGui::SameLine();
@@ -695,7 +695,7 @@ static void bbColorPanel() {
   }
 }
 static void bbAnimationPanel() {
-  ImGui::SeparatorText("Animations");
+  uiSectionHeading("Animations");
   if (ImGui::Button("Add animation"))
     bbEdit("Add animation", [] {
       bbProject.root["animations"].push_back({{"uuid", bb::uuid()},
@@ -768,7 +768,7 @@ static void bbAnimationPanel() {
   bool override = a.value("override", false);
   if (ImGui::Checkbox("Override", &override))
     bbEdit("Animation override", [&] { a["override"] = override; });
-  ImGui::SeparatorText("Keyframe");
+  uiSectionHeading("Keyframe");
   for (auto &track : a["animators"])
     for (auto &k : track["keyframes"])
       if (bbSelection.keyframes.count(k.value("uuid", ""))) {

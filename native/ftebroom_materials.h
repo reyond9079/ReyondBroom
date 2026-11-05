@@ -326,7 +326,7 @@ static void materialBrowser()
 
   char current[1024] = {};
   cvars->GetString("ftebroom_current_material", current, sizeof current);
-  ImGui::SeparatorText(cvars->GetFloat("ftebroom_face_count") ? "Selected surfaces" : "New brush material");
+  uiSectionHeading(cvars->GetFloat("ftebroom_face_count") ? "Selected surfaces" : "New brush material");
   if(gameWad() && *current && current[0]!='<') {
     std::string key=current;std::transform(key.begin(),key.end(),key.begin(),[](unsigned char c){return char(std::tolower(c));});if(key.rfind("textures/",0)!=0)key="textures/"+key;
     if(!materials.count(key)) {
@@ -395,7 +395,7 @@ static void materialBrowser()
   ImGui::TextWrapped("Shift+click: select a face. Enter: commit UV.");
   if(uiTheme==0){ImGui::PopStyleColor(4);ImGui::PopStyleVar();}
   uiInspectorTopEnd("Material browser divider",propertiesHeight);
-  ImGui::SeparatorText("Material collections");
+  uiSectionHeading("Material collections");
   if(gameWad() && !q1MissingWads.empty()) {
     ImGui::TextColored({1,.7f,.25f,1},"Missing WAD archives: %zu",q1MissingWads.size());
     if(ImGui::IsItemHovered()){ImGui::BeginTooltip();ImGui::TextUnformatted("The MAP stores texture names, not texture pixels. Reconnect these WADs with Add WAD(s):");for(const auto& path:q1MissingWads)ImGui::TextUnformatted(path.u8string().c_str());ImGui::EndTooltip();}
@@ -528,7 +528,7 @@ static void materialBrowser()
           ImGui::EndPopup();
         }
         auto d = ImGui::GetWindowDrawList();
-        d->AddRectFilled(p, {p.x + size + 6, p.y + size + 6}, IM_COL32(65, 68, 72, 255));
+        d->AddRectFilled(p, {p.x + size + 6, p.y + size + 6}, uiChrome(IM_COL32(65, 68, 72, 255),UiTone::Inset));
         auto tex = thumbnail(mat.name);
         float w = 1, h = 1;
         draw->ImageSize(tex, &w, &h);
@@ -539,10 +539,10 @@ static void materialBrowser()
         d->PopClipRect();
         if (materialUsage[materialCanonical(mat.name)] > 0)
           d->AddRect(
-            p, {p.x + size + 6, p.y + size + 6}, IM_COL32(230, 205, 45, 255), 0, 0, 2);
+            p, {p.x + size + 6, p.y + size + 6}, uiChrome(IM_COL32(230, 205, 45, 255),UiTone::Muted), 0, 0, 2);
         if (selected)
           d->AddRect(
-            p, {p.x + size + 6, p.y + size + 6}, IM_COL32(225, 55, 55, 255), 0, 0, 2);
+            p, {p.x + size + 6, p.y + size + 6}, uiChrome(IM_COL32(225, 55, 55, 255),UiTone::Selection), 0, 0, 2);
         auto slash = mat.name.find_last_of('/');
         auto label = mat.name.substr(slash == std::string::npos ? 0 : slash + 1);
         d->PushClipRect(
@@ -595,7 +595,7 @@ static void replaceMaterialDialog()
       auto& selected = column == 0 ? from : to;
       auto* filter = column == 0 ? findFrom : findTo;
       ImGui::SetNextItemWidth(-1);
-      ImGui::InputTextWithHint("##filter", "Filter materials", filter, 256);
+      uiBrowserSearch("##filter","Filter materials",filter,256);
       if (ImGui::BeginListBox("##choices", {-1, 300}))
       {
         for (const auto& pair : materials)

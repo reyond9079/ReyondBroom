@@ -169,7 +169,7 @@ static void modelEditTree(int index,int depth=0){
 static void modelEditorInspector(){
   if(modelViewerIsBsp()){
     if(ImGui::Button("BSP UV / texture..."))bspUVShow();
-    ImGui::SeparatorText("BSP preview");ImGui::TextWrapped("Read-only textured geometry. Use the map editor to change brushes and recompile.");
+    uiSectionHeading("BSP preview");ImGui::TextWrapped("Read-only textured geometry. Use the map editor to change brushes and recompile.");
     auto low=modelEditRead("ftebroom_modeleditor_low"),high=modelEditRead("ftebroom_modeleditor_high");
     ImGui::Text("Minimum: %.3f, %.3f, %.3f",low[0],low[1],low[2]);ImGui::Text("Maximum: %.3f, %.3f, %.3f",high[0],high[1],high[2]);
     ImGui::Text("Size: %.3f, %.3f, %.3f",high[0]-low[0],high[1]-low[1],high[2]-low[2]);
@@ -180,7 +180,7 @@ static void modelEditorInspector(){
   ImGui::TextUnformatted("Model editor");ImGui::TextDisabled("Source file is not modified. Export to save.");
   if(modelEditNodes.empty()){ImGui::TextWrapped("Loading editable mesh metadata...");return;}
   if(ImGui::RadioButton("Move",modelEditTool==0))modelEditTool=0;ImGui::SameLine();if(ImGui::RadioButton("Rotate",modelEditTool==1))modelEditTool=1;ImGui::SameLine();if(ImGui::RadioButton("Scale",modelEditTool==2))modelEditTool=2;
-  ImGui::SeparatorText("Meshes");ImGui::BeginChild("Mesh hierarchy",{0,150*uiScale()},ImGuiChildFlags_Borders);modelEditTree(0);ImGui::EndChild();
+  uiSectionHeading("Meshes");ImGui::BeginChild("Mesh hierarchy",{0,150*uiScale()},ImGuiChildFlags_Borders);modelEditTree(0);ImGui::EndChild();
   if(!modelEditValid()){ImGui::TextWrapped("%s",modelEditMessage.c_str());if(ImGui::Button("Reset all transforms")){for(auto& node:modelEditNodes){node.position={};node.rotation={};node.scale={1,1,1};node.total=1;}modelEditChanged=modelEditDirty=true;}return;}
   modelEditBounds();
   auto& n=modelEditNodes[modelEditSelected];ImGui::TextWrapped("%s",n.name.c_str());

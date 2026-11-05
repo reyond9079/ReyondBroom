@@ -24,7 +24,7 @@ static void terrainPanel()
   if(!shown){ImGui::SetNextWindowFocus();shown=true;}
   ImGui::SetNextWindowSize({370*uiScale(),600*uiScale()},ImGuiCond_FirstUseEver);
   if(auto inspector=ImGui::FindWindowByName("Map");inspector&&inspector->DockId)ImGui::SetNextWindowDockID(inspector->DockId,ImGuiCond_FirstUseEver);
-  bool visible=ImGui::Begin("FTE Engine terrain",nullptr,uiPanelFlags());
+  bool visible=uiSoftPanelBegin("FTE Engine terrain",nullptr,uiPanelFlags());
   static bool wasVisible=false;
   auto leave=[](){cvars->SetFloat("ftebroom_terrain_paint",0);cvars->SetFloat("ftebroom_terrain_edit",0);command("ftebroom_tool_deactivate\n");};
   if(!visible&&wasVisible&&cvars->GetFloat("ftebroom_terrain_edit"))leave();

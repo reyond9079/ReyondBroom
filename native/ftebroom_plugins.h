@@ -45,7 +45,7 @@ static int pluginSettle(int operation,const RBSettleOptionsV1* options){
   return -1;
 }
 static void pluginText(const char* text){ImGui::TextWrapped("%s",text?text:"");}
-static void pluginSeparator(const char* text){ImGui::SeparatorText(text?text:"");}
+static void pluginSeparator(const char* text){uiSectionHeading(text?text:"");}
 static int pluginInt(const char* label,int* value){return label&&value&&ImGui::InputInt(label,value);}
 static int pluginFloat(const char* label,float* value){return label&&value&&ImGui::InputFloat(label,value);}
 static int pluginBool(const char* label,int* value){if(!label||!value)return 0;bool b=*value;bool changed=ImGui::Checkbox(label,&b);*value=b;return changed;}
@@ -212,7 +212,7 @@ static void pluginsPanel(){
     ImGui::TextWrapped("Native plugins run with the editor's permissions. Enable only plugins you trust; mod/PAK resources never install or load plugins.");
     if(ImGui::Button("Rescan plugins"))pluginsScan();
     if(!pluginManagerError.empty())ImGui::TextWrapped("%s",pluginManagerError.c_str());
-    for(auto& p:editorPlugins){ImGui::PushID(p.id.c_str());ImGui::SeparatorText(p.name.c_str());ImGui::TextWrapped("%s",p.description.c_str());
+    for(auto& p:editorPlugins){ImGui::PushID(p.id.c_str());uiSectionHeading(p.name.c_str());ImGui::TextWrapped("%s",p.description.c_str());
       bool on=p.enabled;ImGui::BeginDisabled(pluginBusy(p));if(ImGui::Checkbox("Enabled",&on)){if(on)pluginLoad(p);else pluginUnload(p);pluginsSave();}ImGui::EndDisabled();
       if(p.api){ImGui::SameLine();if(ImGui::Button("Open"))p.open=true;}if(!p.error.empty())ImGui::TextWrapped("%s",p.error.c_str());ImGui::PopID();}
   }ImGui::End();}

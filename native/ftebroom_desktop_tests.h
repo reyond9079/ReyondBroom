@@ -9,6 +9,79 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode).rfind("soft122",0)==0){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;
+    if(std::string(mode)=="soft122open"){
+      uiTheme=3;uiScaleChoice=0;uiStyle();uiReset=true;selectEntityTab=true;modFilesOpen=true;modFilesVisible=true;
+      frame();frame();
+    }
+    if(std::string(mode)=="soft122scale"){
+      uiTheme=3;uiScaleChoice=2;uiLanguage=1;uiStyle();frame();frame();
+    }
+    if(std::string(mode)=="soft122horizontal"){
+      uiTheme=3;uiScaleChoice=0;uiLanguage=0;uiStyle();
+      auto center=ImGui::DockBuilderGetCentralNode(uiDockId);
+      if(center){ImGuiID remaining=center->ID,top;ImGui::DockBuilderSplitNode(remaining,ImGuiDir_Up,.17f,&top,&remaining);ImGui::DockBuilderDockWindow("Tools",top);ImGui::DockBuilderFinish(uiDockId);}
+      frame();frame();
+    }
+    if(std::string(mode)=="soft122files"){softLightGallery=false;preferencesRequest=false;buildWindow=false;for(auto& plugin:editorPlugins)plugin.open=false;firstSetupStep=-1;setupNeeded=false;ImGui::ClosePopupsOverWindow(nullptr,false);modFilesOpen=true;modFilesGrid=true;selectEntityTab=true;frame();frame();}
+    if(std::string(mode)=="soft122build"){softLightGallery=false;for(auto& plugin:editorPlugins)plugin.open=false;ImGui::ClosePopupsOverWindow(nullptr,false);buildWindow=true;frame();frame();}
+    if(std::string(mode)=="soft122prefs"){uiTheme=3;uiLanguage=0;uiScaleChoice=0;uiStyle();preferencesRequest=true;frame();frame();}
+    if(std::string(mode)=="soft122setup"){preferencesRequest=false;uiTheme=3;uiStyle();ImGui::ClosePopupsOverWindow(nullptr,false);firstSetupStep=2;setupNeeded=true;frame();frame();}
+    if(std::string(mode)=="soft122generator"){preferencesRequest=false;uiTheme=3;uiStyle();firstSetupStep=-1;setupNeeded=false;ImGui::ClosePopupsOverWindow(nullptr,false);pluginsScan();for(auto& plugin:editorPlugins)if(plugin.id=="org.reyondbroom.autolevel")plugin.open=true;frame();frame();}
+    if(std::string(mode)=="soft122check"){
+      auto colors=ImGui::GetCurrentContext()->ColorStack.Size,vars=ImGui::GetCurrentContext()->StyleVarStack.Size;
+      frame();frame();expect(colors==ImGui::GetCurrentContext()->ColorStack.Size&&vars==ImGui::GetCurrentContext()->StyleVarStack.Size,"soft122_style_stacks_balanced");
+      expect(uiTheme==3&&ImGui::GetStyle().WindowRounding==SoftLight::panelRadius*uiScale(),"soft122_existing_id_and_scaled_style");
+      selectEntityTab=true;frame();frame();
+      expect(!entityAdvancedSearch&&entityVisiblePreviewCount>0&&entityPreviewMarginsValid,"soft122_compact_entity_default_and_margins");
+      auto window=ImGui::FindWindowByName("Entity");expect(window&&entityFooterMax.y<=window->Pos.y+window->Size.y&&entityFooterMax.x<=window->Pos.x+window->Size.x,"soft122_footer_inside_panel");
+      auto* center=ImGui::DockBuilderGetCentralNode(uiDockId);
+      if(window&&center) {
+        const float before=window->Size.x;
+        const float x=(center->Pos.x+center->Size.x+window->Pos.x)*.5f;
+        const float y=center->Pos.y+center->Size.y*.5f;
+        expect(window->Pos.x-center->Pos.x-center->Size.x>=SoftLight::gutter-1 &&
+               viewHit(x,y)<0 && viewHit(uiScenePos.x+uiSceneSize.x*.5f,y)>=0,
+               "soft122_workspace_gutter_excludes_viewport_input");
+        event(0,0,0,x,y,testW,testH);
+        event(1,mouseKeys[0],0,x,y,testW,testH);
+        event(0,0,0,x,y,testW,testH);
+        event(0,0,0,x-32,y,testW,testH);
+        event(0,0,0,x-32,y,testW,testH);
+        event(2,mouseKeys[0],0,x-32,y,testW,testH);
+        frame();
+        expect(window->Size.x>before+16 &&
+               window->Pos.x-center->Pos.x-center->Size.x>=SoftLight::gutter-1,
+               "soft122_dock_resize_preserves_gutter");
+        uiReset=true;selectEntityTab=true;frame();frame();
+        center=ImGui::DockBuilderGetCentralNode(uiDockId);
+        char sample[160];
+        std::snprintf(sample,sizeof sample,"FTEBROOM_GUTTER_SAMPLE %g %g %g %g\n",
+          (center->Pos.x+center->Size.x+window->Pos.x)*.5f,
+          center->Pos.y+center->Size.y*.5f,testW,testH);
+        core->Print(sample);
+      }
+      auto click=[&](const char* name){auto p=entityTestItems.at(name);event(0,0,0,p.x,p.y,testW,testH);event(1,mouseKeys[0],0,p.x,p.y,testW,testH);event(0,0,0,p.x,p.y,testW,testH);event(2,mouseKeys[0],0,p.x,p.y,testW,testH);frame();};
+      auto* tools=ImGui::FindWindowByName("Tools");
+      const bool narrow=tools&&tools->Size.x<120*uiScale()&&entityTestItems.count("rail_options");
+      expect(narrow,"soft122_reference_tool_rail");
+      if(narrow){
+        click("rail_options");
+        expect(ImGui::IsPopupOpen("##rail-tool-options",ImGuiPopupFlags_AnyPopupId),
+               "soft122_rail_options_open");
+        ImGui::ClosePopupsOverWindow(nullptr,false);
+      }
+      click("advanced_search");expect(entityAdvancedSearch,"soft122_advanced_search_opens");click("advanced_search");expect(!entityAdvancedSearch,"soft122_advanced_search_closes");
+      click("definitions_footer");expect(ImGui::IsPopupOpen("Entity definitions menu",ImGuiPopupFlags_AnyPopupId),"soft122_definitions_footer_opens");ImGui::ClosePopupsOverWindow(nullptr,false);
+      for(int language=0;language<7;language++){uiLanguage=language;frame();}uiLanguage=0;
+      expect(uiFonts[uiScaleChoice]&&uiFonts[uiScaleChoice]->FindGlyphNoFallback(0x044f)&&uiFonts[uiScaleChoice]->FindGlyphNoFallback(0x65e5),"soft122_existing_multilingual_fonts");
+      auto saved=uiTheme;cvars->SetFloat("ftebroom_skip_setup",0);uiSaveAppearance();uiTheme=0;uiLoaded=false;uiLoad();cvars->SetFloat("ftebroom_skip_setup",1);expect(uiTheme==saved,"soft122_saved_theme_compatibility");
+    }
+    if(std::string(mode)=="soft122gallery"){
+      uiTheme=3;uiStyle();preferencesRequest=false;firstSetupStep=-1;setupNeeded=false;ImGui::ClosePopupsOverWindow(nullptr,false);softLightGallery=true;frame();frame();
+    }
+  }
   if(std::string(mode)=="bb121open"){
     recentWindow=false;setupNeeded=false;firstSetupStep=-1;gameProfile=2;q1UseLibre=false;std::snprintf(q1Mod,sizeof q1Mod,"%s",root);
     auto p=bb::makeTemplate(1,"monster",2);bb::textureTemplate(p,"skin.png",16,true,0,true,true);bbActivate(std::move(p));bbMode=0;bbSavedStamp=~uint64_t(0);frame();frame();expect(bbAPI()!=nullptr,"bb121_dynamic_mesh_interface");expect(bbTriangles.size()==72,"bb121_template_six_cubes");

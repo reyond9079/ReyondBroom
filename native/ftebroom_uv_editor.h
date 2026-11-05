@@ -45,7 +45,7 @@ static void graphicalUVEditor()
     }
   }
   if(!haveFace)return;
-  ImGui::SeparatorText("UV Editor");
+  uiSectionHeading("UV Editor");
   ImGui::BeginChild("UV canvas",{0,270*uiScale()},ImGuiChildFlags_Borders|ImGuiChildFlags_ResizeY,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
   ImVec2 top=ImGui::GetCursorScreenPos(),size=ImGui::GetContentRegionAvail();size.x=std::max(size.x,40.f);size.y=std::max(size.y,40.f);
   ImGui::InvisibleButton("UV interaction",size,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);

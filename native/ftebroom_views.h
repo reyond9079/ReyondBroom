@@ -168,14 +168,14 @@ static void viewOverlay()
   {
     auto a = viewRects[0], b = viewRects[1];
     list->AddRectFilled(
-      {a.x + a.w, a.y}, {b.x, viewArea.y + viewArea.h}, IM_COL32(85, 85, 90, 255));
+      {a.x + a.w, a.y}, {b.x, viewArea.y + viewArea.h}, uiChrome(IM_COL32(85, 85, 90, 255),UiTone::Muted));
     if (viewLayout >= 3)
     {
       auto lower = viewRects[viewLayout == 3 ? 2 : 3];
       list->AddRectFilled(
         {viewLayout == 3 ? b.x : a.x, b.y + b.h},
         {b.x + b.w, lower.y},
-        IM_COL32(85, 85, 90, 255));
+        uiChrome(IM_COL32(85, 85, 90, 255),UiTone::Muted));
     }
   }
   const char* names[] = {"3D", "YZ / Side", "XZ / Front", "XY / Top"};
@@ -187,18 +187,26 @@ static void viewOverlay()
     list->AddRect(
       {r.x, r.y},
       {r.x + r.w, r.y + r.h},
-      i == viewFocus ? IM_COL32(62, 112, 205, 255) : IM_COL32(100, 100, 110, 255),
+      i == viewFocus ? uiChrome(IM_COL32(62, 112, 205, 255),UiTone::Selection) : uiChrome(IM_COL32(100, 100, 110, 255),UiTone::Muted),
       0,
       0,
       i == viewFocus ? 2 : 1);
+    if(uiSoftLight()) {
+      const auto label=ImGui::CalcTextSize(names[r.type]);
+      ImVec2 lo{r.x+3,r.y+3},hi{r.x+std::min(r.w-3,label.x+16*uiScale()),r.y+label.y+11*uiScale()};
+      list->AddRectFilled(lo,hi,ImGui::GetColorU32(SoftLight::panel),4*uiScale());
+      list->AddRect(lo,hi,ImGui::GetColorU32(SoftLight::border),4*uiScale());
+      list->AddText({lo.x+6*uiScale(),lo.y+4*uiScale()},ImGui::GetColorU32(SoftLight::ink),names[r.type]);
+    } else {
     list->AddRectFilled(
       {r.x + 3, r.y + 3}, {r.x + 100, r.y + 23}, IM_COL32(25, 25, 30, 210));
     list->AddText({r.x + 8, r.y + 6}, IM_COL32(240, 240, 245, 255), names[r.type]);
+    }
   }
 }
 static void viewPreferences()
 {
-  ImGui::SeparatorText("View layout");
+  uiSectionHeading("View layout");
   int count = viewLayout - 1;
   if (ImGui::Combo("Views", &count, "1 view\0 2 views\0 3 views\0 4 views\0"))
     viewSetLayout(count + 1);

@@ -92,7 +92,7 @@ static void viewOptionsPanel()
     if (i % 3 != 2)
       ImGui::SameLine();
   }
-  ImGui::SeparatorText("Entities");
+  uiSectionHeading("Entities");
   viewOption("Point entities", "ftebroom_show_points");
   viewOption("Models", "ftebroom_show_models");
   viewOption("Class names", "ftebroom_show_entity_names");
@@ -159,7 +159,7 @@ static void viewOptionsPanel()
       ImGui::TreePop();
     }
   ImGui::EndChild();
-  ImGui::SeparatorText("Renderer");
+  uiSectionHeading("Renderer");
   int mode = (int)cvars->GetFloat("ftebroom_render_faces");
   if (ImGui::Combo("Faces", &mode, "Textured\0Flat color\0Wireframe\0"))
     cvars->SetFloat("ftebroom_render_faces", float(mode));
@@ -171,7 +171,7 @@ static void viewOptionsPanel()
   int links = (int)cvars->GetFloat("ftebroom_entity_links");
   if (ImGui::Combo("Entity links", &links, "None\0Direct\0Transitive\0All\0"))
     cvars->SetFloat("ftebroom_entity_links", float(links));
-  ImGui::SeparatorText("Selection tags");
+  uiSectionHeading("Selection tags");
   for (const char* type : {"trigger", "clip", "caulk", "hint", "detail"})
   {
     ImGui::PushID(type);

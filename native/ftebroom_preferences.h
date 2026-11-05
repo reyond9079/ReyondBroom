@@ -122,7 +122,7 @@ static void preferencesKeyboard()
     {
       if(!a.command||*a.gesture||(*search&&!std::strstr(a.id,search)))continue;
       ImGui::PushID(a.id);ImGui::TableNextRow();ImGui::TableNextColumn();
-      bool conflict=conflicts.count(a.id);if(conflict)ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1,.35f,.3f,1));
+      bool conflict=conflicts.count(a.id);if(conflict)ImGui::PushStyleColor(ImGuiCol_Text,uiSoftLight()?SoftLight::danger:ImVec4(1,.35f,.3f,1));
       ImGui::TextWrapped("%s",a.label);ImGui::TableNextColumn();
       if(ImGui::Selectable(a.shortcutText.empty()?"Click to assign":a.shortcutText.c_str(),captureShortcut==a.id))captureShortcut=a.id;
       if(ImGui::BeginPopupContextItem()){if(ImGui::MenuItem("Clear shortcut")){shortcutApply(a,"");shortcutOverrides[shortcutVariable(a.id)]="";}ImGui::EndPopup();}

@@ -36,9 +36,9 @@ static void spawnMasterPanel(){
       float top=ImGui::GetCursorPosY();for(int col=0;col<columns;col++){
         int index=row*columns+col;if(index>=int(classes.size()))break;const auto& def=*classes[index];ImGui::SetCursorPos({8+col*cellWidth,top});ImGui::PushID(def.name.c_str());ImVec2 tile=ImGui::GetCursorScreenPos();
         if(ImGui::InvisibleButton("entity",{size,cellHeight-4}))classname=def.name;
-        auto draw=ImGui::GetWindowDrawList();draw->PushClipRect(tile,{tile.x+size,tile.y+size},true);draw->AddRectFilled(tile,{tile.x+size,tile.y+size},IM_COL32(55,58,62,255));
+        auto draw=ImGui::GetWindowDrawList();draw->PushClipRect(tile,{tile.x+size,tile.y+size},true);draw->AddRectFilled(tile,{tile.x+size,tile.y+size},uiChrome(IM_COL32(55,58,62,255),UiTone::Inset));
         if(!entityModelTile(def,tile,size))draw->AddText({tile.x+8,tile.y+size*.4f},ImGui::GetColorU32(ImGuiCol_TextDisabled),"Entity");
-        if(classname==def.name)draw->AddRect(tile,{tile.x+size,tile.y+size},IM_COL32(225,95,55,255),0,0,2);draw->PopClipRect();
+        if(classname==def.name)draw->AddRect(tile,{tile.x+size,tile.y+size},uiChrome(IM_COL32(225,95,55,255),UiTone::Selection),0,0,2);draw->PopClipRect();
         draw->PushClipRect({tile.x,tile.y+size},{tile.x+size,tile.y+cellHeight},true);draw->AddText({tile.x,tile.y+size+2},ImGui::GetColorU32(ImGuiCol_Text),def.name.c_str());draw->PopClipRect();
         if(ImGui::IsItemHovered())ImGui::SetTooltip("%s\n%s",def.name.c_str(),def.description.c_str());ImGui::PopID();
       }ImGui::SetCursorPosY(top+cellHeight);ImGui::Dummy({0,0});

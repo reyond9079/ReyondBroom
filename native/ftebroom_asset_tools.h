@@ -28,7 +28,7 @@ static void assetToolsPanel(){
       else {float cell=std::max(6.f,std::min(28.f*uiScale(),(ImGui::GetContentRegionAvail().x-15*ImGui::GetStyle().ItemSpacing.x)/16));
         for(int i=0;i<256;i++){if(i%16)ImGui::SameLine();ImGui::PushID(i);auto c=(const unsigned char*)paletteBytes.data()+i*3;
           if(ImGui::ColorButton("##color",{c[0]/255.f,c[1]/255.f,c[2]/255.f,1},ImGuiColorEditFlags_NoTooltip,{cell,cell}))paletteSelected=i;
-          if(i==paletteSelected)ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(),ImGui::GetItemRectMax(),IM_COL32(255,220,50,255),0,0,2);
+          if(i==paletteSelected)ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(),ImGui::GetItemRectMax(),uiChrome(IM_COL32(255,220,50,255),UiTone::Selection),0,0,2);
           if(ImGui::IsItemHovered())ImGui::SetTooltip("Index %d | RGB %d, %d, %d | #%02X%02X%02X",i,c[0],c[1],c[2],c[0],c[1],c[2]);ImGui::PopID();}
         auto c=(const unsigned char*)paletteBytes.data()+paletteSelected*3;ImGui::Text("Index %d   RGB %d, %d, %d   #%02X%02X%02X",paletteSelected,c[0],c[1],c[2],c[0],c[1],c[2]);
         ImGui::TextDisabled("Index 255 is transparent only for materials using masked transparency.");

@@ -404,10 +404,10 @@ static void runPanel()
     if(ImGui::Button("Run profile")&&runSaveProfiles())runBegin(profile);ImGui::EndDisabled();
     ImGui::SameLine();ImGui::BeginDisabled(!runActive);if(ImGui::Button("Stop"))runStop();ImGui::EndDisabled();
     ImGui::SameLine();if(ImGui::Button("Copy log"))ImGui::SetClipboardText(runLog.c_str());
-    if(!runError.empty())ImGui::TextColored({1,.3f,.25f,1},"%s",runError.c_str());
+    if(!runError.empty())ImGui::TextColored(uiSoftLight()?SoftLight::danger:ImVec4(1,.3f,.25f,1),"%s",runError.c_str());
     if(ImGui::BeginChild("Tool output",{0,0},ImGuiChildFlags_Borders)){std::istringstream lines(runLog);std::string line;
       while(std::getline(lines,line)){bool error=line.find("ERROR")!=std::string::npos||line.find("error")!=std::string::npos||line.find("Error")!=std::string::npos;
-        if(error)ImGui::TextColored({1,.3f,.25f,1},"%s",line.c_str());else ImGui::TextUnformatted(line.c_str());}}
+        if(error)ImGui::TextColored(uiSoftLight()?SoftLight::danger:ImVec4(1,.3f,.25f,1),"%s",line.c_str());else ImGui::TextUnformatted(line.c_str());}}
     ImGui::EndChild();
   }
   ImGui::End();

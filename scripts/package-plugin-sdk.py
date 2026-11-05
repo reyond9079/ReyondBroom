@@ -10,7 +10,7 @@ names=['sdk/reyondbroom_plugin.h','sdk/LICENSE.txt','plugins/rubble/rubble.cpp',
 names += [p.relative_to(src).as_posix() for folder in ('plugins/common','plugins/autolevel','plugins/ivy','docs/autolevel-acceptance') for p in (src/folder).rglob('*') if p.is_file()]
 names += [p.relative_to(src).as_posix() for p in (src/'tests').glob('test-autolevel-*.cpp')]
 names += ['native/ftebroom_plugin_projection.h','tests/test-plugin-v1-compat.cpp',
-          'scripts/test-autolevel.py','scripts/test-autolevel-runtime.py',
+          'scripts/test-autolevel.py','scripts/test-autolevel-runtime.py','scripts/test-autolevel-imgui.py',
           'tests/autolevel119.cfg','tests/autolevel119-parser.cfg',
           'tests/fixtures/autolevel-builder119.txt','tests/fixtures/attributes.map']
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:

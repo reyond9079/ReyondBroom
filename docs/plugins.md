@@ -1,6 +1,7 @@
 # Native editor plugins — API v1
 
-The bundled **Procedural Level Generator** and **Ivy Grower** are documented in
+The bundled **AutoLevel** generator replaces Procedural Level Generator; its complete
+guide is [AutoLevel](autolevel.md). **Ivy Grower** and the older tools are documented in
 [Alpha 113 tools and lessons](features113.md). They use optional tail extensions
 of the same host ABI; older compiled v1 plugins keep their original fields.
 See [Alpha 115 native ivy models](fixes115.md#ivy-grower) for automatic MDL/MD2/MD3

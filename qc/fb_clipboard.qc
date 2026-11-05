@@ -214,12 +214,12 @@ float fb_clip_command()
     if(importing) pixel=[stof(argv(2)),stof(argv(3)),0];
     filestream file=fopen(importing?"import-in.map":"clipboard-in.map",FILE_READ);
     if((float)file<0) {cvar_set("ftebroom_selection_status","Clipboard is unavailable");return TRUE;}
-    string text="",line;
-    while((line=fgets(file))) {
-        text=strcat(text,line,"\n");
-        if(strlen(text)>16777216) break;
-    }
-    fclose(file);
+    int bytes=fsize(file);
+    if(bytes<1||bytes>16777216){fclose(file);cvar_set("ftebroom_selection_status","Import MAP must be 1 byte to 16 MiB");return TRUE;}
+    // Join once; repeated strcat copied the entire MAP per line.
+    strbuf lines=buf_create();string line;
+    while((line=fgets(file)))bufstr_add(lines,line,TRUE);
+    fclose(file);string text=strzone(buf_implode(lines,"\n"));buf_del(lines);
     int success=fb_map_parse(text);
     if(success && importing && cvar("ftebroom_quake1")) {
         for(int i=0;i<fb_map_count;i++) if(fb_map_items[i].kind==FB_NODE_PATCH) {

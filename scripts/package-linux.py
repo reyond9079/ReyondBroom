@@ -18,9 +18,10 @@ out.mkdir(parents=True, exist_ok=False)
 platform = 'Linux-SDL2-x64' if a.sdl2 else 'Linux-x64'
 root = out / 'ReyondBroom-Linux-x64'
 root.mkdir()
-if any(not (a.deps/'plugins'/name/(name+'.so')).is_file() for name in ('rubble','levelgen','ivy')):
+if any(not (a.deps/'plugins'/name/(name+'.so')).is_file() for name in ('rubble','autolevel','ivy')):
     raise RuntimeError('Build bundled plugins with scripts/build-plugins.py first')
-shutil.copytree(a.deps/'plugins',root/'plugins')
+for name in ('rubble','autolevel','ivy'):
+    shutil.copytree(a.deps/'plugins'/name,root/'plugins'/name)
 for source, name in [
     (a.deps/'gpu-light', 'tools/gpu-light/gpu-light'),
     (a.deps/('fteqw/engine/release-sdl2/fteqw-glsdl2_64' if a.sdl2 else 'fteqw/engine/release-linux/fteqw-gl64'), 'fteqw-gl64'),

@@ -2,6 +2,20 @@
 // Clipboard MAP parsing is data-only and validates every object before insertion.
 string fb_map_text,fb_map_token,fb_map_error;
 int fb_map_cursor,fb_map_length;
+// FTE substring/str2chr inspect the source string. Keep character-level reads
+// bounded instead of rescanning a multi-megabyte generated MAP for every byte.
+string fb_map_window;
+int fb_map_window_start;
+string fb_map_slice(int start,int length)
+{
+    if(start<0||start>=fb_map_length||length<=0)return "";
+    if(length>1024)return substring(fb_map_text,start,length);
+    if(fb_map_window_start<0||start<fb_map_window_start||start+length>fb_map_window_start+strlen(fb_map_window)){
+        strunzone(fb_map_window);fb_map_window_start=start;
+        fb_map_window=strzone(substring(fb_map_text,start,2048));
+    }
+    return substring(fb_map_window,start-fb_map_window_start,length);
+}
 typedef struct {
     int kind,parent,count,contents;
     string fields;
@@ -22,36 +36,37 @@ void fb_map_clear()
     }
     memfree(fb_map_items);fb_map_items=__NULL__;fb_map_count=0;
     strunzone(fb_map_text);strunzone(fb_map_token);fb_map_text=fb_map_token="";
+    strunzone(fb_map_window);fb_map_window="";fb_map_window_start=-1;
 }
 void fb_map_next()
 {
     strunzone(fb_map_token);fb_map_token="";
     while(fb_map_cursor<fb_map_length) {
-        int code=str2chr(fb_map_text,fb_map_cursor);
+        int code=str2chr(fb_map_slice(fb_map_cursor,1),0);
         if(code<=32) {fb_map_cursor++;continue;}
-        if(substring(fb_map_text,fb_map_cursor,2)=="//") {
-            while(fb_map_cursor<fb_map_length && str2chr(fb_map_text,fb_map_cursor)!=10) fb_map_cursor++;
+        if(fb_map_slice(fb_map_cursor,2)=="//") {
+            while(fb_map_cursor<fb_map_length && str2chr(fb_map_slice(fb_map_cursor,1),0)!=10) fb_map_cursor++;
             continue;
         }
-        if(substring(fb_map_text,fb_map_cursor,2)=="/*") {
+        if(fb_map_slice(fb_map_cursor,2)=="/*") {
             fb_map_cursor+=2;
-            while(fb_map_cursor<fb_map_length && substring(fb_map_text,fb_map_cursor,2)!="*/") fb_map_cursor++;
+            while(fb_map_cursor<fb_map_length && fb_map_slice(fb_map_cursor,2)!="*/") fb_map_cursor++;
             if(fb_map_cursor>=fb_map_length) fb_map_error="Unterminated comment";
             fb_map_cursor+=2;continue;
         }
         break;
     }
     if(fb_map_cursor>=fb_map_length) return;
-    string first=substring(fb_map_text,fb_map_cursor++,1);
+    string first=fb_map_slice(fb_map_cursor++,1);
     if(first=="{" || first=="}" || first=="(" || first==")" || first=="[" || first=="]") {fb_map_token=strzone(first);return;}
     int start=fb_map_cursor-1;
     if(first=="\"") {
         string value="";int closed=FALSE;
         while(fb_map_cursor<fb_map_length) {
-            string ch=substring(fb_map_text,fb_map_cursor++,1);
+            string ch=fb_map_slice(fb_map_cursor++,1);
             if(ch=="\"") {closed=TRUE;break;}
             if(ch=="\\" && fb_map_cursor<fb_map_length) {
-                ch=substring(fb_map_text,fb_map_cursor++,1);
+                ch=fb_map_slice(fb_map_cursor++,1);
                 if(ch=="n") ch="\n";
             }
             value=strcat(value,ch);
@@ -60,11 +75,11 @@ void fb_map_next()
         fb_map_token=strzone(value);return;
     }
     while(fb_map_cursor<fb_map_length) {
-        string nextChar=substring(fb_map_text,fb_map_cursor,1);
+        string nextChar=fb_map_slice(fb_map_cursor,1);
         if(str2chr(nextChar,0)<=32 || nextChar=="{" || nextChar=="}" || nextChar=="(" || nextChar==")" || nextChar=="[" || nextChar=="]") break;
         fb_map_cursor++;
     }
-    fb_map_token=strzone(substring(fb_map_text,start,fb_map_cursor-start));
+    fb_map_token=strzone(fb_map_slice(start,fb_map_cursor-start));
 }
 int fb_map_take(string expected)
 {

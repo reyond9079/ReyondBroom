@@ -67,9 +67,24 @@ void fb_fullbench_tick()
 }
 int fb_test_zombie117;
 int fb_test_replace117_count,fb_test_replace117_history;
+int fb_autolevel119_before,fb_autolevel119_after;
 int fb_generators_testcommand()
 {
     if(argv(0)!="ftebroom_test_generators"||!cvar("ftebroom_skip_setup"))return FALSE;
+    if(argv(1)=="autolevel119capture"){
+        fb_selection_clear();fb_createbox('0 0 64','64 64 64');int captureModel=selectedbrushes[0].model,captureBrush=selectedbrushes[0].id;
+        fb_entity_create("light",FALSE,'16 16 96');brush_select(captureModel,captureBrush);
+        localcmd("ftebroom_plugin_surfaces block plugin-autolevel-capture-qa.map\n");return TRUE;
+    }
+    if(argv(1)=="autolevel119before"){
+        fb_tool_refresh();fb_document_tick();fb_autolevel119_before=0;for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_BRUSH)fb_autolevel119_before++;return TRUE;
+    }
+    if(argv(1)=="autolevel119import"){
+        fb_tool_refresh();fb_document_tick();fb_autolevel119_after=0;int root=FALSE;for(int n=2;n<fb_node_count;n++){if(fb_nodes[n].kind==FB_NODE_BRUSH)fb_autolevel119_after++;if(fb_nodes[n].fields["_al_builder"]=="dungeon")root=TRUE;}
+        fb_transform_expect(fb_autolevel119_after>fb_autolevel119_before+1000&&root,"autolevel119_imported_editable_grouped_brushes");
+        brush_undo();fb_document_rebuild();int al119Count=0;for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_BRUSH)al119Count++;fb_transform_expect(al119Count==fb_autolevel119_before,"autolevel119_single_undo_restores_document");
+        brush_redo();fb_document_rebuild();al119Count=0;for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_BRUSH)al119Count++;fb_transform_expect(al119Count==fb_autolevel119_after,"autolevel119_redo_restores_full_level");return TRUE;
+    }
     if(argv(1)=="sprites118"){
         fb_selection_clear();fb_entity_create("test118_sprite",FALSE,'-48 0 48');int sprite118=fb_selected_entity();editor_ents_reload();
         fb_transform_expect(fb_entity_model_ready(sprite118)&&fb_entity_model_name(sprite118)=="progs/s_bubble_blue1.spr","sprites118_pak_sprite_in_viewport");

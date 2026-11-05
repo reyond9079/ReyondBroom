@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT
+#include "../plugins/autolevel/al_storage.cpp"
+#include "../plugins/autolevel/al_brush.cpp"
+#include "../plugins/autolevel/al_repo_compile.cpp"
+#include "../plugins/autolevel/al_solver.cpp"
+#include "../plugins/autolevel/al_group_solver.cpp"
+#include "../plugins/autolevel/al_default_repo.cpp"
+#include "../plugins/autolevel/al_build_map.cpp"
+#include <iostream>
+#include <fstream>
+#include <queue>
+using namespace al;
+void check(bool b,const char* s){if(!b)throw std::runtime_error(s);}
+int main(int argc,char** argv){try{auto repo=defaultRepo();auto rt=compileRepo(repo);auto b=defaultBuilder(repo);integrity(b,rt);b.seed=argc>2?std::stoi(argv[2]):1;EditorSettings es;std::vector<Builder> all{b};auto q=builderRequest(rt,b,all,es,false,nullptr,nullptr);check(solve(q).iterationsUsed,"base solve");q.layer=1;check(solve(q).iterationsUsed,"decor solve");auto build=buildMap(rt,b,es,2);if(argc>1){std::ofstream out(argv[1]);out<<build.map;}
+ if(b.seed==1)for(int profile=0;profile<=4;profile++){auto variant=buildMap(rt,b,es,profile);auto parsed=parseMap(variant.map);int starts=0;for(auto e:parsed.entities){auto cl=e.fields["classname"];if(cl==(profile==0?"info_player_deathmatch":"info_player_start"))starts++;if(profile==4&&cl=="light")check(e.fields.count("_light"),"Half-Life light key");}check(starts==1,"profile-specific single player start");check(parsed.brushes.size()==build.geometry.brushes.size(),"profile preserves editable geometry");}
+ if(b.seed==1){auto edges=b;edges.previewMode=1;auto bounded=buildMap(rt,edges,es,2);check(bounded.lines.size()<=16384*6&&!bounded.warnings.empty(),"brush-edge preview falls back to bounded current layer");}
+ std::vector<Polyhedron> polys;for(auto& brush:build.geometry.brushes){validateBrush(brush);polys.push_back(polyhedron(brush));}for(size_t i=0;i<polys.size();i++)for(size_t j=i+1;j<polys.size();j++){double v=1;for(int a=0;a<3;a++)v*=std::max(0.,std::min(polys[i].max[a],polys[j].max[a])-std::max(polys[i].min[a],polys[j].min[a]));check(v<=1,"AABB brushes have no volume overlap");}
+ Vec3 spawn{};int starts=0,lights=0;for(auto e:build.geometry.entities){auto cl=e.fields["classname"];if(cl=="info_player_start"){spawn=brushio::origin(e);starts++;}if(cl=="light")lights++;}check(starts==1&&lights>0,"exactly one player start and lights");for(auto& brush:build.geometry.brushes)check(!contains(brush,spawn),"start outside solid");
+ const int step=8;Int3 dims{272,272,88};Vec3 low{-64,-64,-64};std::vector<uint8_t> solid(volume(dims)),seen(volume(dims));auto cell=[&](Vec3 v){return Int3{int(std::floor((v.x-low.x)/step)),int(std::floor((v.y-low.y)/step)),int(std::floor((v.z-low.z)/step))};};for(auto p:polys){auto lo=cell(p.min),hi=cell(p.max);for(int z=lo.z;z<hi.z;z++)for(int y=lo.y;y<hi.y;y++)for(int x=lo.x;x<hi.x;x++)if(inside({x,y,z},dims))solid[index({x,y,z},dims)]=1;}
+ std::vector<size_t> queue{index(cell(spawn),dims)};seen[queue[0]]=1;for(size_t head=0;head<queue.size();head++){auto p=position(queue[head],dims);check(p.x&&p.y&&p.z&&p.x<dims.x-1&&p.y<dims.y-1&&p.z<dims.z-1,"voxel flood cannot escape AABB+64");for(auto d:delta){auto np=p+d;if(!inside(np,dims))continue;auto i=index(np,dims);if(!solid[i]&&!seen[i]){seen[i]=1;queue.push_back(i);}}}
+ auto at=[&](int x,int y,int z){return !inside({x,y,z},dims)||solid[index({x,y,z},dims)]!=0;};
+ // Conservative 32x32x56 hull on the 8-unit lattice; standing samples carry
+ // feet height, and transitions permit at most two lattice steps (16 units).
+ auto clear=[&](int x,int y,int z){for(int dz=0;dz<7;dz++)for(int dy=-2;dy<2;dy++)for(int dx=-2;dx<2;dx++)if(at(x+dx,y+dy,z+dz))return false;return true;};
+ auto floorAt=[&](int x,int y,int z){for(int dy=-2;dy<2;dy++)for(int dx=-2;dx<2;dx++)if(at(x+dx,y+dy,z-1))return true;return false;};
+ Int3 start=cell(spawn-Vec3{0,0,24});check(clear(start.x,start.y,start.z)&&floorAt(start.x,start.y,start.z),"player hull fits at spawn");std::vector<uint8_t> reachable(volume(dims));queue={index(start,dims)};reachable[queue[0]]=1;for(size_t head=0;head<queue.size();head++){auto p=position(queue[head],dims);for(int d:{0,2,3,5}){auto np=p+delta[d];for(int dz=2;dz>=-2;dz--){int z=p.z+dz;if(!floorAt(np.x,np.y,z)||!clear(np.x,np.y,z))continue;bool swept=true;for(int h=0;h<=std::abs(dz);h++){int zz=p.z+(dz<0?-h:h);if(!clear(dz>0?p.x:np.x,dz>0?p.y:np.y,zz))swept=false;}if(!swept)continue;auto i=index({np.x,np.y,z},dims);if(!reachable[i]){reachable[i]=1;queue.push_back(i);}break;}}}
+ auto qual=quality(rt,b.levelData);int ordinary=0,stairParts=0,atriumParts=0;for(auto c:qual.component){auto p=position(c,b.levelData.size);auto& s=rt.states[rt.byHash(b.levelData.layers[0].blocks[c])];int tx=(p.x*256+128+64)/8,ty=(p.y*256+128+64)/8;bool found=false;if(s.bigBlockUid=="stair"){stairParts++;continue;}if(s.bigBlockUid=="atrium"){atriumParts++;continue;}for(int z=(p.z*192+16+64)/8;z<(p.z*192+128+64)/8;z++)found|=reachable[index({tx,ty,z},dims)]!=0;if(!found)std::cerr<<"unreachable "<<p.x<<","<<p.y<<","<<p.z<<" "<<s.blockUid<<" reachable samples "<<queue.size()<<std::endl;check(found,"walkable ordinary cell center reachable with player hull");ordinary++;}
+ // Large block cells may be empty headroom. Check physical lower/upper door
+ // landings for every instance instead of pretending those cells contain floors.
+ int verticalDoors=0;for(auto c:qual.component){auto p=position(c,b.levelData.size);auto& s=rt.states[rt.byHash(b.levelData.layers[0].blocks[c])];if(s.bigBlockUid.empty())continue;for(int d:{0,2,3,5})if(s.baseIds[d]==1){auto center=mul(vec(p),repo.cellSize)+Vec3{128,128,16};int a=d==0||d==3?0:1;center[a]=p[a]*256+(d>=3?224:32);auto sample=cell(center);bool found=false;for(int du=-2;du<=2;du++)for(int dv=-2;dv<=2;dv++){auto test=sample;test.x+=du;test.y+=dv;if(inside(test,dims))found|=reachable[index(test,dims)]!=0;}check(found,"large block door landing reachable");verticalDoors++;}}
+ check(verticalDoors>0,"vertical module entrances tested");std::cout<<"PASS geometry: "<<polys.size()<<" valid non-overlapping boxes; sealed 8-unit voxel flood; 32x32x56 hull reaches "<<ordinary<<" ordinary centers and "<<verticalDoors<<" large-module landings ("<<stairParts<<" stair / "<<atriumParts<<" atrium parts); "<<lights<<" lights\n";
+ }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}}

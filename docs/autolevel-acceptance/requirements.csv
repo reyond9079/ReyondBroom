@@ -1,0 +1,26 @@
+Specification,Requirement,Implementation,Automated evidence
+2.1,"Plugin layout, unity build and independent manifests",plugins/autolevel/autolevel.cpp; plugin.ini; CMakeLists.txt; scripts/build-plugins.py,scaffold; Windows/Linux plugin builds
+2.2,"Main-thread host calls, background snapshots, busy/cancel/stale guards/shutdown",plugins/autolevel/al_app.cpp; al_job.cpp,ui; solver active cancellation; runtime import
+2.3,Guard every optional callback by struct_size and pointer,plugins/autolevel/al_ui.h AL_HAS; autolevel.cpp; al_viewport_tools.cpp,scaffold; viewport; pre-extension v1 binary
+3.1-3.3,"All seven actions, direction mapping, centered geometry and inverse-transpose UV",plugins/autolevel/al_math.h; al_brush.cpp transformGeometry,math; brush
+3.4,"All 256 fills, shared-face orientation and side keys",plugins/autolevel/al_fill.h,math; repo
+4,Ordered Empty/Solid/Base groups and integrity/remapping,plugins/autolevel/al_model.h integrity/remapGroups; al_repo_compile.cpp,storage; repo
+5.2.1-4,"Active assets, layer count, built-ins and action variants",plugins/autolevel/al_repo_compile.cpp compileRepo,repo
+5.2.5,"Big-block fresh internal IDs, transformations and divided weights",plugins/autolevel/al_repo_compile.cpp compileRepo; IDGenerator,repo; solver four big-block orientations
+5.2.6-8,"Upper links, fillers and distant dependency tracing",plugins/autolevel/al_repo_compile.cpp compileRepo,repo Matching/AllToAll/fillers/distant cases
+5.2.9-10,"Stable layer/group ranges, missing-layer error and hashed adjacency",plugins/autolevel/al_repo_compile.cpp compileRepo,repo
+5.2.11-12,Exclusive and banned expanded variant connections,plugins/autolevel/al_repo_compile.cpp compileRepo,repo; viewport digit 1/3
+5.2.13-15,"Expanded upper links, group counters and weights",plugins/autolevel/al_repo_compile.cpp compileRepo/upperOf,repo; solver upper layer
+5.3,Portable persistent 64-bit hashes and separate semantic deduplication,plugins/autolevel/al_hash.h; al_repo_compile.cpp,math pinned values; repo symmetric cross
+6.1-6.6,"AC4 dynamic wave, weighted cell modes and full reversible support/ban journal",plugins/autolevel/al_solver.cpp solver::Attempt,solver contradictory-branch rollback; defaults
+6.7-6.9,"Connectivity, quality retries, deterministic MT and transactional builder groups",plugins/autolevel/al_solver.cpp quality/solve; al_group_solver.cpp solveBuilders,solver; defaults 1..30; geometry 1..30
+7.1-7.4,"Geometry cache, placement, no filler duplicates, chunk/instance groups, materials, point entities and profile starts",plugins/autolevel/al_build_map.cpp buildMap/shouldInclude,geometry; ui; runtime Undo/Redo; Q1/Q3 compiler checks
+7.5,"4..64 planes, finite volume above 1, coordinate/brush/import budgets and BSP29 warning",plugins/autolevel/al_brush.cpp validateBrush; al_build_map.cpp buildMap,brush; geometry; compiler checks
+8,"Builder inspector, bounds/selection, painting, presets, boundaries, layers and export",plugins/autolevel/al_ui_builder.cpp; al_viewport_tools.cpp,ui; viewport Move/Scale/Rect; defaults
+9.1-9.4,"Repo/block/big-block editors, workbench, capture and layered assets",plugins/autolevel/al_ui_repo.cpp; al_app.cpp receiveCapture; al_build_map.cpp buildWorkbench,ui; repo; storage; migration; runtime selected-point capture
+9 MakeConnection,All four source/destination connection cases and smallest free IDs,plugins/autolevel/al_repo_compile.cpp makeConnection/IDGenerator,"repo four cases and {1,2,4} ID fixture"
+9.5,"Connected builder groups, layers, parallel independent builders and one group import",plugins/autolevel/al_group_solver.cpp; al_ui_repo.cpp drawBuilders; al_job.cpp,solver group success/failure/parallel; ui
+10,"Optional SDK overlays, rays, all views and input capture/release",sdk/reyondbroom_plugin.h; native/ftebroom_plugin_viewport.h; al_viewport_tools.cpp,host projection round trips; viewport; runtime input; v1 binary compatibility
+11-12,"Default dungeon modules, stairs/atria, lights, seeds, presets and quality",plugins/autolevel/al_default_repo.cpp; al_ui_builder.cpp,defaults 30 seeds; geometry 30 seeds; ui Tower multiplier
+13,"Versioned quoted text, nested records, RLE, 8 MiB limit and safe corrupt-file handling",plugins/autolevel/al_storage.cpp; al_app.cpp loadAll/saveAll,storage; ui corrupt/autosave/shutdown cases
+14.10,"English guide, notices and Windows/Linux distributions",docs/autolevel.md; THIRD-PARTY.md; scripts/package-*.py,archive manifests/checksums/source verification

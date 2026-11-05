@@ -9,6 +9,27 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string(mode).rfind("autolevel119",0)==0){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;
+    if(std::string(mode)=="autolevel119open")pluginsScan();
+    auto found=std::find_if(editorPlugins.begin(),editorPlugins.end(),[](auto& p){return p.id=="org.reyondbroom.autolevel";});
+    expect(found!=editorPlugins.end()&&found->api,"autolevel119_external_module_loaded");if(found==editorPlugins.end()||!found->api)return;
+    auto& p=*found;p.open=true;frame();frame();auto window=ImGui::FindWindowByName("AutoLevel");if(window){ImGui::SetWindowPos(window,{20,100});ImGui::SetWindowSize(window,{760,660});ImGui::SetScrollY(window,window->ScrollMax.y);}frame();frame();
+    auto click=[&](const char* name){auto at=pluginButtonPositions.find(name);expect(at!=pluginButtonPositions.end(),"autolevel119_button_found");if(at==pluginButtonPositions.end())return;auto point=at->second;event(0,0,0,point.x,point.y,testW,testH);event(1,mouseKeys[0],0,point.x,point.y,testW,testH);frame();event(2,mouseKeys[0],0,point.x,point.y,testW,testH);frame();};
+    if(std::string(mode)=="autolevel119open")click("Rebuild All");
+    if(std::string(mode)=="autolevel119ready"){expect(!pluginBusy(p)&&pluginColoredLines.size()>600,"autolevel119_background_preview_ready");click("Export");expect(std::filesystem::exists(documentPath("data/plugin-autolevel-export-dungeon.map")),"autolevel119_export_map_written");}
+    if(std::string(mode)=="autolevel119apply")click("Apply to map");
+    if(std::string(mode)=="autolevel119input"){
+      p.open=false;frame();frame();auto r=viewRects[viewFocus];float x=r.x+r.w-8,y=r.y+r.h*.5f;
+      pluginCurrentId=p.id;pluginViewportAllowed=true;expect(pluginCaptureViewport(1),"autolevel119_viewport_capture_starts");pluginViewportAllowed=false;
+      event(1,mouseKeys[0],0,x,y,testW,testH);expect(!sceneDrag&&(pluginButtonsDown&1),"autolevel119_click_not_routed_to_brush_tool");event(2,mouseKeys[0],0,x,y,testW,testH);
+      int tool=cvars->GetFloat("ftebroom_tool");event(1,input->GetKeyCode("1",nullptr),0,x,y,testW,testH);expect((pluginDigitKeys&2)&&cvars->GetFloat("ftebroom_tool")==tool,"autolevel119_digit_key_reserved");event(2,input->GetKeyCode("1",nullptr),0,x,y,testW,testH);
+      event(1,input->GetKeyCode("escape",nullptr),0,x,y,testW,testH);expect(!pluginViewportCapture,"autolevel119_escape_releases_capture");event(2,input->GetKeyCode("escape",nullptr),0,x,y,testW,testH);
+      pluginCurrentId=p.id;pluginViewportAllowed=true;pluginCaptureViewport(0);pluginCaptureViewport(1);p.open=false;pluginsTick();expect(!pluginViewportCapture,"autolevel119_closed_window_releases_capture");pluginCurrentId.clear();pluginViewportAllowed=false;
+      float bounds[6];expect(pluginSelectionBounds(bounds),"autolevel119_selection_bounds_read_without_file");
+    }
+    return;
+  }
   if(std::string(mode)=="sprites118setup"){
     std::ofstream(documentPath("data/sprites118.fgd"))<<"@PointClass iconsprite(\"progs/s_bubble_blue1.spr\") = test118_sprite []\n@PointClass iconsprite(\"progs/qa118.spr\") = test118_rgba []\n";
     command(("ftebroom_definitions \""+documentPath("data/sprites118.fgd").generic_u8string()+"\"\n").c_str());

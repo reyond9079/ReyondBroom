@@ -1,0 +1,67 @@
+PASS full host initializes
+PASS Rebuild All
+PASS balanced disabled stack
+PASS background finishes
+PASS preview generated
+PASS auto advance builds decor
+PASS Apply to map
+PASS balanced disabled stack
+PASS single import contains groups and player
+PASS Blocks Repo
+PASS balanced disabled stack
+PASS New block from selection
+PASS balanced disabled stack
+PASS background finishes
+PASS selection captured
+PASS capture preserves FTE point-light origin
+PASS Level Builder
+PASS balanced disabled stack
+PASS Save
+PASS balanced disabled stack
+PASS settings persisted
+PASS Load
+PASS balanced disabled stack
+PASS Tower preset only multiplies stair weights by 1.5
+PASS Blocks Repo
+PASS balanced disabled stack
+PASS Block Asset
+PASS balanced disabled stack
+PASS Big Block
+PASS balanced disabled stack
+PASS Builders Window
+PASS balanced disabled stack
+PASS Level Builder
+PASS balanced disabled stack
+PASS Block Asset
+PASS balanced disabled stack
+PASS connection mode UI
+PASS Level Builder
+PASS balanced disabled stack
+PASS Rebuild All
+PASS balanced disabled stack
+PASS background finishes
+PASS fresh preview after capture
+PASS document change invalidates preview
+PASS Rebuild All
+PASS balanced disabled stack
+PASS background finishes
+PASS same-map edit revision invalidates preview
+PASS Rebuild All
+PASS balanced disabled stack
+PASS background finishes
+PASS stale worker result discarded
+PASS Rebuild All
+PASS balanced disabled stack
+PASS Cancel
+PASS balanced disabled stack
+PASS background finishes
+PASS cancel never applies partial result
+PASS Rebuild All
+PASS balanced disabled stack
+PASS background finishes
+PASS explicit selection replacement
+PASS shutdown clears preview
+PASS workbench escapes quoted labels and UIDs
+PASS corrupt file is not overwritten by autosave/shutdown
+PASS too-old host safely rejected
+PASS all UI state, thread ownership, persistence and lifecycle tests

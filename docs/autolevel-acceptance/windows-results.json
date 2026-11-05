@@ -1,0 +1,93 @@
+{
+  "platform": "nt",
+  "tests": [
+    {
+      "test": "math",
+      "passed": true,
+      "seconds": 0.047,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "storage",
+      "passed": true,
+      "seconds": 0.094,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "migration",
+      "passed": true,
+      "seconds": 0.125,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "brush",
+      "passed": true,
+      "seconds": 0.093,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "repo",
+      "passed": true,
+      "seconds": 0.11,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "solver",
+      "passed": true,
+      "seconds": 0.172,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "defaults",
+      "passed": true,
+      "seconds": 6.109,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "geometry",
+      "passed": true,
+      "seconds": 15.625,
+      "cases": 30,
+      "pass_messages": 30
+    },
+    {
+      "test": "ui",
+      "passed": true,
+      "seconds": 1.703,
+      "cases": 1,
+      "pass_messages": 63
+    },
+    {
+      "test": "viewport",
+      "passed": true,
+      "seconds": 0.203,
+      "cases": 1,
+      "pass_messages": 22
+    },
+    {
+      "test": "host",
+      "passed": true,
+      "seconds": 0.078,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "scaffold",
+      "passed": true,
+      "seconds": 0.188,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "pre-extension binary compatibility",
+      "passed": true
+    }
+  ]
+}

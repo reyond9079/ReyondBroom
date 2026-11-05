@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: MIT
+#include "../plugins/autolevel/al_brush.cpp"
+#include <iostream>
+using namespace al;
+void check(bool b,const char* s){if(!b)throw std::runtime_error(s);}
+int main(){try{Geometry g;g.brushes={box({16,32,0},{128,192,64},"al_floor")};auto s=writeMap(g);auto r=parseMap(s);check(near(polyhedron(r.brushes[0]).min,{16,32,0}),"Valve round trip");std::string standard="{\n\"classname\" \"worldspawn\"\n";auto b=g.brushes[0];std::ostringstream o;for(auto& f:b.faces){for(auto p:f.points)brushio::point(o,p);o<<"test 12 24 30 .5 .75\n";}standard+="{\n"+o.str()+"}\n}\n";auto legacy=parseMap(standard);auto reread=parseMap(writeMap(legacy));check(near(polyhedron(reread.brushes[0]).min,{16,32,0}),"Standard round trip");
+ for(int a=0;a<7;a++){auto transformed=transformGeometry(g,{256,256,256},{BlockAction(a)},{10,20,30});auto p=polyhedron(transformed.brushes[0]);check(std::abs(p.volume-polyhedron(b).volume)<.001,"volume preserved");Vec3 center=(p.min+p.max)*.5;check(contains(transformed.brushes[0],center),"outward normals");}
+ auto& f=g.brushes[0].faces[0];f.offsetU=17;f.offsetV=23;f.scaleU=.5;f.scaleV=.75;Vec3 p=f.points[0];auto tr=transformGeometry(g,{256,256,192},{BlockAction::RotateZ},{123,45,60});auto q=transformPoint(p,{256,256,192},{BlockAction::RotateZ})+Vec3{123,45,60};auto& nf=tr.brushes[0].faces[0];check(std::abs(dot(p,f.u)/f.scaleU+f.offsetU-dot(q,nf.u)/nf.scaleU-nf.offsetU)<1e-6,"UV U lock");check(std::abs(dot(p,f.v)/f.scaleV+f.offsetV-dot(q,nf.v)/nf.scaleV-nf.offsetV)<1e-6,"UV V lock");
+ Geometry stair;for(int k=1;k<=12;k++)stair.brushes.push_back(box({16.,64.+32*(k-1),16},{240.,64.+32*k,16.+16*k},"al_stair"));double before=0,after=0;for(auto& b:stair.brushes)before+=polyhedron(b).volume;for(int y=0;y<2;y++)for(int z=0;z<2;z++){auto part=clipGeometry(stair,{0.,256.*y,192.*z},{256.,256.*(y+1),192.*(z+1)});for(auto& b:part.brushes){validateBrush(b);after+=polyhedron(b).volume;}}check(std::abs(before-after)<.001,"stair clipping conserves volume");
+ auto emptyEntity=parseMap("{\n\"classname\" \"light\"\n\"target\" \"\"\n}");check(emptyEntity.entities.size()==1&&emptyEntity.entities[0].fields.at("target").empty(),"empty quoted entity value preserved");
+ Geometry captured;PointEntity light;light.fields={{"classname","light"},{"origin","'16 16 96'"},{"angles","'0 90 0'"}};captured.entities.push_back(light);auto movedLight=translateGeometry(captured,{128,0,0});check(near(brushio::origin(movedLight.entities[0]),{144,16,96}),"FTE quoted vector fields normalize during capture");
+ std::cout<<"PASS brushes: Standard/Valve220 round trips, all affine actions, normals/volume, texture lock, exact stair clipping\n";
+ }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}}

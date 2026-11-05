@@ -22,9 +22,10 @@ output.mkdir(parents=True, exist_ok=False)
 root = output / "ReyondBroom-Windows-x64"
 root.mkdir()
 (root / "bin").mkdir()
-if any(not (bundle/'plugins'/name/(name+'.dll')).is_file() for name in ('rubble','levelgen','ivy')):
+if any(not (bundle/'plugins'/name/(name+'.dll')).is_file() for name in ('rubble','autolevel','ivy')):
     raise RuntimeError('Build bundled plugins with scripts/build-plugins.py first')
-shutil.copytree(bundle/'plugins',root/'plugins')
+for name in ('rubble','autolevel','ivy'):
+    shutil.copytree(bundle/'plugins'/name,root/'plugins'/name)
 for name in (
     "ReyondBroom.exe", "fteqw64.exe", "fteplug_ftebroom_x64.dll", "zlib1.dll", "libpng16.dll",
     "libjpeg.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll", "Launch-ReyondBroom.cmd",

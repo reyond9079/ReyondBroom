@@ -1,0 +1,93 @@
+{
+  "platform": "posix",
+  "tests": [
+    {
+      "test": "math",
+      "passed": true,
+      "seconds": 0.0064,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "storage",
+      "passed": true,
+      "seconds": 0.0103,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "migration",
+      "passed": true,
+      "seconds": 0.0018,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "brush",
+      "passed": true,
+      "seconds": 0.0016,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "repo",
+      "passed": true,
+      "seconds": 0.0019,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "solver",
+      "passed": true,
+      "seconds": 0.0167,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "defaults",
+      "passed": true,
+      "seconds": 3.1475,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "geometry",
+      "passed": true,
+      "seconds": 10.5591,
+      "cases": 30,
+      "pass_messages": 30
+    },
+    {
+      "test": "ui",
+      "passed": true,
+      "seconds": 0.8732,
+      "cases": 1,
+      "pass_messages": 63
+    },
+    {
+      "test": "viewport",
+      "passed": true,
+      "seconds": 0.013,
+      "cases": 1,
+      "pass_messages": 22
+    },
+    {
+      "test": "host",
+      "passed": true,
+      "seconds": 0.0012,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "scaffold",
+      "passed": true,
+      "seconds": 0.0159,
+      "cases": 1,
+      "pass_messages": 1
+    },
+    {
+      "test": "pre-extension binary compatibility",
+      "passed": true
+    }
+  ]
+}

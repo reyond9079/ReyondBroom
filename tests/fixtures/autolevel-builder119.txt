@@ -1,0 +1,44 @@
+AUTOLEVEL_BUILDER 1
+uid "dungeon"
+name "Dungeon"
+repoUid "reyond-dungeon"
+position "0 0 0"
+size "8 8 3"
+selectionMin "2 2 0"
+selectionMax "6 6 3"
+seed "1"
+rebuildBottomLayers "1"
+weight {
+group "Empty"
+override "1"
+value "0.3"
+}
+weight {
+group "Solid"
+override "1"
+value "0.05"
+}
+boundary {
+side "0"
+groups "\"Solid\" "
+}
+boundary {
+side "1"
+groups "\"Solid\" "
+}
+boundary {
+side "2"
+groups "\"Solid\" "
+}
+boundary {
+side "3"
+groups "\"Solid\" "
+}
+boundary {
+side "4"
+groups "\"Solid\" "
+}
+boundary {
+side "5"
+groups "\"Solid\" "
+}

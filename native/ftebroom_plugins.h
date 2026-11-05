@@ -167,6 +167,7 @@ static void pluginsScan(){
   for(auto& p:editorPlugins)pluginUnload(p);editorPlugins.clear();pluginsScanned=true;pluginManagerError.clear();
   try{
     auto root=settingsPath().parent_path()/"plugins";std::filesystem::create_directories(root);
+    bool hasAutoLevel=std::filesystem::is_regular_file(root/"autolevel"/"plugin.ini");
     std::map<std::string,int> enabled;std::ifstream prefs(settingsPath().parent_path()/"ftebroom-plugins.cfg");std::string id;int on;
     while(prefs>>std::quoted(id)>>on)enabled[id]=on;
     for(auto& entry:std::filesystem::directory_iterator(root)){
@@ -181,11 +182,12 @@ static void pluginsScan(){
         else if(key=="linux")library=value;
 #endif
       }
+      if(p.id=="org.reyondbroom.levelgen"&&hasAutoLevel)continue;
       if(p.id.empty()||p.name.empty()||library.empty()||library.find_first_of("/\\:")!=std::string::npos||library=="."||library=="..")continue;
       bool duplicate=false;for(auto& old:editorPlugins)if(old.id==p.id)duplicate=true;if(duplicate)continue;
       p.library=std::filesystem::absolute(p.folder/std::filesystem::u8path(library));
       if(!std::filesystem::is_regular_file(p.library)||std::filesystem::is_symlink(p.library)){p.error="Plugin binary is missing.";}
-      else if(enabled.count(p.id)?enabled[p.id]!=0:((p.id=="org.reyondbroom.rubble"&&entry.path().filename()=="rubble")||(p.id=="org.reyondbroom.levelgen"&&entry.path().filename()=="levelgen")||(p.id=="org.reyondbroom.ivy"&&entry.path().filename()=="ivy")))pluginLoad(p);
+      else if(enabled.count(p.id)?enabled[p.id]!=0:((p.id=="org.reyondbroom.rubble"&&entry.path().filename()=="rubble")||(p.id=="org.reyondbroom.autolevel"&&entry.path().filename()=="autolevel")||(p.id=="org.reyondbroom.ivy"&&entry.path().filename()=="ivy")))pluginLoad(p);
       editorPlugins.push_back(std::move(p));
     }
   }catch(const std::exception& e){pluginManagerError=e.what();}

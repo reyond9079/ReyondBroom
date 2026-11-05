@@ -94,9 +94,11 @@ void fb_entity_links_moved(){fb_links_move_epoch++;}
 void fb_entity_links_prepare()
 {
     float profile81Time=gettime(1);
-    static int revision=-1,geometry=-1,filters=-1,selection=-1,moved=-1;int current=fb_grid_geometry_epoch;
+    static int revision=-1,geometry=-1,filters=-1,selection=-1,moved=-1,transitive=-1;int current=fb_grid_geometry_epoch;
+    int wantTransitive=cvar("ftebroom_entity_links")==2;
     int graphValid=revision==current && geometry==fb_grid_geometry_epoch && filters==fb_filter_epoch && fb_links_entities==fb_entity_render_epoch;
-    if(graphValid && selection==fb_entity_selection_key() && moved==fb_links_move_epoch)return;
+    if(graphValid && selection==fb_entity_selection_key() && moved==fb_links_move_epoch && transitive==wantTransitive)return;
+    transitive=wantTransitive;
     moved=fb_links_move_epoch;
     revision=current;geometry=fb_grid_geometry_epoch;filters=fb_filter_epoch;selection=fb_entity_selection_key();fb_links_entities=fb_entity_render_epoch;
     static vector bounds[2];
@@ -136,7 +138,7 @@ void fb_entity_links_prepare()
     }
     memfree(next);hash_destroytab(heads);
     }
-    for(int step=0;step<fb_node_count;step++) {
+    for(int step=0;wantTransitive && step<fb_node_count;step++) {
         int changed=FALSE;
         for(int e=0;e<fb_entity_connection_count;e++) {fb_entity_link_t edge=fb_entity_connections[e];if(fb_entity_reachable[edge.from] || fb_entity_reachable[edge.to]) {
             if(!fb_entity_reachable[edge.from] || !fb_entity_reachable[edge.to])changed=TRUE;fb_entity_reachable[edge.from]=fb_entity_reachable[edge.to]=TRUE;
@@ -196,11 +198,12 @@ void fb_entity_links_draw()
     int mode=cvar("ftebroom_entity_links");if(!mode)return;
     if(mode<=2 && !selectedbrushcount && !fb_selected_entity_count)return;
     fb_entity_links_prepare();
-    static int revision=-1,geometry=-1,filters=-1,visibility=-1,selection=-1,lastMode=-1;
+    static int revision=-1,entityRevision=-1,filters=-1,visibility=-1,selection=-1,lastMode=-1;
     static int *drawLinks;static int drawCount;
     int currentRevision=fb_grid_geometry_epoch;
-    if(revision!=currentRevision || geometry!=fb_grid_geometry_epoch || filters!=fb_filter_epoch || visibility!=fb_visibility_epoch || selection!=fb_entity_selection_key() || lastMode!=mode){
-        revision=currentRevision;geometry=fb_grid_geometry_epoch;filters=fb_filter_epoch;visibility=fb_visibility_epoch;selection=fb_entity_selection_key();lastMode=mode;
+    int selectionKey=0;if(mode<=2)selectionKey=fb_entity_selection_key();
+    if(revision!=currentRevision || entityRevision!=fb_links_entities || filters!=fb_filter_epoch || visibility!=fb_visibility_epoch || selection!=selectionKey || lastMode!=mode){
+        revision=currentRevision;entityRevision=fb_links_entities;filters=fb_filter_epoch;visibility=fb_visibility_epoch;selection=selectionKey;lastMode=mode;
         memfree(drawLinks);drawLinks=memalloc(max(1,fb_entity_connection_count)*sizeof(int));drawCount=0;
         for(int index=0;index<fb_entity_connection_count;index++){
             fb_entity_link_t candidate=fb_entity_connections[index];

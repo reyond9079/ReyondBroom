@@ -5,18 +5,31 @@ static int bbResizeW = 64, bbResizeH = 64;
 static bool bbResizeUV = true;
 static bool bbNativeImport = false;
 static std::string bbNativeSource;
-static void bbConvertNative(const std::string &source) {
+static bool bbNativeFromInspector=false;
+static int bbNativeSkin=0;
+static std::string bbNativeOpenError;
+static void bbConvertNative(const std::string &source,bool fromInspector) {
   if (modelConverterPending || bbNativeImport)
     throw std::runtime_error("Wait for the active model conversion");
+  if(source.empty()||modEmbedded)
+    throw std::runtime_error("A mounted model is required. Exit mod preview before editing a model.");
   bbNativeSource = source;
+  bbNativeFromInspector=fromInspector;
+  bbNativeSkin=fromInspector?modelViewerSkin:0;
   bbNativeImport = true;
   cvars->SetString("ftebroom_convert_source", source.c_str());
   cvars->SetFloat("ftebroom_convert_sequence", 0);
   cvars->SetFloat("ftebroom_convert_frames", 1);
   cvars->SetFloat("ftebroom_convert_fps", 10);
-  cvars->SetFloat("ftebroom_convert_skin", modelViewerSkin);
+  cvars->SetFloat("ftebroom_convert_skin", bbNativeSkin);
   cvars->SetFloat("ftebroom_convert_status", 0);
   command("ftebroom_model_extract\n");
+}
+static void bbOpenNative(const std::string &source) {
+  bbLeave([source]{
+    try { bbConvertNative(source,false); }
+    catch(const std::exception& e){ bbNativeOpenError=e.what(); }
+  });
 }
 static void bbNativeImportTick() {
   if (!bbNativeImport || !cvars->GetFloat("ftebroom_convert_status"))
@@ -26,7 +39,8 @@ static void bbNativeImportTick() {
     if (cvars->GetFloat("ftebroom_convert_status") != 1)
       throw std::runtime_error("The engine could not extract this model");
     auto mesh = ftebroom::modelExport::parse(modelResource("data/model-convert.mesh"));
-    if (modelEditLoaded && modelEditNodes.size() == mesh.surfaces.size() + 1) {
+    if (bbNativeFromInspector && bbNativeSource==modelViewerPath && modelEditLoaded &&
+        modelEditNodes.size() == mesh.surfaces.size() + 1) {
       std::vector<ftebroom::modelEdit::Matrix> transforms;
       for (size_t i = 1; i < modelEditNodes.size(); i++)
         transforms.push_back(modelEditWorld(i));
@@ -36,15 +50,25 @@ static void bbNativeImportTick() {
     auto bytes = modelResource(bbNativeSource);
     for (size_t i = 0; i < mesh.surfaces.size(); i++) {
       ftebroom::modelExport::Skin skin;
-      if (bytes.substr(0, 4) == "IDPO") {
-        auto mdl = ftebroom::readMdl(bytes, modelViewerSkin);
-        skin = modelImportDecode(ftebroom::quake1::tga(mdl.skin, modelResource("gfx/palette.lmp")));
-      } else if (bytes.substr(0, 4) == "IDST" &&
-                 mesh.surfaces[i].material.rfind("__hl_texture_", 0) == 0)
-        skin = modelImportHalfLifeSkin(bytes, std::stoul(mesh.surfaces[i].material.substr(13)),
-                                       bbNativeSource);
-      else
-        skin = modelImportDecode(modelImportTexture(mesh.surfaces[i].material));
+      try {
+        if (bytes.substr(0, 4) == "IDPO") {
+          auto mdl = ftebroom::readMdl(bytes, bbNativeSkin);
+          skin = modelImportDecode(ftebroom::quake1::tga(mdl.skin, modelResource("gfx/palette.lmp")));
+        } else if (bytes.substr(0, 4) == "IDST" &&
+                   mesh.surfaces[i].material.rfind("__hl_texture_", 0) == 0)
+          skin = modelImportHalfLifeSkin(bytes, std::stoul(mesh.surfaces[i].material.substr(13)),
+                                         bbNativeSource);
+        else
+          skin = modelImportDecode(modelImportTexture(mesh.surfaces[i].material));
+      } catch(const std::exception&) {
+        skin.width=skin.height=16;
+        skin.rgba.resize(16*16*4);
+        for(size_t pixel=0;pixel<skin.rgba.size();pixel+=4){
+          skin.rgba[pixel]=skin.rgba[pixel+1]=skin.rgba[pixel+2]=180;
+          skin.rgba[pixel+3]=255;
+        }
+        p.warnings.push_back("Missing imported texture: "+mesh.surfaces[i].material);
+      }
       bb::Texture t;
       t.id = p.root["textures"][i]["uuid"];
       t.name = "skin" + std::to_string(i) + ".png";
@@ -54,14 +78,16 @@ static void bbNativeImportTick() {
       t.rgba = std::move(skin.rgba);
       p.textures.push_back(std::move(t));
     }
-    auto path = bbPath(bbNativeSource);
-    path.replace_extension(".bbmodel");
-    p.path = path.u8string();
+    if(bbNativeFromInspector){
+      auto path = bbPath(bbNativeSource);
+      path.replace_extension(".bbmodel");
+      p.path = path.u8string();
+    }
     p.warnings.push_back("Vertex animation is not converted; only the first pose is imported");
     bbActivate(std::move(p));
     bbSavedStamp = ~uint64_t(0);
   } catch (const std::exception &e) {
-    bbNotice(e);
+    if(bbNativeFromInspector)bbNotice(e);else bbNativeOpenError=e.what();
   }
 }
 static std::future<std::string> bbBridgeJob;
@@ -119,7 +145,7 @@ static void bbImportFile(const std::filesystem::path &source) {
     return;
   }
   if (!modelImportSource(source)) {
-    bbConvertNative(modFileModelPath(source));
+    bbConvertNative(modFileModelPath(source),false);
     return;
   }
   if (bbBridgeJob.valid())
@@ -1756,6 +1782,17 @@ static void bbImportTick() {
 static void bbNewDialog() {
   bbSettingsLoad();
   bbImportTick();
+  if(!bbNativeOpenError.empty())ImGui::OpenPopup("Could not open model");
+  bool open=true;
+  if(ImGui::BeginPopupModal("Could not open model",&open,ImGuiWindowFlags_AlwaysAutoResize)){
+    ImGui::TextWrapped("%s",bbNativeOpenError.c_str());
+    if(ImGui::Button("Close")){
+      bbNativeOpenError.clear();
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+  if(!open)bbNativeOpenError.clear();
   bbDialogs();
 }
 static void bbPanel() {

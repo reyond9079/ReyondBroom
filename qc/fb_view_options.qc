@@ -9,7 +9,7 @@ var float autocvar_ftebroom_clear_sky=1;
 int fb_clear_sky_faces;
 float fb_surface_shade(vector normal){return autocvar_ftebroom_shade_faces?0.6+0.4*fabs(normal*normalize('0.3 -0.5 1')):1;}
 var float autocvar_ftebroom_bounds_visible=0;
-var float autocvar_ftebroom_hidden_tags=0,autocvar_ftebroom_entity_links=1;
+var float autocvar_ftebroom_hidden_tags=0,autocvar_ftebroom_entity_links=3;
 var string autocvar_ftebroom_hidden_classes="";
 int *fb_filter_tags;int fb_filter_tag_count;
 hashtable fb_shader_tags,fb_shader_previews,fb_shader_loose;

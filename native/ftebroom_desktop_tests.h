@@ -82,6 +82,52 @@ static void testDesktop(){
       uiTheme=3;uiStyle();preferencesRequest=false;firstSetupStep=-1;setupNeeded=false;ImGui::ClosePopupsOverWindow(nullptr,false);softLightGallery=true;frame();frame();
     }
   }
+  if(std::string_view(mode).rfind("rb123",0)==0){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;selectEntityTab=true;
+    if(std::string_view(mode)=="rb123prepare"){
+      buildWindow=false;
+      ImGui::ClosePopupsOverWindow(nullptr,false);
+      command("ftebroom_deselect\n");
+      expect(cvars->GetFloat("ftebroom_entity_links")==3,"rb123_entity_links_default_all");
+      return;
+    }
+    frame();frame();
+    auto* entity=ImGui::FindWindowByName("Entity");
+    const bool propertiesOpen=entity&&entity->StateStorage.GetInt(entity->GetID("Properties"),0)!=0;
+    if(std::string_view(mode)=="rb123unselected"){
+      expect(!propertiesOpen,"rb123_no_selection_collapses_properties");
+      command("ftebroom_entity_select_class info_player_start\n");
+    }else if(std::string_view(mode)=="rb123entity"){
+      expect(propertiesOpen&&cvars->GetFloat("ftebroom_entity_selection_count")>0,
+             "rb123_entity_selection_opens_properties");
+      bool fitted=false;
+      for(auto* window:ImGui::GetCurrentContext()->Windows)
+        if(window->Active&&std::strstr(window->Name,"/Property list_"))
+          fitted=(window->ChildFlags&ImGuiChildFlags_AutoResizeY)&&window->ScrollMax.y<=1 &&
+                 window->Size.y>=ImGui::GetTextLineHeight()*2;
+      expect(fitted,"rb123_property_table_fits_rows");
+      command("ftebroom_deselect\n");
+    }else if(std::string_view(mode)=="rb123deselect"){
+      expect(!propertiesOpen,"rb123_deselect_collapses_properties");
+      command("ftebroom_select all\n");
+    }else if(std::string_view(mode)=="rb123brush"){
+      expect(propertiesOpen&&cvars->GetFloat("ftebroom_selection_count")>0,
+             "rb123_brush_selection_opens_properties");
+      command("ftebroom_entity_create light 0 \"-120 0 56\"\n"
+              "ftebroom_entity_property set targetname rb123_destination\n"
+              "ftebroom_entity_create light 0 \"120 0 56\"\n"
+              "ftebroom_entity_property set target rb123_destination\n"
+              "ftebroom_deselect\n");
+    }else if(std::string_view(mode)=="rb123model"){
+      expect(!propertiesOpen&&cvars->GetFloat("ftebroom_entity_selection_count")==0,
+             "rb123_links_scene_is_deselected");
+      modelEditorShow("progs/player.mdl");
+    }else if(std::string_view(mode)=="rb123modelcheck"){
+      expect(bbActive&&!bbProject.root["elements"].empty()&&bbProject.path.empty()&&!bbNativeImport,
+             "rb123_native_open_routes_to_authoring");
+    }
+    return;
+  }
   if(std::string(mode)=="bb121open"){
     recentWindow=false;setupNeeded=false;firstSetupStep=-1;gameProfile=2;q1UseLibre=false;std::snprintf(q1Mod,sizeof q1Mod,"%s",root);
     auto p=bb::makeTemplate(1,"monster",2);bb::textureTemplate(p,"skin.png",16,true,0,true,true);bbActivate(std::move(p));bbMode=0;bbSavedStamp=~uint64_t(0);frame();frame();expect(bbAPI()!=nullptr,"bb121_dynamic_mesh_interface");expect(bbTriangles.size()==72,"bb121_template_six_cubes");

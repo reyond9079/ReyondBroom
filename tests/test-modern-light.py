@@ -6,7 +6,7 @@ Supply an existing runtime ZIP/tar.gz and the module built from this checkout.
 """
 import argparse, pathlib, re, shutil, subprocess, zipfile, tarfile, os, time, ctypes
 from PIL import Image
-p=argparse.ArgumentParser();p.add_argument('--archive',type=pathlib.Path,required=True);p.add_argument('--plugin',type=pathlib.Path,required=True);p.add_argument('--output',type=pathlib.Path,required=True);p.add_argument('--mod',type=pathlib.Path,required=True);p.add_argument('--benchmark',action='store_true');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--archive',type=pathlib.Path,required=True);p.add_argument('--plugin',type=pathlib.Path,required=True);p.add_argument('--output',type=pathlib.Path,required=True);p.add_argument('--mod',type=pathlib.Path,required=True);p.add_argument('--csqc',type=pathlib.Path);p.add_argument('--benchmark',action='store_true');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
 if a.archive.suffix=='.zip':
  with zipfile.ZipFile(a.archive) as z:z.extractall(out)
@@ -14,6 +14,7 @@ else:
  with tarfile.open(a.archive) as t:t.extractall(out,filter='data')
 root=next(p for p in out.iterdir() if p.is_dir());windows=os.name=='nt'
 shutil.copy2(a.plugin,root/('fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so'))
+if a.csqc:shutil.copy2(a.csqc,root/'ftebroom/csaddon.dat')
 mod=out/'qa-mod';shutil.copytree(a.mod,mod)
 cfg='exec ftebroom.cfg\nset ftebroom_skip_setup 1\nset cl_maxfps 1000\nset cl_idlefps 0\nset vid_vsync 0\nset ftebroom_test_import_root "'+mod.as_posix()+'"\nin 12 ftebroom_test_desktop external69load\n'
 if a.benchmark:
@@ -22,7 +23,14 @@ else:
  cfg+='in 20 ftebroom_test_desktop soft122open\nin 24 ftebroom_test_desktop soft122check\nin 26 screenshot soft-main.png\n'
  for start,mode,name in [(28,'horizontal','horizontal'),(33,'scale','scale'),(38,'prefs','preferences'),(43,'setup','setup'),(48,'generator','generator'),(53,'gallery','controls')]:
   cfg+=f'in {start} ftebroom_test_desktop soft122{mode}\nin {start+3} screenshot soft-{name}.png\n'
- cfg+='in 59 ftebroom_test_desktop soft122files\nin 62 screenshot soft-files.png\nin 64 ftebroom_test_desktop soft122build\nin 67 screenshot soft-build.png\nin 70 quit force\n';images=['soft-'+s for s in ['main','horizontal','scale','preferences','setup','generator','controls','files','build']]
+ cfg+='in 59 ftebroom_test_desktop soft122files\nin 62 screenshot soft-files.png\nin 64 ftebroom_test_desktop soft122build\nin 67 screenshot soft-build.png\n';images=['soft-'+s for s in ['main','horizontal','scale','preferences','setup','generator','controls','files','build']]
+ if a.csqc:
+  for index,mode in enumerate(('prepare','unselected','entity','deselect','brush','model','modelcheck')):
+   cfg+=f'in {69+index*3} ftebroom_test_desktop rb123{mode}\n'
+  cfg+='in 74 screenshot soft-properties.png\nin 83 screenshot soft-links.png\nin 89 screenshot soft-model.png\nin 92 quit force\n'
+  images+=['soft-properties','soft-links','soft-model']
+ else:
+  cfg+='in 70 quit force\n'
 (root/'ftebroom/qa-light.cfg').write_text(cfg,encoding='utf-8')
 engine=root/('bin/fteqw64.exe' if windows else 'fteqw-gl64')
 command=[str(engine),'-ftebroom-child-processes','-nohome','-noupdates','-nosound','-window','-width','1920','-height','1080','-condebug','-basedir',str(root),'+exec','qa-light.cfg']
@@ -48,6 +56,8 @@ for line in log.splitlines():
 assert run.returncode==0 and 'DESKTOP_FAIL' not in log and 'CSQC_Abort' not in log,log[-9000:]
 if not a.benchmark:
  for item in ['style_stacks_balanced','existing_id_and_scaled_style','existing_multilingual_fonts','saved_theme_compatibility','compact_entity_default_and_margins','footer_inside_panel','advanced_search_opens','advanced_search_closes','definitions_footer_opens','workspace_gutter_excludes_viewport_input','dock_resize_preserves_gutter','reference_tool_rail','rail_options_open']:assert 'PASS soft122_'+item in log,item
+ if a.csqc:
+  for item in ['entity_links_default_all','no_selection_collapses_properties','entity_selection_opens_properties','property_table_fits_rows','deselect_collapses_properties','brush_selection_opens_properties','links_scene_is_deselected','native_open_routes_to_authoring']:assert 'PASS rb123_'+item in log,item
 for name in images:
  file=root/'ftebroom'/(name+'.png');image=Image.open(file).convert('RGB');image.thumbnail((192,108));assert sum(max(c)>30 for c in image.getdata())>4000,name
  shutil.copy2(file,out/(name+'.png'))

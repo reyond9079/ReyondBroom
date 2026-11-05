@@ -3,7 +3,8 @@
 #include "ftebroom_bb_render.h"
 static void modelViewerLoad(const std::string &path);
 static bool bbActive = false;
-static void bbConvertNative(const std::string &source);
+static void bbConvertNative(const std::string &source,bool fromInspector=true);
+static void bbOpenNative(const std::string &source);
 static void bbPanel();
 static std::string modelDropText(const std::filesystem::path &path, float x, float y);
 static void bbReleaseImages();

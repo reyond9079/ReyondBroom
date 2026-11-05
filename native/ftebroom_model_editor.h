@@ -89,12 +89,17 @@ static void modelEditBounds(){
 }
 static ModelEditV modelEditPivot(){return modelEditWorld(modelEditSelected).point(modelEditNodes[modelEditSelected].pivot);}
 static void modelEditMoveTo(ModelEditV target){auto& n=modelEditNodes[modelEditSelected];auto p=ftebroom::modelEdit::inverse(modelEditWorld(n.parent)).point(target);for(int a=0;a<3;a++)n.position[a]=p[a]-n.pivot[a];modelEditChanged=modelEditDirty=true;}
-static void modelEditorShow(const std::string& path){
-  if(entityLower(std::filesystem::u8path(path).extension().u8string())==".bbmodel"){bbOpen(path);return;}
-  if(bbActive){bbLeave([path]{bbReleaseImages();if(auto api=bbAPI())api->clear();bbActive=false;cvars->SetFloat("ftebroom_bb_active",0);modelEditorShow(path);});return;}
+static void modelNativeInspectorShow(const std::string& path){
+  if(bbActive){bbLeave([path]{bbReleaseImages();if(auto api=bbAPI())api->clear();bbActive=false;cvars->SetFloat("ftebroom_bb_active",0);modelNativeInspectorShow(path);});return;}
   modelEditorCameraEnd();modelViewerLoad(path);modelEditorActive=true;modelEditLoaded=false;modelEditNodes.clear();modelEditChanged=true;modelEditDirty=false;modelEditSelected=0;modelEditDrag=-1;modelEditMessage.clear();
   auto name=entityLower(std::filesystem::u8path(path).filename().u8string());modelEditPlayer=name.rfind("v_",0)==0;
   modelEditCameraFree=false;cvars->SetFloat("ftebroom_modeleditor_freecamera",0);modelEditDisplay=0;modelEditTool=0;cvars->SetFloat("ftebroom_modeleditor_meshes",0);cvars->SetFloat("ftebroom_modeleditor_active",1);cvars->SetFloat("ftebroom_modeleditor_count",0);
+}
+static void modelEditorShow(const std::string& path){
+  const auto file=std::filesystem::u8path(path);
+  if(entityLower(file.extension().u8string())==".bbmodel")bbOpen(path);
+  else if(modelFile(file))bbOpenNative(path);
+  else modelNativeInspectorShow(path);
 }
 static void modelEditLoad(){
   int count=std::clamp(int(cvars->GetFloat("ftebroom_modeleditor_meshes")),0,256);if(modelEditLoaded||!count)return;

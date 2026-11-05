@@ -250,6 +250,35 @@ static void modFilesTree(const std::filesystem::path& folder,std::filesystem::pa
     }
   }catch(const std::exception& e){ImGui::TextDisabled("%s",e.what());}
 }
+static bool modFileNavigationButton(bool up) {
+  const float height=ImGui::GetFrameHeight(),size=height*.64f;
+  const bool clicked=ImGui::Button(up?"##folder-up":"##folder-refresh",{height,height});
+  const auto min=ImGui::GetItemRectMin();
+  const ImVec2 center{min.x+height*.5f,min.y+height*.5f};
+  auto* list=ImGui::GetWindowDrawList();
+  const auto color=ImGui::GetColorU32(ImGuiCol_Text);
+  const float stroke=1.4f*uiScale();
+  if(up) {
+    list->AddLine({center.x,center.y+size*.40f},{center.x,center.y-size*.40f},color,stroke);
+    list->PathLineTo({center.x-size*.32f,center.y-size*.07f});
+    list->PathLineTo({center.x,center.y-size*.40f});
+    list->PathLineTo({center.x+size*.32f,center.y-size*.07f});
+    list->PathStroke(color,0,stroke);
+  } else {
+    list->PathArcTo(center,size*.39f,.18f,5.46f,18);
+    list->PathStroke(color,0,stroke);
+    list->PathLineTo({center.x+size*.33f,center.y-size*.43f});
+    list->PathLineTo({center.x+size*.33f,center.y-size*.10f});
+    list->PathLineTo({center.x+size*.02f,center.y-size*.16f});
+    list->PathStroke(color,0,stroke);
+  }
+  if(ImGui::IsItemHovered()){
+    const char* label=up?"Up":"Refresh";const char* end=nullptr;
+    FteBroomTranslate(label,end);
+    ImGui::SetTooltip("%.*s",end?int(end-label):int(std::strlen(label)),label);
+  }
+  return clicked;
+}
 static void modFilesPanel() {
   if(modFilesImageRefresh){clearFileImages();modFilesImageRefresh=false;}
   fileImagePump();
@@ -274,8 +303,8 @@ static void modFilesPanel() {
         ~HeaderSpacing(){restore();}
       } headerSpacing(ImGui::GetCurrentWindow()->DockIsActive&&sz.x>sz.y*1.6f);
       bool compact=headerSpacing.active;
-      if(ImGui::Button("Up")&&modFilesFolder!=root){modFilesFolder=modFilesFolder.parent_path();modFilesRefresh=true;}modFilesTarget(modFilesFolder.parent_path());
-      ImGui::SameLine();if(ImGui::Button("Refresh"))modFilesRefresh=true;ImGui::SameLine();if(ImGui::Button("Open in file manager"))modFilesExplorer();
+      if(modFileNavigationButton(true)&&modFilesFolder!=root){modFilesFolder=modFilesFolder.parent_path();modFilesRefresh=true;}modFilesTarget(modFilesFolder.parent_path());
+      ImGui::SameLine();if(modFileNavigationButton(false))modFilesRefresh=true;ImGui::SameLine();if(ImGui::Button("Open in file manager"))modFilesExplorer();
       ImGui::SameLine();ImGui::Checkbox("Thumbnail view",&modFilesGrid);static float tileSize=72;
       if(modFilesGrid){ImGui::SameLine();ImGui::SetNextItemWidth(180);ImGui::SliderFloat("Thumbnail size",&tileSize,48,180,"%.0f");}
       if(compact){ImGui::SameLine();if(ImGui::Button("New..."))ImGui::OpenPopup("Create mod file");}
@@ -330,6 +359,7 @@ static void modFilesPanel() {
           if(!directory&&entityLower(path.extension().u8string())==".lmp"&&ImGui::MenuItem("Open LMP viewer"))lmpShow(path);
           if(directory&&!wadBrowseFolder(path)&&ImGui::MenuItem("New WAD..."))newWadShow(path);
           if(!directory&&modelViewableFile(path)&&ImGui::MenuItem("Open in model editor"))modelEditorShow(modFileModelPath(path));
+          if(!directory&&modelFile(path)&&ImGui::MenuItem("Open native model inspector"))modelNativeInspectorShow(modFileModelPath(path));
           if(directory&&ImGui::MenuItem("New model here"))bbNew(path);
           if(!directory&&modelFile(path)&&ImGui::MenuItem("Convert..."))modelConverterShow(modFileModelPath(path));
           if(ImGui::MenuItem("Copy")){modFilesClipboard=path;modFilesCut=false;}

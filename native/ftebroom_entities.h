@@ -280,7 +280,7 @@ static void testQCBridge()
 }
 static void entitySoundPreview()
 {
-  if(!ImGui::CollapsingHeader("Sound preview"))return;
+  if(!uiInspectorFold("Sound preview",0))return;
   static char manual[1024]={};std::string candidate;
   for(const auto& entity:entityProperties) {
     for(const char* key:{"noise","sound","soundfile","noise1"}) {auto it=entity.second.find(key);if(it!=entity.second.end()&&!it->second.empty()){candidate=it->second;break;}}
@@ -346,23 +346,37 @@ static void entityPanel()
 {
   entityPropertyFocused = false;
   entitySelectionLoad();
+  entityPropertyFocused=false;
   cvars->SetString("ftebroom_entity_ghost", "");
   if (selectEntityTab)
     ImGui::SetNextWindowFocus();
   if (uiSoftPanelBegin("Entity",nullptr,uiPanelFlags()))
   {
-    static float propertiesHeight=210;uiInspectorTopBegin("Entity properties",propertiesHeight);
+    static bool hadSelection=false;
+    static int lastSelectionEpoch=-1,lastMapEpoch=-1;
+    const bool hasSelection=cvars->GetFloat("ftebroom_selection_count")>0 ||
+      cvars->GetFloat("ftebroom_entity_selection_count")>0;
+    if(hasSelection!=hadSelection || organizationMapEpoch!=lastMapEpoch ||
+       (hasSelection&&entitySelectionEpoch!=lastSelectionEpoch))
+      ImGui::SetNextItemOpen(hasSelection,ImGuiCond_Always);
+    hadSelection=hasSelection;
+    lastSelectionEpoch=entitySelectionEpoch;
+    lastMapEpoch=organizationMapEpoch;
     if(cvars->GetFloat("ftebroom_skip_setup")&&cvars->GetFloat("ftebroom_test_model_previews"))ImGui::SetNextItemOpen(false);
-    if (uiInspectorFold("Properties",ImGuiTreeNodeFlags_DefaultOpen))
+    if (uiInspectorFold("Properties",0))
     {
+      const float maxHeight=std::max(32.f,ImGui::GetContentRegionAvail().y-148*uiScale());
+      ImGui::SetNextWindowSizeConstraints({0,0},{FLT_MAX,maxHeight});
+      ImGui::BeginChild("Entity properties",{0,0},ImGuiChildFlags_AutoResizeY|ImGuiChildFlags_AlwaysAutoResize);
       ImGui::Text(
         "Editing %u entit%s",
         (unsigned)entityProperties.size(),
         entityProperties.size() == 1 ? "y" : "ies");
       entityPropertyTable();
       entitySoundPreview();
+      ImGui::EndChild();
     }
-    uiInspectorTopEnd("Entity browser divider",propertiesHeight);
+    ImGui::Separator();
     if (uiInspectorFold("Entity browser",ImGuiTreeNodeFlags_DefaultOpen))
     {
       static char filter[256]{};

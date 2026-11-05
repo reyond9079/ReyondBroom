@@ -23,19 +23,16 @@ static std::set<std::string> protectedPropertyKeys(const std::map<std::string,st
 static void entityPropertyTable()
 {
   const bool linked=entitySelectionLinked;
-  static bool showDefaults = true;
-  ImGui::Checkbox("Show default properties", &showDefaults);
   static std::map<std::string, ftebroom::EntityProperty> definitions;
   static std::set<std::string> keys;
   static std::vector<PropertyRow> rows;
   static std::vector<int> now;
   static std::map<std::string, unsigned> protectedCounts;
   static int selectionEpoch=-2, definitionsEpoch=-2, mapEpoch=-2;
-  static bool defaults=false;
   // Aggregation depends on the published data, not the frame rate or camera.
-  if(selectionEpoch!=entitySelectionEpoch || definitionsEpoch!=entityDefinitionEpoch || mapEpoch!=organizationMapEpoch || defaults!=showDefaults)
+  if(selectionEpoch!=entitySelectionEpoch || definitionsEpoch!=entityDefinitionEpoch || mapEpoch!=organizationMapEpoch)
   {
-    selectionEpoch=entitySelectionEpoch;definitionsEpoch=entityDefinitionEpoch;mapEpoch=organizationMapEpoch;defaults=showDefaults;
+    selectionEpoch=entitySelectionEpoch;definitionsEpoch=entityDefinitionEpoch;mapEpoch=organizationMapEpoch;
     definitions.clear();keys.clear();rows.clear();now.clear();protectedCounts.clear();
     std::set<std::string> classes;
   for (const auto& entity : entityProperties)
@@ -83,8 +80,7 @@ static void entityPropertyTable()
         row.mixed |= row.value != value;
       row.internal |= key == "model" && !value.empty() && value[0] == '*';
     }
-    if (row.explicitValue || showDefaults)
-      rows.push_back(row);
+    rows.push_back(row);
   }
   std::stable_sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
     return a.explicitValue > b.explicitValue;
@@ -149,8 +145,8 @@ static void entityPropertyTable()
   };
   ImGui::BeginChild(
     "Property list",
-    {0, 260 * uiScale()},
-    ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
+    {0, 0},
+    ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize);
   if (
     editing.empty() && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)
     && !ImGui::IsAnyItemActive())

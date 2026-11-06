@@ -42,3 +42,9 @@ xvfb-run -a -s '-screen 0 2560x1800x24' python scripts/test-compilation-runtime.
 The runner owns and clears profile state in that disposable runtime. Artifacts include logs, JSON results, actual editor screenshots and measured control geometry at 800×600 / 1200×800 in light/dark themes and 100/150/200% editor scaling. Screenshot dimensions are recorded honestly when a display constrains the requested window size.
 
 The `Compilation profile parity` workflow builds and runs Windows x64, native Linux and Linux SDL2. It does not publish a release. Acceptance coverage, manual comparisons and remaining differences are reported separately from build success.
+
+For an OS-input-only Windows reproduction, dispatch the same workflow with
+`prepared_run_id` set to a run containing `compilation-Windows-editor`. It verifies
+that native, CSQC and probe sources match the artifact before reusing those binaries.
+This allows changing the OS input driver without rebuilding unchanged C++ each time.
+The reproduction has a separate concurrency group and does not cancel the full run.

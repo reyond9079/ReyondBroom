@@ -22,7 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build and QA tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libx11-dev zlib1g-dev xvfb xauth
+        run: |
+          if command -v g++ && command -v cmake && command -v Xvfb && command -v xauth && test -f /usr/include/X11/Xlib.h && test -f /usr/include/zlib.h; then
+            echo "Build and QA prerequisites are already present in the runner image."
+          else
+            sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
+            sudo timeout 180s apt-get install -y build-essential cmake libx11-dev zlib1g-dev xvfb xauth
+          fi
       - name: Fetch and verify base release
         run: |
           mkdir base deps

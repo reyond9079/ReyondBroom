@@ -35,7 +35,7 @@ def wait_for(fn,timeout=10):
   time.sleep(.1)
  raise AssertionError('Timed out waiting for editor state')
 def live():return json.loads((data/'compilation-ui-live.json').read_text())
-def profiles():return json.loads(store.read_text())['games']['quake3']['profiles']
+def profiles():return json.loads(store.read_text())['games'][live()['game']]['profiles']
 def expect(value,name):
  assert value,name
  checks.append(name);(out/'ui-results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
@@ -157,7 +157,7 @@ try:
  click('compile');wait_for(lambda:live()['running']);click('close');click('close-confirm-yes');wait_for(lambda:not live()['running'] and not live()['compileOpen']);expect(True,'Close Yes stops process and closes dialog')
  click('menu/Run');click('Menu/Run/Compile...');wait_for(lambda:live()['compileOpen'])
  click('launch');click('launch-configure');click('engine-add');edit('Engine name','Probe engine');edit('Engine path',str(probe).replace('\\','/'));click('engine-close')
- wait_for(lambda:len(json.loads(store.read_text())['games']['quake3']['engines'])==1)
+ wait_for(lambda:len(json.loads(store.read_text())['games'][live()['game']]['engines'])==1)
  click('launch-engine/0');edit('Launch parameters','write ui-detached.txt launched');marker=probe.parent/'ui-detached.txt';marker.unlink(missing_ok=True);click('engine-launch');wait_for(lambda:marker.is_file());expect(marker.read_text()=='launched','Launch dialog preserves edited arguments and engine working directory');click('launch-close')
  before=store.read_bytes();click('import');edit('import-path',str(repo/'tests/fixtures/CompilationProfiles-original.cfg').replace('\\','/'));click('import-review');click('import-cancel');expect(store.read_bytes()==before,'review and Cancel do not change profiles')
  click('import');click('import-review');click('import-commit');expect(len(profiles())==6 and sum(len(x['tasks']) for x in profiles()[1:])==70,'UI imports original five profiles and seventy tasks')

@@ -20,7 +20,7 @@ Usage, DSP parameters, project/resource semantics and precise runtime limits:
 | A12–A13 | Real two-pass loudnorm; measured output −16.05 LUFS, −15.33 dBTP on the test tone; silence, stationary-noise reduction, five voice filters, Enhance and bypass checks |
 | A14 | Native capture device enumeration, countdown, queue polling, stop/drain and recording import/file insertion; Linux SDL dummy device tests, not a physical microphone |
 | A15 | Mix and 10-second In/Out export; WAV/OGG/MP3/FLAC reopened at 48 kHz mono; 16-bit WAV differs from the preview graph by less than one LSB; cancellation leaves target intact |
-| A16–A17 | Project roundtrip, recovery snapshot, failed-load retention, resource update and reopen using immutable snapshots, backup, roots/external-change/export-over-source guards, PAK neighbor preservation; legacy audio36/sound93/sound94 checks |
+| A16–A17 | Project roundtrip, recovery snapshot, project-local clipboard reset, failed-load retention, resource update and reopen using immutable snapshots, backup, roots/external-change/export-over-source guards, PAK neighbor preservation; legacy audio36/sound93/sound94 checks |
 | A18 | Approved 71-action catalog, engine chord resolution, Ctrl+B through real engine events, independent undo, text/outside focus and timeline mouse interception; shortcuts modal and context actions |
 
 ## Reproduction
@@ -53,6 +53,18 @@ cancellation is tested both before export and after a child has launched.
 
 ## Screenshots and records
 
+| View | Native capture |
+| --- | --- |
+| Basic, 1920×1080 | [Open](screenshots/basic.png) |
+| Compact, 1280×800 | [Open](screenshots/compact.png) |
+| Voice / Speed | [Voice](screenshots/voice.png) / [Speed](screenshots/speed.png) |
+| Export / Record / Shortcut | [Export](screenshots/export.png) / [Record](screenshots/record.png) / [Shortcut](screenshots/shortcuts.png) |
+| Light / Retro | [Light](screenshots/light.png) / [Retro](screenshots/retro.png) |
+| Native scale 150% / 200% | [150%](screenshots/scale150.png) / [200%](screenshots/scale200.png) |
+
+[Machine-readable validation](validation.json), [native checks](logs/native.log),
+[legacy checks](logs/legacy.log), [DSP/model/capture checks](logs/core-tests.log).
+
 Native screenshots and logs are stored alongside this document. Screens include
 1920×1080 and 1280×800, Basic/Voice changer/Speed, Export, Record, Shortcut,
 Modern Light, Retro Dark, and native scale 150%/200% at 1920×1200/2560×1600.
@@ -74,5 +86,9 @@ Inspector/library/timeline scroll independently when content exceeds the viewpor
 
 Windows CI compiles the actual native module and runs the same graph/DSP tests
 against the rebuilt, file-only bundled converter. See `audio-editor-checks.yml`
-for pinned corresponding sources and uploaded QA artifacts. Final run status is
-recorded in the task/PR and validation records after completion.
+for pinned corresponding sources and uploaded QA artifacts. The final run for runtime commit `cec617f30f021f415e847bc64a7798eef59d2853`
+[passed](https://github.com/reyond9079/ReyondBroom/actions/runs/42239350372).
+It builds the real Windows module and tests the rebuilt converter, including
+four codecs, 0.25–4× pitch-preserving speed, normalization, cancellation, quoted
+Unicode converter paths and multichannel rejection. [Windows results](logs/windows.log).
+The subsequent evidence commit changes only QA documentation, screenshots and logs.

@@ -1462,7 +1462,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    dispatchAction(key, down, inScene);
+    if (!soundKeyboardEvent(key, down)) dispatchAction(key, down, inScene);
   }
   return qtrue;
 }
@@ -1922,7 +1922,9 @@ static void shutdownEditor()
   settleCancel=true;if(settleJob.valid())settleJob.wait();
   textureFolderCancel=true;if(textureFolderJob.valid())textureFolderJob.wait();
   soundStop();
-  if(soundJob.valid())soundJob.wait();
+  if(soundState.control)soundState.control->cancel=true;
+  soundState.capture.end();
+  if(soundState.job.valid())soundState.job.wait();
   desktopDetach();
   modEmbedEnd();
   if(runActive)runStop();

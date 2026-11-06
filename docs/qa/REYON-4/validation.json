@@ -1,0 +1,41 @@
+{
+  "dateUTC": "2026-11-06",
+  "nativeUICommit": "cec617f30f021f415e847bc64a7798eef59d2853",
+  "latestModelOptimization": "8f49b47",
+  "nativeEngine": "official alpha124 Linux x64",
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "ffmpeg": "ffmpeg version 7.1.5-0+deb13u1 Copyright (c) 2000-2026 the FFmpeg developers",
+  "normalizationMeasured": {
+    "integratedLUFS": -16.05,
+    "truePeakDbTP": -15.33
+  },
+  "previewVs16BitWavMaxDifference": "less than 1/30000 full scale",
+  "capturedFteOutput": {
+    "leftHz": 440,
+    "rightHz": 660,
+    "peak": 0.171142578125,
+    "leftRMS": 0.10744188378728085,
+    "rightRMS": 0.10745271622322793,
+    "routing": "FTE RawAudio -> PulseAudio null sink -> monitor -> FFmpeg PCM capture",
+    "physicalDeviceTest": false
+  },
+  "captureTest": "SDL2 synthetic dummy, countdown -> capture -> inserted WAV clip",
+  "windowsPassedRun": "https://github.com/reyond9079/ReyondBroom/actions/runs/42239350372",
+  "latestWindowsRun": "https://github.com/reyond9079/ReyondBroom/actions/runs/42239350372",
+  "sanitizers": "ASan+UBSan model pass",
+  "limits": [
+    "No physical microphone/output hardware test",
+    "No Windows interactive UI test",
+    "Queue-clock playhead estimate; RawAudio has no consumed-frame query",
+    "Per-clip analysis can introduce new filter boundary transients",
+    "Source update reencodes, loop/cue metadata not preserved"
+  ],
+  "runtimeCodeCommit": "cec617f30f021f415e847bc64a7798eef59d2853",
+  "nativeChecksPassed": 38,
+  "projectClipboardLoadCheck": "pass",
+  "surroundImport": "rejected before project commit",
+  "windowsFinalConclusion": "success",
+  "checkedUTC": "2026-11-06T15:11:54.318459+00:00",
+  "linuxModuleSHA256": "f666752ba34b4ffedccca4d9d4610288aac5c6ac51fc3a6e07c2382aa9935139",
+  "legacyRegressionCommit": "cec617f30f021f415e847bc64a7798eef59d2853"
+}

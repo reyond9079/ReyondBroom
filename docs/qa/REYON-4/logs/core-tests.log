@@ -1,0 +1,5 @@
+PASS grouped lock/linkage, ripple interval union, magnet, dB automation, trim, visibility and output overload protection
+PASS split identity, move, history, JSON validation, mute/solo, fades and locked-track protection
+PASS 440/880 Hz pitch modes, shared preview/export (<1 LSB), normalization "-16.05" LUFS / "-15.33" dBTP
+PASS four codecs, 48k mono range, cancellation preserves target, running-child cancellation, silent normalization, noise reduction, five voice filters and bypass
+PASS capture API queue, device selection and stop, 5120 frames (synthetic dummy device, not a physical microphone)

@@ -9,6 +9,7 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+#include "ftebroom_sound_tests.h"
   if(std::string_view(mode)=="inspect125map"||std::string_view(mode)=="inspect125face"){
     auto click=[&](const char* key){
       const auto p=fileBrowserTestItems.at(key);

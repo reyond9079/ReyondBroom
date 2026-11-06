@@ -1,0 +1,77 @@
+name: Audio editor checks
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/REYON-4-audio-editor]
+  pull_request:
+    paths: ['native/ftebroom*audio*', 'native/ftebroom_sound*', 'tests/audio*', 'scripts/*audio*', '.github/workflows/audio-editor-checks.yml']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-pkgconf git curl diffutils tar make
+      - name: Fetch verified converter source from the base release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force converter-base,audio-deps | Out-Null
+          gh release download v0.5.0-alpha.124 --repo $env:GITHUB_REPOSITORY --dir converter-base --pattern '*-Windows-x64-Sources.zip' --pattern '*-Windows-x64-Sources.zip.sha256'
+          if ($LASTEXITCODE -ne 0) { throw 'Converter source download failed' }
+          $archive = (Get-ChildItem converter-base/*-Sources.zip).FullName
+          $expected = ((Get-Content converter-base/*-Sources.zip.sha256) -split '\s+')[0]
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Converter source checksum mismatch' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
+          try {
+            $entry = $zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz')
+            if (!$entry) { throw 'Pinned FFmpeg source missing from base sources' }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true)
+          } finally { $zip.Dispose() }
+      - name: Build the isolated float/DSP converter from pinned sources
+        shell: msys2 {0}
+        run: scripts/build-audio.sh "$PWD/audio-deps"
+      - name: Validate graph and real DSP using the bundled converter
+        shell: msys2 {0}
+        run: scripts/test-audio-core.sh "$PWD/audio-qa" "$(cygpath -m "$PWD/tools/audio/ffmpeg.exe")"
+      - name: Fetch pinned native dependencies
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force deps | Out-Null
+          gh release download v0.5.0-alpha.124 --repo $env:GITHUB_REPOSITORY --dir deps --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency download failed' }
+          $archive = (Get-ChildItem deps/*-Sources.zip).FullName
+          $expected = ((Get-Content deps/*-Sources.zip.sha256) -split '\s+')[0]
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Dependency checksum mismatch' }
+          Expand-Archive $archive deps/base
+          foreach ($name in @('bullet','fteqw','imgui')) { Expand-Archive "deps/base/sources/$name-source.zip" "deps/$name" }
+      - name: Compile the actual Windows native editor module
+        shell: msys2 {0}
+        run: |
+          cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
+          cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
+          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audio-windows-qa
+          path: |
+            audio-qa/
+            audio-deps/ffmpeg-8.0.1/ffbuild/config.log
+            audio-deps/lame-source/config.log
+            tools/audio/ffmpeg.exe
+            tools/audio/*LICENSE*
+            tools/audio/*LGPL*
+            tools/audio/*source*

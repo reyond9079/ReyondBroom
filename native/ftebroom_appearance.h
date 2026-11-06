@@ -157,7 +157,7 @@ static void uiReachableWindows(){
   auto display=ImGui::GetIO().DisplaySize;float margin=12*uiScale(),top=ImGui::GetFrameHeight()+margin;
   for(auto window:ImGui::GetCurrentContext()->Windows){
     if(!window->Active||window->DockIsActive||window->DockNode||window->Flags&(ImGuiWindowFlags_ChildWindow|ImGuiWindowFlags_Tooltip)||(window->Flags&ImGuiWindowFlags_NoDecoration)==ImGuiWindowFlags_NoDecoration)continue;
-    std::string name=window->Name;if(name=="First-time setup"||name=="Tools"||name=="Map"||name=="Face"||name=="Entity"||name=="FTE Engine terrain")continue;
+    std::string name=window->Name;if(name=="First-time setup"||name=="Sound editor"||name=="Tools"||name=="Map"||name=="Face"||name=="Entity"||name=="FTE Engine terrain")continue;
     ImVec2 size=window->SizeFull;
     if(window->Appearing){auto ideal=ImGui::CalcWindowNextAutoFitSize(window);size.x=std::max(size.x,ideal.x);size.y=std::max(size.y,ideal.y);ImGui::SetWindowCollapsed(window,false,ImGuiCond_Always);}
     size.x=std::clamp(size.x,std::min(280.f,display.x-2*margin),std::max(1.f,display.x-2*margin));

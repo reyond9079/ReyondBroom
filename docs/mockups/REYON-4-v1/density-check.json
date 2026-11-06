@@ -1,0 +1,34 @@
+[
+  {
+    "logicalViewport": [
+      1280,
+      800
+    ],
+    "deviceScaleFactor": 1.5,
+    "pixelSize": [
+      1920,
+      1200
+    ],
+    "inspectorScroll": {
+      "top": 173,
+      "height": 315,
+      "total": 488
+    }
+  },
+  {
+    "logicalViewport": [
+      1280,
+      800
+    ],
+    "deviceScaleFactor": 2,
+    "pixelSize": [
+      2560,
+      1600
+    ],
+    "inspectorScroll": {
+      "top": 173,
+      "height": 315,
+      "total": 488
+    }
+  }
+]

@@ -1,0 +1,72 @@
+action_id,label,platform,context,primary,secondary,repeat,status,source,behavior
+transport.play,Play / Pause,Windows/Linux,audio-player,Space,,no,reference,R2,Pause keeps cursor; Play resumes
+transport.stop,Stop,Windows/Linux,audio-player,,,no,proposal,Proposal v1,Return to start of active range
+transport.left,Previous audio step,Windows/Linux,audio-timeline,Left,,no,reference+adaptation,R2,Move cursor -10 ms; R2 frame-based original; audio step proposed
+transport.right,Next audio step,Windows/Linux,audio-timeline,Right,,no,reference+adaptation,R2,Move cursor +10 ms; audio step proposed
+transport.leftLarge,Previous large step,Windows/Linux,audio-timeline,Shift+Left,,no,proposal,Proposal v1,Move cursor -100 ms
+transport.rightLarge,Next large step,Windows/Linux,audio-timeline,Shift+Right,,no,proposal,Proposal v1,Move cursor +100 ms
+transport.previousCut,Previous cut,Windows/Linux,audio-timeline,Up,,no,proposal,Proposal v1,Previous visible clip boundary
+transport.nextCut,Next cut,Windows/Linux,audio-timeline,Down,,no,proposal,Proposal v1,Next visible clip boundary
+transport.home,Project start,Windows/Linux,audio-timeline,Home,,no,proposal,Proposal v1,Cursor to zero
+transport.end,Project end,Windows/Linux,audio-timeline,End,,no,proposal,Proposal v1,Cursor to project duration
+tool.select,Select tool,Windows/Linux,audio-timeline,A,,no,proposal,Proposal v1,Select and move unlocked clips
+tool.split,Split tool,Windows/Linux,audio-timeline,B,,no,proposal,Proposal v1,Click a clip to split at pointer
+clip.split,Split selected,Windows/Linux,audio-timeline,Ctrl+B,,no,reference,R2,Split selected unlocked clips at playhead
+clip.splitAll,Split all,Windows/Linux,audio-timeline,Ctrl+Shift+B,,no,proposal,Proposal v1,Split all unlocked tracks at playhead
+clip.trimLeft,Trim left,Windows/Linux,audio-timeline,Q,,no,proposal,Proposal v1,Trim selected clips up to playhead; do not extend clips
+clip.trimRight,Trim right,Windows/Linux,audio-timeline,W,,no,proposal,Proposal v1,Trim selected clips after playhead; do not extend clips
+clip.delete,Delete clips,Windows/Linux,audio-timeline,Delete,,no,proposal,Proposal v1,Remove selection; ripple only if enabled
+clip.rippleDelete,Ripple delete,Windows/Linux,audio-timeline,Shift+Delete,,no,proposal,Proposal v1,Remove selected span and close gap on affected unlocked tracks
+edit.undo,Undo,Windows/Linux,audio-focused,Ctrl+Z,,no,proposal,Proposal v1,Audio history only; input field has priority
+edit.redo,Redo,Windows/Linux,audio-focused,Ctrl+Shift+Z,,no,proposal,Proposal v1,Audio history only; not verified as CapCut default
+edit.copy,Copy,Windows/Linux,audio-timeline,Ctrl+C,,no,proposal,Proposal v1,Copy selected clips preserving relative times
+edit.cut,Cut,Windows/Linux,audio-timeline,Ctrl+X,,no,proposal,Proposal v1,Copy and remove unlocked selected clips
+edit.paste,Paste,Windows/Linux,audio-timeline,Ctrl+V,,no,proposal,Proposal v1,Paste at playhead on selected unlocked track
+edit.duplicate,Duplicate,Windows/Linux,audio-timeline,Ctrl+D,,no,proposal,Proposal v1,Duplicate after selection; resolve collisions explicitly
+edit.selectAll,Select all,Windows/Linux,audio-timeline,Ctrl+A,,no,proposal,Proposal v1,Select editable clips; do not alter locked tracks
+edit.cancel,Cancel / Deselect,Windows/Linux,modal-or-audio,Escape,,no,proposal,Proposal v1,Close dialog or cancel active gesture before clearing selection
+clip.group,Group,Windows/Linux,audio-timeline,Ctrl+G,,no,proposal,Proposal v1,Create a linked selection group
+clip.ungroup,Ungroup,Windows/Linux,audio-timeline,Ctrl+Shift+G,,no,proposal,Proposal v1,Remove selection group linkage
+range.in,Set In,Windows/Linux,audio-timeline,I,,no,reference,R3,Set range start at playhead; allow either marker order
+range.out,Set Out,Windows/Linux,audio-timeline,O,,no,reference,R3,Set range end at playhead
+range.select,Select export range,Windows/Linux,audio-timeline,Shift+X,,no,reference+verification,R3,Activate In/Out selection; detailed interaction still requires reference check
+range.clear,Clear range,Windows/Linux,audio-timeline,,,no,proposal,Proposal v1,Use entire project for preview/export
+marker.add,Add marker,Windows/Linux,audio-timeline,M,,no,proposal,Proposal v1,Marker at playhead
+timeline.magnet,Track magnet,Windows/Linux,audio-timeline,,,no,reference+verification,R2/R1a,Close main-track gaps after edits; locked main track is never moved
+timeline.snap,Auto snapping,Windows/Linux,audio-timeline,,,no,reference+verification,R2/R1a,"Snap dragged edges to playhead, markers and unlocked clip boundaries"
+timeline.linkage,Linkage,Windows/Linux,audio-timeline,,,no,verification,R1a,Move grouped clips together when enabled; precise CapCut audio-only parity not verified
+timeline.previewAxis,Preview axis,Windows/Linux,audio-timeline,,,no,verification,R1a,Proposal: hover time guide without changing playhead; requires confirmation
+timeline.zoomIn,Zoom in,Windows/Linux,audio-timeline,Ctrl+=,,no,proposal,Proposal v1,Zoom about playhead
+timeline.zoomOut,Zoom out,Windows/Linux,audio-timeline,Ctrl+-,,no,proposal,Proposal v1,Zoom about playhead
+timeline.fit,Zoom to fit,Windows/Linux,audio-timeline,Shift+Z,,no,proposal,Proposal v1,Fit full project duration
+project.new,New audio project,Windows/Linux,audio-focused,Ctrl+N,,no,proposal,Proposal v1,Prompt to save dirty project
+project.open,Open project,Windows/Linux,audio-focused,Ctrl+O,,no,proposal,Proposal v1,Load .rbaudio.json independently of MAP
+project.save,Save project,Windows/Linux,audio-focused,Ctrl+S,,no,proposal,Proposal v1,Save arrangement only; do not replace source audio
+project.saveAs,Save project as,Windows/Linux,audio-focused,,,no,proposal,Proposal v1,Choose a project file and preserve media refs
+project.import,Import audio,Windows/Linux,audio-focused,Ctrl+I,,no,proposal,Proposal v1,Import local configured mod/authoring sources
+export.open,Export audio,Windows/Linux,audio-focused,Ctrl+E,,no,proposal,Proposal v1,Open mix/range export dialog
+resource.update,Update source with backup,Windows/Linux,audio-focused,,,no,proposal,Proposal v1,"Explicit target selection, fingerprint check, backup; separate from mix export"
+record.open,Record audio,Windows/Linux,audio-focused,,,no,reference+proposal,R1,Open input device and recording dialog
+shortcuts.open,Shortcut,Windows/Linux,audio-focused,,,no,reference+proposal,R1a,Show real assignments; current mockup is a proposed preset
+workspace.layout,Workspace layout,Windows/Linux,audio-focused,,,no,reference+verification,R1a,Workspace layout menu; no preset changes before approval
+track.add,Add track,Windows/Linux,audio-timeline,,,no,proposal,Proposal v1,Add unlocked audio track
+track.delete,Delete track,Windows/Linux,track-context-menu,,,no,proposal,Proposal v1,Confirm populated track removal; undo supported
+track.rename,Rename track,Windows/Linux,track-context-menu,,,no,proposal,Proposal v1,Edit label without changing track ID
+track.lock,Lock track,Windows/Linux,audio-timeline,,,no,reference+proposal,R1a,Prevent clip edits/reordering on this track
+track.visibility,Track visibility,Windows/Linux,audio-timeline,,,no,reference+adaptation,R1a,Hide waveforms only; retain track row and sound; mute is separate
+track.mute,Mute track,Windows/Linux,audio-timeline,,,no,reference+proposal,R1a,Remove this track from monitor and exported mix
+track.solo,Solo track,Windows/Linux,audio-timeline,,,no,proposal-extension,Proposal v1,Only solo tracks contribute; mute still has priority
+clip.gain,Clip volume,Windows/Linux,audio-inspector,,,no,reference+proposal,R1/R4,dB gain with optional keyframes
+clip.fadeIn,Fade in,Windows/Linux,audio-inspector,,,no,reference+proposal,R1/R4,Clip-relative fade duration
+clip.fadeOut,Fade out,Windows/Linux,audio-inspector,,,no,reference+proposal,R1/R4,Clip-relative fade duration
+clip.normalize,Normalize loudness,Windows/Linux,audio-inspector,,,no,reference+proposal,R4,"Local two-pass loudness processing; advanced target -16 LUFS, -1 dBTP proposal"
+clip.enhance,Enhance voice,Windows/Linux,audio-inspector,,,no,reference+adaptation,R4,Local speech processing chain; not an emulation of a proprietary AI model
+clip.denoise,Reduce noise,Windows/Linux,audio-inspector,,,no,reference+proposal,R4,Local noise reduction with bypass
+clip.balance,Channel balance,Windows/Linux,audio-inspector,,,no,reference+proposal,R1/R4,Stereo balance; mono remains mono at source export
+clip.keyframe,Add gain keyframe,Windows/Linux,audio-inspector,,,no,proposal,Proposal v1,Gain keyframe at playhead
+clip.voice,Voice filters,Windows/Linux,audio-inspector,,,no,reference+adaptation,R1,Local DSP presets only: Original/Low/High/Radio/Echo/Tremolo
+clip.speed,Speed,Windows/Linux,audio-inspector,,,no,reference+proposal,R1a,0.25–4×; preserve legacy pitch-linked mode
+clip.pitchLink,Voice tone change,Windows/Linux,audio-inspector,,,no,reference+proposal,R1a,Off preserves pitch; On links pitch and speed
+clip.reset,Reset parameters,Windows/Linux,audio-inspector,,,no,reference+proposal,R1a,"Reset selected group of parameters, undoable"
+source.relink,Relink source,Windows/Linux,audio-dialog,,,no,proposal,Proposal v1,Select a source in configured roots; do not overwrite existing resources
+master.gain,Master output gain,Windows/Linux,audio-player,,,no,proposal-extension,Proposal v1,Master gain after track sum; same value for preview and offline export

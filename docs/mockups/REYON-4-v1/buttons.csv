@@ -1,0 +1,72 @@
+action_id,control,reference_position,mockup_position,evidence,notes
+transport.play,Play / Pause,"Player lower row, around center","Player lower row, center/right",reference,Pause keeps cursor; Play resumes
+transport.stop,Stop,Not verified; existing Reyond function,Before Play in Player lower row,proposal,Return to start of active range
+transport.left,Previous audio step,No exact verified source button position,Context command / proposed preset; not a new toolbar button,reference+adaptation,Move cursor -10 ms; R2 frame-based original; audio step proposed
+transport.right,Next audio step,No exact verified source button position,Context command / proposed preset; not a new toolbar button,reference+adaptation,Move cursor +10 ms; audio step proposed
+transport.leftLarge,Previous large step,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Move cursor -100 ms
+transport.rightLarge,Next large step,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Move cursor +100 ms
+transport.previousCut,Previous cut,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Previous visible clip boundary
+transport.nextCut,Next cut,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Next visible clip boundary
+transport.home,Project start,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Cursor to zero
+transport.end,Project end,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Cursor to project duration
+tool.select,Select tool,Timeline toolbar far left,Timeline toolbar far left,proposal,Select and move unlocked clips
+tool.split,Split tool,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Click a clip to split at pointer
+clip.split,Split selected,Timeline toolbar left,After Undo/Redo divider,reference,Split selected unlocked clips at playhead
+clip.splitAll,Split all,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Split all unlocked tracks at playhead
+clip.trimLeft,Trim left,Timeline toolbar left; icon semantics require verification,After Split,proposal,Trim selected clips up to playhead; do not extend clips
+clip.trimRight,Trim right,Timeline toolbar left; icon semantics require verification,After Trim left,proposal,Trim selected clips after playhead; do not extend clips
+clip.delete,Delete clips,Timeline toolbar left,After Trim right,proposal,Remove selection; ripple only if enabled
+clip.rippleDelete,Ripple delete,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Remove selected span and close gap on affected unlocked tracks
+edit.undo,Undo,Timeline toolbar left,"Timeline toolbar left, after Select",proposal,Audio history only; input field has priority
+edit.redo,Redo,"Timeline toolbar left, after Undo",After Undo,proposal,Audio history only; not verified as CapCut default
+edit.copy,Copy,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Copy selected clips preserving relative times
+edit.cut,Cut,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Copy and remove unlocked selected clips
+edit.paste,Paste,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Paste at playhead on selected unlocked track
+edit.duplicate,Duplicate,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Duplicate after selection; resolve collisions explicitly
+edit.selectAll,Select all,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Select editable clips; do not alter locked tracks
+edit.cancel,Cancel / Deselect,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Close dialog or cancel active gesture before clearing selection
+clip.group,Group,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Create a linked selection group
+clip.ungroup,Ungroup,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Remove selection group linkage
+range.in,Set In,Timeline ruler / export workflow,Timeline ruler range and Export dialog,reference,Set range start at playhead; allow either marker order
+range.out,Set Out,Timeline ruler / export workflow,Timeline ruler range and Export dialog,reference,Set range end at playhead
+range.select,Select export range,Timeline ruler / export workflow,Timeline ruler range and Export dialog,reference+verification,Activate In/Out selection; detailed interaction still requires reference check
+range.clear,Clear range,Timeline ruler / export workflow,Timeline ruler range and Export dialog,proposal,Use entire project for preview/export
+marker.add,Add marker,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Marker at playhead
+timeline.magnet,Track magnet,Timeline toolbar right (exact switch semantics pending),Record → Magnet → Snapping → Linkage → Preview axis,reference+verification,Close main-track gaps after edits; locked main track is never moved
+timeline.snap,Auto snapping,Timeline toolbar right (exact switch semantics pending),Record → Magnet → Snapping → Linkage → Preview axis,reference+verification,"Snap dragged edges to playhead, markers and unlocked clip boundaries"
+timeline.linkage,Linkage,Timeline toolbar right (exact switch semantics pending),Record → Magnet → Snapping → Linkage → Preview axis,verification,Move grouped clips together when enabled; precise CapCut audio-only parity not verified
+timeline.previewAxis,Preview axis,Timeline toolbar right (exact switch semantics pending),Record → Magnet → Snapping → Linkage → Preview axis,verification,Proposal: hover time guide without changing playhead; requires confirmation
+timeline.zoomIn,Zoom in,Timeline toolbar far-right zoom group,After zoom slider,proposal,Zoom about playhead
+timeline.zoomOut,Zoom out,Timeline toolbar far-right zoom group,"After Fit, before zoom slider",proposal,Zoom about playhead
+timeline.fit,Zoom to fit,"Timeline toolbar right, before Minus","Timeline toolbar right, before Minus",proposal,Fit full project duration
+project.new,New audio project,Media/library or Menu; exact project actions are Reyond proposals,Upper-left Media/Import or Menu,proposal,Prompt to save dirty project
+project.open,Open project,Media/library or Menu; exact project actions are Reyond proposals,Upper-left Media/Import or Menu,proposal,Load .rbaudio.json independently of MAP
+project.save,Save project,Media/library or Menu; exact project actions are Reyond proposals,Upper-left Media/Import or Menu,proposal,Save arrangement only; do not replace source audio
+project.saveAs,Save project as,Media/library or Menu; exact project actions are Reyond proposals,Upper-left Media/Import or Menu,proposal,Choose a project file and preserve media refs
+project.import,Import audio,Media/library or Menu; exact project actions are Reyond proposals,Upper-left Media/Import or Menu,proposal,Import local configured mod/authoring sources
+export.open,Export audio,"Header, upper-right",Header upper-right,proposal,Open mix/range export dialog
+resource.update,Update source with backup,Media/library or Menu; exact project actions are Reyond proposals,Upper-left Media/Import or Menu,proposal,"Explicit target selection, fingerprint check, backup; separate from mix export"
+record.open,Record audio,"Timeline toolbar, before edit toggles","Timeline toolbar right, before magnet/snap/linkage",reference+proposal,Open input device and recording dialog
+shortcuts.open,Shortcut,"Header, right before Export","Header right, before Export",reference+proposal,Show real assignments; current mockup is a proposed preset
+workspace.layout,Workspace layout,"Header, immediately left of Shortcut","Header right, immediately left of Shortcut",reference+verification,Workspace layout menu; no preset changes before approval
+track.add,Add track,Track header for lock/visibility/speaker; other functions not verified,Timeline left track header or its context menu,proposal,Add unlocked audio track
+track.delete,Delete track,Track header for lock/visibility/speaker; other functions not verified,Timeline left track header or its context menu,proposal,Confirm populated track removal; undo supported
+track.rename,Rename track,Track header for lock/visibility/speaker; other functions not verified,Timeline left track header or its context menu,proposal,Edit label without changing track ID
+track.lock,Lock track,Track header for lock/visibility/speaker; other functions not verified,Timeline left track header or its context menu,reference+proposal,Prevent clip edits/reordering on this track
+track.visibility,Track visibility,Track header for lock/visibility/speaker; other functions not verified,Timeline left track header or its context menu,reference+adaptation,Hide waveforms only; retain track row and sound; mute is separate
+track.mute,Mute track,Track header for lock/visibility/speaker; other functions not verified,Timeline left track header or its context menu,reference+proposal,Remove this track from monitor and exported mix
+track.solo,Solo track,Track header for lock/visibility/speaker; other functions not verified,Timeline left track header or its context menu,proposal-extension,Only solo tracks contribute; mute still has priority
+clip.gain,Clip volume,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,dB gain with optional keyframes
+clip.fadeIn,Fade in,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,Clip-relative fade duration
+clip.fadeOut,Fade out,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,Clip-relative fade duration
+clip.normalize,Normalize loudness,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,"Local two-pass loudness processing; advanced target -16 LUFS, -1 dBTP proposal"
+clip.enhance,Enhance voice,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+adaptation,Local speech processing chain; not an emulation of a proprietary AI model
+clip.denoise,Reduce noise,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,Local noise reduction with bypass
+clip.balance,Channel balance,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,Stereo balance; mono remains mono at source export
+clip.keyframe,Add gain keyframe,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,proposal,Gain keyframe at playhead
+clip.voice,Voice filters,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+adaptation,Local DSP presets only: Original/Low/High/Radio/Echo/Tremolo
+clip.speed,Speed,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,0.25–4×; preserve legacy pitch-linked mode
+clip.pitchLink,Voice tone change,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,Off preserves pitch; On links pitch and speed
+clip.reset,Reset parameters,"Inspector, corresponding tab; detailed rows not build-verified",Upper-right inspector; Basic / Voice changer / Speed,reference+proposal,"Reset selected group of parameters, undoable"
+source.relink,Relink source,No exact verified source button position,Context command / proposed preset; not a new toolbar button,proposal,Select a source in configured roots; do not overwrite existing resources
+master.gain,Master output gain,Not verified; Reyond extension,"Player monitor lower-right, next to peak readout",proposal-extension,Master gain shared by preview/export; not claimed as CapCut placement

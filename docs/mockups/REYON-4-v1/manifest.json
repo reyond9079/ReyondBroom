@@ -1,0 +1,26 @@
+{
+  "version": "v1",
+  "approval": "pending",
+  "files": {
+    "buttons.csv": "a469ff977d55cdaa7ef94e9b1ab6e336ea90969d335cbde5836e32e65f4daf15",
+    "density-check.json": "6f15662598845287669cecec2fc84d835ac12561bbb74458b33f796c33fd45c2",
+    "index.html": "c02a2609aa855340c701bfec0f04c36ad318f348860ee6fb1a9167d2dcb0cac8",
+    "layout-check.json": "d23b3231ddc70b6f617cce58d025f6fb5041557050e8d0f6e468b5af6ec5aac9",
+    "reference-passport.json": "b6dfd5343a6e3548d0acfa324126dca2328f7a57d9cea4b3f69f8ad961e1587b",
+    "review.md": "c981a688db0302692fbb81b21e8692ec18db00ef5b692e1bb6b09a96faa3f541",
+    "screenshots/basic-1280x800.png": "983d7f29a0a1af20efe94fb2afd647f2912b63bf80e1fc00fe006b4d14cbb499",
+    "screenshots/basic-1920x1080.png": "7e38874994621c214aa80a84b04f25fee51a3b24cc9a69f176a9f56430eeb80b",
+    "screenshots/basic-density-1.5x.png": "d74f52a6fd28ddb9b8ea3550854269c06f08ab457b706eacdd6520fe8dc35d43",
+    "screenshots/basic-density-2x.png": "78e6f245dd69bb8be3bc6fbfa340def8839c6081709ffe936156174fa052ba23",
+    "screenshots/export-1920x1080.png": "4c36e06e8d1e3f5c5f9ff11ef7ba1e1d2d4a91964af07bff2334b0cf57ba7197",
+    "screenshots/menu-1280x800.png": "5cd83023fb3608d2c1c7c19eff828afad4ec36a7ffb9d70a6146855c969c7780",
+    "screenshots/missing-1280x800.png": "53c154f3c610bb744097cc46de40ba9977de3c3ad275823c0961e569554dcae5",
+    "screenshots/multiselect-1920x1080.png": "fe823dfd2ce92ee085025e01bc63ad6e909b960d0cdc13cc40801292abfa5bce",
+    "screenshots/record-1920x1080.png": "6b7eb505d3465f09fdcdf39f0c4c92a60a9b8ad1bae43b05ebd0a7c3740d8322",
+    "screenshots/shortcuts-1920x1080.png": "5352047c6319fcda82b6fd6979ca219ae4988ef598d2bc6af70f64316fba5ad7",
+    "screenshots/source-conflict-1280x800.png": "0dade94688cfdd323f497998a7d056d261286dbb3de1a1afaf8bb4a6409e2963",
+    "screenshots/speed-1920x1080.png": "08ea9517779c8f74402b3a66f2ba5b94ae95a37f24c5d1c7035117bf3302f323",
+    "screenshots/voice-1920x1080.png": "dbce6ad5aaac50cf5eb7e5d61f026975b87c7c0736446acd4312a4a64990018f",
+    "shortcuts.csv": "087a55409795a5e5e3076471163fc12b765c94092a1df3f04a5791cefc9cb0b7"
+  }
+}

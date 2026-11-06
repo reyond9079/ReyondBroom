@@ -1,0 +1,166 @@
+{
+  "checks": [
+    {
+      "state": "basic",
+      "w": 1920,
+      "h": 1080,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1920,
+      "client": 1920
+    },
+    {
+      "state": "basic",
+      "w": 1280,
+      "h": 800,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1280,
+      "client": 1280
+    },
+    {
+      "state": "voice",
+      "w": 1920,
+      "h": 1080,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1920,
+      "client": 1920
+    },
+    {
+      "state": "speed",
+      "w": 1920,
+      "h": 1080,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1920,
+      "client": 1920
+    },
+    {
+      "state": "export",
+      "w": 1920,
+      "h": 1080,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1920,
+      "client": 1920,
+      "dialog": {
+        "x": 615,
+        "y": 243.421875,
+        "width": 690,
+        "height": 593.140625,
+        "top": 243.421875,
+        "right": 1305,
+        "bottom": 836.5625,
+        "left": 615
+      }
+    },
+    {
+      "state": "record",
+      "w": 1920,
+      "h": 1080,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1920,
+      "client": 1920,
+      "dialog": {
+        "x": 615,
+        "y": 251.921875,
+        "width": 690,
+        "height": 576.140625,
+        "top": 251.921875,
+        "right": 1305,
+        "bottom": 828.0625,
+        "left": 615
+      }
+    },
+    {
+      "state": "shortcuts",
+      "w": 1920,
+      "h": 1080,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1920,
+      "client": 1920,
+      "dialog": {
+        "x": 615,
+        "y": 163.359375,
+        "width": 690,
+        "height": 753.28125,
+        "top": 163.359375,
+        "right": 1305,
+        "bottom": 916.640625,
+        "left": 615
+      }
+    },
+    {
+      "state": "multiselect",
+      "w": 1920,
+      "h": 1080,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1920,
+      "client": 1920
+    },
+    {
+      "state": "missing",
+      "w": 1280,
+      "h": 800,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1280,
+      "client": 1280,
+      "dialog": {
+        "x": 295,
+        "y": 238.03125,
+        "width": 690,
+        "height": 323.9375,
+        "top": 238.03125,
+        "right": 985,
+        "bottom": 561.96875,
+        "left": 295
+      }
+    },
+    {
+      "state": "source-conflict",
+      "w": 1280,
+      "h": 800,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1280,
+      "client": 1280,
+      "dialog": {
+        "x": 295,
+        "y": 233.53125,
+        "width": 690,
+        "height": 332.9375,
+        "top": 233.53125,
+        "right": 985,
+        "bottom": 566.46875,
+        "left": 295
+      }
+    },
+    {
+      "state": "menu",
+      "w": 1280,
+      "h": 800,
+      "panels": 3,
+      "tracks": 3,
+      "clips": 4,
+      "width": 1280,
+      "client": 1280
+    }
+  ],
+  "errors": [],
+  "reviewNavigation": "passed"
+}

@@ -1,0 +1,57 @@
+{
+  "passport": "REYON-4-mockup-v1 / CC-DESKTOP-AUDIO-2026-11-06",
+  "application": "CapCut Desktop",
+  "platform": "Windows (working assumption)",
+  "language": "English",
+  "theme": "Dark",
+  "app_build": null,
+  "app_build_status": "Not available in public references; no installed CapCut inspection was performed",
+  "approval_status": "awaiting explicit user approval",
+  "baseline_options": [
+    "Approve this public-reference-based v1 and its proposed behavior/keys",
+    "Provide or select a specific CapCut build and reference capture before implementation"
+  ],
+  "references": [
+    {
+      "id": "R1",
+      "url": "https://www.capcut.com/resource/best-free-audio-recording-and-editing-software",
+      "scope": "Audio workflow overview"
+    },
+    {
+      "id": "R1a",
+      "url": "https://p16-seeyou-useast5.capcutcdn-us.com/tos-useast5-i-2zwwjm3azk-tx/7382557a97ec4e7790d7e495ddfca2a6~tplv-2zwwjm3azk-compress%3Aq75.image",
+      "pixels": [
+        1280,
+        679
+      ],
+      "sha256": "d95c09f746558afcc09fe672743d729bcb564f0f416b08fb4c6e1561916a619a",
+      "scope": "Primary audio-only layout and Speed tab; build not shown"
+    },
+    {
+      "id": "R2",
+      "url": "https://www.capcut.com/resource/pc-professional-video-editor",
+      "scope": "Ctrl+B, Space, arrows; timeline switches"
+    },
+    {
+      "id": "R3",
+      "url": "https://www.capcut.com/help/export-clip-of-video",
+      "scope": "I/O and Shift+X for export range"
+    },
+    {
+      "id": "R4",
+      "url": "https://www.capcut.com/resource/audio-booster-for-pc",
+      "scope": "Audio processing features; screenshot is a video clip with Audio subtab, not the primary layout"
+    },
+    {
+      "id": "R4a",
+      "url": "https://p16-seeyou-sg.ibyteimg.com/tos-alisg-i-2zwwjm3azk-sg/99f4376557a24a92a4e630573d5395e6~tplv-2zwwjm3azk-compress:q75.image",
+      "sha256": "dc32766854094b3a86d0f228c1113726c8814594f6adbeaf3519e8d268ec8b4e",
+      "scope": "Supplementary Basic/audio processing controls; not a matching exact build"
+    },
+    {
+      "id": "R5",
+      "url": "https://www.capcut.com/help/capcut-ui-update-changes",
+      "scope": "Layout varies across releases"
+    }
+  ]
+}

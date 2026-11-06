@@ -32,6 +32,10 @@ static char importWad[4096]={},importName[16]={};static bool importRequest=false
 static HWND desktopHost;static WNDPROC desktopPrevious;
 static BOOL CALLBACK desktopFind(HWND h,LPARAM){DWORD pid=0;GetWindowThreadProcessId(h,&pid);if(pid==GetCurrentProcessId()&&IsWindowVisible(h)&&!GetWindow(h,GW_OWNER)){desktopHost=h;return FALSE;}return TRUE;}
 static LRESULT CALLBACK desktopProc(HWND h,UINT message,WPARAM w,LPARAM l){
+ if(runUiLive&&(message==WM_KEYDOWN||message==WM_KEYUP||message==WM_SYSKEYDOWN||message==WM_SYSKEYUP)){
+  if(runUiInputTrace.size()>=100)runUiInputTrace.erase(runUiInputTrace.begin());
+  runUiInputTrace.push_back({{"windowMessage",message},{"virtualKey",w},{"scanCode",(l>>16)&511},{"rawKeyboard",cvars->GetFloat("in_rawinput_keyboard")}});
+ }
  if(message==WM_CLOSE && modEmbedded)modEmbedEnd();
  if(message==WM_ACTIVATE && LOWORD(w)!=WA_INACTIVE)cvars->SetFloat("ftebroom_focus_time",float(core->GetMilliseconds())/1000.f);
  // Forward WM_SETCURSOR so FTE can install the newly sized hardware image.

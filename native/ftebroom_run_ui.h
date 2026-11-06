@@ -80,16 +80,16 @@ static nlohmann::json runUiVariables(bool workdir=false,bool engine=false){
  }return vars;
 }
 static ImGuiID runUiCaretId=0;static int runUiCaret=0;
-struct RunUiCompletion {int cursor=0;bool tab=false;ImGuiID id=0;};
-static int runUiCompletionCallback(ImGuiInputTextCallbackData* data){auto& c=*static_cast<RunUiCompletion*>(data->UserData);if(data->EventFlag==ImGuiInputTextFlags_CallbackAlways&&runUiCaretId==c.id){data->CursorPos=data->SelectionStart=data->SelectionEnd=runUiCaret;runUiCaretId=0;}c.cursor=data->CursorPos;if(data->EventFlag==ImGuiInputTextFlags_CallbackCompletion)c.tab=true;return 0;}
+struct RunUiCompletion {int cursor=0;bool tab=false;ImGuiID id=0;std::vector<char>* buffer=nullptr;};
+static int runUiCompletionCallback(ImGuiInputTextCallbackData* data){auto& c=*static_cast<RunUiCompletion*>(data->UserData);if(data->EventFlag==ImGuiInputTextFlags_CallbackResize){c.buffer->resize(data->BufSize);data->Buf=c.buffer->data();return 0;}if(data->EventFlag==ImGuiInputTextFlags_CallbackAlways&&runUiCaretId==c.id){data->CursorPos=data->SelectionStart=data->SelectionEnd=runUiCaret;runUiCaretId=0;}c.cursor=data->CursorPos;if(data->EventFlag==ImGuiInputTextFlags_CallbackCompletion)c.tab=true;return 0;}
 static std::string runUiRefocus;
 struct RunUiCompletionRange {size_t begin,end;std::string prefix;};
 static std::map<ImGuiID,RunUiCompletionRange> runUiCompletions;
 static bool runUiEdit(const char* id,std::string& value,const char* hint="",int scope=-1,const char* placeholder=""){
- std::vector<char> buffer(std::max<size_t>(4096,value.size()+1024),0);std::copy(value.begin(),value.end(),buffer.begin());RunUiCompletion completion;
+ std::vector<char> buffer(std::max<size_t>(4096,value.size()+1024),0);std::copy(value.begin(),value.end(),buffer.begin());RunUiCompletion completion;completion.buffer=&buffer;
  const auto inputId=ImGui::GetID(id);completion.id=inputId;auto key=std::to_string(inputId);if(runUiRefocus==key){ImGui::SetKeyboardFocusHere();runUiRefocus.clear();}
  int caret=int(value.size());if(auto* state=ImGui::GetInputTextState(inputId))caret=state->GetCursorPos();auto prefixAt=value.rfind("${",size_t(std::max(0,caret)));bool completing=scope>=0&&prefixAt!=value.npos&&prefixAt<size_t(caret)&&value.find('}',prefixAt)>=size_t(caret);
- bool changed=ImGui::InputTextWithHint(id,placeholder,buffer.data(),buffer.size(),scope<0?ImGuiInputTextFlags_None:(completing?ImGuiInputTextFlags_CallbackCompletion:0)|ImGuiInputTextFlags_CallbackAlways,runUiCompletionCallback,&completion);
+ bool changed=ImGui::InputTextWithHint(id,placeholder,buffer.data(),buffer.size(),ImGuiInputTextFlags_CallbackResize|(scope<0?ImGuiInputTextFlags_None:(completing?ImGuiInputTextFlags_CallbackCompletion:0)|ImGuiInputTextFlags_CallbackAlways),runUiCompletionCallback,&completion);
  if(changed)value=buffer.data();runUiHint(hint);runUiRecord(id);
  if(scope>=0){
   auto prefixEnd=std::min(size_t(std::max(0,completion.cursor)),value.size());auto start=value.rfind("${",prefixEnd);

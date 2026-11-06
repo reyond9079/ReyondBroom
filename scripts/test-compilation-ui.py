@@ -128,6 +128,25 @@ def edit(name,text):
   ctrl=d.keysym_to_keycode(XK.string_to_keysym('Control_L'));code=d.keysym_to_keycode(ord('a'));xtest.fake_input(d,X.KeyPress,ctrl);xtest.fake_input(d,X.KeyPress,code);xtest.fake_input(d,X.KeyRelease,code);xtest.fake_input(d,X.KeyRelease,ctrl);d.sync()
  key('backspace');type_text(text);time.sleep(.2)
 def console(command):key('grave');type_text(command);key('enter');key('grave')
+def paste(text):
+ if os.name=='nt':
+  kernel=ctypes.windll.kernel32
+  kernel.GlobalAlloc.argtypes=[wintypes.UINT,ctypes.c_size_t];kernel.GlobalAlloc.restype=wintypes.HANDLE
+  kernel.GlobalLock.argtypes=[wintypes.HANDLE];kernel.GlobalLock.restype=ctypes.c_void_p
+  kernel.GlobalUnlock.argtypes=[wintypes.HANDLE]
+  user.SetClipboardData.argtypes=[wintypes.UINT,wintypes.HANDLE];user.SetClipboardData.restype=wintypes.HANDLE
+  payload=(text+'\0').encode('utf-16-le');handle=kernel.GlobalAlloc(2,len(payload));assert handle
+  pointer=kernel.GlobalLock(handle);assert pointer;ctypes.memmove(pointer,payload,len(payload));kernel.GlobalUnlock(handle)
+  wait_for(lambda:user.OpenClipboard(None))
+  try:user.EmptyClipboard();assert user.SetClipboardData(13,handle)
+  finally:user.CloseClipboard()
+  press(17);press(86);press(86,True);press(17,True)
+ else:
+  subprocess.run([os.environ.get('RB_QA_XCLIP','xclip'),'-selection','clipboard'],input=text.encode(),check=True)
+  ctrl=d.keysym_to_keycode(XK.string_to_keysym('Control_L'));v=d.keysym_to_keycode(ord('v'))
+  for code,kind in [(ctrl,X.KeyPress),(v,X.KeyPress),(v,X.KeyRelease),(ctrl,X.KeyRelease)]:xtest.fake_input(d,kind,code)
+  d.sync()
+ time.sleep(.3)
 try:
  wait_for(lambda:live()['widgets'].get('profile-add'))
  click('profile-add');expect(profiles()[0]['name']=='unnamed','create profile using mini toolbar')
@@ -138,7 +157,9 @@ try:
  click('task-add');click('add-task/0');expect(profiles()[0]['tasks'][0]['type']=='export','add Export Map from six-item menu')
  click('task-add');click('add-task/1');expect(profiles()[0]['tasks'][1]['type']=='tool','insert tool after selected task')
  probe=root/('tools/compilation-profile-probe.exe' if os.name=='nt' else 'tools/compilation-profile-probe')
- edit('task/1/Tool path',str(probe).replace('\\','/'));edit('task/1/Parameters','write ui-real.txt marker')
+ edit('task/1/Tool path',str(probe).replace('\\','/'))
+ click('task/1/Parameters');paste('x'*8192);wait_for(lambda:len(profiles()[0]['tasks'][1]['parameters'])==8192);expect(True,'pasting long parameters does not truncate the value')
+ edit('task/1/Parameters','write ui-real.txt marker')
  click('test');time.sleep(1);expect(not (sandbox/'ui-real.txt').exists() and not (sandbox/'qa_clip-compile.map').exists(),'Test launches no process and writes no export')
  click('task/1/Parameters');key('enter');wait_for(lambda:(sandbox/'ui-real.txt').exists());expect((sandbox/'ui-real.txt').read_text()=='marker','Compile starts actual configured process');expect((sandbox/'qa_clip-compile.map').is_file(),'Compile exports current map')
  click('task/1/enabled');expect(not profiles()[0]['tasks'][1]['enabled'],'disabled state persists')

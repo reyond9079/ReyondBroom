@@ -64,7 +64,7 @@ jobs:
             printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
           fi
           sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
-          sudo timeout 180s apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth libsdl2-dev ripgrep
+          sudo timeout 180s apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip libsdl2-dev ripgrep
       - name: Install UI probe dependencies
         run: python -m pip install python-xlib Pillow
       - name: Verify base runtime and extract build dependencies

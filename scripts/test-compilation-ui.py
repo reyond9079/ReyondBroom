@@ -63,12 +63,16 @@ if os.name=='nt':
   point=wintypes.POINT();user.ClientToScreen(hwnd,ctypes.byref(point));rect=wintypes.RECT();user.GetClientRect(hwnd,ctypes.byref(rect));display=live()['display'];client_scale=(rect.right/display[0],rect.bottom/display[1]);
   (out/'window-position.json').write_text(json.dumps({'origin':[point.x,point.y],'client':[rect.right,rect.bottom],'display':display,'scale':client_scale}))
   return point.x,point.y
- def press(code,up=False):user.keybd_event(code,0,2 if up else 0,0)
+ # FTE maps physical scan codes from WM_KEYDOWN, unlike UIA text injection.
+ # A zero bScan can type WM_CHAR text but cannot operate Ctrl/Backspace/Tab.
+ def press(code,up=False):user.keybd_event(code,user.MapVirtualKeyW(code,0),2 if up else 0,0)
+ def chord(code,modifiers=()):
+  for modifier in modifiers:press(modifier)
+  time.sleep(.04);press(code);time.sleep(.04);press(code,True);time.sleep(.04)
+  for modifier in reversed(modifiers):press(modifier,True)
  codes={'ctrl':17,'shift':16,'alt':18,'enter':13,'esc':27,'tab':9,'backspace':8,'grave':192}
  def key(name,mods=()):
-  for m in mods:press(codes[m])
-  press(codes[name]);press(codes[name],True)
-  for m in reversed(mods):press(codes[m],True)
+  chord(codes[name],[codes[m] for m in mods])
   time.sleep(.15)
  def type_text(text):
   for c in text:
@@ -123,7 +127,7 @@ def click(name,right=False):
 def edit(name,text):
  click(name)
  # Ctrl+A is a normal text-edit shortcut on both backends.
- if os.name=='nt':press(17);press(65);press(65,True);press(17,True)
+ if os.name=='nt':chord(65,[17])
  else:
   ctrl=d.keysym_to_keycode(XK.string_to_keysym('Control_L'));code=d.keysym_to_keycode(ord('a'));xtest.fake_input(d,X.KeyPress,ctrl);xtest.fake_input(d,X.KeyPress,code);xtest.fake_input(d,X.KeyRelease,code);xtest.fake_input(d,X.KeyRelease,ctrl);d.sync()
  key('backspace');type_text(text);time.sleep(.2)
@@ -140,7 +144,7 @@ def paste(text):
   wait_for(lambda:user.OpenClipboard(None))
   try:user.EmptyClipboard();assert user.SetClipboardData(13,handle)
   finally:user.CloseClipboard()
-  press(17);press(86);press(86,True);press(17,True)
+  chord(86,[17])
  else:
   subprocess.run([os.environ.get('RB_QA_XCLIP','xclip'),'-selection','clipboard'],input=text.encode(),check=True)
   ctrl=d.keysym_to_keycode(XK.string_to_keysym('Control_L'));v=d.keysym_to_keycode(ord('v'))

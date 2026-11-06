@@ -7,8 +7,10 @@
 static bool runSettingsWindow=false,runLaunchWindow=false,runEngineWindow=false;
 static int runUiTaskSelected=-1,runUiEngineSelected=-1,runUiCloseRequest=0;
 static float runUiManagerHeight=442.f;
-static nlohmann::json runUiRects=nlohmann::json::object();
+static nlohmann::json runUiRects=nlohmann::json::object(),runUiGlobalRects=nlohmann::json::object();
 static ImVec2 runUiOrigin;
+static bool runUiLive=false;
+static std::string runUiRecordPrefix;
 static int runUiAtlasWidth=0,runUiAtlasHeight=0,runUiAtlasTheme=-1,runUiAtlasFrames=0;
 static std::filesystem::path runUiAtlasDirectory;
 static bool runUiImportRequested=false;
@@ -16,7 +18,8 @@ static void runUiShow(int mode){if(mode==1)runSettingsWindow=true;else if(mode==
 static void runOpenSettings(){runUiShow(1);}
 static bool runUiSave(){return runSaveProfiles();}
 static void runUiHint(const char* text){if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))ImGui::SetTooltip("%s",text);}
-static void runUiRecord(const std::string& key){auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiRects[key]={{"x",p.x-runUiOrigin.x},{"y",p.y-runUiOrigin.y},{"width",q.x-p.x},{"height",q.y-p.y}};}
+static void runUiRecord(const std::string& key){auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiRects[(key.rfind("##",0)==0?runUiRecordPrefix+key.substr(2):key)]={{"x",p.x-runUiOrigin.x},{"y",p.y-runUiOrigin.y},{"width",q.x-p.x},{"height",q.y-p.y}};}
+static void runUiRecordGlobal(const std::string& key){if(!runUiLive)return;auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiGlobalRects[key]={{"x",p.x},{"y",p.y},{"width",q.x-p.x},{"height",q.y-p.y}};}
 struct RunUiStyle {
  RunUiStyle(){
   const bool dark=uiTheme!=1&&uiTheme!=3;
@@ -70,19 +73,22 @@ static nlohmann::json runUiVariables(bool workdir=false,bool engine=false){
 struct RunUiCompletion {int cursor=0;bool tab=false;};
 static int runUiCompletionCallback(ImGuiInputTextCallbackData* data){auto& c=*static_cast<RunUiCompletion*>(data->UserData);c.cursor=data->CursorPos;if(data->EventFlag==ImGuiInputTextFlags_CallbackCompletion)c.tab=true;return 0;}
 static std::string runUiRefocus;
-static bool runUiEdit(const char* id,std::string& value,const char* hint="",int scope=-1){
+struct RunUiCompletionRange {size_t begin,end;std::string prefix;};
+static std::map<ImGuiID,RunUiCompletionRange> runUiCompletions;
+static bool runUiEdit(const char* id,std::string& value,const char* hint="",int scope=-1,const char* placeholder=""){
  std::vector<char> buffer(std::max<size_t>(4096,value.size()+1024),0);std::copy(value.begin(),value.end(),buffer.begin());RunUiCompletion completion;
- auto key=std::to_string(ImGui::GetID(id));if(runUiRefocus==key){ImGui::SetKeyboardFocusHere();runUiRefocus.clear();}
- bool changed=ImGui::InputText(id,buffer.data(),buffer.size(),scope<0?ImGuiInputTextFlags_None:ImGuiInputTextFlags_CallbackCompletion|ImGuiInputTextFlags_CallbackAlways,runUiCompletionCallback,&completion);
+ const auto inputId=ImGui::GetID(id);auto key=std::to_string(inputId);if(runUiRefocus==key){ImGui::SetKeyboardFocusHere();runUiRefocus.clear();}
+ bool changed=ImGui::InputTextWithHint(id,placeholder,buffer.data(),buffer.size(),scope<0?ImGuiInputTextFlags_None:ImGuiInputTextFlags_CallbackCompletion|ImGuiInputTextFlags_CallbackAlways,runUiCompletionCallback,&completion);
  if(changed)value=buffer.data();runUiHint(hint);runUiRecord(id);
  if(scope>=0){
   auto prefixEnd=std::min(size_t(std::max(0,completion.cursor)),value.size());auto start=value.rfind("${",prefixEnd);
   bool valid=start!=value.npos&&start<prefixEnd&&value.find('}',start)>=prefixEnd;
-  if(completion.tab&&valid)ImGui::OpenPopup("Variables");
+  if(completion.tab&&valid){runUiCompletions[inputId]={start,prefixEnd,value.substr(start+2,prefixEnd-start-2)};ImGui::OpenPopup("Variables");}
   if(ImGui::BeginPopup("Variables")){
-   auto vars=runUiVariables(scope==1,scope==2);std::string prefix=valid?value.substr(start+2,prefixEnd-start-2):"";bool found=false;
+   auto vars=runUiVariables(scope==1,scope==2);auto range=runUiCompletions[inputId];start=range.begin;prefixEnd=range.end;const auto& prefix=range.prefix;bool found=false;
    for(auto it=vars.begin();it!=vars.end();++it)if(it.key().compare(0,prefix.size(),prefix)==0){found=true;
     if(ImGui::Selectable(it.key().c_str())){auto end=value.find('}',start);if(end==value.npos)end=prefixEnd;else ++end;value.replace(start,end-start,"${"+it.key()+"}");changed=true;runUiRefocus=key;ImGui::ClearActiveID();ImGui::CloseCurrentPopup();}
+    runUiRecord("completion/"+it.key());
     auto text=it.value().is_string()?it.value().get<std::string>():it.value().dump();runUiHint(text.c_str());
    }
    if(!found)ImGui::TextDisabled("No matching variables");ImGui::EndPopup();
@@ -142,10 +148,10 @@ static void runUiFormRow(const char* label){ImGui::TableNextRow();ImGui::TableNe
 static bool runUiTaskCard(RunTask& t,int index,std::string& mutation){
  const char* names[]={"Export Map","Run Tool","Copy Files","Rename File","Delete Files","Launch Engine"};bool changed=false;const float u=uiScale(),w=ImGui::GetContentRegionAvail().x;
  const int rows=t.kind==0?4:t.kind==1?3:t.kind==4?1:2;const float row=std::max(22*u,ImGui::GetFrameHeight()),body=16*u+rows*row+(rows-1)*4*u,height=20*u+body+u;
- auto p=ImGui::GetCursorScreenPos();ImGui::PushID(index);ImGui::SetNextItemAllowOverlap();
+ auto p=ImGui::GetCursorScreenPos();runUiRecordPrefix="task/"+std::to_string(index)+"/";ImGui::PushID(index);ImGui::SetNextItemAllowOverlap();
  if(ImGui::Selectable("##card",runUiTaskSelected==index,ImGuiSelectableFlags_AllowOverlap,{w,height}))runUiTaskSelected=index;
  runUiRecord("card/"+std::to_string(index));
- if(ImGui::BeginPopupContextItem("Task context")){if(ImGui::MenuItem("Move Up",nullptr,false,index>0))mutation="up";if(ImGui::MenuItem("Move Down",nullptr,false,runSelected>=0&&index+1<int(runProfiles[runSelected].tasks.size())))mutation="down";ImGui::Separator();if(ImGui::MenuItem("Duplicate"))mutation="duplicate";if(ImGui::MenuItem("Remove"))mutation="remove";if(!mutation.empty())runUiTaskSelected=index;ImGui::EndPopup();}
+ if(ImGui::BeginPopupContextItem("Task context")){if(ImGui::MenuItem("Move Up",nullptr,false,index>0))mutation="up";if(ImGui::MenuItem("Move Down",nullptr,false,runSelected>=0&&index+1<int(runProfiles[runSelected].tasks.size())))mutation="down";ImGui::Separator();if(ImGui::MenuItem("Duplicate"))mutation="duplicate";runUiRecord("task-context/duplicate");if(ImGui::MenuItem("Remove"))mutation="remove";runUiRecord("task-context/remove");if(!mutation.empty())runUiTaskSelected=index;ImGui::EndPopup();}
  ImGui::SetCursorScreenPos(p);runUiTitle(names[std::clamp(t.kind,0,5)],w);
  ImGui::SetCursorScreenPos({p.x+2*u,p.y+20*u+(body-ImGui::GetFrameHeight())*.5f});changed|=ImGui::Checkbox("##Enabled",&t.enabled);runUiRecord("task/"+std::to_string(index)+"/enabled");runUiHint("Whether to include this task when running the compile profile");
  ImGui::SetCursorScreenPos({p.x+28*u,p.y+28*u});ImGui::BeginGroup();
@@ -155,9 +161,9 @@ static bool runUiTaskCard(RunTask& t,int index,std::string& mutation){
   auto field=[&](const char* label,const char* id,std::string& value,const char* tooltip){runUiFormRow(label);changed|=runUiEdit(id,value,tooltip,0);};
   if(t.kind==0){
    field("File Path","##Export path",t.source,"The path of the exported file.\nVariables are allowed. Use Tab for completion.");
-   runUiFormRow("Strip Entities");changed|=runUiEdit("##Strip entities",t.stripEntityPattern,"Set a GLOB pattern to strip any entities with a matching classname. Example: info_player_*");
+   runUiFormRow("Strip Entities");changed|=runUiEdit("##Strip entities",t.stripEntityPattern,"Set a GLOB pattern to strip any entities with a matching classname. Example: info_player_*",-1,"enter GLOB pattern");
    runUiFormRow("Add Entity");std::string classname;if(t.entityToAdd.is_array())for(const auto& prop:t.entityToAdd)if(prop.at("key")=="classname")classname=prop.at("value").get<std::string>();
-   if(runUiEdit("##Add entity",classname,"Set the classname of an entity added at the camera position and view direction.")){
+   if(runUiEdit("##Add entity",classname,"Set the classname of an entity added at the camera position and view direction.",-1,"enter classname")){
     changed=true;if(classname.empty())t.entityToAdd=nullptr;else{if(!t.entityToAdd.is_array())t.entityToAdd=nlohmann::json::array();bool found=false;for(auto& prop:t.entityToAdd)if(prop.at("key")=="classname"){prop["value"]=classname;found=true;}if(!found)t.entityToAdd.push_back({{"key","classname"},{"value",classname}});}
    }
    runUiFormRow("");changed|=ImGui::Checkbox("Strip TrenchBroom specific entity properties",&t.stripTbProperties);runUiHint("Strip entity properties starting with _tb_ from the exported map file. Some compilers cannot handle these properties.");
@@ -177,7 +183,7 @@ static bool runUiTaskCard(RunTask& t,int index,std::string& mutation){
   }
   ImGui::EndTable();
  }
- ImGui::PopStyleVar();ImGui::EndGroup();ImGui::SetCursorScreenPos({p.x,p.y+height-u});ImGui::Separator();ImGui::SetCursorScreenPos(p);ImGui::Dummy({w,height});ImGui::PopID();return changed;
+ ImGui::PopStyleVar();ImGui::EndGroup();ImGui::SetCursorScreenPos({p.x,p.y+height-u});ImGui::Separator();ImGui::SetCursorScreenPos(p);ImGui::Dummy({w,height});ImGui::PopID();runUiRecordPrefix.clear();return changed;
 }
 static std::string runUiElide(std::string text,float width){if(ImGui::CalcTextSize(text.c_str()).x<=width)return text;while(!text.empty()&&ImGui::CalcTextSize((text+"...").c_str()).x>width){size_t at=text.size()-1;while(at>0&&(static_cast<unsigned char>(text[at])&0xc0)==0x80)--at;text.resize(at);}return text+"...";}
 static bool runUiListItem(const std::string& id,const std::string& title,const std::string& subtitle,bool selected){
@@ -193,7 +199,7 @@ static void runUiProfiles(float height){
  ImGui::BeginChild("Profile list",{0,std::max(1.f,height-64*u)},ImGuiChildFlags_None);
  for(int i=0;i<int(runProfiles.size());++i){const auto& p=runProfiles[i];ImGui::PushID(i);
   if(runUiListItem("profile/"+std::to_string(i),p.name,std::to_string(p.tasks.size())+" tasks",i==runSelected)){runSelected=i;runUiTaskSelected=-1;}
-  if(ImGui::BeginPopupContextItem("Profile context")){if(ImGui::MenuItem("Duplicate")){action="duplicate";actionRow=i;}if(ImGui::MenuItem("Remove")){action="remove";actionRow=i;}ImGui::EndPopup();}ImGui::PopID();
+  if(ImGui::BeginPopupContextItem("Profile context")){if(ImGui::MenuItem("Duplicate")){action="duplicate";actionRow=i;}runUiRecord("profile-context/duplicate");if(ImGui::MenuItem("Remove")){action="remove";actionRow=i;}runUiRecord("profile-context/remove");ImGui::EndPopup();}ImGui::PopID();
  }
  if(runProfiles.empty())ImGui::TextWrapped("Click the '+' button to create a compilation profile.");ImGui::EndChild();
  ImGui::SetCursorPosY(height-44*u);if(ImGui::Button("Import TrenchBroom profiles...",{ImGui::GetContentRegionAvail().x,22*u}))runUiImportRequested=true;runUiRecord("import");
@@ -215,7 +221,7 @@ static void runUiDetails(float height){
  for(int i=0;i<int(p.tasks.size());++i){changed|=runUiTaskCard(p.tasks[i],i,mutation);if(!mutation.empty())break;}
  ImGui::EndChild();if(changed)runUiSave();if(!mutation.empty())runUiTaskMutation(mutation,runUiTaskSelected);
  ImGui::SetCursorPos({0,height-20*u});if(runUiIcon("task-add",'+',"Add task"))ImGui::OpenPopup("Add task");
- if(ImGui::BeginPopup("Add task")){const char* titles[]={"Export Map","Copy Files","Rename File","Delete Files","Run Tool","Launch Engine"};int kinds[]={0,2,3,4,1,5};for(int i=0;i<6;++i)if(ImGui::MenuItem(titles[i]))runUiAddTask(kinds[i]);ImGui::EndPopup();}
+ if(ImGui::BeginPopup("Add task")){const char* titles[]={"Export Map","Copy Files","Rename File","Delete Files","Run Tool","Launch Engine"};int kinds[]={0,2,3,4,1,5};for(int i=0;i<6;++i){if(ImGui::MenuItem(titles[i]))runUiAddTask(kinds[i]);runUiRecord("add-task/"+std::to_string(kinds[i]));}ImGui::EndPopup();}
  ImGui::SameLine(0,0);if(runUiIcon("task-remove",'-',"Remove the selected task",runUiTaskSelected>=0&&runUiTaskSelected<int(p.tasks.size())))runUiTaskMutation("remove",runUiTaskSelected);
  ImGui::SameLine(0,0);if(runUiIcon("task-up",'^',"Move the selected task up",runUiTaskSelected>0&&runUiTaskSelected<int(p.tasks.size())))runUiTaskMutation("up",runUiTaskSelected);
  ImGui::SameLine(0,0);if(runUiIcon("task-down",'v',"Move the selected task down",runUiTaskSelected>=0&&runUiTaskSelected+1<int(p.tasks.size())))runUiTaskMutation("down",runUiTaskSelected);
@@ -237,9 +243,13 @@ static void runUiCompile(){
   ImGui::SetCursorPosY(top+manager);ImGui::InvisibleButton("Output splitter",{available.x,splitter});runUiRecord("splitter");auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();ImGui::GetWindowDrawList()->AddRectFilled(a,b,ImGui::GetColorU32(ImGuiCol_Border));
   if(ImGui::IsItemHovered()||ImGui::IsItemActive())ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);if(ImGui::IsItemActive())runUiManagerHeight+=ImGui::GetIO().MouseDelta.y/u;
   const float output=std::max(20*u,available.y-manager-splitter-footer);ImGui::SetCursorPosY(top+manager+splitter);
-  static std::string cached;static std::vector<char> buffer(1,0);if(cached!=runLog){cached=runLog;buffer.assign(cached.begin(),cached.end());buffer.push_back(0);}
-  ImGui::InputTextMultiline("##Output",buffer.data(),buffer.size(),{available.x,output},ImGuiInputTextFlags_ReadOnly);runUiRecord("output");
-  if(ImGui::BeginPopupContextItem("Output context")){if(ImGui::MenuItem("Copy",nullptr,false,!runLog.empty())){auto* state=ImGui::GetInputTextState(ImGui::GetItemID());if(state&&state->HasSelection()){int begin=state->GetSelectionStart(),end=state->GetSelectionEnd();if(begin>end)std::swap(begin,end);ImGui::SetClipboardText(runLog.substr(size_t(begin),size_t(end-begin)).c_str());}else ImGui::SetClipboardText(runLog.c_str());}if(ImGui::MenuItem("Clear"))runLog.clear();ImGui::EndPopup();}
+  static std::string cached,selection;static std::vector<char> buffer(1,0);static bool selectAll=false;bool newLog=cached!=runLog;
+  if(newLog){cached=runLog;buffer.assign(cached.begin(),cached.end());buffer.push_back(0);}
+  if(selectAll)ImGui::SetKeyboardFocusHere();
+  ImGui::InputTextMultiline("##Output",buffer.data(),buffer.size(),{available.x,output},ImGuiInputTextFlags_ReadOnly);auto outputId=ImGui::GetItemID();runUiRecord("output");
+  if(auto* state=ImGui::GetInputTextState(outputId)){if(selectAll){state->SelectAll();selectAll=false;}if(state->HasSelection()){int begin=state->GetSelectionStart(),end=state->GetSelectionEnd();if(begin>end)std::swap(begin,end);begin=std::clamp(begin,0,int(runLog.size()));end=std::clamp(end,begin,int(runLog.size()));selection=runLog.substr(size_t(begin),size_t(end-begin));}else selection.clear();}
+  auto* window=ImGui::GetCurrentWindow();if(!window->DC.ChildWindows.empty()){auto* child=window->DC.ChildWindows.back();static bool followed=true;bool userScroll=(ImGui::IsItemHovered()&&ImGui::GetIO().MouseWheel!=0)||ImGui::GetActiveID()==ImGui::GetWindowScrollbarID(child,ImGuiAxis_Y);if(userScroll)followed=child->Scroll.y>=child->ScrollMax.y-2*u;if(newLog&&followed)ImGui::SetScrollY(child,1e20f);else if(!newLog)followed=child->Scroll.y>=child->ScrollMax.y-2*u;}
+  if(ImGui::BeginPopupContextItem("Output context")){if(ImGui::MenuItem("Copy",nullptr,false,!selection.empty()))ImGui::SetClipboardText(selection.c_str());if(ImGui::MenuItem("Select All",nullptr,false,!runLog.empty()))selectAll=true;ImGui::Separator();if(ImGui::MenuItem("Clear")){runLog.clear();selection.clear();}ImGui::EndPopup();}
   ImGui::SetCursorPosY(top+available.y-footer+10*u);float button=80*u,gap=6*u,total=5*button+4*gap;ImGui::SetCursorPosX(std::max(8*u,available.x-total-8*u));
   if(ImGui::Button("Launch...",{button,24*u}))runUiShow(2);runUiRecord("launch");ImGui::SameLine(0,gap);
   ImGui::BeginDisabled(!runActive);if(ImGui::Button("Stop",{button,24*u}))runStop();runUiRecord("stop");ImGui::EndDisabled();ImGui::SameLine(0,gap);
@@ -252,7 +262,7 @@ static void runUiCompile(){
   }
   if(runActive){ImGui::SetCursorPos({8*u,top+available.y-footer+12*u});ImGui::TextUnformatted(("Running "+runningProfile.name).c_str());}
  }
- if(runUiImportRequested){runUiImportRequested=false;runImportOpen();}runImportPanel();runUiBrowsePanel();
+ if(runUiImportRequested){runUiImportRequested=false;runImportOpen();}runImportPanel();
  if(runUiAtlasFrames>0&&--runUiAtlasFrames==0){
   try{std::filesystem::create_directories(runUiAtlasDirectory);std::ofstream(runUiAtlasDirectory/"geometry.json")<<nlohmann::json{{"toolkit","ImGui"},{"scale",u},{"theme",uiTheme},{"widgets",runUiRects}}.dump(2);auto relative=(runUiAtlasDirectory.lexically_relative(documentPath("ftebroom.cfg").parent_path())/"compile.png").generic_u8string();command(("screenshot "+organizationQuote(relative)+"\n").c_str());}catch(const std::exception& e){runError=e.what();}
   runUiAtlasWidth=runUiAtlasHeight=0;
@@ -295,7 +305,7 @@ static void runUiSettings(){
   }
   ImGui::SameLine();if(ImGui::Button("Cancel",{80*uiScale(),0}))runSettingsWindow=false;if(!runError.empty())ImGui::TextWrapped("%s",runError.c_str());
  }
- ImGui::End();ImGui::PopStyleVar();runUiBrowsePanel();
+ ImGui::End();ImGui::PopStyleVar();
 }
 static std::vector<RunEngineProfile> runUiEngineDraft;
 static std::string runUiEngineGame;
@@ -318,9 +328,9 @@ static void runUiEngines(){
     runUiFormRow("Path");ImGui::SetNextItemWidth(std::max(10*u,ImGui::GetContentRegionAvail().x-58*u));runUiEdit("##Engine path",e.path,"Click on the button to choose...");ImGui::SameLine(0,2*u);if(ImGui::Button("...",{56*u,0})){int selected=runUiEngineSelected;runUiChoose(e.path,[selected](const std::string& path){if(selected<int(runUiEngineDraft.size())){auto& e=runUiEngineDraft[selected];e.path=path;if(e.name.empty())e.name=std::filesystem::u8path(path).stem().u8string();}});}ImGui::EndTable();
    }ImGui::EndGroup();
   }else ImGui::TextWrapped("Select a game engine profile");ImGui::EndChild();
-  ImGui::SetCursorPosX(std::max(8*u,ImGui::GetContentRegionAvail().x-88*u));if(ImGui::Button("Close",{80*u,24*u}))open=false;
+  ImGui::SetCursorPosX(std::max(8*u,ImGui::GetContentRegionAvail().x-88*u));if(ImGui::Button("Close",{80*u,24*u}))open=false;runUiRecord("engine-close");
  }
- ImGui::End();if(!open){nlohmann::json engines=nlohmann::json::array();for(const auto& e:runUiEngineDraft)engines.push_back({{"id",e.id},{"name",e.name},{"path",e.path},{"parameters",e.parameters}});if(!runUiExecute({{"action","engineProfiles"},{"engines",engines}}).contains("error"))runEngineWindow=false;}runUiBrowsePanel();
+ ImGui::End();if(!open){nlohmann::json engines=nlohmann::json::array();for(const auto& e:runUiEngineDraft)engines.push_back({{"id",e.id},{"name",e.name},{"path",e.path},{"parameters",e.parameters}});if(!runUiExecute({{"action","engineProfiles"},{"engines",engines}}).contains("error"))runEngineWindow=false;}
 }
 static void runUiLaunch(){
  if(!runLaunchWindow)return;float u=uiScale();ImGui::SetNextWindowSize({660*u,360*u},ImGuiCond_FirstUseEver);bool open=true;
@@ -328,14 +338,14 @@ static void runUiLaunch(){
   runUiTitle(gameProfileName());float available=ImGui::GetContentRegionAvail().x,body=ImGui::GetContentRegionAvail().y-44*u;float side=250*u;
   ImGui::BeginChild("Launch description",{std::max(120*u,available-side-u),body});ImGui::SetCursorPos({20*u,20*u});ImGui::TextUnformatted("Launch Engine");ImGui::SetCursorPos({20*u,60*u});
   ImGui::PushTextWrapPos(ImGui::GetWindowWidth()-20*u);ImGui::TextUnformatted("Select a game engine from the list on the right and edit the commandline parameters in the text box below. You can use variables to refer to the map name and other values.");ImGui::PopTextWrapPos();
-  ImGui::SetCursorPosX(20*u);if(ImGui::Button("Configure engines..."))runEngineWindow=true;
+  ImGui::SetCursorPosX(20*u);if(ImGui::Button("Configure engines..."))runEngineWindow=true;runUiRecord("launch-configure");
   static std::string selectedId;static int selection=-1;if(selection>=int(runEngines.size())||(selection>=0&&runEngines[selection].id!=selectedId))selection=-1;
   ImGui::SetCursorPos({20*u,std::max(ImGui::GetCursorPosY()+4*u,body-70*u)});ImGui::TextUnformatted("Parameters");ImGui::SetCursorPosX(20*u);ImGui::SetNextItemWidth(std::max(20*u,ImGui::GetContentRegionAvail().x-20*u));ImGui::BeginDisabled(selection<0);
   if(selection>=0){if(runUiEdit("##Launch parameters",runEngines[selection].parameters,"Parameters passed to the game engine. Variables are allowed.",2))runUiSave();}else{std::string empty;runUiEdit("##Launch parameters",empty);}ImGui::EndDisabled();ImGui::EndChild();ImGui::SameLine(0,u);
   ImGui::BeginChild("Launch engine profiles",{0,body});for(int i=0;i<int(runEngines.size());++i)if(runUiListItem("launch-engine/"+std::to_string(i),runEngines[i].name,runEngines[i].path,i==selection)){selection=i;selectedId=runEngines[i].id;if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))try{runLaunchConfiguredEngine(runEngines[i]);}catch(const std::exception& e){runError=e.what();}}
   if(runEngines.empty())ImGui::TextWrapped("Click the 'Configure engines...' button to create a game engine profile.");ImGui::EndChild();
-  ImGui::SetCursorPosX(std::max(8*u,available-174*u));ImGui::BeginDisabled(selection<0);bool launch=ImGui::Button("Launch",{80*u,24*u});if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Enter))launch=true;
-  if(launch&&selection>=0)try{runUiSave();runLaunchConfiguredEngine(runEngines[selection]);}catch(const std::exception& e){runError=e.what();}ImGui::EndDisabled();ImGui::SameLine();if(ImGui::Button("Close",{80*u,24*u}))open=false;
+  ImGui::SetCursorPosX(std::max(8*u,available-174*u));ImGui::BeginDisabled(selection<0);bool launch=ImGui::Button("Launch",{80*u,24*u});runUiRecord("engine-launch");if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Enter))launch=true;
+  if(launch&&selection>=0)try{runUiSave();runLaunchConfiguredEngine(runEngines[selection]);}catch(const std::exception& e){runError=e.what();}ImGui::EndDisabled();ImGui::SameLine();if(ImGui::Button("Close",{80*u,24*u}))open=false;runUiRecord("launch-close");
  }
  ImGui::End();if(!open){runLaunchWindow=false;runUiSave();}
 }
@@ -343,12 +353,22 @@ static void runUiConfirmClose(){
  static int reason=0;if(runUiCloseRequest){reason=runUiCloseRequest;runUiCloseRequest=0;ImGui::OpenPopup("Stop compilation?");}
  if(ImGui::BeginPopupModal("Stop compilation?",nullptr,ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking)){
   ImGui::TextUnformatted(reason==2?"Closing the editor will stop the running compilation. Are you sure?":"Closing this dialog will stop the running compilation. Are you sure?");
-  if(ImGui::Button("Yes",{80*uiScale(),0})){if(runActive)runStop();runWindow=false;runUiSave();ImGui::CloseCurrentPopup();if(reason==2)documentRequest("exit");}
-  ImGui::SameLine();if(ImGui::Button("No",{80*uiScale(),0})||ImGui::IsKeyPressed(ImGuiKey_Escape))ImGui::CloseCurrentPopup();ImGui::EndPopup();
+  if(ImGui::Button("Yes",{80*uiScale(),0})){if(runActive)runStop();runWindow=false;runUiSave();ImGui::CloseCurrentPopup();if(reason==2)documentRequest("exit");}runUiRecord("close-confirm-yes");
+  ImGui::SameLine();if(ImGui::Button("No",{80*uiScale(),0})||ImGui::IsKeyPressed(ImGuiKey_Escape))ImGui::CloseCurrentPopup();runUiRecord("close-confirm-no");ImGui::EndPopup();
  }
 }
+static void runUiWriteLive(){
+ if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";std::ofstream(temp)<<nlohmann::json{{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"error",runError}}.dump();
+#ifdef _WIN32
+  MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
+#else
+  std::filesystem::rename(temp,path);
+#endif
+ }}
+ }
 static void runImGuiPanel(){
- if(!runWindow&&!runSettingsWindow&&!runLaunchWindow&&!runEngineWindow&&!runUiCloseRequest&&!ImGui::IsPopupOpen("Stop compilation?"))return;runLoad();
+ if(!runUiLive&&!runWindow&&!runSettingsWindow&&!runLaunchWindow&&!runEngineWindow&&!runUiCloseRequest&&!ImGui::IsPopupOpen("Stop compilation?"))return;runLoad();
  if(runUiAtlasWidth&&runUiAtlasTheme>=0){uiTheme=runUiAtlasTheme;uiStyle();}
- RunUiStyle style;if(runWindow)runUiCompile();runUiSettings();runUiEngines();runUiLaunch();runUiConfirmClose();
+ if(!runWindow){runUiOrigin={0,0};runUiRects=nlohmann::json::object();runUiRects["window"]={{"x",0},{"y",0},{"width",ImGui::GetIO().DisplaySize.x},{"height",ImGui::GetIO().DisplaySize.y}};}
+ RunUiStyle style;if(runWindow)runUiCompile();runUiSettings();runUiEngines();runUiLaunch();runUiBrowsePanel();runUiConfirmClose();runUiWriteLive();
 }

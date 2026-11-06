@@ -17,7 +17,10 @@ static nlohmann::json runWorkspaceJson(){
  return {{"profiles",p},{"engines",e},{"variables",runVariables},{"gameRoot",runGameRoot},{"baseMod",runBaseMod},{"enabledMods",runEnabledMods},{"modsConfigured",runModsConfigured}};
 }
 static void runReadWorkspace(const nlohmann::json& j){
- runProfiles.clear();runEngines.clear();runVariables=runBundledVariables;runGameRoot.clear();runEnabledMods.clear();
+ runProfiles.clear();runEngines.clear();runVariables.clear();
+ const std::vector<std::string> tools=gameProfile==2?std::vector<std::string>{"qbsp","vis","light"}:gameProfile==3?std::vector<std::string>{"q2bsp","q2vis","q2light"}:gameProfile==4?std::vector<std::string>{"hlcsg","hlbsp","hlvis","hlrad"}:std::vector<std::string>{"q3map2","bspc"};
+ for(const auto& name:tools){auto i=runBundledVariables.find(name);runVariables[name]=i==runBundledVariables.end()?"":i->second;}
+ runGameRoot.clear();runEnabledMods.clear();
  runBaseMod=gameProfile==2?"id1":gameProfile==3?"baseq2":gameProfile==4?"valve":"baseq3";
  for(const auto& p:j.value("profiles",nlohmann::json::array()))runProfiles.push_back(runProfileFromJson(p));
  for(const auto& e:j.value("engines",nlohmann::json::array()))runEngines.push_back({e.at("id"),e.at("name"),e.at("path"),e.at("parameters")});

@@ -354,7 +354,7 @@ static void runExportTrenchSnapshot(const RunTask& task,const std::filesystem::p
   auto text=q1Read(documentPath("data/export-map.map"));
   // Format conversion only; resource staging/model/contents transformations stay in
   // the legacy build adapter, not in a TrenchBroom Export Map task.
-  if(gameWad())text=ftebroom::quake1::map(text,q1MapFormat==0,q1WadList(),false,false);
+  if(gameWad())text=ftebroom::quake1::map(text,gameProfile==2&&q1MapFormat==0,"",false,false);
   auto entity=task.entityToAdd;
   if(!entity.is_null())for(auto it=runCameraEntity.begin();it!=runCameraEntity.end();++it){bool found=false;
     for(auto& p:entity)if(p.at("key")==it.key()){p["value"]=it.value();found=true;}
@@ -481,6 +481,7 @@ static bool runText(const char* label,std::string& value)
   std::vector<char> buffer(std::max<size_t>(4096,value.size()+256));std::copy(value.begin(),value.end(),buffer.begin());
   if(ImGui::InputText(label,buffer.data(),buffer.size())){value=buffer.data();return true;}return false;
 }
+static void runUiRecord(const std::string& key);
 #include "ftebroom_run_import.h"
 #include "ftebroom_run_commands.h"
 #include "ftebroom_run_ui.h"

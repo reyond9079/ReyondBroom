@@ -24,6 +24,10 @@ On first use without the new store, saved records in `ftebroom-run-profiles.txt`
 
 To deliberately roll back migration, restore the legacy file together with removing the new store. Verification must use disposable copies, not user data.
 
+## Observed reference behavior
+
+TrenchBroom 2026.2's Delete Files runner stops its deletion batch on an individual deletion error but still continues to the next task. A real readonly-folder experiment confirmed this behavior: the protected file remained, the following process ran, and no deletion failure was printed. The compatible runner preserves that behavior. Missing-directory/traversal errors still fail the task. Core tests include this distinction.
+
 ## Verification
 
 `native/profile` includes the upstream EL corpus, original customer profile import/roundtrip and file/export tests. `tests/compilation-parity-native.cfg` exercises actual child processes, Unicode files, recursive delete, no-op Test, Stop, engine IDs, mod arrays and per-game persistence inside the editor.

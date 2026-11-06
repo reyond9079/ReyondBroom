@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: compilation-${{ github.head_ref || github.ref }}
+  group: compilation-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   linux:
@@ -27,8 +27,13 @@ jobs:
           python-version: '3.12'
       - name: Install build/runtime dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev zlib1g-dev xvfb xauth libsdl2-2.0-0 ripgrep
+          if test -f /etc/apt/apt-mirrors.txt; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
+          fi
+          sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
+          sudo timeout 180s apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev zlib1g-dev xvfb xauth libsdl2-2.0-0 ripgrep
+      - name: Install UI probe dependencies
+        run: python -m pip install python-xlib Pillow
       - name: Verify base runtime and extract build dependencies
         run: |
           mkdir base deps bundle
@@ -49,6 +54,8 @@ jobs:
           cp deps/profile-core/compilation-profile-probe bundle/ReyondBroom-Linux-x64/tools/
       - name: Run real editor regression, restart, processes, files and UI atlas
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
+      - name: Exercise actual ImGui controls with OS input
+        run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-ui.py bundle/ReyondBroom-Linux-x64 qa/ui
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -59,6 +66,7 @@ jobs:
   windows:
     runs-on: windows-2022
     env:
+      RB_QA_RENDERER: d3d11 warp
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -91,9 +99,21 @@ jobs:
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
           cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
+      - name: Install UI screenshot dependency
+        shell: pwsh
+        run: python -m pip install Pillow
+      - name: Configure a usable desktop for the UI atlas
+        shell: pwsh
+        run: |
+          if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) {
+            Set-DisplayResolution -Width 3840 -Height 2160 -Force
+          }
       - name: Run real Windows editor checks and UI atlas
         shell: pwsh
         run: python scripts/test-compilation-runtime.py bundle/ReyondBroom-Windows-x64 qa
+      - name: Exercise actual Windows ImGui controls with OS input
+        shell: pwsh
+        run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
       - uses: actions/upload-artifact@v4
         if: always()
         with:

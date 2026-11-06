@@ -24,6 +24,12 @@ FilePlan planFiles(int kind,const std::string& source,const std::string& target,
 void executeFiles(const FilePlan& p) {
  if(p.kind==2){checked(tb::fs::Disk::createDirectory(p.target));for(const auto& s:p.sources)checked(tb::fs::Disk::copyFile(s,p.target));}
  else if(p.kind==3){checked(tb::fs::Disk::createDirectory(p.target.parent_path()));checked(tb::fs::Disk::moveFile(p.sources.at(0),p.target));}
- else for(const auto& s:p.sources)checked(tb::fs::Disk::deleteFile(s));
+ else for(const auto& s:p.sources){
+  // TB 2026.2 wraps the deletion fold in transform rather than and_then. A
+  // per-file deletion failure ends that fold, but the task still emits end().
+  // Preserve the observed reference behavior; directory/traversal errors above
+  // still fail the task. See the recorded readonly-folder oracle experiment.
+  if(tb::fs::Disk::deleteFile(s).is_error())break;
+ }
 }
 }

@@ -28,10 +28,15 @@ int main(){
  assert(fs::exists(root/"moved/renamed.txt")&&fs::exists(root/"cleanup/nested/keep.bsp")&&!fs::exists(root/"cleanup/nested/deep.TMP"));
  assert(planFiles(2,"cleanup/*.bsp","out",root).sources.empty()); // Copy is flat.
  bool absentParent=false;try{planFiles(4,"missing-dir/*.tmp","",root);}catch(...){absentParent=true;}assert(absentParent);
+ fs::create_directories(root/"locked");std::ofstream(root/"locked/protected.tmp")<<"locked";
+ fs::permissions(root/"locked/protected.tmp",fs::perms::owner_read);fs::permissions(root/"locked",fs::perms::owner_read|fs::perms::owner_exec);
+ executeFiles(planFiles(4,"locked/*.tmp","",root));assert(fs::exists(root/"locked/protected.tmp"));
+ fs::permissions(root/"locked",fs::perms::owner_all);fs::permissions(root/"locked/protected.tmp",fs::perms::owner_all);
  std::string map="// quoted braces must not change nesting\n{\n\"classname\" \"worldspawn\"\n\"_tb_test\" \"{ value }\"\n\"_TB_keep\" \"keep\"\n}\n{\"classname\" \"Light_Spot\"}\n";
  auto exported=exportEntities(map,true,"light*",Json::array({{{"key","classname"},{"value","info_player_start"}},{{"key","origin"},{"value","1 2 3"}},{{"key","_tb_extra"},{"value","remove"}}}));
  assert(exported.find("_tb_test")==std::string::npos&&exported.find("Light_Spot")==std::string::npos&&exported.find("_tb_extra")==std::string::npos);
  assert(exported.find("_TB_keep")!=std::string::npos&&exported.find("info_player_start")!=std::string::npos&&exported.find("1 2 3")!=std::string::npos);
  assert(exportEntities(map,false,"",nullptr)==map);assert(exportEntities(map,false,"info*",Json::array({{{"key","classname"},{"value","info_player_start"}}})).find("info_player_start")==std::string::npos);
+ assert(exportEntities("{\"classname\" \"worldspawn\" \"_tb_layer_omit_from_export\" \"1\"}",true,"world*",nullptr).find("worldspawn")!=std::string::npos);
  fs::remove_all(root);std::cout<<"PASS typed EL/scopes, argv, original TB disk traversal and export-only options\n";
 }

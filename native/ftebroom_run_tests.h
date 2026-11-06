@@ -13,12 +13,20 @@ static void testRunParity(int stage){
 #endif
  static RunProfile pipeline;static nlohmann::json before;static std::string previousMods;
  auto finishProfile=[&](std::vector<RunTask> tasks){RunProfile p{"Compatibility probe",root.u8string(),false,std::move(tasks)};p.trenchBroom=true;runBegin(p);};
- if(stage>=60&&stage<=64){uiScaleChoice=stage-60;uiStyle();}
+ if(stage==70||stage==71){
+  runLoad();auto custom=std::find_if(runProfiles.begin(),runProfiles.end(),[](const auto& p){return p.name=="Custom imported";});
+  expect(runProfiles.size()==2&&custom!=runProfiles.end(),"legacy_migration_does_not_duplicate_profiles");
+  expect(custom!=runProfiles.end()&&custom->work.empty()&&custom->tasks.size()==1&&!custom->tasks[0].enabled&&custom->tasks[0].flags==RunAllowNonzero&&!custom->trenchBroom,"legacy_fields_and_disabled_flags_preserved");
+  expect(runVariables.count("migration_variable")&&runVariables["migration_variable"]=="custom value","legacy_custom_variables_preserved");
+  auto original=documentPath("ftebroom-run-profiles.txt"),backup=original;backup+=".legacy.bak";
+  expect(std::filesystem::exists(backup)&&q1Read(original)==q1Read(backup),"legacy_original_and_backup_unchanged");
+  int previous=gameProfile;gameProfile=2;runLoad();expect(runProfiles.size()==1&&runProfiles.front().name=="Q1: Saved compile","legacy_scoped_profile_migrates_to_correct_game");gameProfile=previous;runLoad();expect(runSaveProfiles(),"legacy_canonical_store_saved");
+ }else if(stage>=60&&stage<=64){uiScaleChoice=stage-60;uiStyle();}
  else if(stage>=40&&stage<=43){
   runWindow=true;runUiAtlasWidth=stage>=42?1200:800;runUiAtlasHeight=stage>=42?800:600;runUiAtlasTheme=stage%2?2:1;runUiManagerHeight=442;
   runUiAtlasDirectory=documentPath("compile-ui-atlas")/(std::to_string(runUiAtlasWidth)+"x"+std::to_string(runUiAtlasHeight)+(stage%2?"-dark":"-light"));runUiAtlasFrames=3;
   expect(true,"imgui_compile_ui_capture_requested");
- }else if(stage==20){
+ }else if(stage==50){runWindow=true;runUiLive=true;}else if(stage==20){
   std::filesystem::remove_all(root);std::filesystem::create_directories(root/"cleanup/nested");
   buildWriteTexture(root/std::filesystem::u8path(u8"seed α.txt"),"seed data");buildWriteTexture(root/"cleanup/top.tmp","remove");buildWriteTexture(root/"cleanup/nested/deep.TMP","remove");buildWriteTexture(root/"cleanup/nested/keep.bsp","keep");
   pipeline={"TrenchBroom compatibility",root.u8string(),false,{
@@ -67,4 +75,30 @@ static void testRunParity(int stage){
  else if(stage==37)expect(!runActive&&runHadError&&runStep==0,"missing_engine_stops_when_configured");
  else if(stage==38)finishProfile({{2,documentFile.u8string(),"source-map-copy",true,RunCopyToDirectory}});
  else if(stage==39)expect(!runActive&&!runHadError&&q1Read(root/"source-map-copy"/documentFile.filename())==q1Read(documentFile),"copy_source_map_is_allowed");
+ else if(stage==80){
+#ifdef _WIN32
+  RunProfile p{"Relative executable",root.u8string(),false,{{1,"tools/compilation-profile-probe.exe","args relative"}}};
+#else
+  RunProfile p{"Relative executable",(app/"tools").u8string(),false,{{1,"./compilation-profile-probe","args relative"}}};
+#endif
+  p.trenchBroom=true;runBegin(p);
+ }else if(stage==81)expect(!runActive&&!runHadError&&runLog.find("PROBE_RAN")!=std::string::npos,"relative_executable_parent_uses_platform_rules");
+ else if(stage==82){
+#ifdef _WIN32
+  finishProfile({{1,"cmd.exe","/d /c echo PATH_RAN"}});
+#else
+  finishProfile({{1,"echo","PATH_RAN"}});
+#endif
+ }else if(stage==83)expect(!runActive&&!runHadError&&runLog.find("PATH_RAN")!=std::string::npos,"bare_executable_uses_path");
+ else if(stage==84){RunProfile p{"Empty workdir","",false,{{1,probe,"args empty-working"}}};p.trenchBroom=true;runBegin(p);}
+ else if(stage==85)expect(!runActive&&!runHadError&&runLog.find("PROBE_RAN")!=std::string::npos,"empty_workdir_keeps_process_directory");
+ else if(stage==86){auto dir=root/"created-by-export";std::filesystem::remove_all(dir);RunProfile p{"Export creates workdir",dir.u8string(),false,{{0,"${WORK_DIR_PATH}/new.map",""},{1,probe,"args after-export"}}};p.trenchBroom=true;runBegin(p);}
+ else if(stage==87)expect(!runActive&&!runHadError&&std::filesystem::exists(root/"created-by-export/new.map")&&runLog.find("PROBE_RAN")!=std::string::npos,"missing_workdir_can_be_created_by_export");
+ else if(stage==88){RunProfile p{"Missing workdir",(root/"still-missing").u8string(),false,{{1,probe,"args fail",true,RunAllowNonzero}}};p.trenchBroom=true;runBegin(p);}
+ else if(stage==89)expect(!runActive&&runHadError&&runStep==0,"missing_workdir_tool_spawn_always_fails");
+ else if(stage==90)finishProfile({{1,probe,"crash",true,RunAllowNonzero},{1,probe,"must-not-run"}});
+ else if(stage==91)expect(!runActive&&runHadError&&runStep==0,"crash_not_masked_by_nonzero_policy");
+ else if(stage==92)finishProfile({{1,probe,"exit 7"},{1,probe,"must-not-run"}});
+ else if(stage==93)expect(!runActive&&runHadError&&runStep==0,"strict_nonzero_error_stops");
+
 }

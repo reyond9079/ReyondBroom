@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "../native/third_party/json.hpp"
 #include <chrono>
+#include <csignal>
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -10,6 +14,14 @@
 #include <windows.h>
 #endif
 int probeMain(const std::vector<std::string>& args){
+ if(args.size()>1&&args[1]=="crash"){
+#ifdef _WIN32
+  SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);RaiseException(EXCEPTION_ACCESS_VIOLATION,EXCEPTION_NONCONTINUABLE,0,nullptr);
+#else
+  rlimit limit{0,0};setrlimit(RLIMIT_CORE,&limit);std::raise(SIGSEGV);
+#endif
+  return 255;
+ }
  if(args.size()>1&&args[1]=="exit")return args.size()>2?std::stoi(args[2]):7;
  if(args.size()>1&&args[1]=="sleep"){std::this_thread::sleep_for(std::chrono::milliseconds(args.size()>2?std::stoi(args[2]):10000));return 0;}
  if(args.size()>3&&args[1]=="write"){std::ofstream(std::filesystem::u8path(args[2]),std::ios::binary)<<args[3];return 0;}

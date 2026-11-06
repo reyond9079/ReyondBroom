@@ -12,9 +12,13 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
+          path-type: inherit
           update: false
           install: >-
             mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake

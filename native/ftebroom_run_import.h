@@ -67,7 +67,7 @@ static void runImportPanel()
   bool open=true;
   if(!ImGui::BeginPopupModal("Import TrenchBroom profiles",&open))return;
   ImGui::TextWrapped("Select a local CompilationProfiles.cfg from TrenchBroom. Imported steps are saved without running them.");
-  if(runText("Profile file",runImportPath))runImportReviewed=false;
+  if(runText("Profile file",runImportPath))runImportReviewed=false;runUiRecord("import-path");
   if(ImGui::CollapsingHeader("Browse files")){
     runText("Folder",runImportDirectory);
     if(ImGui::Button("Up one level")){
@@ -110,7 +110,7 @@ static void runImportPanel()
       runImportReviewed=true;
     }catch(const std::exception& error){runImportMessage=error.what();}
   }
-  ImGui::EndDisabled();
+  runUiRecord("import-review");ImGui::EndDisabled();
   ImGui::SameLine();
   ImGui::BeginDisabled(!runImportReviewed||runImportPreview.profiles.empty());
   if(ImGui::Button("Import profiles")){
@@ -119,9 +119,9 @@ static void runImportPanel()
       ImGui::CloseCurrentPopup();
     }else runImportMessage=runError;
   }
-  ImGui::EndDisabled();
+  runUiRecord("import-commit");ImGui::EndDisabled();
   ImGui::SameLine();
-  if(ImGui::Button("Cancel"))ImGui::CloseCurrentPopup();
+  if(ImGui::Button("Cancel"))ImGui::CloseCurrentPopup();runUiRecord("import-cancel");
   if(!runImportMessage.empty())ImGui::TextWrapped("%s",runImportMessage.c_str());
   if(runImportReviewed){
     ImGui::BeginChild("Profile review",{0,0},ImGuiChildFlags_Borders);

@@ -26,14 +26,14 @@ std::string exportEntities(const std::string& original,bool stripTb,const std::s
   for(const auto& p:added)map+=quote(p.at("key").get<std::string>())+" "+quote(p.at("value").get<std::string>())+"\n";
   map+="}\n";
  }
- auto tokens=tokenize(map);std::vector<std::pair<size_t,size_t>> erase;std::vector<std::pair<size_t,size_t>> properties;int depth=0;size_t begin=0;std::string classname;
+ auto tokens=tokenize(map);std::vector<std::pair<size_t,size_t>> erase;std::vector<std::pair<size_t,size_t>> properties;int depth=0;size_t begin=0,entityIndex=0;bool omitDefault=false;std::string classname;
  for(size_t i=0;i<tokens.size();++i){auto& t=tokens[i];
-  if(!t.quoted&&t.text=="{"){if(depth++==0){begin=t.begin;classname.clear();properties.clear();}}
+  if(!t.quoted&&t.text=="{"){if(depth++==0){begin=t.begin;classname.clear();properties.clear();omitDefault=false;}}
   else if(!t.quoted&&t.text=="}"){
    if(--depth<0)throw std::runtime_error("Unbalanced MAP braces.");
-   if(depth==0){if(!pattern.empty()&&!classname.empty()&&filenameMatches(classname,pattern))erase.push_back({begin,t.end});else erase.insert(erase.end(),properties.begin(),properties.end());}
+   if(depth==0){if(!(entityIndex++==0&&omitDefault)&&!pattern.empty()&&!classname.empty()&&filenameMatches(classname,pattern))erase.push_back({begin,t.end});else erase.insert(erase.end(),properties.begin(),properties.end());}
   }else if(depth==1&&t.quoted&&i+1<tokens.size()&&tokens[i+1].quoted){
-   const auto& v=tokens[++i];if(t.text=="classname")classname=v.text;
+   const auto& v=tokens[++i];if(t.text=="classname")classname=v.text;if(t.text=="_tb_layer_omit_from_export"&&v.text=="1")omitDefault=true;
    if(stripTb&&t.text.rfind("_tb_",0)==0)properties.push_back({t.begin,v.end});
   }
  }

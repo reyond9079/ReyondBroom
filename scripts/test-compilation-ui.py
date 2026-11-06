@@ -64,10 +64,24 @@ if os.name=='nt':
   point=wintypes.POINT();user.ClientToScreen(hwnd,ctypes.byref(point));rect=wintypes.RECT();user.GetClientRect(hwnd,ctypes.byref(rect));display=live()['display'];client_scale=(rect.right/display[0],rect.bottom/display[1]);
   (out/'window-position.json').write_text(json.dumps({'origin':[point.x,point.y],'client':[rect.right,rect.bottom],'display':display,'scale':client_scale,'target':hwnd,'foreground':user.GetForegroundWindow()}))
   return point.x,point.y
+ def window_diagnostics():
+  windows=[]
+  @ctypes.WINFUNCTYPE(ctypes.c_bool,wintypes.HWND,wintypes.LPARAM)
+  def collect(w,l):
+   pid=wintypes.DWORD();thread=user.GetWindowThreadProcessId(w,ctypes.byref(pid))
+   if pid.value==process.pid:
+    title=ctypes.create_unicode_buffer(512);kind=ctypes.create_unicode_buffer(256)
+    user.GetWindowTextW(w,title,512);user.GetClassNameW(w,kind,256)
+    windows.append({'handle':w,'thread':thread,'title':title.value,'class':kind.value,'visible':bool(user.IsWindowVisible(w))})
+   return True
+  user.EnumWindows(collect,0)
+  (out/'native-windows.json').write_text(json.dumps(windows,indent=2))
  # Hosted desktops can accept mouse input while dropping globally injected
  # keyboard events. Send native window messages, with scan codes and shared
  # keyboard state, through FTE's real WM_KEYDOWN/UP handler instead.
- def strokes(text):Desktop(backend='win32').window(handle=hwnd).send_keystrokes(text)
+ def strokes(text):
+  window_diagnostics()
+  Desktop(backend='win32').window(handle=hwnd).send_keystrokes(text)
  def chord(code,modifiers=()):
   strokes(''.join({17:'^',16:'+',18:'%'}[m] for m in modifiers)+chr(code).lower())
  codes={'ctrl':'^','shift':'+','alt':'%','enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`'}

@@ -98,5 +98,5 @@ else:
     with tarfile.open(out / runtime_name, 'w:gz') as archive:
         archive.add(root, arcname=root.name)
 for name in (runtime_name, source_name):
-    (out / (name + '.sha256')).write_text(sha(out / name) + '  ' + name + '\n')
+    (out / (name + '.sha256')).write_bytes((sha(out / name) + '  ' + name + '\n').encode('ascii'))
 print(info)

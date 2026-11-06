@@ -23,10 +23,10 @@ PKG_CONFIG_PATH="$PWD/../prefix/lib/pkgconfig" ./configure \
  --disable-everything --disable-autodetect --disable-network --disable-doc \
  --disable-x86asm --disable-debug --enable-small --disable-shared --enable-static \
  --enable-ffmpeg --enable-protocol=file \
- --enable-demuxer=wav,ogg,mp3,flac,pcm_s16le --enable-muxer=wav,ogg,mp3,flac,pcm_s16le \
+ --enable-demuxer=wav,ogg,mp3,flac,pcm_s16le,pcm_f32le --enable-muxer=wav,ogg,mp3,flac,pcm_s16le,pcm_f32le,null \
  --enable-decoder=pcm_s16le,pcm_u8,pcm_s24le,pcm_s32le,pcm_f32le,vorbis,mp3,mp3float,flac \
- --enable-encoder=pcm_s16le,vorbis,flac,libmp3lame --enable-libmp3lame \
- --enable-filter=aresample,volume,atrim,asetpts,asetrate,aformat,anull \
+ --enable-encoder=pcm_s16le,pcm_s24le,pcm_f32le,vorbis,flac,libmp3lame --enable-libmp3lame \
+ --enable-filter=aresample,volume,atrim,asetpts,asetrate,aformat,anull,atempo,loudnorm,afftdn,highpass,lowpass,acompressor,aecho,tremolo \
  --enable-parser=mpegaudio,flac,vorbis \
  --extra-cflags="-I$PWD/../prefix/include" --extra-ldflags="-static -L$PWD/../prefix/lib"
 mingw32-make -j8 MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe

@@ -1,0 +1,67 @@
+name: Release Linux UI update
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without v (UI-only update, engine and CSQC unchanged)
+        required: true
+        default: '0.5.0-alpha.125'
+      base_tag:
+        description: Official release supplying unchanged runtime and dependency sources
+        required: true
+        default: 'v0.5.0-alpha.124'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      BASE_TAG: ${{ inputs.base_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and QA tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libx11-dev zlib1g-dev xvfb xauth
+      - name: Fetch and verify base release
+        run: |
+          mkdir base deps
+          gh release download "$BASE_TAG" --repo "$GITHUB_REPOSITORY" --dir base --pattern '*-Linux-x64.tar.gz' --pattern '*-Linux-x64.tar.gz.sha256' --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+          (cd base && sha256sum -c ./*.sha256)
+          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
+          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+      - name: Build pinned Bullet libraries and editor module
+        run: |
+          cmake -S deps/bullet -B deps/bullet-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
+          cmake --build deps/bullet-build -j2 --target BulletDynamics BulletCollision LinearMath
+          g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
+          g++ -std=c++17 -O2 -Ideps/imgui tests/test-modern-light.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/test-modern-light
+          deps/test-modern-light
+      - name: Package runtime and complete corresponding sources
+        run: |
+          python3 scripts/package-linux-ui-update.py --base-runtime base/*-Linux-x64.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --version "$VERSION" --output out/release
+          (cd out/release && sha256sum -c ./*.sha256)
+      - name: Test the actual packaged runtime
+        run: |
+          mkdir qa
+          tar -xzf out/release/*-Linux-x64.tar.gz -C qa
+          cp tests/setup61.cfg qa/ReyondBroom-Linux-x64/ftebroom/
+          printf 'exec ftebroom.cfg\nset ftebroom_skip_setup 1\nin 7 ftebroom_test_desktop modern124dark\nin 10 screenshot reyon2-dark.png\nin 13 quit force\n' > qa/ReyondBroom-Linux-x64/ftebroom/release-dark.cfg
+          cd qa/ReyondBroom-Linux-x64
+          xvfb-run -a -s '-screen 0 1920x1080x24' env LIBGL_ALWAYS_SOFTWARE=1 timeout 80s ./fteqw-gl64 -ftebroom-child-processes -nohome -noupdates -nosound -window -width 1280 -height 800 -condebug +exec setup61.cfg > setup.log 2>&1
+          for check in setup61_game_choice setup_recommended_libre_default_without_mount setup61_libre_choice setup61_own_choice setup_recommended_manual_choice_retained setup_recommended_existing_mod_retained setup61_wizard_close setup61_resources_open setup61_resources_stays_closed; do grep "DESKTOP_PASS $check" setup.log; done
+          ! grep -E 'DESKTOP_FAIL|CSQC_Abort' setup.log
+          xvfb-run -a -s '-screen 0 1920x1080x24' env LIBGL_ALWAYS_SOFTWARE=1 timeout 80s ./fteqw-gl64 -ftebroom-child-processes -nohome -noupdates -nosound -window -width 1920 -height 1080 -condebug +exec release-dark.cfg > dark.log 2>&1
+          for check in modern124_dark_workspace_gutter modern124_integer_snap_icon_toggles; do grep "DESKTOP_PASS $check" dark.log; done
+          ! grep -E 'DESKTOP_FAIL|CSQC_Abort' dark.log
+      - name: Upload validated archives and screenshots to the draft release
+        run: |
+          test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
+          gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 qa/ReyondBroom-Linux-x64/ftebroom/reyon2-dark.png qa/ReyondBroom-Linux-x64/ftebroom/setup61-games.png qa/ReyondBroom-Linux-x64/ftebroom/setup61-mods.png --clobber
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-qa
+          path: |
+            qa/**/*.log
+            qa/**/*.png

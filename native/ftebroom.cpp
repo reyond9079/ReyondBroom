@@ -1536,7 +1536,7 @@ static void QDECL actionFocusTick(int)
   clipboardPump();
   documentTick();
   // Compiler jobs must advance even while the UI is occluded or another menu owns focus.
-  if(ready){runTick();buildTick();modPreviewTick();pluginsTick();bbImportTick();}
+  if(ready){runQtPump();runTick();buildTick();modPreviewTick();pluginsTick();bbImportTick();}
   if (!ready || input->HasMenuFocus())
     return;
   modelEditorCameraEnd(false);
@@ -1918,6 +1918,7 @@ static void testModControls()
 }
 static void shutdownEditor()
 {
+  runQtShutdown();
   pluginsShutdown();
   settleCancel=true;if(settleJob.valid())settleJob.wait();
   textureFolderCancel=true;if(textureFolderJob.valid())textureFolderJob.wait();

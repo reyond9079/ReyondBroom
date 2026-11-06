@@ -4,6 +4,7 @@
 #include "ftebroom_resource_directory.h"
 #include "ftebroom_wall_file.h"
 #include "ftebroom_mod_definitions.h"
+static void runOpenSettings();
 static int gameProfile;
 static int gameWallMode=5;
 static bool gameClearSky=true;
@@ -110,6 +111,7 @@ static void gameProfileFields(bool wizard=false)
     ImGui::TextWrapped(gameProfile==3?"Compiler: bundled ericw-tools for Quake II. No compiler path is required here. Configure stages later in Setup compile.":"Compiler: bundled SDHLT (CSG, BSP, VIS and RAD). No compiler path is required here. Keep LIGHT / RAD enabled for lightmaps; configure stages later in Setup compile.");
     setupModBrowse();
   }
+  if(ImGui::Button("Compilation profiles settings..."))runOpenSettings();
   if(gameProfile==1) {
     setupPathField("Runtime mod directory (optional for mapping)",gameMod,sizeof gameMod);
     ImGui::TextWrapped("Preview engine: bundled FTE (required for embedded free camera).");

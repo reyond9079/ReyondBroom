@@ -10,18 +10,20 @@ static bool runSaveImported(RunImport imported)
 {
   auto oldVariables=runVariables;
   const auto oldCount=runProfiles.size();
-  for(auto& profile:imported.profiles){
-    const auto base=profile.name;
-    for(int suffix=1;std::any_of(runProfiles.begin(),runProfiles.end(),[&](const auto& p){return p.name==profile.name;});++suffix)
-      profile.name=base+" (TrenchBroom "+std::to_string(suffix)+")";
-    runProfiles.push_back(std::move(profile));
+  const auto oldEngines=runEngines;
+  for(auto engine:imported.engines){
+    const auto id=engine.id;int suffix=1;
+    while(std::any_of(runEngines.begin(),runEngines.end(),[&](const auto& e){return e.id==engine.id;}))engine.id=id+"-import-"+std::to_string(suffix++);
+    if(id!=engine.id)for(auto& p:imported.profiles)for(auto& t:p.tasks)if(t.engineProfileId==id)t.engineProfileId=engine.id;
+    runEngines.push_back(std::move(engine));
   }
+  for(auto& profile:imported.profiles)runProfiles.push_back(std::move(profile));
   for(const auto& variable:imported.missingVariables){
     auto& value=runVariables[variable.first];
     if(value.empty())value=variable.second;
   }
   if(!runSaveProfiles()){
-    runProfiles.resize(oldCount);
+    runProfiles.resize(oldCount);runEngines=oldEngines;
     runVariables=std::move(oldVariables);
     return false;
   }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+string fb_map_quote(string text);
 var float autocvar_ftebroom_instantiate_defaults=0;
 int *fb_property_entities;int fb_property_entity_count,fb_property_epoch;
 int fb_ui_attached,fb_ui_linked;
@@ -73,6 +74,7 @@ string ReyondBroom_UIQuery(float operation,float cursor)
     if(fb_node_count<2)return "";
     fb_ui_attached=TRUE;
     if(operation==0)return sprintf("RBUI1 %i %i %i %i %i %i",fb_property_epoch,fb_property_entity_count,fb_node_count,fb_grid_geometry_epoch,fb_entity_render_epoch,fb_ui_linked);
+    if(operation==7)return strcat("RBMODS1 ",fb_map_quote(fb_nodes[0].fields["_tb_mod"]));
     if(operation==5) {int view=bound(1,(int)cursor,3);return sprintf("RBVIEW1 %.9g %.9g %.9g",fb_view_centers[view][0],fb_view_centers[view][1],fb_view_centers[view][2]);}
     if(operation==6) {if(!fb_visual_has_bounds)return "";return sprintf("RBBOUNDS1 %.9g %.9g %.9g %.9g %.9g %.9g",fb_visual_min_x,fb_visual_min_y,fb_visual_min_z,fb_visual_max_x,fb_visual_max_y,fb_visual_max_z);}
     if(operation==4) {
@@ -227,4 +229,16 @@ float fb_entity_command()
     if(argv(0)=="ftebroom_entity_definitions_loaded") {fb_entity_definitions_load();editor_ents_reload();fb_grid_geometry_epoch++;return TRUE;}
     if(argv(0)=="ftebroom_entity_definition_path") {string path=strzone(argv(1));fb_tx_set_key(0,"_tb_def",path,HIST_ENTITY);strunzone(path);return TRUE;}
     return FALSE;
+}
+
+// Compilation settings edit the same per-map ordered mod list as TrenchBroom.
+// One transaction preserves Undo and all unrelated worldspawn properties.
+void fb_compile_mods(string replacement)
+{
+    string mods=strzone(replacement);fb_document_tick();
+    if(fb_nodes[0].fields["_tb_mod"]==mods){strunzone(mods);return;}
+    string data="";int count=fb_entity_tokenize(terrain_edit(TEREDIT_ENT_GET,0));
+    for(int k=0;k<count;k+=2)if(argv(k)!="_tb_mod")data=strcat(data,fb_map_quote(argv(k))," ",fb_map_quote(argv(k+1)),"\n");
+    if(mods!="")data=strcat(data,"\"_tb_mod\" ",fb_map_quote(mods),"\n");
+    data=strzone(data);fb_tx_begin("Enabled mods");fb_tx_entity_set(0,data,HIST_ENTITY);fb_tx_commit();strunzone(data);strunzone(mods);
 }

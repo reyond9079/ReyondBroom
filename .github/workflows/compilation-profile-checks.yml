@@ -1,0 +1,118 @@
+name: Compilation profile parity
+on:
+  push:
+    branches: ['feat/REYON-6-compilation-parity']
+  pull_request:
+    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', '.github/workflows/compilation-profile-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [Linux-x64, Linux-SDL2-x64]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Qt and build/runtime dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev zlib1g-dev xvfb xauth patchelf libsdl2-2.0-0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 libxcb-render-util0 ripgrep
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 -O "$PWD/qt" --archives qtbase qtsvg icu
+      - name: Verify base runtime and extract build dependencies
+        run: |
+          mkdir base deps bundle
+          gh release download v0.5.0-alpha.126 --repo "$GITHUB_REPOSITORY" --dir base --pattern "*-$PLATFORM.tar.gz" --pattern "*-$PLATFORM.tar.gz.sha256" --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+          (cd base && sha256sum -c ./*.sha256)
+          tar -xf base/*-$PLATFORM.tar.gz -C bundle
+          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
+          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+      - name: Build core, upstream corpus, host and CSQC
+        run: |
+          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests
+          cmake -S deps/bullet -B deps/bullet-build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
+          cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
+          g++ -std=c++17 -O1 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o bundle/ReyondBroom-Linux-x64/fteplug_ftebroom_amd64.so
+          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz'
+          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
+          cp csaddon.dat bundle/ReyondBroom-Linux-x64/ftebroom/csaddon.dat
+          cp deps/profile-core/compilation-profile-probe bundle/ReyondBroom-Linux-x64/tools/
+      - name: Build and deploy same-process Qt UI
+        run: |
+          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64
+          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64 --output bundle/ReyondBroom-Linux-x64
+      - name: Run real editor regression, restart, processes, files and UI atlas
+        run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compilation-${{ matrix.platform }}
+          path: |
+            qa
+            deps/profile-core/Testing/Temporary/LastTest.log
+  windows:
+    runs-on: windows-2022
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          update: false
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make mingw-w64-x86_64-zlib git make unzip
+      - name: Install official MSVC Qt kit (C ABI boundary)
+        shell: pwsh
+        run: |
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt windows desktop 6.10.3 win64_msvc2022_64 -O "$PWD/qt" --archives qtbase qtsvg
+      - name: Verify and unpack base runtime and SDK
+        shell: msys2 {0}
+        run: |
+          mkdir base deps bundle
+          gh release download v0.5.0-alpha.126 --repo "$GITHUB_REPOSITORY" --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+          (cd base && sha256sum -c ./*.sha256)
+          unzip -q base/*-Windows-x64.zip -d bundle
+          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
+          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+      - name: Build MinGW host, core, upstream tests, actual probe and CSQC
+        shell: msys2 {0}
+        run: |
+          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests --generator 'MinGW Makefiles'
+          cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
+          cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
+          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
+          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
+          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
+          cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
+          cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
+      - name: Build official MSVC Qt UI and deploy
+        shell: pwsh
+        run: |
+          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --generator 'Visual Studio 17 2022'
+          if ($LASTEXITCODE) { throw 'Qt UI build failed' }
+          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --output bundle/ReyondBroom-Windows-x64
+          if ($LASTEXITCODE) { throw 'Qt UI deploy failed' }
+      - name: Run real Windows editor checks and UI atlas
+        shell: pwsh
+        run: python scripts/test-compilation-runtime.py bundle/ReyondBroom-Windows-x64 qa
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compilation-Windows-x64
+          path: |
+            qa
+            deps/profile-core/Testing/Temporary/LastTest.log

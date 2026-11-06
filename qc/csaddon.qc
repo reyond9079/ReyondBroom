@@ -942,6 +942,7 @@ void(float prevprogs) init =
     registercommand("ftebroom_test_organize");
     registercommand("ftebroom_test_entities");
     registercommand("ftebroom_export_map");
+    registercommand("ftebroom_compile_mods");
     registercommand("ftebroom_gpu_snapshot");
     registercommand("ftebroom_material_remap");
     registercommand("ftebroom_export_selected_bsp");

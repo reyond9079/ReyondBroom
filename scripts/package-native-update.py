@@ -19,6 +19,8 @@ p.add_argument('--base-runtime', type=Path, required=True)
 p.add_argument('--base-sources', type=Path, required=True)
 p.add_argument('--module', type=Path, required=True)
 p.add_argument('--audio-dir', type=Path)
+p.add_argument('--compilation-runtime', type=Path, required=True, help='Deployed Qt component and resources runtime root')
+p.add_argument('--csprogs', type=Path, required=True)
 p.add_argument('--version', required=True)
 p.add_argument('--output', type=Path, required=True)
 a = p.parse_args()
@@ -54,6 +56,8 @@ with tarfile.open(fileobj=io.BytesIO(checkout)) as archive:
     archive.extractall(sources / 'sources/ftebroom', filter='data')
 module_name = 'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so'
 shutil.copy2(a.module, root / module_name)
+shutil.copytree(a.compilation_runtime, root, dirs_exist_ok=True)
+shutil.copy2(a.csprogs, root/'ftebroom/csaddon.dat')
 subprocess.run(['strip', str(root / module_name)], check=True)
 shutil.copy2(src / 'runtime/fonts/FTEBroom-CJK.otf', root / 'ftebroom/fonts/FTEBroom-CJK.otf')
 shutil.copytree(src / 'docs', root / 'docs', dirs_exist_ok=True)
@@ -76,7 +80,7 @@ revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=src, text=T
 compiler = subprocess.check_output(['g++', '--version'], text=True).splitlines()[0]
 info = (f'ReyondBroom {a.version}\nPlatform: {a.platform}\nEditor revision: {revision}\n'
         f'Editor compiler: {compiler}\nModule SHA256: {sha(root / module_name)}\n'
-        'Native module update; engine, CSQC, plugins and game compilers retained from the verified base runtime.\n'
+        'Native module update; engine, plugins and game compilers retained from the verified base runtime.\n'
         + ('Windows audio helper rebuilt from pinned sources.\n' if windows else 'System FFmpeg is used through the bundled wrapper.\n'))
 (root / 'build-info.txt').write_text(info)
 (sources / 'RELEASE-BUILD.txt').write_text(info + 'Build/QA: sources/ftebroom/.github/workflows/release-linux-ui-update.yml\n')

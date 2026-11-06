@@ -50,17 +50,25 @@ jobs:
           (cd base && sha256sum -c ./*.sha256)
           unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
           for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+      - name: Build compatibility core, native UI and CSQC
+        run: |
+          sudo apt-get install -y libgl-dev patchelf
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 -O "$PWD/qt" --archives qtbase qtsvg icu
+          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests
+          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64
+          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64 --output deps/compilation-runtime
+          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz'
+          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
       - name: Build and test the native module and profile importer
         run: |
           cmake -S deps/bullet -B deps/bullet-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
           cmake --build deps/bullet-build -j2 --target BulletDynamics BulletCollision LinearMath
-          g++ -std=c++17 -O2 tests/trenchbroom-profiles.cpp -o deps/profile-test
-          deps/profile-test tests/fixtures/CompilationProfiles-cpu-count.cfg
-          g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
+          g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
           scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
       - name: Package native runtime and corresponding sources
         run: |
-          python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --version "$VERSION" --output out/release
+          python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --compilation-runtime deps/compilation-runtime --csprogs csaddon.dat --version "$VERSION" --output out/release
           (cd out/release && sha256sum -c ./*.sha256)
       - name: Validate the packaged editor
         run: |
@@ -117,6 +125,15 @@ jobs:
           try { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz'), "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true) } finally { $zip.Dispose() }
           Expand-Archive (Get-ChildItem sdk/*-Sources.zip).FullName deps/base
           foreach ($name in @('bullet','fteqw','imgui')) { Expand-Archive "deps/base/sources/$name-source.zip" "deps/$name" }
+      - name: Build MSVC Qt UI component
+        shell: pwsh
+        run: |
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt windows desktop 6.10.3 win64_msvc2022_64 -O "$PWD/qt" --archives qtbase qtsvg
+          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --generator 'Visual Studio 17 2022'
+          if ($LASTEXITCODE) { throw 'Qt UI build failed' }
+          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --output deps/compilation-runtime
+          if ($LASTEXITCODE) { throw 'Qt UI deploy failed' }
       - name: Rebuild and test the complete audio helper
         shell: msys2 {0}
         run: |
@@ -127,13 +144,14 @@ jobs:
         run: |
           cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
           cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
-          g++ -std=c++17 -O2 tests/trenchbroom-profiles.cpp -o audio-qa/profile-test.exe
-          audio-qa/profile-test.exe tests/fixtures/CompilationProfiles-cpu-count.cfg
-          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests --generator 'MinGW Makefiles'
+          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
+          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
+          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
       - name: Package runtime and complete corresponding sources
         shell: msys2 {0}
         run: |
-          python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --audio-dir tools/audio --version "$VERSION" --output out/release
+          python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --compilation-runtime deps/compilation-runtime --csprogs csaddon.dat --audio-dir tools/audio --version "$VERSION" --output out/release
           (cd out/release && sha256sum -c ./*.sha256)
       - name: Upload validated packages to the draft release
         shell: pwsh

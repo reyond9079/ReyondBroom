@@ -499,7 +499,7 @@ static void testRunProfiles()
       {2,"source.txt","copy.txt"},
       {3,"copy.txt","renamed.txt"},
       {4,"renamed.txt",""},{1,"missing-disabled-tool","",false}}};
-    runLoad();runBegin(profile);
+    runLoad();runBegin(profile);runMissingDecision=1;
   }
   else if(stage==1)
   {

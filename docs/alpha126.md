@@ -12,9 +12,9 @@ the expression; no machine-specific thread count is baked into the import.
 Other TrenchBroom expressions still require manual setup. No shell evaluation was
 added, and importing does not execute compiler/copy/delete tasks.
 
-The supplied file also has `.bspw` in the first profile's VIS arguments. That is a
-separate filename typo: import preserves it rather than silently changing user
-commands. Use `.bsp` there before running that profile. External `D:/...` compiler
+The supplied configuration imports as-is, including `.bspw` in the first
+profile's VIS arguments. Import preserves user filenames and commands; no
+extension changes are needed to import this profile. External `D:/...` compiler
 and game paths still need to exist on the user's machine.
 
 Alpha 126 also includes the approved multitrack Sound Editor already merged in

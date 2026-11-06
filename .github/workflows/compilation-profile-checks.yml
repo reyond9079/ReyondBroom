@@ -6,13 +6,67 @@ on:
   pull_request:
     paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', '.github/workflows/compilation-profile-checks.yml']
   workflow_dispatch:
+    inputs:
+      prepared_run_id:
+        description: Reuse a Windows-editor artifact to reproduce OS input without recompiling unchanged C++
+        required: false
+        default: ''
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: compilation-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  windows-input-reproduction:
+    if: github.event_name == 'workflow_dispatch' && inputs.prepared_run_id != ''
+    runs-on: windows-2022
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREPARED_RUN: ${{ inputs.prepared_run_id }}
+      RB_QA_RENDERER: gl rb_qa_opengl.dll
+      GALLIUM_DRIVER: llvmpipe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore verified runtime and the compiled editor with matching sources
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force base, prepared, mesa | Out-Null
+          gh release download v0.5.0-alpha.126 --repo $env:GITHUB_REPOSITORY --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256'
+          if ($LASTEXITCODE) { throw 'Runtime download failed' }
+          $sum = (Get-Content (Get-ChildItem base/*.sha256).FullName) -split '\s+'
+          if ((Get-FileHash (Join-Path base $sum[1]) -Algorithm SHA256).Hash.ToLower() -ne $sum[0]) { throw 'Runtime checksum mismatch' }
+          Expand-Archive (Get-ChildItem base/*.zip).FullName bundle
+          gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Windows-editor --dir prepared
+          if ($LASTEXITCODE) { throw 'Prepared editor download failed' }
+          $revision = (Get-Content prepared/compilation-editor-revision.txt).Trim()
+          git diff --exit-code $revision HEAD -- native qc tests/compilation-profile-probe.cpp
+          if ($LASTEXITCODE) { throw 'Prepared C++/CSQC/probe sources differ: rebuild the editor first' }
+          Copy-Item prepared/fteplug_ftebroom_x64.dll bundle/ReyondBroom-Windows-x64 -Force
+          Copy-Item prepared/ftebroom/csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom -Force
+          Copy-Item prepared/tools/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools -Force
+          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
+          if ($LASTEXITCODE) { throw 'Renderer download failed' }
+          if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Renderer checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
+          if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
+          Copy-Item mesa/extracted/x64/*.dll bundle/ReyondBroom-Windows-x64/bin -Force
+          Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
+          python -m pip install Pillow pywinauto
+      - name: Exercise actual Windows controls with OS input
+        run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compilation-Windows-input-reproduction
+          path: qa
   windows-reference:
+    if: github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == ''
     runs-on: windows-2022
     env:
       GH_TOKEN: ${{ github.token }}
@@ -45,6 +99,7 @@ jobs:
           name: compilation-Windows-reference
           path: qa
   linux:
+    if: github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == ''
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -102,6 +157,7 @@ jobs:
             qa
             deps/profile-core/Testing/Temporary/LastTest.log
   windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == ''
     runs-on: windows-2022
     env:
       RB_QA_RENDERER: gl rb_qa_opengl.dll
@@ -138,6 +194,7 @@ jobs:
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
           cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
+          git rev-parse HEAD > bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
       # Test-machine renderer only. The editor distribution does not gain a Mesa dependency.
       - name: Install a pinned software OpenGL renderer for the headless Windows host
         shell: pwsh
@@ -156,7 +213,16 @@ jobs:
           Copy-Item $gl.FullName bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
       - name: Install UI screenshot dependency
         shell: pwsh
-        run: python -m pip install Pillow
+        run: python -m pip install Pillow pywinauto
+      - name: Preserve the built Windows editor for focused UI reproductions
+        uses: actions/upload-artifact@v4
+        with:
+          name: compilation-Windows-editor
+          path: |
+            bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
+            bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
+            bundle/ReyondBroom-Windows-x64/tools/compilation-profile-probe.exe
+            bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
       - name: Configure a usable desktop for the UI atlas
         shell: pwsh
         run: |

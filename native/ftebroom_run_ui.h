@@ -11,6 +11,7 @@ static float runUiManagerHeight=442.f;
 static nlohmann::json runUiRects=nlohmann::json::object(),runUiGlobalRects=nlohmann::json::object();
 static ImVec2 runUiOrigin;
 static bool runUiLive=false;
+static nlohmann::json runUiInputTrace=nlohmann::json::array();
 static std::string runUiRecordPrefix;
 static int runUiAtlasWidth=0,runUiAtlasHeight=0,runUiAtlasTheme=-1,runUiAtlasFrames=0;
 static std::filesystem::path runUiAtlasDirectory;
@@ -375,7 +376,7 @@ static void runUiConfirmClose(){
  }
 }
 static void runUiWriteLive(){
- if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";std::ofstream(temp)<<nlohmann::json{{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError}}.dump();
+ if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";std::ofstream(temp)<<nlohmann::json{{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError},{"inputTrace",runUiInputTrace}}.dump();
 #ifdef _WIN32
   MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
 #else

@@ -1144,6 +1144,10 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
 {
   initialize();
   auto& io = ImGui::GetIO();
+  if(runUiLive&&(type==1||type==2)){
+    if(runUiInputTrace.size()>=100)runUiInputTrace.erase(runUiInputTrace.begin());
+    runUiInputTrace.push_back({{"type",type},{"key",key},{"unicode",unicode},{"ctrlCode",input->GetKeyCode("ctrl",nullptr)},{"backspaceCode",input->GetKeyCode("backspace",nullptr)},{"ctrl",io.KeyCtrl},{"active",ImGui::GetActiveID()},{"nav",runUiNavigation()}});
+  }
   if(modelEditorInput(type,key,x,y)){
     if(type==0){io.AddMousePosEvent(modelEditCameraCursor.x,modelEditCameraCursor.y);panel(w,h);}
     return qtrue;

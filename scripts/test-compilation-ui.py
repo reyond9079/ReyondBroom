@@ -42,6 +42,7 @@ def expect(value,name):
 if os.name=='nt':
  from ctypes import wintypes
  user=ctypes.windll.user32
+ from pywinauto import Desktop
  user.SetProcessDPIAware()
  hwnd=None;client_scale=(1,1)
  user.GetForegroundWindow.restype=wintypes.HWND
@@ -61,7 +62,7 @@ if os.name=='nt':
   user.EnumWindows(enum,0)
   assert hwnd
   point=wintypes.POINT();user.ClientToScreen(hwnd,ctypes.byref(point));rect=wintypes.RECT();user.GetClientRect(hwnd,ctypes.byref(rect));display=live()['display'];client_scale=(rect.right/display[0],rect.bottom/display[1]);
-  (out/'window-position.json').write_text(json.dumps({'origin':[point.x,point.y],'client':[rect.right,rect.bottom],'display':display,'scale':client_scale}))
+  (out/'window-position.json').write_text(json.dumps({'origin':[point.x,point.y],'client':[rect.right,rect.bottom],'display':display,'scale':client_scale,'target':hwnd,'foreground':user.GetForegroundWindow()}))
   return point.x,point.y
  # FTE maps physical scan codes from WM_KEYDOWN, unlike UIA text injection.
  # A zero bScan can type WM_CHAR text but cannot operate Ctrl/Backspace/Tab.
@@ -82,7 +83,7 @@ if os.name=='nt':
    if shift:press(16,True)
    time.sleep(.005)
  def mouse(x,y,right=False):
-  ox,oy=position();user.SetForegroundWindow(hwnd);user.SetCursorPos(int(ox+x*client_scale[0]),int(oy+y*client_scale[1]));time.sleep(.08)
+  ox,oy=position();Desktop(backend='win32').window(handle=hwnd).set_focus();user.SetCursorPos(int(ox+x*client_scale[0]),int(oy+y*client_scale[1]));time.sleep(.08)
   user.mouse_event(8 if right else 2,0,0,0,0);time.sleep(.08);user.mouse_event(16 if right else 4,0,0,0,0);time.sleep(.25)
 else:
  from Xlib import X,XK,display
@@ -195,6 +196,7 @@ try:
 finally:
  try:
   (out/'last-state.json').write_text(json.dumps(live(),indent=2))
+  shutil.copy2(store,out/'profiles-final.json')
   from PIL import ImageGrab
   ImageGrab.grab().save(out/'last-desktop.png')
  except Exception as error:(out/'capture-error.txt').write_text(str(error))

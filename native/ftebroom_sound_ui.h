@@ -657,12 +657,23 @@ static void soundInspector() {
       }
       auto before = p;
       float amount = c->fx.amount;
-      bool changed = ImGui::SliderFloat("Intensity", &amount, 0, 1);
-      if (changed)
-        for (auto &v : p.clips)
-          if (s.selected.count(v.id))
-            v.fx.amount = amount;
-      soundDirtyField(before, changed, "Effect intensity");
+      bool changed = false, adjustable = false;
+      for (const auto &clip : p.clips)
+        if (s.selected.count(clip.id))
+          adjustable |=
+              clip.fx.denoise || clip.fx.voice == 4 || clip.fx.voice == 5;
+      {
+        SoundDisabled amountDisabled(!adjustable);
+        changed = ImGui::SliderFloat("Intensity", &amount, 0, 1);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+          ImGui::SetTooltip(
+              "Intensity applies to Reduce noise, Echo and Tremolo.");
+        if (changed)
+          for (auto &clip : p.clips)
+            if (s.selected.count(clip.id))
+              clip.fx.amount = amount;
+        soundDirtyField(before, changed, "Effect intensity");
+      }
       before = p;
       bool bypass = c->fx.bypass;
       changed = ImGui::Checkbox("Bypass effects", &bypass);

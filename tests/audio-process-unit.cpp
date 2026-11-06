@@ -99,6 +99,19 @@ int main(int argc, char **argv) {
     assert(roundtrip.rate == 48000 && roundtrip.channels == 1 &&
            std::abs(double(roundtrip.length()) / 44100 - 2) < .03);
   }
+  auto surroundArgs = ffargs();
+  auto surround = w.path / "surround.flac";
+  surroundArgs.insert(surroundArgs.end(),
+                      {"-i", target.u8string(), "-ac", "6", "-c:a", "flac",
+                       surround.u8string()});
+  process(exe, surroundArgs, w.path / "surround.log");
+  bool surroundRejected = false;
+  try {
+    decode(exe, surround.u8string(), readBytes(surround), 44100);
+  } catch (...) {
+    surroundRejected = true;
+  }
+  assert(surroundRejected);
   auto cancel = std::make_shared<JobControl>();
   cancel->cancel = true;
   auto original = readBytes(target);
@@ -157,6 +170,7 @@ int main(int argc, char **argv) {
   m = prepare(exe, p);
   assert(m.prepared.at(id).pcm == noisy);
   std::cout << "PASS four codecs, 48k mono range, cancellation preserves "
-               "target, running-child cancellation, silent normalization, "
+               "target, running-child cancellation, multichannel rejection, "
+               "silent normalization, "
                "noise reduction, five voice filters and bypass\n";
 }

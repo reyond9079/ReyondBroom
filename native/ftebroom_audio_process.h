@@ -296,10 +296,21 @@ inline Source decode(const fs::path &exe, std::string uri, std::string bytes,
   std::smatch match;
   if (std::regex_search(
           log, match,
-          std::regex("Audio: [^\\n]*?([0-9]+) Hz, (mono|stereo)"))) {
+          std::regex("Audio: [^\\n]*?([0-9]+) Hz, ([^,\\r\\n]+)"))) {
     s.rate = std::stoi(match[1]);
-    s.channels = match[2] == "mono" ? 1 : 2;
-  }
+    auto layout = match[2].str();
+    if (layout == "mono" || layout == "1 channels")
+      s.channels = 1;
+    else if (layout == "stereo" || layout == "2 channels")
+      s.channels = 2;
+    else
+      throw std::runtime_error(
+          "Only mono/stereo audio sources are supported; export a stereo copy "
+          "before importing this channel layout: " +
+          layout);
+  } else
+    throw std::runtime_error("Cannot determine original sample rate/channel "
+                             "layout; source unchanged");
 
   s.pcm = readPCM(output);
   s.buildPeaks();

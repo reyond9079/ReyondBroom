@@ -1,6 +1,6 @@
 # Sound Editor
 
-Open WAV, OGG, MP3 or FLAC from the Mod file manager, including PAK/PK3 members.
+Open mono/stereo WAV, OGG, MP3 or FLAC from the Mod file manager, including PAK/PK3 members.
 The editor opens a full-window audio workspace with Media on the left, the master
 monitor in the middle, the clip inspector on the right and tracks below.
 The layout and audio shortcut preset follow the approved REYON-4 mockup v1.

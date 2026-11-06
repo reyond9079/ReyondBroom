@@ -42,6 +42,10 @@ jobs:
           gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Windows-editor --dir prepared
           if ($LASTEXITCODE) { throw 'Prepared editor download failed' }
           $revision = (Get-Content prepared/compilation-editor-revision.txt).Trim()
+          # PR checkouts build a synthetic merge commit, which may no longer be
+          # referenced by the current PR after a test-driver-only update.
+          git fetch --no-tags --depth=1 origin $revision
+          if ($LASTEXITCODE) { throw 'Cannot retrieve the prepared editor source revision' }
           git diff --exit-code $revision HEAD -- native qc tests/compilation-profile-probe.cpp
           if ($LASTEXITCODE) { throw 'Prepared C++/CSQC/probe sources differ: rebuild the editor first' }
           Copy-Item prepared/fteplug_ftebroom_x64.dll bundle/ReyondBroom-Windows-x64 -Force

@@ -64,24 +64,18 @@ if os.name=='nt':
   point=wintypes.POINT();user.ClientToScreen(hwnd,ctypes.byref(point));rect=wintypes.RECT();user.GetClientRect(hwnd,ctypes.byref(rect));display=live()['display'];client_scale=(rect.right/display[0],rect.bottom/display[1]);
   (out/'window-position.json').write_text(json.dumps({'origin':[point.x,point.y],'client':[rect.right,rect.bottom],'display':display,'scale':client_scale,'target':hwnd,'foreground':user.GetForegroundWindow()}))
   return point.x,point.y
- # FTE maps physical scan codes from WM_KEYDOWN, unlike UIA text injection.
- # A zero bScan can type WM_CHAR text but cannot operate Ctrl/Backspace/Tab.
- def press(code,up=False):user.keybd_event(code,user.MapVirtualKeyW(code,0),2 if up else 0,0)
+ # Hosted desktops can accept mouse input while dropping globally injected
+ # keyboard events. Send native window messages, with scan codes and shared
+ # keyboard state, through FTE's real WM_KEYDOWN/UP handler instead.
+ def strokes(text):Desktop(backend='win32').window(handle=hwnd).send_keystrokes(text)
  def chord(code,modifiers=()):
-  for modifier in modifiers:press(modifier)
-  time.sleep(.04);press(code);time.sleep(.04);press(code,True);time.sleep(.04)
-  for modifier in reversed(modifiers):press(modifier,True)
- codes={'ctrl':17,'shift':16,'alt':18,'enter':13,'esc':27,'tab':9,'backspace':8,'grave':192}
+  strokes(''.join({17:'^',16:'+',18:'%'}[m] for m in modifiers)+chr(code).lower())
+ codes={'ctrl':'^','shift':'+','alt':'%','enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`'}
  def key(name,mods=()):
-  chord(codes[name],[codes[m] for m in mods])
+  strokes(''.join(codes[m] for m in mods)+codes[name])
   time.sleep(.15)
  def type_text(text):
-  for c in text:
-   v=user.VkKeyScanW(ord(c));shift=(v>>8)&1
-   if shift:press(16)
-   press(v&255);press(v&255,True)
-   if shift:press(16,True)
-   time.sleep(.005)
+  strokes(''.join('{'+c+'}' if c in '+^%~(){}' else c for c in text))
  def mouse(x,y,right=False):
   ox,oy=position();Desktop(backend='win32').window(handle=hwnd).set_focus();user.SetCursorPos(int(ox+x*client_scale[0]),int(oy+y*client_scale[1]));time.sleep(.08)
   user.mouse_event(8 if right else 2,0,0,0,0);time.sleep(.08);user.mouse_event(16 if right else 4,0,0,0,0);time.sleep(.25)

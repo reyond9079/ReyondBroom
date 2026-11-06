@@ -43,17 +43,26 @@ if os.name=='nt':
  from ctypes import wintypes
  user=ctypes.windll.user32
  user.SetProcessDPIAware()
- hwnd=None
+ hwnd=None;client_scale=(1,1)
+ user.GetForegroundWindow.restype=wintypes.HWND
+ user.ClientToScreen.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.POINT)]
+ user.GetClientRect.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.RECT)]
  @ctypes.WINFUNCTYPE(ctypes.c_bool,wintypes.HWND,wintypes.LPARAM)
  def enum(w,l):
   global hwnd
   pid=wintypes.DWORD();user.GetWindowThreadProcessId(w,ctypes.byref(pid))
-  if pid.value==process.pid and user.IsWindowVisible(w):hwnd=w;return False
+  title=ctypes.create_unicode_buffer(512);user.GetWindowTextW(w,title,512)
+  if pid.value==process.pid and user.IsWindowVisible(w) and title.value.startswith('ReyondBroom:'):hwnd=w;return False
   return True
+ def close_window():
+  position();user.PostMessageW(hwnd,0x0010,0,0);time.sleep(.2)
  def position():
+  global client_scale
   user.EnumWindows(enum,0)
   assert hwnd
-  point=wintypes.POINT();user.ClientToScreen(hwnd,ctypes.byref(point));return point.x,point.y
+  point=wintypes.POINT();user.ClientToScreen(hwnd,ctypes.byref(point));rect=wintypes.RECT();user.GetClientRect(hwnd,ctypes.byref(rect));display=live()['display'];client_scale=(rect.right/display[0],rect.bottom/display[1]);
+  (out/'window-position.json').write_text(json.dumps({'origin':[point.x,point.y],'client':[rect.right,rect.bottom],'display':display,'scale':client_scale}))
+  return point.x,point.y
  def press(code,up=False):user.keybd_event(code,0,2 if up else 0,0)
  codes={'ctrl':17,'shift':16,'alt':18,'enter':13,'esc':27,'tab':9,'backspace':8,'grave':192}
  def key(name,mods=()):
@@ -69,13 +78,23 @@ if os.name=='nt':
    if shift:press(16,True)
    time.sleep(.005)
  def mouse(x,y,right=False):
-  ox,oy=position();user.SetForegroundWindow(hwnd);user.SetCursorPos(int(ox+x),int(oy+y));time.sleep(.08)
-  user.mouse_event(8 if right else 2,0,0,0,0);user.mouse_event(16 if right else 4,0,0,0,0);time.sleep(.25)
+  ox,oy=position();user.SetForegroundWindow(hwnd);user.SetCursorPos(int(ox+x*client_scale[0]),int(oy+y*client_scale[1]));time.sleep(.08)
+  user.mouse_event(8 if right else 2,0,0,0,0);time.sleep(.08);user.mouse_event(16 if right else 4,0,0,0,0);time.sleep(.25)
 else:
  from Xlib import X,XK,display
  from Xlib.ext import xtest
  d=display.Display()
- def position():return 0,0
+ def close_window():
+  from Xlib.protocol import event
+  for window in d.screen().root.query_tree().children:
+   if (window.get_wm_name() or '').startswith('ReyondBroom:'):
+    message=event.ClientMessage(window=window,client_type=d.intern_atom('WM_PROTOCOLS'),data=(32,[d.intern_atom('WM_DELETE_WINDOW'),X.CurrentTime,0,0,0]));window.send_event(message,event_mask=0);d.sync();time.sleep(.2);return
+  raise RuntimeError('Editor window not found')
+ def position():
+  for window in d.screen().root.query_tree().children:
+   if (window.get_wm_name() or '').startswith('ReyondBroom:'):
+    point=d.screen().root.translate_coords(window,0,0);return point.x,point.y
+  raise RuntimeError('Editor window not found')
  def key(name,mods=()):
   names={'ctrl':'Control_L','shift':'Shift_L','alt':'Alt_L','enter':'Return','esc':'Escape','tab':'Tab','backspace':'BackSpace','grave':'grave'}
   codes=[d.keysym_to_keycode(XK.string_to_keysym(names[m])) for m in mods]
@@ -92,8 +111,8 @@ else:
    if upper:xtest.fake_input(d,X.KeyRelease,shift)
    d.sync();time.sleep(.005)
  def mouse(x,y,right=False):
-  xtest.fake_input(d,X.MotionNotify,x=int(x),y=int(y));d.sync();time.sleep(.08);button=3 if right else 1
-  xtest.fake_input(d,X.ButtonPress,button);xtest.fake_input(d,X.ButtonRelease,button);d.sync();time.sleep(.25)
+  ox,oy=position();xtest.fake_input(d,X.MotionNotify,x=int(ox+x),y=int(oy+y));d.sync();time.sleep(.08);button=3 if right else 1
+  xtest.fake_input(d,X.ButtonPress,button);d.sync();time.sleep(.06);xtest.fake_input(d,X.ButtonRelease,button);d.sync();time.sleep(.25)
 def click(name,right=False):
  state=wait_for(lambda:live() if name in live()['widgets'] or name in live().get('globalWidgets',{}) else None)
  if name in state.get('globalWidgets',{}):
@@ -113,7 +132,7 @@ try:
  wait_for(lambda:live()['widgets'].get('profile-add'))
  click('profile-add');expect(profiles()[0]['name']=='unnamed','create profile using mini toolbar')
  edit('Profile name','');expect(profiles()[0]['name']=='','empty names persist')
- edit('Profile name','UI parity')
+ edit('Profile name','UI parity');key('tab');wait_for(lambda:live()['widgets']['Working directory'].get('active'));expect(True,'Tab moves from Name to Working Directory')
  edit('Working directory','${MAP_D');key('tab');click('completion/MAP_DIR_PATH');expect(profiles()[0]['workdir']=='${MAP_DIR_PATH}','Tab variable completion')
  sandbox=data/'maps'/('ui-parity-'+str(process.pid));sandbox.mkdir(parents=True,exist_ok=True);edit('Working directory',str(sandbox).replace('\\','/'))
  click('task-add');click('add-task/0');expect(profiles()[0]['tasks'][0]['type']=='export','add Export Map from six-item menu')
@@ -121,7 +140,7 @@ try:
  probe=root/('tools/compilation-profile-probe.exe' if os.name=='nt' else 'tools/compilation-profile-probe')
  edit('task/1/Tool path',str(probe).replace('\\','/'));edit('task/1/Parameters','write ui-real.txt marker')
  click('test');time.sleep(1);expect(not (sandbox/'ui-real.txt').exists() and not (sandbox/'qa_clip-compile.map').exists(),'Test launches no process and writes no export')
- click('compile');wait_for(lambda:(sandbox/'ui-real.txt').exists());expect((sandbox/'ui-real.txt').read_text()=='marker','Compile starts actual configured process');expect((sandbox/'qa_clip-compile.map').is_file(),'Compile exports current map')
+ click('task/1/Parameters');key('enter');wait_for(lambda:(sandbox/'ui-real.txt').exists());expect((sandbox/'ui-real.txt').read_text()=='marker','Compile starts actual configured process');expect((sandbox/'qa_clip-compile.map').is_file(),'Compile exports current map')
  click('task/1/enabled');expect(not profiles()[0]['tasks'][1]['enabled'],'disabled state persists')
  click('task-up');expect(profiles()[0]['tasks'][0]['type']=='tool','move selected task up')
  click('task-down');expect(profiles()[0]['tasks'][1]['type']=='tool','move selected task down')
@@ -130,8 +149,10 @@ try:
  click('profile/0',right=True);click('profile-context/duplicate');expect(len(profiles())==2 and profiles()[0]['name']==profiles()[1]['name'],'duplicate profile keeps its name')
  click('profile-remove');expect(len(profiles())==1,'remove profile from mini toolbar')
  # A close confirmation must not block the background process loop.
- click('task/1/enabled');edit('task/1/Parameters','sleep 10000');click('compile');wait_for(lambda:live().get('running'))
- click('close');click('close-confirm-no');expect(live()['compileOpen'] and live()['running'],'Close No keeps compilation running')
+ click('task/1/enabled');edit('task/1/Parameters','sleep 30000');click('compile');wait_for(lambda:live().get('running'))
+ click('task/1/Parameters');key('esc');click('close-confirm-no');expect(live()['compileOpen'] and live()['running'],'Escape from a field / No keeps compilation running')
+ original_document=live()['document'];click('menu/File');click('Menu/File/New');click('close-confirm-no');expect(live()['running'] and live()['document']==original_document,'Changing document asks before stopping active compilation')
+ close_window();click('close-confirm-no');expect(live()['compileOpen'] and live()['running'],'OS window Close / No keeps editor and compilation alive')
  click('stop');wait_for(lambda:not live()['running']);expect(True,'Stop terminates actual sleeping process')
  click('compile');wait_for(lambda:live()['running']);click('close');click('close-confirm-yes');wait_for(lambda:not live()['running'] and not live()['compileOpen']);expect(True,'Close Yes stops process and closes dialog')
  click('menu/Run');click('Menu/Run/Compile...');wait_for(lambda:live()['compileOpen'])
@@ -146,5 +167,10 @@ try:
  click('menu/File');click('Menu/File/Exit');process.wait(timeout=10)
 
 finally:
+ try:
+  (out/'last-state.json').write_text(json.dumps(live(),indent=2))
+  from PIL import ImageGrab
+  ImageGrab.grab().save(out/'last-desktop.png')
+ except Exception as error:(out/'capture-error.txt').write_text(str(error))
  if process.poll() is None:process.terminate();process.wait(timeout=10)
  stream.close()

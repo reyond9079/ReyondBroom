@@ -5,6 +5,7 @@
 #include <functional>
 #include <cfloat>
 static bool runSettingsWindow=false,runLaunchWindow=false,runEngineWindow=false;
+static std::string runUiPendingDocument;
 static int runUiTaskSelected=-1,runUiEngineSelected=-1,runUiCloseRequest=0;
 static float runUiManagerHeight=442.f;
 static nlohmann::json runUiRects=nlohmann::json::object(),runUiGlobalRects=nlohmann::json::object();
@@ -16,9 +17,17 @@ static std::filesystem::path runUiAtlasDirectory;
 static bool runUiImportRequested=false;
 static void runUiShow(int mode){if(mode==1)runSettingsWindow=true;else if(mode==2)runLaunchWindow=true;else if(mode==3)runUiCloseRequest=2;else runWindow=true;}
 static void runOpenSettings(){runUiShow(1);}
+static bool runBeforeDocument(const std::string& next){if(!runActive)return false;runUiPendingDocument=next;runUiCloseRequest=3;return true;}
+static bool runUiNavigation(){
+ auto* context=ImGui::GetCurrentContext();if(!context)return false;
+ for(auto* window=context->NavWindow;window;window=window->ParentWindowInBeginStack){std::string name=window->Name;
+  for(const char* prefix:{"Compile","Compilation settings","Launch Engine","Game Engines","Choose file","Import TrenchBroom profiles","Stop compilation?"})if(name==prefix||name.rfind(std::string(prefix)+"/",0)==0)return true;
+ }return false;
+}
+static void runUiConsumeEnter(){auto& g=*ImGui::GetCurrentContext();g.NavActivateId=g.NavActivateDownId=g.NavActivatePressedId=0;}
 static bool runUiSave(){return runSaveProfiles();}
 static void runUiHint(const char* text){if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))ImGui::SetTooltip("%s",text);}
-static void runUiRecord(const std::string& key){auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiRects[(key.rfind("##",0)==0?runUiRecordPrefix+key.substr(2):key)]={{"x",p.x-runUiOrigin.x},{"y",p.y-runUiOrigin.y},{"width",q.x-p.x},{"height",q.y-p.y}};}
+static void runUiRecord(const std::string& key){auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiRects[(key.rfind("##",0)==0?runUiRecordPrefix+key.substr(2):key)]={{"x",p.x-runUiOrigin.x},{"y",p.y-runUiOrigin.y},{"width",q.x-p.x},{"height",q.y-p.y},{"active",ImGui::IsItemActive()}};}
 static void runUiRecordGlobal(const std::string& key){if(!runUiLive)return;auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiGlobalRects[key]={{"x",p.x},{"y",p.y},{"width",q.x-p.x},{"height",q.y-p.y}};}
 struct RunUiStyle {
  RunUiStyle(){
@@ -58,7 +67,7 @@ static void runUiTitle(const char* title,float width=0){
  ImGui::SetCursorScreenPos(p);ImGui::Dummy({width,h});
 }
 static bool runUiIcon(const char* id,char glyph,const char* hint,bool enabled=true){
- ImGui::BeginDisabled(!enabled);const float u=uiScale();bool clicked=ImGui::InvisibleButton(id,{20*u,20*u});auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
+ ImGui::BeginDisabled(!enabled);const float u=uiScale();bool clicked=ImGui::InvisibleButton(id,{20*u,20*u},ImGuiButtonFlags_EnableNav);auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
  if(ImGui::IsItemHovered()||ImGui::IsItemActive())ImGui::GetWindowDrawList()->AddRectFilled(a,b,ImGui::GetColorU32(ImGui::IsItemActive()?ImGuiCol_ButtonActive:ImGuiCol_ButtonHovered));
  auto c=ImGui::GetColorU32(enabled?ImGuiCol_Text:ImGuiCol_TextDisabled);auto* draw=ImGui::GetWindowDrawList();float x=(a.x+b.x)*.5f,y=(a.y+b.y)*.5f,r=4*u;
  if(glyph=='+'||glyph=='-'){draw->AddLine({x-r,y},{x+r,y},c,1.5f*u);if(glyph=='+')draw->AddLine({x,y-r},{x,y+r},c,1.5f*u);}
@@ -70,15 +79,17 @@ static nlohmann::json runUiVariables(bool workdir=false,bool engine=false){
   if(runSelected>=0&&runSelected<int(runProfiles.size()))try{vars["WORK_DIR_PATH"]=ftebroom::profile::interpolate(runProfiles[runSelected].work,runWorkdirVariables());}catch(...){}
  }return vars;
 }
-struct RunUiCompletion {int cursor=0;bool tab=false;};
-static int runUiCompletionCallback(ImGuiInputTextCallbackData* data){auto& c=*static_cast<RunUiCompletion*>(data->UserData);c.cursor=data->CursorPos;if(data->EventFlag==ImGuiInputTextFlags_CallbackCompletion)c.tab=true;return 0;}
+static ImGuiID runUiCaretId=0;static int runUiCaret=0;
+struct RunUiCompletion {int cursor=0;bool tab=false;ImGuiID id=0;};
+static int runUiCompletionCallback(ImGuiInputTextCallbackData* data){auto& c=*static_cast<RunUiCompletion*>(data->UserData);if(data->EventFlag==ImGuiInputTextFlags_CallbackAlways&&runUiCaretId==c.id){data->CursorPos=data->SelectionStart=data->SelectionEnd=runUiCaret;runUiCaretId=0;}c.cursor=data->CursorPos;if(data->EventFlag==ImGuiInputTextFlags_CallbackCompletion)c.tab=true;return 0;}
 static std::string runUiRefocus;
 struct RunUiCompletionRange {size_t begin,end;std::string prefix;};
 static std::map<ImGuiID,RunUiCompletionRange> runUiCompletions;
 static bool runUiEdit(const char* id,std::string& value,const char* hint="",int scope=-1,const char* placeholder=""){
  std::vector<char> buffer(std::max<size_t>(4096,value.size()+1024),0);std::copy(value.begin(),value.end(),buffer.begin());RunUiCompletion completion;
- const auto inputId=ImGui::GetID(id);auto key=std::to_string(inputId);if(runUiRefocus==key){ImGui::SetKeyboardFocusHere();runUiRefocus.clear();}
- bool changed=ImGui::InputTextWithHint(id,placeholder,buffer.data(),buffer.size(),scope<0?ImGuiInputTextFlags_None:ImGuiInputTextFlags_CallbackCompletion|ImGuiInputTextFlags_CallbackAlways,runUiCompletionCallback,&completion);
+ const auto inputId=ImGui::GetID(id);completion.id=inputId;auto key=std::to_string(inputId);if(runUiRefocus==key){ImGui::SetKeyboardFocusHere();runUiRefocus.clear();}
+ int caret=int(value.size());if(auto* state=ImGui::GetInputTextState(inputId))caret=state->GetCursorPos();auto prefixAt=value.rfind("${",size_t(std::max(0,caret)));bool completing=scope>=0&&prefixAt!=value.npos&&prefixAt<size_t(caret)&&value.find('}',prefixAt)>=size_t(caret);
+ bool changed=ImGui::InputTextWithHint(id,placeholder,buffer.data(),buffer.size(),scope<0?ImGuiInputTextFlags_None:(completing?ImGuiInputTextFlags_CallbackCompletion:0)|ImGuiInputTextFlags_CallbackAlways,runUiCompletionCallback,&completion);
  if(changed)value=buffer.data();runUiHint(hint);runUiRecord(id);
  if(scope>=0){
   auto prefixEnd=std::min(size_t(std::max(0,completion.cursor)),value.size());auto start=value.rfind("${",prefixEnd);
@@ -87,7 +98,7 @@ static bool runUiEdit(const char* id,std::string& value,const char* hint="",int 
   if(ImGui::BeginPopup("Variables")){
    auto vars=runUiVariables(scope==1,scope==2);auto range=runUiCompletions[inputId];start=range.begin;prefixEnd=range.end;const auto& prefix=range.prefix;bool found=false;
    for(auto it=vars.begin();it!=vars.end();++it)if(it.key().compare(0,prefix.size(),prefix)==0){found=true;
-    if(ImGui::Selectable(it.key().c_str())){auto end=value.find('}',start);if(end==value.npos)end=prefixEnd;else ++end;value.replace(start,end-start,"${"+it.key()+"}");changed=true;runUiRefocus=key;ImGui::ClearActiveID();ImGui::CloseCurrentPopup();}
+    if(ImGui::Selectable(it.key().c_str())){auto end=value.find('}',start);if(end==value.npos)end=prefixEnd;else ++end;value.replace(start,end-start,"${"+it.key()+"}");changed=true;runUiRefocus=key;runUiCaretId=inputId;runUiCaret=int(start+it.key().size()+3);ImGui::ClearActiveID();ImGui::CloseCurrentPopup();}
     runUiRecord("completion/"+it.key());
     auto text=it.value().is_string()?it.value().get<std::string>():it.value().dump();runUiHint(text.c_str());
    }
@@ -110,6 +121,7 @@ static void runUiBrowsePanel(){
  if(runUiBrowseRequested){runUiBrowseRequested=false;ImGui::OpenPopup("Choose file");}
  ImGui::SetNextWindowSize({640*uiScale(),440*uiScale()},ImGuiCond_FirstUseEver);
  if(ImGui::BeginPopupModal("Choose file",nullptr,ImGuiWindowFlags_NoDocking)){
+  if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{8*uiScale(),8*uiScale()});
   if(ImGui::Button("Up"))runUiBrowseFolder=runUiBrowseFolder.parent_path();ImGui::SameLine();ImGui::TextUnformatted(runUiBrowseFolder.u8string().c_str());
   ImGui::BeginChild("Files",{0,-70*uiScale()},ImGuiChildFlags_Borders);
@@ -188,7 +200,7 @@ static bool runUiTaskCard(RunTask& t,int index,std::string& mutation){
 static std::string runUiElide(std::string text,float width){if(ImGui::CalcTextSize(text.c_str()).x<=width)return text;while(!text.empty()&&ImGui::CalcTextSize((text+"...").c_str()).x>width){size_t at=text.size()-1;while(at>0&&(static_cast<unsigned char>(text[at])&0xc0)==0x80)--at;text.resize(at);}return text+"...";}
 static bool runUiListItem(const std::string& id,const std::string& title,const std::string& subtitle,bool selected){
  const float u=uiScale(),w=ImGui::GetContentRegionAvail().x,h=34*u;auto p=ImGui::GetCursorScreenPos();
- bool clicked=ImGui::Selectable(("##"+id).c_str(),selected,ImGuiSelectableFlags_AllowDoubleClick,{w,h});runUiRecord(id);
+ bool clicked=ImGui::Selectable(("##"+id).c_str(),selected,ImGuiSelectableFlags_AllowDoubleClick|ImGuiSelectableFlags_SelectOnNav,{w,h});runUiRecord(id);
  auto* draw=ImGui::GetWindowDrawList();draw->PushClipRect(p,{p.x+w,p.y+h},true);
  auto* font=uiBoldFonts[std::clamp(uiScaleChoice,0,4)];if(font)ImGui::PushFont(font);auto name=runUiElide(title,w-8*u);draw->AddText({p.x+4*u,p.y+2*u},ImGui::GetColorU32(ImGuiCol_Text),name.c_str());if(font)ImGui::PopFont();
  draw->AddText({p.x+4*u,p.y+17*u},ImGui::GetColorU32(ImGuiCol_Text),runUiElide(subtitle,w-8*u).c_str());draw->PopClipRect();
@@ -234,13 +246,18 @@ static void runUiCompile(){
  bool open=true;bool visible=ImGui::Begin("Compile",&open,ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
  runUiOrigin=ImGui::GetWindowPos();runUiRects=nlohmann::json::object();auto windowSize=ImGui::GetWindowSize();runUiRects["window"]={{"x",runUiOrigin.x},{"y",runUiOrigin.y},{"width",windowSize.x},{"height",windowSize.y}};
  if(!open)runUiCloseCompile();
+ bool defaultEnter=false;
  if(visible){
+  if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&!ImGui::IsPopupOpen("",ImGuiPopupFlags_AnyPopupId|ImGuiPopupFlags_AnyPopupLevel)){
+   if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);runUiCloseCompile();}
+   if(ImGui::IsKeyPressed(ImGuiKey_Enter)){auto id=ImGui::GetCurrentContext()->NavId;bool footer=false;for(const char* label:{"Launch...","Stop","Test","Compile","Close"})footer|=id==ImGui::GetID(label);if(!footer){defaultEnter=true;runUiConsumeEnter();}}
+  }
   const auto available=ImGui::GetContentRegionAvail();const float footer=44*u,splitter=6*u;float top=ImGui::GetCursorPosY();float usable=available.y-footer-splitter;
   runUiManagerHeight=std::clamp(runUiManagerHeight,140.f,std::max(140.f,usable/u-40.f));float manager=std::min(runUiManagerHeight*u,usable-30*u);
   ImGui::BeginChild("Manager",{0,manager},ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
   float side=std::min(256*u,ImGui::GetContentRegionAvail().x*.43f);ImGui::BeginChild("Profiles",{side,manager},ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);runUiProfiles(manager);ImGui::EndChild();ImGui::SameLine(0,u);
   ImGui::BeginChild("Details",{0,manager},ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);runUiDetails(manager);ImGui::EndChild();ImGui::EndChild();
-  ImGui::SetCursorPosY(top+manager);ImGui::InvisibleButton("Output splitter",{available.x,splitter});runUiRecord("splitter");auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();ImGui::GetWindowDrawList()->AddRectFilled(a,b,ImGui::GetColorU32(ImGuiCol_Border));
+  ImGui::SetCursorPosY(top+manager);ImGui::InvisibleButton("Output splitter",{available.x,splitter});runUiRecord("splitter");auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();ImGui::GetWindowDrawList()->AddRectFilled(a,b,ImGui::GetColorU32(ImGuiCol_Border));ImGui::GetWindowDrawList()->AddRectFilled({(a.x+b.x)*.5f-20*u,a.y+u},{(a.x+b.x)*.5f+20*u,b.y-u},ImGui::GetColorU32(uiTheme==1||uiTheme==3?uiColor(210,210,210):uiColor(90,90,90)));
   if(ImGui::IsItemHovered()||ImGui::IsItemActive())ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);if(ImGui::IsItemActive())runUiManagerHeight+=ImGui::GetIO().MouseDelta.y/u;
   const float output=std::max(20*u,available.y-manager-splitter-footer);ImGui::SetCursorPosY(top+manager+splitter);
   static std::string cached,selection;static std::vector<char> buffer(1,0);static bool selectAll=false;bool newLog=cached!=runLog;
@@ -257,9 +274,7 @@ static void runUiCompile(){
   ImGui::BeginDisabled(!canRun);if(ImGui::Button("Test",{button,24*u})&&runUiSave())runBegin(runProfiles[runSelected],true);runUiRecord("test");ImGui::SameLine(0,gap);
   if(ImGui::Button("Compile",{button,24*u})&&runUiSave())runBegin(runProfiles[runSelected]);runUiRecord("compile");ImGui::EndDisabled();ImGui::SameLine(0,gap);
   if(ImGui::Button("Close",{button,24*u}))runUiCloseCompile();runUiRecord("close");
-  if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&!ImGui::GetIO().WantTextInput&&!ImGui::IsPopupOpen("",ImGuiPopupFlags_AnyPopupId|ImGuiPopupFlags_AnyPopupLevel)){
-   if(ImGui::IsKeyPressed(ImGuiKey_Escape))runUiCloseCompile();if(canRun&&ImGui::IsKeyPressed(ImGuiKey_Enter)&&runUiSave())runBegin(runProfiles[runSelected]);
-  }
+  if(defaultEnter&&canRun&&runWindow&&!runUiCloseRequest&&runUiSave())runBegin(runProfiles[runSelected]);
   if(runActive){ImGui::SetCursorPos({8*u,top+available.y-footer+12*u});ImGui::TextUnformatted(("Running "+runningProfile.name).c_str());}
  }
  if(runUiImportRequested){runUiImportRequested=false;runImportOpen();}runImportPanel();
@@ -314,6 +329,7 @@ static void runUiEngines(){
  if(!wasOpen||runUiEngineGame!=runStoreGame){runUiEngineDraft=runEngines;runUiEngineGame=runStoreGame;runUiEngineSelected=-1;wasOpen=true;}
  ImGui::SetNextWindowSize({600*uiScale(),400*uiScale()},ImGuiCond_FirstUseEver);bool open=true;
  if(ImGui::Begin("Game Engines",&open,ImGuiWindowFlags_NoDocking)){
+  if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Escape)&&!ImGui::IsPopupOpen("",ImGuiPopupFlags_AnyPopupId|ImGuiPopupFlags_AnyPopupLevel)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);open=false;}
   float u=uiScale();runUiTitle(gameProfileName());auto available=ImGui::GetContentRegionAvail();float body=available.y-44*u;
   ImGui::BeginChild("Engine profiles",{std::min(250*u,available.x*.45f),body});runUiTitle("Profiles");ImGui::BeginChild("Engine list",{0,-20*u});
   for(int i=0;i<int(runUiEngineDraft.size());++i)if(runUiListItem("engine/"+std::to_string(i),runUiEngineDraft[i].name,runUiEngineDraft[i].path,i==runUiEngineSelected))runUiEngineSelected=i;
@@ -335,6 +351,7 @@ static void runUiEngines(){
 static void runUiLaunch(){
  if(!runLaunchWindow)return;float u=uiScale();ImGui::SetNextWindowSize({660*u,360*u},ImGuiCond_FirstUseEver);bool open=true;
  if(ImGui::Begin("Launch Engine",&open,ImGuiWindowFlags_NoDocking)){
+  if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Escape)&&!ImGui::IsPopupOpen("",ImGuiPopupFlags_AnyPopupId|ImGuiPopupFlags_AnyPopupLevel)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);open=false;}
   runUiTitle(gameProfileName());float available=ImGui::GetContentRegionAvail().x,body=ImGui::GetContentRegionAvail().y-44*u;float side=250*u;
   ImGui::BeginChild("Launch description",{std::max(120*u,available-side-u),body});ImGui::SetCursorPos({20*u,20*u});ImGui::TextUnformatted("Launch Engine");ImGui::SetCursorPos({20*u,60*u});
   ImGui::PushTextWrapPos(ImGui::GetWindowWidth()-20*u);ImGui::TextUnformatted("Select a game engine from the list on the right and edit the commandline parameters in the text box below. You can use variables to refer to the map name and other values.");ImGui::PopTextWrapPos();
@@ -344,7 +361,7 @@ static void runUiLaunch(){
   if(selection>=0){if(runUiEdit("##Launch parameters",runEngines[selection].parameters,"Parameters passed to the game engine. Variables are allowed.",2))runUiSave();}else{std::string empty;runUiEdit("##Launch parameters",empty);}ImGui::EndDisabled();ImGui::EndChild();ImGui::SameLine(0,u);
   ImGui::BeginChild("Launch engine profiles",{0,body});for(int i=0;i<int(runEngines.size());++i)if(runUiListItem("launch-engine/"+std::to_string(i),runEngines[i].name,runEngines[i].path,i==selection)){selection=i;selectedId=runEngines[i].id;if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))try{runLaunchConfiguredEngine(runEngines[i]);}catch(const std::exception& e){runError=e.what();}}
   if(runEngines.empty())ImGui::TextWrapped("Click the 'Configure engines...' button to create a game engine profile.");ImGui::EndChild();
-  ImGui::SetCursorPosX(std::max(8*u,available-174*u));ImGui::BeginDisabled(selection<0);bool launch=ImGui::Button("Launch",{80*u,24*u});runUiRecord("engine-launch");if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Enter))launch=true;
+  ImGui::SetCursorPosX(std::max(8*u,available-174*u));ImGui::BeginDisabled(selection<0);bool launch=ImGui::Button("Launch",{80*u,24*u});runUiRecord("engine-launch");if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Enter)&&ImGui::GetCurrentContext()->NavId!=ImGui::GetID("Close"))launch=true;
   if(launch&&selection>=0)try{runUiSave();runLaunchConfiguredEngine(runEngines[selection]);}catch(const std::exception& e){runError=e.what();}ImGui::EndDisabled();ImGui::SameLine();if(ImGui::Button("Close",{80*u,24*u}))open=false;runUiRecord("launch-close");
  }
  ImGui::End();if(!open){runLaunchWindow=false;runUiSave();}
@@ -352,13 +369,13 @@ static void runUiLaunch(){
 static void runUiConfirmClose(){
  static int reason=0;if(runUiCloseRequest){reason=runUiCloseRequest;runUiCloseRequest=0;ImGui::OpenPopup("Stop compilation?");}
  if(ImGui::BeginPopupModal("Stop compilation?",nullptr,ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking)){
-  ImGui::TextUnformatted(reason==2?"Closing the editor will stop the running compilation. Are you sure?":"Closing this dialog will stop the running compilation. Are you sure?");
-  if(ImGui::Button("Yes",{80*uiScale(),0})){if(runActive)runStop();runWindow=false;runUiSave();ImGui::CloseCurrentPopup();if(reason==2)documentRequest("exit");}runUiRecord("close-confirm-yes");
-  ImGui::SameLine();if(ImGui::Button("No",{80*uiScale(),0})||ImGui::IsKeyPressed(ImGuiKey_Escape))ImGui::CloseCurrentPopup();runUiRecord("close-confirm-no");ImGui::EndPopup();
+  ImGui::TextUnformatted(reason==3?"Changing the map will stop the running compilation. Are you sure?":reason==2?"Closing the editor will stop the running compilation. Are you sure?":"Closing this dialog will stop the running compilation. Are you sure?");
+  if(ImGui::Button("Yes",{80*uiScale(),0})){if(runActive)runStop();runWindow=false;runUiSave();ImGui::CloseCurrentPopup();if(reason==2)documentRequest("exit");else if(reason==3){auto next=std::move(runUiPendingDocument);runUiPendingDocument.clear();documentRequest(next);}}ImGui::SetItemDefaultFocus();runUiRecord("close-confirm-yes");
+  ImGui::SameLine();if(ImGui::Button("No",{80*uiScale(),0})||(!ImGui::IsWindowAppearing()&&ImGui::IsKeyPressed(ImGuiKey_Escape)))ImGui::CloseCurrentPopup();runUiRecord("close-confirm-no");ImGui::EndPopup();
  }
 }
 static void runUiWriteLive(){
- if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";std::ofstream(temp)<<nlohmann::json{{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"error",runError}}.dump();
+ if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";std::ofstream(temp)<<nlohmann::json{{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError}}.dump();
 #ifdef _WIN32
   MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
 #else

@@ -66,7 +66,8 @@ jobs:
   windows:
     runs-on: windows-2022
     env:
-      RB_QA_RENDERER: d3d11 warp
+      RB_QA_RENDERER: gl opengl32.dll
+      GALLIUM_DRIVER: llvmpipe
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -99,6 +100,19 @@ jobs:
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
           cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
+      # Test-machine renderer only. The editor distribution does not gain a Mesa dependency.
+      - name: Install a pinned software OpenGL renderer for the headless Windows host
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force mesa | Out-Null
+          gh release download 26.2.6 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-26.2.6-release-msvc.7z
+          if ($LASTEXITCODE) { throw 'Mesa test renderer download failed' }
+          if ((Get-FileHash mesa/mesa3d-26.2.6-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne 'b2e00615feaba45942343c265cc8c5f576142ca682c1ac6661922d4b72492877') { throw 'Mesa checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-26.2.6-release-msvc.7z '-omesa/extracted' -y
+          if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
+          $gl = Get-ChildItem mesa/extracted -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
+          if (!$gl) { throw '64-bit Mesa OpenGL DLL missing' }
+          Copy-Item (Join-Path $gl.DirectoryName '*.dll') bundle/ReyondBroom-Windows-x64/bin -Force
       - name: Install UI screenshot dependency
         shell: pwsh
         run: python -m pip install Pillow

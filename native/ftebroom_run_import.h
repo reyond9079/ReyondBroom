@@ -66,6 +66,7 @@ static void runImportPanel()
   ImGui::SetNextWindowSize({660*uiScale(),520*uiScale()},ImGuiCond_FirstUseEver);
   bool open=true;
   if(!ImGui::BeginPopupModal("Import TrenchBroom profiles",&open))return;
+  if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
   ImGui::TextWrapped("Select a local CompilationProfiles.cfg from TrenchBroom. Imported steps are saved without running them.");
   if(runText("Profile file",runImportPath))runImportReviewed=false;runUiRecord("import-path");
   if(ImGui::CollapsingHeader("Browse files")){

@@ -359,8 +359,10 @@ static void documentSaveFinished()
     core->Print(("ReyondBroom save failed: " + documentError + "\n").c_str());
   }
 }
+static bool runBeforeDocument(const std::string& next);
 static void documentRequest(const std::string& next)
 {
+  if(runBeforeDocument(next))return;
   if(bbBeforeDocument(next))return;
   if (savingDocument)
     return;

@@ -1103,9 +1103,15 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     auto click=[&](ImVec2 p){event(0,0,0,p.x,p.y,1280,800);event(1,mouseKeys[0],0,p.x,p.y,1280,800);event(0,0,0,p.x,p.y,1280,800);event(2,mouseKeys[0],0,p.x,p.y,1280,800);frame();};
     frame();frame();const int profiles[]={2,3,0};
     for(int i=0;i<3;i++){click(setupGameCenters[i]);expect(gameProfile==profiles[i],"setup61_game_choice");}
-    click(setupGameCenters[0]);firstSetupStep=4;frame();frame();
+    click(setupGameCenters[0]);
+    *q1Mod=0;q1UseLibre=false;setupModChoice=-1;firstSetupStep=4;frame();frame();
+    expect(setupModChoice==0&&!q1UseLibre,"setup_recommended_libre_default_without_mount");
     click(setupModCenters[0]);expect(setupModChoice==0,"setup61_libre_choice");
     click(setupModCenters[1]);expect(setupModChoice==1&&!q1UseLibre,"setup61_own_choice");
+    frame();expect(setupModChoice==1,"setup_recommended_manual_choice_retained");
+    std::snprintf(q1Mod,sizeof q1Mod,"%s","existing-custom-mod");setupModChoice=-1;frame();frame();
+    expect(setupModChoice==1,"setup_recommended_existing_mod_retained");
+    *q1Mod=0;setupModChoice=-1;frame();frame();
     auto window=ImGui::FindWindowByName("First-time setup");
     click({window->Pos.x+window->Size.x-ImGui::GetFrameHeight()*.5f,window->Pos.y+ImGui::GetFrameHeight()*.5f});
     frame();frame();expect(firstSetupStep==-1&&!ImGui::FindWindowByName("First-time setup")->Active,"setup61_wizard_close");

@@ -495,3 +495,5 @@
 {"Native model (automatic format)","Модель (формат по профилю)","Native model (automatic format)","Native model (automatic format)","Native model (automatic format)","Native model (automatic format)","Native model (automatic format)"},
 {"Brush geometry (game-native)","Брашевая геометрия","Brush geometry (game-native)","Brush geometry (game-native)","Brush geometry (game-native)","Brush geometry (game-native)","Brush geometry (game-native)"},
 {"Ready","Готово","Ready","Ready","Ready","Ready","Ready"},
+{"Quake 1 (recommended)","Quake 1 (рекомендуется)","Quake 1 (empfohlen)","Quake 1 (recommandé)","Quake 1（推荐）","Quake 1（推奨）","Quake 1 (recomendado)"},
+{"Download LibreQuake (recommended)","Скачать LibreQuake (рекомендуется)","LibreQuake herunterladen (empfohlen)","Télécharger LibreQuake (recommandé)","下载 LibreQuake（推荐）","LibreQuake をダウンロード（推奨）","Descargar LibreQuake (recomendado)"},

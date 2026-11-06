@@ -28,7 +28,7 @@ constexpr Palette dark{
   color(0x191C1D),color(0x1E2223),color(0x272C2D),color(0x1F2324),color(0x212627),color(0x303637),
   color(0xEDF1EE),color(0xAAB6B1),color(0x414B4B),color(0x374345),color(0x394C49),
   color(0x75B3A7),color(0xA1D5C9),color(0xF7A59B),color(0xE9C788),
-  color(0x181C1D),color(0xEDF1EE),color(0xAAB6B1),color(0x2C3536),color(0x36504C),color(0x272F30),color(0x202627),
+  color(0xEEE9D8),color(0x292D2B),color(0x62675E),color(0xDFD9C7),color(0xBCD2C7),color(0xF8F5E9),color(0xFFFFF0),
   color(0xCBD7D2,.24f),color(0xCBD7D2,.43f),color(0xCBD7D2,.40f),color(0xCBD7D2),color(0x000000),color(0x080A0A),
   color(0x30564F),color(0x39685E),color(0xA1D5C9,.70f)
 };
@@ -97,25 +97,25 @@ static void uiOutsideScene(const ImRect& bounds,const ImRect& scene,Paint paint)
   for(const auto& strip:strips)
     if(strip.GetWidth()>0 && strip.GetHeight()>0)paint(strip);
 }
-static void uiSoftSurface(ImDrawList* draw,const ImRect& bounds,float radius,bool dark=false,
+static void uiSoftSurface(ImDrawList* draw,const ImRect& bounds,float radius,bool toolStrip=false,
                           const ImRect* scene=nullptr) {
   if(bounds.IsInverted() || bounds.GetWidth()<1 || bounds.GetHeight()<1)return;
   auto paint=[&]{
     const float scale=uiScale();
     const auto& p=uiModernPalette();
-    if(!dark)for(int spread:{7,4,2}){
+    if(!toolStrip)for(int spread:{7,4,2}){
       const float pad=spread*scale;
       draw->AddRectFilled({bounds.Min.x-pad,bounds.Min.y+2*scale-pad},
         {bounds.Max.x+pad,bounds.Max.y+3*scale+pad},
         ImGui::GetColorU32(ModernChrome::alpha(p.shadow,spread==2?.032f:.019f)),radius+pad);
     }
-    const ImU32 top=ImGui::GetColorU32(dark?p.navTop:p.elevated);
-    const ImU32 bottom=ImGui::GetColorU32(dark?p.nav:p.panel);
+    const ImU32 top=ImGui::GetColorU32(toolStrip?p.navTop:p.elevated);
+    const ImU32 bottom=ImGui::GetColorU32(toolStrip?p.nav:p.panel);
     const int first=draw->VtxBuffer.Size;
     draw->AddRectFilled(bounds.Min,bounds.Max,top,radius);
     ImGui::ShadeVertsLinearColorGradientKeepAlpha(draw,first,draw->VtxBuffer.Size,
       bounds.Min,{bounds.Min.x,bounds.Max.y},top,bottom);
-    draw->AddRect(bounds.Min,bounds.Max,ImGui::GetColorU32(dark?ModernChrome::color(0xFFFFFF,.09f):p.border),radius);
+    draw->AddRect(bounds.Min,bounds.Max,ImGui::GetColorU32(toolStrip?ModernChrome::color(0xFFFFFF,.09f):p.border),radius);
   };
   if(!scene){paint();return;}
   const auto* viewport=ImGui::GetMainViewport();

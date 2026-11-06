@@ -35,10 +35,11 @@ static bool setupChoice(const char* id,const char* title,const char* subtitle,bo
 }
 static void setupGameChoices() {
   const int order[]={2,3,0,4,1};
-  const char* titles[]={"Quake 1","Quake II","Quake III Arena","Half-Life","FTE Custom game"};
+  const char* ids[]={"Quake 1","Quake II","Quake III Arena","Half-Life","FTE Custom game"};
+  const char* titles[]={"Quake 1 (recommended)","Quake II","Quake III Arena","Half-Life","FTE Custom game"};
   const char* captions[]={"Classic Quake maps, WAD textures and mods","Quake II maps, WAL textures and PAK archives","Quake III maps, patches and shaders","GoldSrc maps, WAD3 textures, FreeHL / FreeCS","Custom FTE games and engine features"};
   const char* logos[]={"ui/games/quake1.png","ui/games/quake2.png","ui/games/quake3.png","ui/games/halflife.png","ui/games/fte.png"};
-  for(int i=0;i<5;i++)if(setupChoice(titles[i],titles[i],captions[i],gameProfile==order[i],logos[i],&setupGameCenters[i])){
+  for(int i=0;i<5;i++)if(setupChoice(ids[i],titles[i],captions[i],gameProfile==order[i],logos[i],&setupGameCenters[i])){
     if(gameProfile<2)q3Root=baseq3;
     gameProfile=order[i];
     std::snprintf(baseq3,sizeof baseq3,"%s",gameProfile==3?q2Mod:gameWad()?q1Authoring().c_str():q3Root.c_str());
@@ -81,11 +82,13 @@ static void setupModBrowse() {
 }
 static int setupModChoice=-1;
 static void setupQuakeModFields() {
-  if(setupModChoice<0)setupModChoice=q1UseLibre?0:1;
+  // Recommend the download on a fresh install, retaining an existing custom mod.
+  // Selection does not enable q1UseLibre until the download is ready to mount.
+  if(setupModChoice<0)setupModChoice=(q1UseLibre||!*q1Mod)?0:1;
   uint64_t done=0,total=0;std::string phase;char progressLabel[128]={};
   if(libreBusy()){std::ifstream(libreInstall()/"progress.txt")>>done>>total>>phase;std::snprintf(progressLabel,sizeof progressLabel,"%s  %.1f / %.1f MiB",uiTr(phase.empty()?"Connecting...":phase.c_str()),done/1048576.,total/1048576.);}
   ImGui::BeginDisabled(libreBusy());
-  if(setupChoice("libre","LibreQuake",libreReady()?"Installed and ready to use":"Downloads automatically when you start",setupModChoice==0,nullptr,&setupModCenters[0],libreBusy()?(total?float(double(done)/total):0.f):-1,progressLabel)){setupModChoice=0;q1UseLibre=libreReady();}
+  if(setupChoice("libre","Download LibreQuake (recommended)",libreReady()?"Installed and ready to use":"Downloads automatically when you start",setupModChoice==0,nullptr,&setupModCenters[0],libreBusy()?(total?float(double(done)/total):0.f):-1,progressLabel)){setupModChoice=0;q1UseLibre=libreReady();}
   if(setupChoice("own","Choose my own mod","Select a directory with your mod resources",setupModChoice==1,nullptr,&setupModCenters[1])){setupModChoice=1;q1UseLibre=false;}
   ImGui::EndDisabled();
   if(setupModChoice==0 && !libreError.empty())ImGui::TextWrapped("%s",libreError.c_str());

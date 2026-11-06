@@ -175,7 +175,8 @@ struct Project {
     if (sources.size() >= 256)
       throw std::runtime_error("Maximum 256 audio sources");
     s.id = next++;
-    s.buildPeaks();
+    if (s.peaks.empty())
+      s.buildPeaks();
     sources.push_back(std::move(s));
     return sources.back().id;
   }

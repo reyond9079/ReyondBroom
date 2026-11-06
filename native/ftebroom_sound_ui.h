@@ -611,12 +611,18 @@ static void soundInspector() {
           float at = float(c->keys[i].at) / p.rate, db = c->keys[i].db;
           ImGui::SetNextItemWidth(80 * uiScale());
           changed =
-              ImGui::DragFloat("s", &at, .01f, 0, float(c->length()) / p.rate);
+              ImGui::DragFloat("s", &at, .01f, 0, float(c->length()) / p.rate,
+                               "%.3f", ImGuiSliderFlags_AlwaysClamp);
           ImGui::SameLine();
           ImGui::SetNextItemWidth(80 * uiScale());
-          changed |= ImGui::DragFloat("dB", &db, .1f, -96, 24);
+          changed |= ImGui::DragFloat("dB", &db, .1f, -96, 24, "%.1f",
+                                      ImGuiSliderFlags_AlwaysClamp);
           if (changed) {
-            c->keys[i] = {rbAudio::frames(std::max(0.f, at), p.rate), db};
+            at = std::isfinite(at)
+                     ? std::clamp(at, 0.f, float(c->length()) / p.rate)
+                     : 0.f;
+            db = std::isfinite(db) ? std::clamp(db, -96.f, 24.f) : 0.f;
+            c->keys[i] = {rbAudio::frames(at, p.rate), db};
             std::sort(c->keys.begin(), c->keys.end(),
                       [](auto a, auto b) { return a.at < b.at; });
             c->keys.erase(

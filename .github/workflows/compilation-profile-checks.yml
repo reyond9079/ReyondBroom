@@ -2,8 +2,9 @@ name: Compilation profile parity
 on:
   push:
     branches: ['feat/REYON-6-compilation-parity']
+    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', '.github/workflows/compilation-profile-checks.yml']
   pull_request:
-    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', '.github/workflows/compilation-profile-checks.yml']
+    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', '.github/workflows/compilation-profile-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,6 +12,38 @@ concurrency:
   group: compilation-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  windows-reference:
+    runs-on: windows-2022
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GALLIUM_DRIVER: llvmpipe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare the unmodified official TB reference and test-machine renderer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force reference, mesa | Out-Null
+          gh release download v2026.2 --repo TrenchBroom/TrenchBroom --dir reference --pattern TrenchBroom-Win64-AMD64-v2026.2-Release.zip
+          if ($LASTEXITCODE) { throw 'Reference download failed' }
+          if ((Get-FileHash reference/TrenchBroom-Win64-AMD64-v2026.2-Release.zip -Algorithm SHA256).Hash.ToLower() -ne 'dd2c5491851275a805110ce465eee3deb45be98e80b00e7b21bb6d250de57fe6') { throw 'Reference checksum mismatch' }
+          Expand-Archive reference/TrenchBroom-Win64-AMD64-v2026.2-Release.zip reference/app
+          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
+          if ($LASTEXITCODE) { throw 'Renderer download failed' }
+          if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Renderer checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
+          if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
+          Copy-Item mesa/extracted/x64/*.dll reference/app -Force
+          python -m pip install Pillow pywinauto
+      - name: Capture actual Windows TB controls through OS accessibility/input
+        run: python tools/qa/capture-trenchbroom-windows.py reference/app qa/windows-reference
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compilation-Windows-reference
+          path: qa
   linux:
     runs-on: ubuntu-24.04
     strategy:
@@ -71,7 +104,7 @@ jobs:
   windows:
     runs-on: windows-2022
     env:
-      RB_QA_RENDERER: gl opengl32.dll
+      RB_QA_RENDERER: gl rb_qa_opengl.dll
       GALLIUM_DRIVER: llvmpipe
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -118,6 +151,9 @@ jobs:
           $gl = Get-ChildItem mesa/extracted -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
           if (!$gl) { throw '64-bit Mesa OpenGL DLL missing' }
           Copy-Item (Join-Path $gl.DirectoryName '*.dll') bundle/ReyondBroom-Windows-x64/bin -Force
+          # FTE deliberately bypasses application-local opengl32.dll. A distinct
+          # minidriver name selects the test renderer instead of system GDI 1.1.
+          Copy-Item $gl.FullName bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
       - name: Install UI screenshot dependency
         shell: pwsh
         run: python -m pip install Pillow

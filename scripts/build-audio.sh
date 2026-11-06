@@ -39,7 +39,7 @@ for library in ogg vorbis; do
 done
 cd ffmpeg-8.0.1
 PKG_CONFIG_PATH="$PWD/../prefix/lib/pkgconfig" ./configure \
- --target-os=mingw32 --arch=x86_64 --cc=gcc --cxx=g++ \
+ --target-os=mingw32 --arch=x86_64 --cc=gcc --cxx=g++ --pkg-config-flags=--static \
  --disable-everything --disable-autodetect --disable-network --disable-doc \
  --disable-x86asm --disable-debug --enable-small --disable-shared --enable-static \
  --enable-ffmpeg --enable-protocol=file \

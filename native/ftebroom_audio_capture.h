@@ -69,42 +69,57 @@ class Capture {
   void load() {
     if (library)
       return;
+    try {
 #ifdef _WIN32
-    library = LoadLibraryW(L"winmm.dll");
-    if (!library)
-      throw std::runtime_error("Cannot load Windows audio capture");
-    open = symbol<Open>("waveInOpen");
-    prepare = symbol<Header>("waveInPrepareHeader");
-    unprepare = symbol<Header>("waveInUnprepareHeader");
-    add = symbol<Header>("waveInAddBuffer");
-    start = symbol<Simple>("waveInStart");
-    stop = symbol<Simple>("waveInStop");
-    reset = symbol<Simple>("waveInReset");
-    close = symbol<Simple>("waveInClose");
+      library = LoadLibraryW(L"winmm.dll");
+      if (!library)
+        throw std::runtime_error("Cannot load Windows audio capture");
+      open = symbol<Open>("waveInOpen");
+      prepare = symbol<Header>("waveInPrepareHeader");
+      unprepare = symbol<Header>("waveInUnprepareHeader");
+      add = symbol<Header>("waveInAddBuffer");
+      start = symbol<Simple>("waveInStart");
+      stop = symbol<Simple>("waveInStop");
+      reset = symbol<Simple>("waveInReset");
+      close = symbol<Simple>("waveInClose");
 #else
-    library = dlopen("libSDL2-2.0.so.0", RTLD_NOW | RTLD_LOCAL);
-    if (!library)
-      throw std::runtime_error(
-          "Recording requires the system SDL2 audio library");
-    init = symbol<decltype(init)>("SDL_InitSubSystem");
-    quit = symbol<decltype(quit)>("SDL_QuitSubSystem");
-    count = symbol<decltype(count)>("SDL_GetNumAudioDevices");
-    name = symbol<decltype(name)>("SDL_GetAudioDeviceName");
-    error = symbol<decltype(error)>("SDL_GetError");
-    open = symbol<decltype(open)>("SDL_OpenAudioDevice");
-    pause = symbol<decltype(pause)>("SDL_PauseAudioDevice");
-    close = symbol<decltype(close)>("SDL_CloseAudioDevice");
-    queued = symbol<decltype(queued)>("SDL_GetQueuedAudioSize");
-    dequeue = symbol<decltype(dequeue)>("SDL_DequeueAudio");
-    if (init(0x10))
-      throw std::runtime_error(std::string("Audio input unavailable: ") +
-                               error());
-    initialized = true;
+      library = dlopen("libSDL2-2.0.so.0", RTLD_NOW | RTLD_LOCAL);
+      if (!library)
+        throw std::runtime_error(
+            "Recording requires the system SDL2 audio library");
+      init = symbol<decltype(init)>("SDL_InitSubSystem");
+      quit = symbol<decltype(quit)>("SDL_QuitSubSystem");
+      count = symbol<decltype(count)>("SDL_GetNumAudioDevices");
+      name = symbol<decltype(name)>("SDL_GetAudioDeviceName");
+      error = symbol<decltype(error)>("SDL_GetError");
+      open = symbol<decltype(open)>("SDL_OpenAudioDevice");
+      pause = symbol<decltype(pause)>("SDL_PauseAudioDevice");
+      close = symbol<decltype(close)>("SDL_CloseAudioDevice");
+      queued = symbol<decltype(queued)>("SDL_GetQueuedAudioSize");
+      dequeue = symbol<decltype(dequeue)>("SDL_DequeueAudio");
+      if (init(0x10))
+        throw std::runtime_error(std::string("Audio input unavailable: ") +
+                                 error());
+      initialized = true;
 #endif
+    } catch (...) {
+#ifdef _WIN32
+      if (library)
+        FreeLibrary(library);
+#else
+      if (library)
+        dlclose(library);
+      initialized = false;
+#endif
+      library = nullptr;
+      throw;
+    }
   }
   void append(const int16_t *p, size_t size, float volume) {
-    if (samples.size() + size > maxDecodedBytes / 2)
-      throw std::runtime_error("Recording reached the 256 MiB capture limit");
+    if (samples.size() + size >= maxDecodedBytes / sizeof(float))
+      throw std::runtime_error(
+          "Recording reached the decoded size limit. Insert the captured take "
+          "before starting another");
     for (size_t i = 0; i < size; i++) {
       auto value = int16_t(std::clamp(float(p[i]) * volume, -32768.f, 32767.f));
       samples.push_back(value);
@@ -219,6 +234,28 @@ public:
       append(buffer.data(), bytes / 2, volume);
     }
 #endif
+  }
+  void finish(float volume = 1) {
+    if (!active())
+      return;
+    try {
+      poll(volume);
+#ifdef _WIN32
+      stop(device);
+      reset(device);
+      for (auto &header : headers)
+        if ((header.dwFlags & WHDR_DONE) && header.dwBytesRecorded)
+          append((const int16_t *)header.lpData, header.dwBytesRecorded / 2,
+                 volume);
+#else
+      pause(device, 1);
+      poll(volume);
+#endif
+      end();
+    } catch (...) {
+      end();
+      throw;
+    }
   }
   void end() {
     if (!active())

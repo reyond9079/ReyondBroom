@@ -20,6 +20,11 @@ static double rms(const PCM &pcm) {
 int main(int argc, char **argv) {
   fs::path exe = argc > 1 ? fs::u8path(argv[1]) : fs::path("/usr/bin/ffmpeg");
   Workspace w;
+  auto converterFolder = w.path / fs::u8path("converter 'quoted' звук");
+  fs::create_directories(converterFolder);
+  auto copied = converterFolder / "ffmpeg.exe";
+  fs::copy_file(exe, copied);
+  exe = copied;
   Project p;
   auto data = std::make_shared<PCM>(44100 * 8);
   for (size_t i = 0; i < data->size() / 2; i++)

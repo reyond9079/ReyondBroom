@@ -14,7 +14,7 @@ int main() {
   capture.begin(0);
   std::this_thread::sleep_for(std::chrono::milliseconds(160));
   capture.poll();
-  capture.end();
+  capture.finish();
   assert(!capture.active() && capture.samples.size() > 1000);
   std::cout << "PASS capture API queue, device selection and stop, "
             << capture.samples.size() / 2

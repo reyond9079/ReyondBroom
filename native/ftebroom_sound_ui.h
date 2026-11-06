@@ -1293,8 +1293,7 @@ static void soundBrowserAccept() {
 }
 static void soundRecordFinish() {
   auto &s = soundState;
-  s.capture.poll(s.recordGain);
-  s.capture.end();
+  s.capture.finish(s.recordGain);
   s.recordAt = -1;
   if (s.capture.samples.empty())
     throw std::runtime_error("Microphone returned no audio");
@@ -1690,6 +1689,14 @@ static void soundDialogs() {
           s.recordTrack = s.track;
           s.recordAt = ImGui::GetTime() + s.countdown;
           soundStop();
+        }
+        if (!s.capture.active() && s.recordAt < 0 &&
+            !s.capture.samples.empty()) {
+          if (ImGui::Button("Insert captured take")) {
+            soundRecordFinish();
+            s.dialog.clear();
+            ImGui::CloseCurrentPopup();
+          }
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
@@ -2177,5 +2184,6 @@ static void soundPanel() {
     soundMessage = e.what();
     soundStop();
     s.capture.end();
+    s.recordAt = -1;
   }
 }

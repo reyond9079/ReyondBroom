@@ -114,6 +114,19 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     expect(uiBlocksScene(900, 700), "audio4_timeline_mouse_blocks_map");
     s.selected = {voice};
     s.track = p.clip(voice)->track;
+    s.cursor = 4 * p.rate;
+    s.focused = s.timelineFocused = true;
+    auto ctrl = input->GetKeyCode("ctrl", nullptr),
+         b = input->GetKeyCode("b", nullptr);
+    count = p.clips.size();
+    event(1, ctrl, 0, 600, 800, testW, testH);
+    event(1, b, 0, 600, 800, testW, testH);
+    event(2, b, 0, 600, 800, testW, testH);
+    event(2, ctrl, 0, 600, 800, testW, testH);
+    expect(p.clips.size() == count + 1, "audio4_engine_event_routes_to_audio");
+    soundExecute("edit.undo");
+    s.cursor = previous;
+    s.selected = {voice};
   } else if (test == "audio4save") {
     saved = rbAudio::serialize(p);
     original = rbAudio::readBytes(folder / "voice.wav");
@@ -218,6 +231,24 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     soundExecute("shortcuts.open");
   } else if (test == "audio4record") {
     soundExecute("record.open");
+  } else if (test == "audio4recordstart") {
+    s.recordPosition = s.cursor;
+    s.recordTrack = s.track;
+    s.countdown = 1;
+    s.recordAt = ImGui::GetTime() + 1;
+  } else if (test == "audio4recordfinish") {
+    expect(s.capture.active(), "audio4_capture_started_after_countdown");
+    soundRecordFinish();
+    ImGui::ClosePopupToLevel(0, true);
+    s.dialog.clear();
+  } else if (test == "audio4recordcheck") {
+    finish();
+    expect(p.sources.size() == 4 && p.sources.back().pcm &&
+               p.sources.back().length() > p.rate,
+           "audio4_recording_creates_clip_source");
+    expect(
+        std::filesystem::exists(std::filesystem::u8path(p.sources.back().uri)),
+        "audio4_recording_file_persisted");
   } else if (test == "audio4light") {
     uiTheme = 3;
     uiStyle();
@@ -233,7 +264,7 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     uiScaleChoice = 4;
     uiStyle();
   } else if (test == "audio4dialogclose") {
-    ImGui::ClosePopupsExceptModals();
+    ImGui::ClosePopupToLevel(0, true);
     s.dialog.clear();
     s.pendingDialog.clear();
   }

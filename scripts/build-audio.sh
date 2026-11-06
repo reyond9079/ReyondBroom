@@ -6,7 +6,7 @@ destination=$(cd "$(dirname "$0")/.." && pwd)/tools/audio
 workspace=${1:?Pass a dedicated build directory}
 mkdir -p "$workspace" "$destination"
 cd "$workspace"
-if [ ! -f ffmpeg-8.0.1.tar.xz ]; then curl -fL https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz -o ffmpeg-8.0.1.tar.xz; fi
+if [ ! -f ffmpeg-8.0.1.tar.xz ]; then curl -4 --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 20 --max-time 180 -fL https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz -o ffmpeg-8.0.1.tar.xz; fi
 echo '05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41  ffmpeg-8.0.1.tar.xz' | sha256sum -c -
 if [ ! -d ffmpeg-8.0.1 ]; then tar -xf ffmpeg-8.0.1.tar.xz; fi
 if [ ! -d lame-source ]; then git clone https://github.com/rbrito/lame.git lame-source; fi

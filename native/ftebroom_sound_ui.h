@@ -382,10 +382,36 @@ static void soundExecute(const std::string &id) {
       });
       return;
     }
+    if (id == "clip.normalize" || id == "clip.denoise" ||
+        id == "clip.enhance" || id == "clip.pitchLink") {
+      soundApply("Toggle clip processing", [&] {
+        rbAudio::requireEditable(p, s.selected);
+        auto selected = soundSelected();
+        if (!selected)
+          return;
+        bool value = id == "clip.normalize" ? !selected->fx.normalize
+                     : id == "clip.denoise" ? !selected->fx.denoise
+                     : id == "clip.enhance" ? !selected->fx.enhance
+                                            : !selected->pitchLinked;
+        for (auto &clip : p.clips)
+          if (s.selected.count(clip.id)) {
+            if (id == "clip.normalize")
+              clip.fx.normalize = value;
+            else if (id == "clip.denoise")
+              clip.fx.denoise = value;
+            else if (id == "clip.enhance")
+              clip.fx.enhance = value;
+            else
+              clip.pitchLinked = value;
+          }
+      });
+      return;
+    }
     if (id == "clip.speed" || id == "clip.voice" || id == "clip.gain" ||
         id == "clip.fadeIn" || id == "clip.fadeOut" || id == "clip.normalize" ||
         id == "clip.denoise" || id == "clip.enhance" || id == "clip.balance" ||
         id == "clip.pitchLink" || id == "master.gain") {
+      s.focusField = id;
       s.tab = id == "clip.speed" || id == "clip.pitchLink" ? 2
               : id == "clip.voice"                         ? 1
                                                            : 0;
@@ -446,6 +472,13 @@ static void soundDirtyField(const rbAudio::Project &before, bool changed,
     }
   }
 }
+static void soundFocusField(const char *id) {
+  auto &focus = soundState.focusField;
+  if (focus == id) {
+    ImGui::SetKeyboardFocusHere();
+    focus.clear();
+  }
+}
 static void soundInspector() {
   auto &s = soundState;
   auto &p = s.project;
@@ -485,18 +518,33 @@ static void soundInspector() {
     if (s.tab == 0) {
       auto before = p;
       float value = c->db;
+      soundFocusField("clip.gain");
       bool changed = soundFloatRow("Volume", value, .1f, -96, 24, "%.1f dB");
       if (changed)
         for (auto &v : p.clips)
           if (s.selected.count(v.id))
             v.db = value;
       soundDirtyField(before, changed, "Clip volume");
+      before = p;
+      value = c->db;
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x -
+                              38 * uiScale());
+      changed = ImGui::SliderFloat("##clipgain", &value, -96, 24, "");
+      soundVolumeMin = ImGui::GetItemRectMin();
+      soundVolumeMax = ImGui::GetItemRectMax();
+      soundVolume = rbAudio::gain(value);
+      if (changed)
+        for (auto &clip : p.clips)
+          if (s.selected.count(clip.id))
+            clip.db = value;
+      soundDirtyField(before, changed, "Clip volume");
       ImGui::SameLine();
-      if (ImGui::SmallButton("+ key"))
+      if (soundIcon("clip.keyframe", "Add volume keyframe", false, 24))
         soundExecute("clip.keyframe");
       for (bool out : {false, true}) {
         before = p;
         float sec = float(out ? c->fadeOut : c->fadeIn) / p.rate;
+        soundFocusField(out ? "clip.fadeOut" : "clip.fadeIn");
         changed = soundFloatRow(out ? "Fade out" : "Fade in", sec, .01f, 0,
                                 float(c->length()) / p.rate, "%.2f s");
         if (changed)
@@ -541,6 +589,7 @@ static void soundInspector() {
       ImGui::Separator();
       before = p;
       float balance = c->balance;
+      soundFocusField("clip.balance");
       changed = soundFloatRow("Channel balance", balance, .01f, -1, 1, "%.2f");
       if (changed)
         for (auto &v : p.clips)
@@ -619,6 +668,7 @@ static void soundInspector() {
     } else {
       auto before = p;
       float speed = c->speed;
+      soundFocusField("clip.speed");
       bool changed = soundFloatRow("Times", speed, .01f, .25f, 4, "%.2fx");
       if (changed)
         for (auto &v : p.clips)
@@ -687,6 +737,13 @@ static void soundTimeline() {
       ImGui::SameLine(0, 5 * scale);
     if (soundIcon(tools[i].second, tools[i].first, i == 0 && soundTool == 0))
       soundExecute(tools[i].second);
+    if (i == 0 && ImGui::BeginPopupContextItem("Audio tool")) {
+      if (ImGui::MenuItem("Select", "A", soundTool == 0))
+        soundExecute("tool.select");
+      if (ImGui::MenuItem("Split", "B", soundTool == 2))
+        soundExecute("tool.split");
+      ImGui::EndPopup();
+    }
   }
   ImGui::SameLine();
   float rightWidth = 330 * scale;
@@ -1918,6 +1975,7 @@ static void soundPlayer() {
               s.peak > 1 ? "  OVER" : "");
   auto before = p;
   ImGui::SetNextItemWidth(-1);
+  soundFocusField("master.gain");
   bool changed = ImGui::SliderFloat("##mastergain", &p.masterDb, -96, 12,
                                     "Master %.1f dB");
   soundDirtyField(before, changed, "Master gain");

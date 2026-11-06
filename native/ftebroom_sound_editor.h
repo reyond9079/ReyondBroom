@@ -89,7 +89,7 @@ struct SoundState {
   std::filesystem::path browseFolder;
   std::vector<std::filesystem::path> browseEntries;
   std::set<std::filesystem::path> browseDirectories;
-  std::string afterSave;
+  std::string afterSave, focusField;
   double lastAutosave = 0;
   bool autosaveWarning = false;
   rbAudio::Frame dragAt = 0;

@@ -68,6 +68,68 @@ int main() {
     rejected = true;
   }
   assert(rejected);
+
+  // Grouped moves are atomic with respect to locks, and clamps preserve
+  // offsets.
+  p.track(t)->locked = false;
+  p.track(t2)->muted = false;
+  p.clips.clear();
+  a = p.addClip(sid, t, 100);
+  b = p.addClip(sid, t2, 300);
+  auto group = p.next++;
+  p.clip(a)->group = p.clip(b)->group = group;
+  move(p, {a}, -200);
+  assert(p.clip(a)->at == 0 && p.clip(b)->at == 200);
+  p.track(t2)->locked = true;
+  auto lockedState = serialize(p);
+  rejected = false;
+  try {
+    move(p, {a}, 20);
+  } catch (...) {
+    rejected = true;
+  }
+  assert(rejected && serialize(p) == lockedState);
+  p.track(t2)->locked = false;
+  p.linkage = false;
+  move(p, {a}, 20);
+  assert(p.clip(b)->at == 200);
+  // Ripple closes the union of overlapping deleted spans only on their track.
+  p.clips.clear();
+  p.linkage = true;
+  a = p.addClip(sid, t, 0);
+  p.clip(a)->out = 100;
+  b = p.addClip(sid, t, 50);
+  p.clip(b)->out = 100;
+  auto later = p.addClip(sid, t, 200), other = p.addClip(sid, t2, 200);
+  erase(p, {a, b}, true);
+  assert(p.clip(later)->at == 50 && p.clip(other)->at == 200);
+  p.magnet = true;
+  magnet(p);
+  assert(p.clip(later)->at == 0 && p.clip(other)->at == 200);
+  p.magnet = false;
+  p.clip(later)->keys = {{0, -12}, {100, 0}, {1000, -6}};
+  p.clip(later)->out = 1000;
+  auto automation = p.clip(later)->automation(50);
+  assert(std::abs(automation + 6) < 1e-6);
+  trim(p, {later}, 100, true);
+  assert(p.clip(later)->in == 100 && p.clip(later)->at == 100 &&
+         p.clip(later)->keys.front().at == 0);
+  // Visibility never removes audio; clipping is shared by preview/export and
+  // leaves all in-range samples unchanged at unity gain.
+  p.clips.clear();
+  a = p.addClip(sid, t);
+  p.sources[0].pcm = std::make_shared<PCM>(2000, .95f);
+  p.track(t)->visible = false;
+  m.project = p;
+  m.render(0, 1000, after);
+  assert(after[100] == .95f);
+  b = p.addClip(sid, t2);
+  m.project = p;
+  float peak = 0;
+  m.render(0, 1000, after, &peak);
+  assert(after[100] == 1 && peak > 1.8f);
+  std::cout << "PASS grouped lock/linkage, ripple interval union, magnet, dB "
+               "automation, trim, visibility and output overload protection\n";
   std::cout << "PASS split identity, move, history, JSON validation, "
                "mute/solo, fades and locked-track protection\n";
 }

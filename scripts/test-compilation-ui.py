@@ -18,7 +18,9 @@ data=root/'ftebroom';repo=Path(__file__).resolve().parents[1]
 store=data/'compilation-profiles.json'
 store.write_text(json.dumps({'version':1,'games':{}}))
 (data/'compilation-ui-live.json').unlink(missing_ok=True)
-(data/'ui-interaction.cfg').write_text('exec qa-clip.cfg\nin 5 ftebroom_test_run 60\nin 6 ftebroom_test_run 50\n')
+# The fixture loads its map at 7 seconds and restores the camera at 10.
+# Begin interaction after those startup commands have finished.
+(data/'ui-interaction.cfg').write_text('exec qa-clip.cfg\nin 11 ftebroom_test_run 60\nin 12 ftebroom_test_run 50\n')
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 renderer_args=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 stream=(out/'editor.log').open('wb')
@@ -82,6 +84,12 @@ if os.name=='nt':
  def strokes(text):
   window_diagnostics()
   Desktop(backend='win32').window(handle=hwnd).send_keystrokes(text)
+  # A software-rendered frame may outlast the fixed input pauses. Wait for
+  # two subsequent UI snapshots so queued messages and ImGui edits are both
+  # observed before the next operation/assertion.
+  for _ in range(2):
+   stamp=(data/'compilation-ui-live.json').stat().st_mtime_ns
+   wait_for(lambda:(data/'compilation-ui-live.json').stat().st_mtime_ns!=stamp)
  def chord(code,modifiers=()):
   strokes(''.join({17:'^',16:'+',18:'%'}[m] for m in modifiers)+chr(code).lower())
  codes={'ctrl':'^','shift':'+','alt':'%','enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`'}
@@ -162,9 +170,9 @@ def paste(text):
   d.sync()
  time.sleep(.3)
 try:
- wait_for(lambda:live()['widgets'].get('profile-add'))
+ wait_for(lambda:live()['widgets'].get('profile-add'),timeout=25)
  click('profile-add');expect(profiles()[0]['name']=='unnamed','create profile using mini toolbar')
- edit('Profile name','');expect(profiles()[0]['name']=='','empty names persist')
+ edit('Profile name','');wait_for(lambda:profiles()[0]['name']=='');expect(True,'empty names persist')
  edit('Profile name','UI parity');key('tab');wait_for(lambda:live()['widgets']['Working directory'].get('active'));expect(True,'Tab moves from Name to Working Directory')
  edit('Working directory','${MAP_D');key('tab');click('completion/MAP_DIR_PATH');expect(profiles()[0]['workdir']=='${MAP_DIR_PATH}','Tab variable completion')
  sandbox=data/'maps'/('ui-parity-'+str(process.pid));sandbox.mkdir(parents=True,exist_ok=True);edit('Working directory',str(sandbox).replace('\\','/'))

@@ -413,6 +413,11 @@ static void soundProjectSave(const std::filesystem::path &p,
   }
 }
 static void soundProjectLoad(const std::filesystem::path &p) {
+  if (soundBusy()) {
+    soundMessage = "Wait for or cancel the current audio operation before "
+                   "loading/recovery.";
+    return;
+  }
   auto roots = soundRoots();
   auto exe = soundFFmpeg();
   soundStop();
@@ -654,6 +659,7 @@ static void soundFinish() {
     s.project = std::move(result.project);
     s.projectPath = result.path;
     s.history.clear();
+    s.clipboard.clear();
     s.selected.clear();
     s.cursor = 0;
     s.track = s.project.tracks.empty() ? 0 : s.project.tracks.front().id;

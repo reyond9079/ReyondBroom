@@ -157,11 +157,13 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     soundProjectSave(folder / "recovery.rbaudio.json", true);
     expect(rbAudio::readBytes(folder / "voice.wav") == original,
            "audio4_save_project_preserves_source");
+    s.clipboard = {p.clips.front()};
     soundProjectLoad(folder / "session.rbaudio.json");
   } else if (test == "audio4load") {
     finish();
     expect(rbAudio::serialize(p) == saved && s.ready,
            "audio4_project_roundtrip");
+    expect(s.clipboard.empty(), "audio4_project_load_clears_clipboard");
     s.selected = {voice};
     s.source = p.clip(voice)->source;
     s.track = p.clip(voice)->track;

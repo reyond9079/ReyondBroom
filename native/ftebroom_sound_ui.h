@@ -1761,6 +1761,19 @@ static void soundDialogs() {
             "Desktop layout: Media left, Player center, Basic / Voice changer "
             "/ Speed right, multitrack timeline below. The audio window can be "
             "resized; panels scroll independently.");
+        {
+          SoundDisabled disabled(!p.sources.empty() || !p.clips.empty());
+          int rate = p.rate == 48000 ? 1 : 0;
+          if (ImGui::Combo("New project rate", &rate,
+                           "44,100 Hz\0"
+                           "48,000 Hz\0"))
+            soundApply("Project sample rate",
+                       [&] { p.rate = rate ? 48000 : 44100; });
+        }
+        if (ImGui::Button("Reset timeline view")) {
+          s.zoom = 1;
+          s.viewStart = 0;
+        }
         if (ImGui::Button("Close")) {
           s.dialog.clear();
           ImGui::CloseCurrentPopup();

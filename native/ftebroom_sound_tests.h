@@ -13,7 +13,25 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     expect(!soundBusy(), "audio4_worker_completed");
   };
   std::string test = mode;
-  if (test == "audio4begin") {
+  if (test == "audio4preview") {
+    gameProfile = 0;
+    std::snprintf(baseq3, sizeof baseq3, "%s", root);
+    soundEditorOpen = true;
+    uiTheme = 0;
+    uiScaleChoice = 0;
+    uiStyle();
+    soundProjectLoad(folder / "updated.rbaudio.json");
+  } else if (test == "audio4previewready") {
+    finish();
+    if (!p.clips.empty()) {
+      s.selected = {p.clips[0].id};
+      s.source = p.clips[0].source;
+      s.track = p.clips[0].track;
+    }
+    s.cursor = rbAudio::frames(3.6, p.rate);
+    s.tab = 0;
+    soundMessage.clear();
+  } else if (test == "audio4begin") {
     gameProfile = 0;
     std::snprintf(baseq3, sizeof baseq3, "%s", root);
     uiTheme = 0;

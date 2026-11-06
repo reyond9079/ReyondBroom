@@ -20,6 +20,24 @@ jobs:
             mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
             mingw-w64-x86_64-make mingw-w64-x86_64-zlib
             mingw-w64-x86_64-pkgconf git curl diffutils tar make
+      - name: Fetch verified converter source from the base release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force converter-base,audio-deps | Out-Null
+          gh release download v0.5.0-alpha.124 --repo $env:GITHUB_REPOSITORY --dir converter-base --pattern '*-Windows-x64-Sources.zip' --pattern '*-Windows-x64-Sources.zip.sha256'
+          if ($LASTEXITCODE -ne 0) { throw 'Converter source download failed' }
+          $archive = (Get-ChildItem converter-base/*-Sources.zip).FullName
+          $expected = ((Get-Content converter-base/*-Sources.zip.sha256) -split '\s+')[0]
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Converter source checksum mismatch' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
+          try {
+            $entry = $zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz')
+            if (!$entry) { throw 'Pinned FFmpeg source missing from base sources' }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true)
+          } finally { $zip.Dispose() }
       - name: Build the isolated float/DSP converter from pinned sources
         shell: msys2 {0}
         run: scripts/build-audio.sh "$PWD/audio-deps"

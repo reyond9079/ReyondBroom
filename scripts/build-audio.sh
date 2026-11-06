@@ -4,6 +4,7 @@ set -eu
 export PATH=/mingw64/bin:/usr/bin:$PATH
 destination=$(cd "$(dirname "$0")/.." && pwd)/tools/audio
 workspace=${1:?Pass a dedicated build directory}
+msys_shell=$(cygpath -m /usr/bin/sh.exe)
 mkdir -p "$workspace" "$destination"
 cd "$workspace"
 if [ ! -f ffmpeg-8.0.1.tar.xz ]; then curl -4 --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 20 --max-time 180 -fL https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz -o ffmpeg-8.0.1.tar.xz; fi
@@ -12,9 +13,16 @@ if [ ! -d ffmpeg-8.0.1 ]; then tar -xf ffmpeg-8.0.1.tar.xz; fi
 if [ ! -d lame-source ]; then git clone https://github.com/rbrito/lame.git lame-source; fi
 git -C lame-source checkout --detach af984672a95bb0eedc9f3193604e269c97cca162
 cd lame-source
-./configure --host=x86_64-w64-mingw32 --prefix="$PWD/../prefix" --disable-shared --enable-static --disable-frontend --disable-asm
-mingw32-make -j8 MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe
-mingw32-make install MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe
+./configure --host=x86_64-w64-mingw32 --prefix="$PWD/../prefix" --disable-shared --enable-static --disable-frontend --disable-nasm
+mingw32-make -j8 MAKE=mingw32-make SHELL="$msys_shell"
+mingw32-make install MAKE=mingw32-make SHELL="$msys_shell"
+# Flatten libtool's convenience-library objects explicitly. On MSYS2 the
+# libtool nested-archive extraction can omit decoder/SSE objects from the final
+# static archive even though both convenience libraries built successfully.
+for object in mpglib/*.o libmp3lame/vector/*.o; do
+  if [ -f "$object" ]; then ar r ../prefix/lib/libmp3lame.a "$object"; fi
+done
+ranlib ../prefix/lib/libmp3lame.a
 git archive --format=zip --output="$destination/lame-source.zip" HEAD
 cp COPYING "$destination/LAME-LGPL.txt"
 cd ..
@@ -41,7 +49,7 @@ PKG_CONFIG_PATH="$PWD/../prefix/lib/pkgconfig" ./configure \
  --enable-filter=aresample,volume,atrim,asetpts,asetrate,aformat,anull,atempo,loudnorm,afftdn,highpass,lowpass,acompressor,aecho,tremolo \
  --enable-parser=mpegaudio,flac,vorbis \
  --extra-cflags="-I$prefix_native/include" --extra-ldflags="-static -L$prefix_native/lib" || { tail -n 100 ffbuild/config.log; exit 1; }
-mingw32-make -j8 MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe
+mingw32-make -j8 MAKE=mingw32-make SHELL="$msys_shell"
 cp ffmpeg.exe "$destination/ffmpeg.exe"
 cp COPYING.LGPLv2.1 "$destination/FFmpeg-LGPL-2.1.txt"
 cp ../ffmpeg-8.0.1.tar.xz "$destination/ffmpeg-8.0.1-source.tar.xz"

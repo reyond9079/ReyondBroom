@@ -13,6 +13,9 @@
 #include <sstream>
 #include <thread>
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #else
 #include <fcntl.h>
@@ -510,18 +513,7 @@ inline void exportAudio(const fs::path &exe, const Mixer &mixer,
   if (ext == ".mp3" || ext == ".ogg")
     args.insert(args.end(), {"-b:a", std::to_string(options.bitrate) + "k"});
   args.push_back(encoded.u8string());
-  try {
-    process(exe, args, w.path / "export.log", job);
-  } catch (const std::exception &e) {
-    std::string error = e.what();
-    if (ext != ".ogg" || error.find("Unknown encoder") == std::string::npos)
-      throw;
-    for (auto &arg : args)
-      if (arg == "libvorbis")
-        arg = "vorbis";
-    args.insert(args.end() - 1, {"-strict", "-2"});
-    process(exe, args, w.path / "export.log", job);
-  }
+  process(exe, args, w.path / "export.log", job);
   cancelled(job);
   // Stage on the destination filesystem before replacement. An existing file is
   // never destroyed if encoding/cancellation/write fails.

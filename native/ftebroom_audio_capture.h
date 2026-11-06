@@ -4,8 +4,12 @@
 #include <array>
 #include <cstring>
 #ifdef _WIN32
-#include <mmsystem.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
+
+#include <mmsystem.h>
 #else
 #include <dlfcn.h>
 #endif

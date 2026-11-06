@@ -17,7 +17,19 @@ mingw32-make -j8 MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe
 mingw32-make install MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe
 git archive --format=zip --output="$destination/lame-source.zip" HEAD
 cp COPYING "$destination/LAME-LGPL.txt"
-cd ../ffmpeg-8.0.1
+cd ..
+prefix_native=$(cygpath -m "$PWD/prefix")
+for library in ogg vorbis; do
+  if [ "$library" = ogg ]; then revision=e1774cd77f471443541596e09078e78fdc342e4f; else revision=0657aee69dec8508a0011f47f3b69d7538e9d262; fi
+  if [ ! -d "$library-source" ]; then git clone --no-checkout "https://github.com/xiph/$library.git" "$library-source"; fi
+  git -C "$library-source" checkout --detach "$revision"
+  cmake -S "$library-source" -B "$library-build" -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix_native" -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DINSTALL_DOCS=OFF -DOGG_ROOT="$prefix_native"
+  cmake --build "$library-build" -j4
+  cmake --install "$library-build"
+  git -C "$library-source" archive --format=zip --output="$destination/$library-source.zip" HEAD
+  cp "$library-source/COPYING" "$destination/$library-BSD.txt"
+done
+cd ffmpeg-8.0.1
 PKG_CONFIG_PATH="$PWD/../prefix/lib/pkgconfig" ./configure \
  --target-os=mingw32 --arch=x86_64 --cc=gcc --cxx=g++ \
  --disable-everything --disable-autodetect --disable-network --disable-doc \
@@ -25,10 +37,10 @@ PKG_CONFIG_PATH="$PWD/../prefix/lib/pkgconfig" ./configure \
  --enable-ffmpeg --enable-protocol=file \
  --enable-demuxer=wav,ogg,mp3,flac,pcm_s16le,pcm_f32le --enable-muxer=wav,ogg,mp3,flac,pcm_s16le,pcm_f32le,null \
  --enable-decoder=pcm_s16le,pcm_u8,pcm_s24le,pcm_s32le,pcm_f32le,vorbis,mp3,mp3float,flac \
- --enable-encoder=pcm_s16le,pcm_s24le,pcm_f32le,vorbis,flac,libmp3lame --enable-libmp3lame \
+ --enable-encoder=pcm_s16le,pcm_s24le,pcm_f32le,libvorbis,flac,libmp3lame --enable-libmp3lame --enable-libvorbis \
  --enable-filter=aresample,volume,atrim,asetpts,asetrate,aformat,anull,atempo,loudnorm,afftdn,highpass,lowpass,acompressor,aecho,tremolo \
  --enable-parser=mpegaudio,flac,vorbis \
- --extra-cflags="-I$PWD/../prefix/include" --extra-ldflags="-static -L$PWD/../prefix/lib" || { tail -n 100 ffbuild/config.log; exit 1; }
+ --extra-cflags="-I$prefix_native/include" --extra-ldflags="-static -L$prefix_native/lib" || { tail -n 100 ffbuild/config.log; exit 1; }
 mingw32-make -j8 MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe
 cp ffmpeg.exe "$destination/ffmpeg.exe"
 cp COPYING.LGPLv2.1 "$destination/FFmpeg-LGPL-2.1.txt"

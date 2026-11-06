@@ -21,8 +21,6 @@ output = args.output.resolve()
 output.mkdir(parents=True, exist_ok=False)
 root = output / "ReyondBroom-Windows-x64"
 root.mkdir()
-shutil.copytree(bundle/'tools/compile-ui', root/'tools/compile-ui')
-shutil.copytree(source/'runtime/ui/compilation', root/'ftebroom/ui/compilation')
 (root / "bin").mkdir()
 if any(not (bundle/'plugins'/name/(name+'.dll')).is_file() for name in ('rubble','autolevel','ivy')):
     raise RuntimeError('Build bundled plugins with scripts/build-plugins.py first')

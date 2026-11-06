@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
-#ifndef _WIN32
-#include <dlfcn.h>
-#endif
-static bool runQtInitialized=false;
-static bool runQtFailed=false;
-static std::string runQtLoadError;
-static int runQtPendingMode=-1;
-static int (*runQtInitialize)(const char* (*)(const char*),const char*);
-static void (*runQtShowFunction)(int),(*runQtTickFunction)(),(*runQtShutdownFunction)();
-static int (*runQtVisibleFunction)();
-static int (*runQtCaptureFunction)(const char*,int,int,int);
 static std::string runImportReviewGame;
-static nlohmann::json runQtState(){
+static nlohmann::json runUiState(){
  using J=nlohmann::json;runLoad();J profiles=J::array(),engines=J::array(),presets=J::array();
  for(const auto& p:runProfiles)profiles.push_back(runProfileToJson(p));for(const auto& p:runBundledProfiles)presets.push_back(runProfileToJson(p));
  for(const auto& e:runEngines)engines.push_back({{"id",e.id},{"name",e.name},{"path",e.path},{"parameters",e.parameters}});
@@ -28,11 +17,10 @@ static void runLaunchConfiguredEngine(const RunEngineProfile& engine){
  try{auto args=ftebroom::profile::interpolate(engine.parameters,runCommonVariables());runStartProcess(engine.path,args,std::filesystem::u8path(engine.path).parent_path(),true);runStrict=oldStrict;}
  catch(...){runStrict=oldStrict;throw;}
 }
-static const char* runQtRequest(const char* encoded){
- static std::string result;
+static nlohmann::json runUiExecute(const nlohmann::json& q){
  try{
-  using J=nlohmann::json;auto q=J::parse(encoded);auto action=q.at("action").get<std::string>();runLoad();J response={{"ok",true}};
-  if(action=="state")response=runQtState();
+  using J=nlohmann::json;auto action=q.at("action").get<std::string>();runLoad();J response={{"ok",true}};
+  if(action=="state")response=runUiState();
   else if(action=="profiles"){
    auto incoming=q.at("profiles");if(!incoming.is_array()||incoming.size()>4096)throw std::runtime_error("Invalid profile list.");std::vector<RunProfile> next;
    for(const auto& p:incoming)next.push_back(runProfileFromJson(p));auto old=runProfiles;auto selected=runSelected;runProfiles=std::move(next);runSelected=q.value("selected",-1);
@@ -75,38 +63,7 @@ static const char* runQtRequest(const char* encoded){
    auto e=q.at("engine");RunEngineProfile engine{e.at("id"),e.at("name"),e.at("path"),e.at("parameters")};
    for(auto& saved:runEngines)if(saved.id==engine.id)saved.parameters=engine.parameters;runSaveProfiles();runLaunchConfiguredEngine(engine);
   }else throw std::runtime_error("Unknown Compile action: "+action);
-  response["revision"]=runStoreRevision;result=response.dump();
- }catch(const std::exception& e){result=nlohmann::json{{"error",e.what()}}.dump();}
- return result.c_str();
+  response["revision"]=runStoreRevision;return response;
+ }catch(const std::exception& e){runError=e.what();return nlohmann::json{{"error",e.what()}};}
+
 }
-static bool runQtLoad(){
- if(runQtInitialized)return true;if(runQtFailed)return false;runLoad();
- auto root=documentPath("ftebroom.cfg").parent_path().parent_path();
-#ifdef _WIN32
- auto path=root/"tools/compile-ui/reyond-compile-ui.dll";auto library=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
- auto symbol=[&](const char* n){return library?reinterpret_cast<void*>(GetProcAddress(library,n)):nullptr;};
-#else
- auto path=root/"tools/compile-ui/libreyond-compile-ui.so";auto library=dlopen(path.c_str(),RTLD_NOW|RTLD_LOCAL);
- auto symbol=[&](const char* n){return library?dlsym(library,n):nullptr;};
-#endif
- runQtCaptureFunction=reinterpret_cast<decltype(runQtCaptureFunction)>(symbol("reyondCompileCapture"));
- runQtInitialize=reinterpret_cast<decltype(runQtInitialize)>(symbol("reyondCompileInitialize"));runQtShowFunction=reinterpret_cast<decltype(runQtShowFunction)>(symbol("reyondCompileShow"));runQtTickFunction=reinterpret_cast<decltype(runQtTickFunction)>(symbol("reyondCompileTick"));runQtVisibleFunction=reinterpret_cast<decltype(runQtVisibleFunction)>(symbol("reyondCompileVisible"));runQtShutdownFunction=reinterpret_cast<decltype(runQtShutdownFunction)>(symbol("reyondCompileShutdown"));
- if(!runQtInitialize||!runQtShowFunction||!runQtTickFunction||!runQtVisibleFunction||!runQtShutdownFunction){runQtFailed=true;runError="The native Compile UI component is missing or incompatible. Install the complete editor package.";
-#ifndef _WIN32
- if(const char* error=dlerror())core->Print((std::string("Compile UI: ")+error+"\n").c_str());
-#endif
- runQtLoadError=runError;return false;}
- runQtInitialized=runQtInitialize(runQtRequest,documentPath("ui/compilation").u8string().c_str())!=0;
- if(!runQtInitialized){runQtFailed=true;runError="Cannot initialize the native Compile UI.";}return runQtInitialized;
-}
-static void runQtShow(int mode){runQtPendingMode=mode;}
-static void runOpenSettings(){runQtShow(1);}
-static void runQtPump(){
- if(runQtPendingMode>=0){int mode=runQtPendingMode;runQtPendingMode=-1;if(runQtLoad())runQtShowFunction(mode);}
- if(runQtInitialized)runQtTickFunction();
-}
-static void runQtPanel(){
- if(runWindow&&runQtLoad()&&!runQtVisibleFunction())runQtShowFunction(0);
- if(runWindow&&runQtFailed){ImGui::SetNextWindowSize({560,150},ImGuiCond_FirstUseEver);if(ImGui::Begin("Compile",&runWindow))ImGui::TextWrapped("%s",runQtLoadError.empty()?"Install the complete native Compile UI component.":runQtLoadError.c_str());ImGui::End();}
-}
-static void runQtShutdown(){if(runQtInitialized){runQtShutdownFunction();runQtInitialized=false;}}

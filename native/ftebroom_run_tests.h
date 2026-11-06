@@ -13,11 +13,11 @@ static void testRunParity(int stage){
 #endif
  static RunProfile pipeline;static nlohmann::json before;static std::string previousMods;
  auto finishProfile=[&](std::vector<RunTask> tasks){RunProfile p{"Compatibility probe",root.u8string(),false,std::move(tasks)};p.trenchBroom=true;runBegin(p);};
- if(stage>=40&&stage<=43){
-  runWindow=true;if(!runQtLoad()){expect(false,"native_compile_ui_loaded");return;}
-  int width=stage>=42?1200:800,height=stage>=42?800:600,dark=stage%2;
-  auto directory=documentPath("compile-ui-atlas")/(std::to_string(width)+"x"+std::to_string(height)+(dark?"-dark":"-light"));
-  expect(runQtCaptureFunction&&runQtCaptureFunction(directory.u8string().c_str(),width,height,dark),"native_compile_ui_captured");
+ if(stage>=60&&stage<=64){uiScaleChoice=stage-60;uiStyle();}
+ else if(stage>=40&&stage<=43){
+  runWindow=true;runUiAtlasWidth=stage>=42?1200:800;runUiAtlasHeight=stage>=42?800:600;runUiAtlasTheme=stage%2?2:1;runUiManagerHeight=442;
+  runUiAtlasDirectory=documentPath("compile-ui-atlas")/(std::to_string(runUiAtlasWidth)+"x"+std::to_string(runUiAtlasHeight)+(stage%2?"-dark":"-light"));runUiAtlasFrames=3;
+  expect(true,"imgui_compile_ui_capture_requested");
  }else if(stage==20){
   std::filesystem::remove_all(root);std::filesystem::create_directories(root/"cleanup/nested");
   buildWriteTexture(root/std::filesystem::u8path(u8"seed α.txt"),"seed data");buildWriteTexture(root/"cleanup/top.tmp","remove");buildWriteTexture(root/"cleanup/nested/deep.TMP","remove");buildWriteTexture(root/"cleanup/nested/keep.bsp","keep");

@@ -46,13 +46,10 @@ if (!$enginePath) {
 Run 'mingw32-make' @('-C', "$fte/engine/qclib", '-j4', 'R_qcc', 'CC=gcc', 'BASE_CFLAGS=-DQCCONLY', 'BASE_LDFLAGS=-s -lz -Wl,--stack,16777216')
 Copy-Item "$fte/engine/qclib/fteqcc.bin" "$out/fteqcc.exe" -Force
 Run "$out/fteqcc.exe" @('-src', "$src/qc", '-srcfile', 'csaddon.src', '-max_globals', '262144', '-max_strings', '4194304')
-if (-not $env:REYOND_QT_ROOT) { throw 'Set REYOND_QT_ROOT to the Qt 6.10.3 MSVC 2022 kit' }
-Run 'python' @("$src/scripts/build-profile-support.py", 'ui', '--build-dir', "$deps/compile-ui", '--qt-root', $env:REYOND_QT_ROOT, '--generator', 'Visual Studio 17 2022')
 $bundle = Join-Path $out 'ReyondBroom-Windows-x64'
 New-Item -ItemType Directory -Force "$bundle/ftebroom", "$bundle/licenses" | Out-Null
 Run 'python' @("$src/scripts/build-profile-support.py", 'core', '--build-dir', "$deps/profile-core", '--generator', 'MinGW Makefiles')
 Run 'g++' @('-std=c++17', '-O2', '-shared', '-static', "-I$bullet/src", "-I$fte/plugins", "-I$imgui", "$src/native/ftebroom.cpp", "$imgui/imgui.cpp", "$imgui/imgui_draw.cpp", "$imgui/imgui_tables.cpp", "$imgui/imgui_widgets.cpp", "$deps/profile-core/libreyond-profile.a", "$deps/bullet-build/lib/libBulletDynamics.a", "$deps/bullet-build/lib/libBulletCollision.a", "$deps/bullet-build/lib/libLinearMath.a", '-lz', '-lole32', '-lwindowscodecs', '-lcomdlg32', '-lshell32', '-lgdi32', '-o', "$bundle/fteplug_ftebroom_x64.dll")
-Run 'python' @("$src/scripts/build-profile-support.py", 'deploy', '--build-dir', "$deps/compile-ui", '--qt-root', $env:REYOND_QT_ROOT, '--output', $bundle)
 Copy-Item $enginePath "$bundle/fteqw64.exe" -Force
 Run 'python' @("$src/scripts/build-plugins.py", '--compiler', "$MinGW/g++.exe", '--output', "$bundle/plugins")
 Set-Content "$out/launcher.rc" ('1 ICON "'+($fte.Replace('\','/')+'/engine/client/fte_eukaranopng.ico')+'"')

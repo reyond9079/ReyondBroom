@@ -18,7 +18,6 @@ out.mkdir(parents=True, exist_ok=False)
 platform = 'Linux-SDL2-x64' if a.sdl2 else 'Linux-x64'
 root = out / 'ReyondBroom-Linux-x64'
 root.mkdir()
-shutil.copytree(a.deps/'compilation-runtime',root,dirs_exist_ok=True)
 if any(not (a.deps/'plugins'/name/(name+'.so')).is_file() for name in ('rubble','autolevel','ivy')):
     raise RuntimeError('Build bundled plugins with scripts/build-plugins.py first')
 for name in ('rubble','autolevel','ivy'):

@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: compilation-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   linux:
     runs-on: ubuntu-24.04
@@ -22,12 +25,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install Qt and build/runtime dependencies
+      - name: Install build/runtime dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake ninja-build build-essential libgl-dev libegl1 libopengl0 libx11-dev zlib1g-dev xvfb xauth patchelf libsdl2-2.0-0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 libxcb-render-util0 ripgrep
-          python -m pip install aqtinstall==3.3.0
-          python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 -O "$PWD/qt" --archives qtbase qtsvg icu
+          sudo apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev zlib1g-dev xvfb xauth libsdl2-2.0-0 ripgrep
       - name: Verify base runtime and extract build dependencies
         run: |
           mkdir base deps bundle
@@ -46,10 +47,6 @@ jobs:
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Linux-x64/ftebroom/csaddon.dat
           cp deps/profile-core/compilation-profile-probe bundle/ReyondBroom-Linux-x64/tools/
-      - name: Build and deploy same-process Qt UI
-        run: |
-          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64
-          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64 --output bundle/ReyondBroom-Linux-x64
       - name: Run real editor regression, restart, processes, files and UI atlas
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
       - uses: actions/upload-artifact@v4
@@ -74,11 +71,6 @@ jobs:
           path-type: inherit
           update: false
           install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make mingw-w64-x86_64-zlib git make unzip
-      - name: Install official MSVC Qt kit (C ABI boundary)
-        shell: pwsh
-        run: |
-          python -m pip install aqtinstall==3.3.0
-          python -m aqt install-qt windows desktop 6.10.3 win64_msvc2022_64 -O "$PWD/qt" --archives qtbase qtsvg
       - name: Verify and unpack base runtime and SDK
         shell: msys2 {0}
         run: |
@@ -99,13 +91,6 @@ jobs:
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
           cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
-      - name: Build official MSVC Qt UI and deploy
-        shell: pwsh
-        run: |
-          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --generator 'Visual Studio 17 2022'
-          if ($LASTEXITCODE) { throw 'Qt UI build failed' }
-          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --output bundle/ReyondBroom-Windows-x64
-          if ($LASTEXITCODE) { throw 'Qt UI deploy failed' }
       - name: Run real Windows editor checks and UI atlas
         shell: pwsh
         run: python scripts/test-compilation-runtime.py bundle/ReyondBroom-Windows-x64 qa

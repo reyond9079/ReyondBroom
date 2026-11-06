@@ -258,7 +258,7 @@ static void executeAction(const Action& a, bool down = true)
     else if (name == "revert" && !documentFile.empty())
       documentRequest("@"+documentFile.u8string());
     else if (name == "exit") {
-      if(runActive)runQtShow(3);else documentRequest("exit");
+      if(runActive)runUiShow(3);else documentRequest("exit");
     }
     else if (name == "save" && !documentUntitled)
       documentSave(documentName);

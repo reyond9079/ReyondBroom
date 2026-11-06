@@ -18,7 +18,7 @@ out.mkdir(parents=True, exist_ok=True)
 data = root/'ftebroom'
 for name in ['run.cfg', 'trenchbroom-native.cfg', 'trenchbroom-restore.cfg', 'compilation-parity-native.cfg']:
     shutil.copy2(repo/'tests'/name, data/name)
-shutil.copy2(repo/'tests/fixtures/CompilationProfiles-cpu-count.cfg', data/'CompilationProfiles-regression.cfg')
+shutil.copy2(repo/'tests/fixtures/CompilationProfiles-original.cfg', data/'CompilationProfiles-regression.cfg')
 # QA owns this runtime; no personal profile store is used.
 for name in ['compilation-profiles.json', 'ftebroom-run-profiles.txt']:
     (data/name).unlink(missing_ok=True)
@@ -52,17 +52,20 @@ for case in ['run', 'trenchbroom-native', 'trenchbroom-restore', 'compilation-pa
     expected = {'run': 15, 'trenchbroom-native': 3, 'trenchbroom-restore': 3, 'compilation-parity-native': 23}[case]
     if len(passes) < expected:
         raise RuntimeError(f'{case}: missing checks ({len(passes)} < {expected})')
-# Capture the imported original fixture, with actual native widgets and DIP geometry.
-(data/'compilation-profiles.json').unlink(missing_ok=True)
-(data/'profile-atlas.cfg').write_text('exec qa-clip.cfg\nin 10 ftebroom_test_run 10\n'+
-    '\n'.join(f'in {13+3*i} ftebroom_test_run {40+i}' for i in range(4))+'\nin 27 quit force\n')
-with (out/'atlas.log').open('wb') as stream:
-    subprocess.run([str(engine), '-ftebroom-child-processes', '-nohome', '-noupdates', '-nosound',
-        '-window', '-width', '1280', '-height', '800', '-basedir', str(root), '+exec', 'profile-atlas.cfg'],
-        cwd=root, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}, stdout=stream, stderr=subprocess.STDOUT,
-        timeout=65, check=True)
-atlas_log=(out/'atlas.log').read_text(errors='replace')
-if 'FTEBROOM_PARITY_FAIL' in atlas_log or not (data/'compile-ui-atlas').is_dir():
-    raise RuntimeError('Native Qt capture failed: '+atlas_log[-5000:])
-shutil.copytree(data/'compile-ui-atlas', out/'ui-atlas', dirs_exist_ok=True)
-assert len(list((out/'ui-atlas').glob('*/compile.png'))) == 4
+# Capture the imported fixture using the actual ImGui editor and its measured geometry.
+for scale in ['1', '1.5', '2']:
+    (data/'compilation-profiles.json').unlink(missing_ok=True)
+    shutil.rmtree(data/'compile-ui-atlas', ignore_errors=True)
+    choice={'1':0,'1.5':2,'2':4}[scale]
+    (data/'profile-atlas.cfg').write_text('exec qa-clip.cfg\nin 5 ftebroom_test_run '+str(60+choice)+'\nin 6 ftebroom_test_run 10\n'+
+        '\n'.join(f'in {9+3*i} ftebroom_test_run {40+i}' for i in range(4))+'\nin 23 quit force\n')
+    with (out/f'atlas-{scale}.log').open('wb') as stream:
+        subprocess.run([str(engine), '-ftebroom-child-processes', '-nohome', '-noupdates', '-nosound',
+            '-window', '-width', '2520', '-height', '1700', '-basedir', str(root), '+exec', 'profile-atlas.cfg'],
+            cwd=root, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}, stdout=stream, stderr=subprocess.STDOUT,
+            timeout=65, check=True)
+    atlas_log=(out/f'atlas-{scale}.log').read_text(errors='replace')
+    if 'FTEBROOM_PARITY_FAIL' in atlas_log or not (data/'compile-ui-atlas').is_dir():
+        raise RuntimeError('ImGui capture failed: '+atlas_log[-5000:])
+    shutil.copytree(data/'compile-ui-atlas', out/'ui-atlas'/scale, dirs_exist_ok=True)
+    assert len(list((out/'ui-atlas'/scale).glob('*/compile.png'))) == 4

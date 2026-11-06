@@ -482,13 +482,15 @@ static bool runText(const char* label,std::string& value)
   if(ImGui::InputText(label,buffer.data(),buffer.size())){value=buffer.data();return true;}return false;
 }
 #include "ftebroom_run_import.h"
-#include "ftebroom_run_qt.h"
-static void runPanel(){runQtPanel();}
+#include "ftebroom_run_commands.h"
+#include "ftebroom_run_ui.h"
+static void runPanel(){runImGuiPanel();}
 static void runAction(const std::string& operation)
 {
   runLoad();
-  if(operation=="launch"){runQtShow(2);return;}
+  if(operation=="launch"){runUiShow(2);return;}
   if(operation=="rerun"){
+    if(runHaveLast&&!lastRunProfile.trenchBroom){runBegin(lastRunProfile);return;}
     if(runHaveLast){auto p=std::find_if(runProfiles.begin(),runProfiles.end(),[](const auto& p){return p.name==lastRunProfile.name;});if(p!=runProfiles.end())runBegin(*p);}
     return;
   }

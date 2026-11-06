@@ -50,14 +50,9 @@ jobs:
           (cd base && sha256sum -c ./*.sha256)
           unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
           for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
-      - name: Build compatibility core, native UI and CSQC
+      - name: Build compatibility core and CSQC
         run: |
-          sudo apt-get install -y libgl-dev libegl1 libopengl0 patchelf
-          python -m pip install aqtinstall==3.3.0
-          python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 -O "$PWD/qt" --archives qtbase qtsvg icu
           python scripts/build-profile-support.py core --build-dir deps/profile-core --tests
-          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64
-          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/gcc_64 --output deps/compilation-runtime
           make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz'
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
       - name: Build and test the native module and profile importer
@@ -68,7 +63,7 @@ jobs:
           scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
       - name: Package native runtime and corresponding sources
         run: |
-          python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --compilation-runtime deps/compilation-runtime --csprogs csaddon.dat --version "$VERSION" --output out/release
+          python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --csprogs csaddon.dat --version "$VERSION" --output out/release
           (cd out/release && sha256sum -c ./*.sha256)
       - name: Validate the packaged editor
         run: |
@@ -125,15 +120,6 @@ jobs:
           try { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz'), "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true) } finally { $zip.Dispose() }
           Expand-Archive (Get-ChildItem sdk/*-Sources.zip).FullName deps/base
           foreach ($name in @('bullet','fteqw','imgui')) { Expand-Archive "deps/base/sources/$name-source.zip" "deps/$name" }
-      - name: Build MSVC Qt UI component
-        shell: pwsh
-        run: |
-          python -m pip install aqtinstall==3.3.0
-          python -m aqt install-qt windows desktop 6.10.3 win64_msvc2022_64 -O "$PWD/qt" --archives qtbase qtsvg
-          python scripts/build-profile-support.py ui --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --generator 'Visual Studio 17 2022'
-          if ($LASTEXITCODE) { throw 'Qt UI build failed' }
-          python scripts/build-profile-support.py deploy --build-dir deps/compile-ui --qt-root qt/6.10.3/msvc2022_64 --output deps/compilation-runtime
-          if ($LASTEXITCODE) { throw 'Qt UI deploy failed' }
       - name: Rebuild and test the complete audio helper
         shell: msys2 {0}
         run: |
@@ -151,7 +137,7 @@ jobs:
       - name: Package runtime and complete corresponding sources
         shell: msys2 {0}
         run: |
-          python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --compilation-runtime deps/compilation-runtime --csprogs csaddon.dat --audio-dir tools/audio --version "$VERSION" --output out/release
+          python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --audio-dir tools/audio --version "$VERSION" --output out/release
           (cd out/release && sha256sum -c ./*.sha256)
       - name: Upload validated packages to the draft release
         shell: pwsh

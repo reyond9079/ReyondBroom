@@ -86,6 +86,11 @@ if os.name=='nt':
  user.AttachThreadInput.argtypes=[wintypes.DWORD,wintypes.DWORD,wintypes.BOOL]
  user.MapVirtualKeyW.argtypes=[wintypes.UINT,wintypes.UINT]
  user.VkKeyScanW.argtypes=[wintypes.WCHAR];user.VkKeyScanW.restype=ctypes.c_short
+ def settle_input():
+  # Observe queued input and the following ImGui edit, even on slow GL hosts.
+  for _ in range(2):
+   stamp=(data/'compilation-ui-live.json').stat().st_mtime_ns
+   wait_for(lambda:(data/'compilation-ui-live.json').stat().st_mtime_ns!=stamp)
  def strokes(text):
   from pywinauto import keyboard
   window_diagnostics()
@@ -114,12 +119,7 @@ if os.name=='nt':
      state=(ctypes.c_ubyte*256).from_buffer_copy(stack.pop());assert user.SetKeyboardState(state)
   finally:
    user.SetKeyboardState((ctypes.c_ubyte*256).from_buffer_copy(initial));user.AttachThreadInput(current,target,False)
-  # A software-rendered frame may outlast the fixed input pauses. Wait for
-  # two subsequent UI snapshots so queued messages and ImGui edits are both
-  # observed before the next operation/assertion.
-  for _ in range(2):
-   stamp=(data/'compilation-ui-live.json').stat().st_mtime_ns
-   wait_for(lambda:(data/'compilation-ui-live.json').stat().st_mtime_ns!=stamp)
+  settle_input()
  def chord(code,modifiers=()):
   strokes(''.join({17:'^',16:'+',18:'%'}[m] for m in modifiers)+chr(code).lower())
  codes={'ctrl':'^','shift':'+','alt':'%','enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`'}
@@ -130,6 +130,7 @@ if os.name=='nt':
   strokes(''.join('{'+c+'}' if c in '+^%~(){}' else c for c in text))
  def mouse(x,y,right=False):
   ox,oy=position();Desktop(backend='win32').window(handle=hwnd).set_focus();user.SetCursorPos(int(ox+x*client_scale[0]),int(oy+y*client_scale[1]));time.sleep(.08)
+  settle_input()
   user.mouse_event(8 if right else 2,0,0,0,0);time.sleep(.08);user.mouse_event(16 if right else 4,0,0,0,0);time.sleep(.25)
 else:
  from Xlib import X,XK,display
@@ -173,6 +174,7 @@ def click(name,right=False):
 
 def edit(name,text):
  click(name)
+ wait_for(lambda:live()['widgets'][name].get('active'))
  # Ctrl+A is a normal text-edit shortcut on both backends.
  if os.name=='nt':chord(65,[17])
  else:

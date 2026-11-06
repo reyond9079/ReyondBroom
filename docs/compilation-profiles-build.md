@@ -16,6 +16,8 @@ python scripts/build-profile-support.py core --build-dir build/profile --tests
 
 Link `build/profile/libreyond-profile.a` into the host. The normal Linux/Windows build scripts and native-update workflow do this. Rebuild `csaddon.dat` and install it as `ftebroom/csaddon.dat`; it supplies the per-map mod list and its undoable editor command. Updating only the host with old CSQC cannot provide that API.
 
+SDL2 also requires rebuilding the engine with `bash scripts/build-sdl2-engine.sh /dedicated/fteqw`. Its SDL window-close event must pass through the same editor confirmation as native Linux and Windows. The native-update workflow supplies this rebuilt executable and corresponding patched engine sources to the packager; it rejects an SDL2 package without them.
+
 ## Migration
 
 The canonical store is `ftebroom/compilation-profiles.json`, version 1, with independent records keyed by game. Writes use a temporary file and atomic replacement. Empty and duplicate profile names are valid; an empty list stays empty. Bundled presets are available through Compilation settings and are not inserted automatically.

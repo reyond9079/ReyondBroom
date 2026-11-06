@@ -3,7 +3,7 @@ on:
   push:
     branches: ['feat/REYON-6-compilation-parity']
   pull_request:
-    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', '.github/workflows/compilation-profile-checks.yml']
+    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', '.github/workflows/compilation-profile-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
             printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
           fi
           sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
-          sudo timeout 180s apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev zlib1g-dev xvfb xauth libsdl2-2.0-0 ripgrep
+          sudo timeout 180s apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth libsdl2-dev ripgrep
       - name: Install UI probe dependencies
         run: python -m pip install python-xlib Pillow
       - name: Verify base runtime and extract build dependencies
@@ -52,6 +52,11 @@ jobs:
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Linux-x64/ftebroom/csaddon.dat
           cp deps/profile-core/compilation-profile-probe bundle/ReyondBroom-Linux-x64/tools/
+      - name: Rebuild SDL2 engine with the window-close guard
+        if: matrix.platform == 'Linux-SDL2-x64'
+        run: |
+          bash scripts/build-sdl2-engine.sh deps/sdl-engine
+          cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/fteqw-gl64
       - name: Run real editor regression, restart, processes, files and UI atlas
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
       - name: Exercise actual ImGui controls with OS input
@@ -105,10 +110,10 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force mesa | Out-Null
-          gh release download 26.2.6 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-26.2.6-release-msvc.7z
+          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
           if ($LASTEXITCODE) { throw 'Mesa test renderer download failed' }
-          if ((Get-FileHash mesa/mesa3d-26.2.6-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne 'b2e00615feaba45942343c265cc8c5f576142ca682c1ac6661922d4b72492877') { throw 'Mesa checksum mismatch' }
-          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-26.2.6-release-msvc.7z '-omesa/extracted' -y
+          if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Mesa checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
           if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
           $gl = Get-ChildItem mesa/extracted -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
           if (!$gl) { throw '64-bit Mesa OpenGL DLL missing' }

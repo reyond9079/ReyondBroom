@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime', type=Path)
@@ -109,3 +110,17 @@ for meta in (out/'ui-atlas').glob('*/*/geometry.json'):
     layout_checks.append(str(meta.relative_to(out)))
 (out/'layout-results.json').write_text(json.dumps({'passed':layout_checks,'toolkit':'ImGui','pixel_equality_required':False},indent=2))
 print('PASS',len(layout_checks),'real UI layouts',flush=True)
+
+# Real bundled compiler, without legacy staging/preview hooks: export, compile,
+# deploy the resulting BSP, then remove the compiler's portal file.
+subprocess.run([sys.executable,str(repo/'tests/make-linux-build-fixture.py'),str(root)],check=True)
+(data/'strict-compiler.cfg').write_text('exec ftebroom.cfg\nset ftebroom_skip_setup 1\nin 7 mapedit maps/build-fixture.map\nin 11 ftebroom_test_run 100\nin 25 ftebroom_test_run 101\nin 27 quit force\n')
+(data/'qconsole.log').unlink(missing_ok=True)
+with (out/'strict-compiler.log').open('wb') as stream:
+    subprocess.run([str(engine),*renderer_args,'-ftebroom-child-processes','-nohome','-noupdates','-nosound','-window','-condebug','-basedir',str(root),'+exec','strict-compiler.cfg'],cwd=root,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'},stdout=stream,stderr=subprocess.STDOUT,timeout=65,check=True)
+text=(out/'strict-compiler.log').read_text(errors='replace')
+if (data/'qconsole.log').is_file():text+='\n'+(data/'qconsole.log').read_text(errors='replace')
+(out/'strict-compiler.log').write_text(text)
+shutil.copy2(data/'strict-compiler.log',out/'strict-compiler-tasks.log')
+assert 'FTEBROOM_PARITY_FAIL' not in text and 'FTEBROOM_PARITY_PASS strict_export_compile_copy_cleanup' in text,text[-5000:]
+print('PASS actual bundled compiler / deploy / cleanup',flush=True)

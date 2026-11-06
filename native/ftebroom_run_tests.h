@@ -101,4 +101,14 @@ static void testRunParity(int stage){
  else if(stage==92)finishProfile({{1,probe,"exit 7"},{1,probe,"must-not-run"}});
  else if(stage==93)expect(!runActive&&runHadError&&runStep==0,"strict_nonzero_error_stops");
 
+ else if(stage==100){
+  runLoad();auto folder=documentPath("maps/strict-compiler");
+#ifdef _WIN32
+  auto compiler=(app/"tools/q3map2/q3map2.exe").u8string();
+#else
+  auto compiler=(app/"tools/q3map2/q3map2").u8string();
+#endif
+  RunProfile p{"Strict compiler chain",folder.u8string(),false,{{0,"${WORK_DIR_PATH}/strict.map",""},{1,compiler,"-game quake3 -fs_basepath \""+app.u8string()+"\" -meta -threads 2 \"${WORK_DIR_PATH}/strict.map\""},{2,"${WORK_DIR_PATH}/strict.bsp","${WORK_DIR_PATH}/deploy",true,RunCopyToDirectory},{4,"${WORK_DIR_PATH}/strict.prt",""}}};p.trenchBroom=true;runBegin(p);
+ }else if(stage==101){auto folder=documentPath("maps/strict-compiler");auto bsp=q1Read(folder/"deploy/strict.bsp");expect(!runActive&&!runHadError&&runStep==4&&bsp.size()>100&&bsp.substr(0,4)=="IBSP"&&!std::filesystem::exists(folder/"strict.prt"),"strict_export_compile_copy_cleanup");std::ofstream(documentPath("strict-compiler.log"))<<runLog;}
+
 }

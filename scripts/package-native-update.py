@@ -1,6 +1,6 @@
 """Rebuild a native editor distribution from a verified compatible base runtime.
 
-Engine/plugins/game compilers stay pinned to the base distribution. Current CSQC is rebuilt. Windows
+Plugins/game compilers stay pinned to the base distribution. SDL2 supplies a rebuilt engine and its sources. Current CSQC is rebuilt. Windows
 must supply the rebuilt audio helper used by the current multitrack editor.
 """
 from pathlib import Path
@@ -18,12 +18,16 @@ p.add_argument('--platform', choices=['Windows-x64', 'Linux-x64', 'Linux-SDL2-x6
 p.add_argument('--base-runtime', type=Path, required=True)
 p.add_argument('--base-sources', type=Path, required=True)
 p.add_argument('--module', type=Path, required=True)
+p.add_argument('--engine', type=Path)
+p.add_argument('--engine-source', type=Path)
 p.add_argument('--audio-dir', type=Path)
 p.add_argument('--csprogs', type=Path, required=True)
 p.add_argument('--version', required=True)
 p.add_argument('--output', type=Path, required=True)
 a = p.parse_args()
 windows = a.platform == 'Windows-x64'
+if bool(a.engine) != bool(a.engine_source) or (a.platform == 'Linux-SDL2-x64' and not a.engine):
+    p.error('SDL2 requires --engine and --engine-source for its window-close guard; supply both together')
 if windows and (not a.audio_dir or not (a.audio_dir / 'ffmpeg.exe').is_file()):
     p.error('Windows requires the rebuilt audio helper and corresponding sources')
 src = Path(__file__).resolve().parents[1]
@@ -56,6 +60,16 @@ with tarfile.open(fileobj=io.BytesIO(checkout)) as archive:
 module_name = 'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so'
 shutil.copy2(a.module, root / module_name)
 shutil.copy2(a.csprogs, root/'ftebroom/csaddon.dat')
+if a.engine:
+    shutil.copy2(a.engine, root/('bin/fteqw64.exe' if windows else 'fteqw-gl64'))
+    if not windows:
+        shutil.copy2(a.engine, root/'tools/runtimes/fteqw-preview64')
+    # Use the actual patched source files; exclude Git metadata and build output.
+    tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=a.engine_source).decode().split('\0')
+    with zipfile.ZipFile(sources/'sources/fteqw-source.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+        for name in tracked:
+            if name and (a.engine_source/name).is_file():
+                archive.write(a.engine_source/name, name)
 subprocess.run(['strip', str(root / module_name)], check=True)
 shutil.copy2(src / 'runtime/fonts/FTEBroom-CJK.otf', root / 'ftebroom/fonts/FTEBroom-CJK.otf')
 shutil.copytree(src / 'docs', root / 'docs', dirs_exist_ok=True)
@@ -78,7 +92,8 @@ revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=src, text=T
 compiler = subprocess.check_output(['g++', '--version'], text=True).splitlines()[0]
 info = (f'ReyondBroom {a.version}\nPlatform: {a.platform}\nEditor revision: {revision}\n'
         f'Editor compiler: {compiler}\nModule SHA256: {sha(root / module_name)}\n'
-        'Native module update; engine, plugins and game compilers retained from the verified base runtime.\n'
+        + ('SDL2 engine rebuilt from pinned FTE sources with the current editor patch stack.\n' if a.engine else 'Engine retained from the verified base runtime.\n')+
+        'Plugins and game compilers retained from the verified base runtime.\n'
         + ('Windows audio helper rebuilt from pinned sources.\n' if windows else 'System FFmpeg is used through the bundled wrapper.\n'))
 (root / 'build-info.txt').write_text(info)
 (sources / 'RELEASE-BUILD.txt').write_text(info + 'Build/QA: sources/ftebroom/.github/workflows/release-linux-ui-update.yml\n')

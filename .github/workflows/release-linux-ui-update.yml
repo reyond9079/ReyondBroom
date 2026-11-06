@@ -52,7 +52,7 @@ jobs:
           for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
       - name: Build compatibility core, native UI and CSQC
         run: |
-          sudo apt-get install -y libgl-dev patchelf
+          sudo apt-get install -y libgl-dev libegl1 libopengl0 patchelf
           python -m pip install aqtinstall==3.3.0
           python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 -O "$PWD/qt" --archives qtbase qtsvg icu
           python scripts/build-profile-support.py core --build-dir deps/profile-core --tests

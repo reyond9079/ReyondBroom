@@ -11,6 +11,8 @@ file(GLOB fs ${tb}/TbFsLib/src/*.cpp)
 add_library(reyond-profile STATIC ${el} ${kd} ${base} ${fs} el.cpp files.cpp export.cpp)
 target_include_directories(reyond-profile PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/.. PRIVATE ${tb}/TbElLib/include ${tb}/TbBaseLib/include ${tb}/KdLib/include ${tb}/TbFsLib/include ${tb}/VmLib/include ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/fmt)
 target_compile_definitions(reyond-profile PRIVATE FMT_HEADER_ONLY)
+# GCC 16/MinGW no longer supplies cstdint transitively to the upstream VM headers.
+target_precompile_headers(reyond-profile PRIVATE <cstdint>)
 if(MSVC)
  target_compile_options(reyond-profile PRIVATE /utf-8 /EHsc)
 endif()

@@ -9,7 +9,7 @@ Use a writable installation directory; settings stay with the portable installat
 Install runtime dependencies on Ubuntu 24.04:
 
 ```sh
-sudo apt install libgl1 libx11-6 libxrandr2 libxcursor1 libxi6 libasound2t64 libpulse0 \
+sudo apt install libgl1 libegl1 libopengl0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 libxcb-render-util0 libx11-6 libxrandr2 libxcursor1 libxi6 libasound2t64 libpulse0 \
   libpng16-16t64 libjpeg-turbo8 zlib1g libstdc++6 \
   ffmpeg xdg-utils libwayland-client0 python3
 ```

@@ -25,7 +25,7 @@ jobs:
       - name: Install Qt and build/runtime dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev zlib1g-dev xvfb xauth patchelf libsdl2-2.0-0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 libxcb-render-util0 ripgrep
+          sudo apt-get install -y cmake ninja-build build-essential libgl-dev libegl1 libopengl0 libx11-dev zlib1g-dev xvfb xauth patchelf libsdl2-2.0-0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 libxcb-render-util0 ripgrep
           python -m pip install aqtinstall==3.3.0
           python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 -O "$PWD/qt" --archives qtbase qtsvg icu
       - name: Verify base runtime and extract build dependencies

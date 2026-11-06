@@ -92,4 +92,12 @@ static nlohmann::json runCommonVariables(){
  vars["MAP_BASE_NAME"]=documentFile.stem().u8string();vars["GAME_DIR_PATH"]=root;vars["MODS"]=mods;
  return vars;
 }
-static nlohmann::json runWorkdirVariables(){auto vars=runCommonVariables();vars["MAP_FULL_NAME"]=documentFile.filename().u8string();vars["MAP_DIR_PATH"]=ftebroom::pak::diskFolder(documentFile.parent_path()).u8string();vars["APP_DIR_PATH"]=documentPath("ftebroom.cfg").parent_path().parent_path().u8string();vars.erase("CPU_COUNT");vars.erase("WORK_DIR_PATH");return vars;}
+static std::filesystem::path runApplicationDirectory(){
+#ifdef _WIN32
+ std::vector<wchar_t> path(32768);auto n=GetModuleFileNameW(nullptr,path.data(),DWORD(path.size()));if(n&&n<path.size())return std::filesystem::path(std::wstring(path.data(),n)).parent_path();
+#else
+ std::error_code error;auto path=std::filesystem::read_symlink("/proc/self/exe",error);if(!error)return path.parent_path();
+#endif
+ throw std::runtime_error("Cannot determine the running application directory.");
+}
+static nlohmann::json runWorkdirVariables(){auto vars=runCommonVariables();vars["MAP_FULL_NAME"]=documentFile.filename().u8string();vars["MAP_DIR_PATH"]=ftebroom::pak::diskFolder(documentFile.parent_path()).u8string();vars["APP_DIR_PATH"]=runApplicationDirectory().u8string();vars.erase("CPU_COUNT");vars.erase("WORK_DIR_PATH");return vars;}

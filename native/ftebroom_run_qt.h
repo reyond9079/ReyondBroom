@@ -64,6 +64,13 @@ static const char* runQtRequest(const char* encoded){
    if(!runImportReviewed||runImportReviewGame!=runStoreGame)throw std::runtime_error("Review the import for the active game first.");
    if(q.contains("variables"))for(auto it=q["variables"].begin();it!=q["variables"].end();++it)runImportPreview.missingVariables[it.key()]=it.value().get<std::string>();
    if(!runSaveImported(runImportPreview))throw std::runtime_error(runError);runImportReviewed=false;
+  }else if(action=="engineProfiles"){
+   std::vector<RunEngineProfile> next;std::set<std::string> ids;
+   for(const auto& e:q.at("engines")){RunEngineProfile p{e.at("id"),e.at("name"),e.at("path"),e.at("parameters")};if(p.id.empty()||!ids.insert(p.id).second)throw std::runtime_error("Engine profile IDs must be unique.");next.push_back(std::move(p));}
+   auto old=runEngines;runEngines=std::move(next);if(!runSaveProfiles()){runEngines=std::move(old);throw std::runtime_error(runError);}
+  }else if(action=="engineParameters"){
+   for(const auto& e:q.at("engines"))for(auto& saved:runEngines)if(saved.id==e.at("id"))saved.parameters=e.at("parameters").get<std::string>();
+   if(!runSaveProfiles())throw std::runtime_error(runError);
   }else if(action=="launchEngine"){
    auto e=q.at("engine");RunEngineProfile engine{e.at("id"),e.at("name"),e.at("path"),e.at("parameters")};
    for(auto& saved:runEngines)if(saved.id==engine.id)saved.parameters=engine.parameters;runSaveProfiles();runLaunchConfiguredEngine(engine);

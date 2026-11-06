@@ -41,7 +41,7 @@ static RunProfile runProfileFromJson(const nlohmann::json& entry) {
  RunProfile p;p.name=entry.at("name").get<std::string>();p.work=entry.at("workdir").get<std::string>();p.trenchBroom=entry.value("trenchBroom",true);p.launch=entry.value("legacyLaunch",false);
  for(const auto& s:entry.at("tasks")) {
   RunTask t;t.enabled=s.value("enabled",true);auto type=s.at("type").get<std::string>();
-  if(type=="export"){t.source=s.at("target");t.stripTbProperties=s.value("stripTbProperties",false);t.stripEntityPattern=s.value("stripEntityPattern",std::string{});if(s.contains("entityToAdd"))t.entityToAdd=s.at("entityToAdd");}
+  if(type=="export"){t.source=s.at("target");t.stripTbProperties=s.value("stripTbProperties",false);t.stripEntityPattern=s.value("stripEntityPattern",std::string{});if(s.contains("entityToAdd")){t.entityToAdd=s.at("entityToAdd");if(!t.entityToAdd.is_array())throw std::runtime_error("entityToAdd must be a list of properties.");for(const auto& prop:t.entityToAdd){prop.at("key").get<std::string>();prop.at("value").get<std::string>();}}}
   else if(type=="copy"||type=="rename"){t.kind=type=="copy"?2:3;t.source=s.at("source");t.destination=s.at("target");if(t.kind==2)t.flags|=RunCopyToDirectory;}
   else if(type=="delete"){t.kind=4;t.source=s.at("target");}
   else if(type=="tool"){t.kind=1;t.source=s.at("tool");t.destination=s.at("parameters");if(!s.value("treatNonZeroResultCodeAsError",false))t.flags|=RunAllowNonzero;}

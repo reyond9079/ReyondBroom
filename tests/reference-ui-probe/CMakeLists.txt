@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+project(TrenchBroomReferenceProbe LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 6.10 COMPONENTS Widgets REQUIRED)
+add_library(reyond-reference-probe MODULE probe.cpp)
+target_link_libraries(reyond-reference-probe PRIVATE Qt6::Widgets)
+set_target_properties(reyond-reference-probe PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/styles" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/styles")

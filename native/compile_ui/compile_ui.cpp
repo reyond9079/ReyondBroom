@@ -9,6 +9,7 @@
 #include "ui/ControlListBox.h"
 #include "ui/DialogButtonLayout.h"
 #include "ui/ElidedLabel.h"
+#include "ui/DialogHeader.h"
 #include "ui/EmptyWidget.h"
 #include "ui/FixedWidthFont.h"
 #include "ui/MiniToolBarLayout.h"
@@ -87,6 +88,19 @@ void applyTheme(bool dark){
  qApp->styleHints()->setColorScheme(dark?Qt::ColorScheme::Dark:Qt::ColorScheme::Light);
  darkTheme=dark;
 }
+class VariablesModel:public QAbstractTableModel {
+ std::vector<std::pair<std::string,J>> values;
+public:
+ explicit VariablesModel(const J& vars,QObject* parent):QAbstractTableModel(parent){for(auto it=vars.begin();it!=vars.end();++it)values.emplace_back(it.key(),it.value());}
+ int rowCount(const QModelIndex& =QModelIndex{})const override{return int(values.size());}
+ int columnCount(const QModelIndex& =QModelIndex{})const override{return 2;}
+ QVariant data(const QModelIndex& index,int role)const override{
+  if(!index.isValid()||index.row()<0||index.row()>=int(values.size())||index.column()>1)return {};
+  const auto& v=values[size_t(index.row())];
+  if(index.column()==0)return role==Qt::EditRole?qs("${"+v.first+"}"):role==Qt::DisplayRole?qs(v.first):QVariant{};
+  return qs(v.second.is_string()?v.second.get<std::string>():v.second.dump());
+ }
+};
 class CompileDialog;
 class ProfileList:public ControlListBox {
  CompileDialog& owner;
@@ -97,6 +111,22 @@ public:
 private:
  size_t itemCount()const override;
  ControlListBoxItemRenderer* createItemRenderer(QWidget*,size_t)override;
+};
+class EngineItem:public ControlListBoxItemRenderer {
+ J& engines;size_t index;ElidedLabel *name,*path;
+public:
+ EngineItem(J& e,size_t i,QWidget* p):ControlListBoxItemRenderer(p),engines(e),index(i){name=new ElidedLabel{"",Qt::ElideRight};path=new ElidedLabel{"",Qt::ElideMiddle};setEmphasizedStyle(name);setInfoStyle(path);auto* l=new QVBoxLayout;l->setContentsMargins(QMargins{});l->setSpacing(LayoutConstants::NarrowVMargin);l->addWidget(name);l->addWidget(path);setLayout(l);updateItem();}
+ void updateItem()override{if(index<engines.size()){name->setText(qs(engines[index].value("name",std::string{})));path->setText(qs(engines[index].value("path",std::string{})));}}
+};
+class EngineList:public ControlListBox {
+ J& engines;
+public:
+ std::function<void()> activate;
+ EngineList(J& e,QWidget* p=nullptr):ControlListBox{"Click the '+' button to create a game engine profile.",true,p},engines(e){}
+ void rebuild(){reload();}void refresh(){updateItems();}
+ size_t itemCount()const override{return engines.size();}
+ ControlListBoxItemRenderer* createItemRenderer(QWidget* p,size_t i)override{return new EngineItem(engines,i,p);}
+ void doubleClicked(size_t)override{if(activate)activate();}
 };
 class TaskList:public ControlListBox {
  CompileDialog& owner;
@@ -138,11 +168,12 @@ public:
  void showImport();
  void showSettings();
  void showLaunch();
+ void showEngineSettings();
  void run(bool dry){commit();auto r=request({{"action",dry?"test":"run"},{"selected",selected}});check(r,this);pull();}
  void complete(MultiCompletionLineEdit* edit,bool workdir=false){
-  QStringList names;const auto& vars=snapshot.value(workdir?"workdirVariables":"taskVariables",J::object());
-  for(auto it=vars.begin();it!=vars.end();++it)names<<qs("${"+it.key()+"}");
-  auto* completer=new QCompleter(names,edit);completer->setCaseSensitivity(Qt::CaseInsensitive);edit->setMultiCompleter(completer);edit->setWordDelimiters(QRegularExpression{"\\$"},QRegularExpression{"\\}"});
+  const auto vars=snapshot.value(workdir?"workdirVariables":"taskVariables",J::object());
+  if(auto* old=edit->findChild<QCompleter*>())delete old;
+  auto* completer=new QCompleter(edit);completer->setModel(new VariablesModel(vars,completer));completer->setCaseSensitivity(Qt::CaseInsensitive);edit->setMultiCompleter(completer);edit->setWordDelimiters(QRegularExpression{"\\$"},QRegularExpression{"\\}"});
  }
 protected:
  void closeEvent(QCloseEvent* e)override {
@@ -179,11 +210,11 @@ public:
   auto* panel=new TitledPanel{title};auto* l=new QVBoxLayout;l->setContentsMargins(0,0,0,0);l->setSpacing(0);l->addWidget(panel);l->addWidget(new BorderLine);setLayout(l);
   auto* enabled=new QCheckBox;enabled->setChecked(task().value("enabled",true));enabled->setToolTip("Whether to include this task when running the compile profile");
   auto* line=new QHBoxLayout;line->setContentsMargins(0,0,0,0);line->addSpacing(LayoutConstants::NarrowHMargin);line->addWidget(enabled,0,Qt::AlignVCenter);line->addSpacing(LayoutConstants::NarrowHMargin);
-  auto* f=new QFormLayout;f->setContentsMargins(8,8,8,8);f->setVerticalSpacing(4);f->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);line->addLayout(f,1);panel->getPanel()->setLayout(line);
+  auto* f=new QFormLayout;f->setContentsMargins(LayoutConstants::WideHMargin,LayoutConstants::WideVMargin,LayoutConstants::WideHMargin,LayoutConstants::WideVMargin);f->setVerticalSpacing(LayoutConstants::MediumVMargin);f->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);line->addLayout(f,1);panel->getPanel()->setLayout(line);
   connect(enabled,&QCheckBox::clicked,enabled,[this](bool v){task()["enabled"]=v;owner.commit();});
   if(type=="export"){
    field(f,"File Path","target","The path of the exported file.\nVariables are allowed.");
-   auto* strip=new QLineEdit(qs(task().value("stripEntityPattern",std::string{})));strip->setPlaceholderText("enter GLOB pattern");strip->setToolTip("Set a GLOB pattern to strip any entities with a matching classname.");f->addRow("Strip Entities",strip);
+   auto* strip=new QLineEdit(qs(task().value("stripEntityPattern",std::string{})));strip->setPlaceholderText("enter GLOB pattern");strip->setToolTip("Set a GLOB pattern to strip any entities with a matching classname. Example: 'info_player_*' to strip all info_player_start and all info_player_deatchmatch entities.");f->addRow("Strip Entities",strip);
    connect(strip,&QLineEdit::textChanged,strip,[this](const QString& t){if(t.isEmpty())task().erase("stripEntityPattern");else task()["stripEntityPattern"]=utf8(t);owner.commit();});
    std::string classname;for(const auto& p:task().value("entityToAdd",J::array()))if(p.value("key",std::string{})=="classname")classname=p.value("value",std::string{});
    auto* add=new QLineEdit(qs(classname));add->setPlaceholderText("enter classname");add->setToolTip("Set the classname of an entity that will be added to the map. The entities' origin and angles will be set to the camera position and view direction, respectively.");f->addRow("Add Entity",add);
@@ -291,16 +322,42 @@ void CompileDialog::showSettings(){
  auto* box=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);layout->addWidget(box);
  connect(box,&QDialogButtonBox::accepted,d,[this,d,root,base,mods,variables,table]{J vars=J::object(),eng=J::array(),enabled=J::array();for(int r=0;r<variables->rowCount();++r)if(variables->item(r,0)&&variables->item(r,1)&&!variables->item(r,0)->text().isEmpty())vars[utf8(variables->item(r,0)->text())]=utf8(variables->item(r,1)->text());for(int r=0;r<table->rowCount();++r){J e;const char* keys[]={"id","name","path","parameters"};for(int c=0;c<4;++c)e[keys[c]]=table->item(r,c)?utf8(table->item(r,c)->text()):std::string{};if(e["id"]=="")e["id"]=utf8(QUuid::createUuid().toString(QUuid::WithoutBraces));eng.push_back(e);}for(const auto& m:mods->toPlainText().split('\n'))if(!m.trimmed().isEmpty())enabled.push_back(utf8(m.trimmed()));auto res=request({{"action","settings"},{"gameRoot",utf8(root->text())},{"baseMod",utf8(base->text())},{"enabledMods",enabled},{"variables",vars},{"engines",eng}});check(res,d);if(!res.contains("error")){pull(true);d->accept();}});connect(box,&QDialogButtonBox::rejected,d,&QDialog::reject);d->show();
 }
+QWidget* gameIndicator(const J& state){
+ auto key=state.value("game",std::string{});auto icon=key=="quake1"?"Quake":key=="quake2"?"Quake2":key=="halflife"?"Half-Life":"Quake3";
+ auto path=reyondCompileResources/"images/games"/(std::string(icon)+".png");
+ return new DialogHeader(qs(state.value("gameName",std::string{})),QPixmap(qs(path.u8string())));
+}
+void CompileDialog::showEngineSettings(){
+ auto state=request({{"action","state"}});auto data=std::make_shared<J>(state.value("engines",J::array()));
+ auto* d=new QDialog(this);d->setAttribute(Qt::WA_DeleteOnClose);d->setWindowTitle("Game Engines");setWindowIconTB(d);d->setFixedSize(600,400);
+ auto* left=new TitledPanel("Profiles");auto* right=new TitledPanel("Details");left->setMaximumWidth(250);
+ auto* list=new EngineList(*data,left->getPanel());auto* add=createBitmapButton("Add.svg","Add profile");auto* remove=createBitmapButton("Remove.svg","Remove the selected profile");remove->setEnabled(false);
+ auto* ll=new QVBoxLayout;ll->setContentsMargins(QMargins{});ll->setSpacing(0);ll->addWidget(list,1);ll->addWidget(new BorderLine);ll->addLayout(createMiniToolBarLayout(add,remove));left->getPanel()->setLayout(ll);
+ auto* stacked=new QStackedWidget;stacked->addWidget(createEmptyWidget("Select a game engine profile"));auto* container=new QWidget;setBaseWindowColor(container);
+ auto* name=new QLineEdit;name->setPlaceholderText("Choose a name");auto* path=new QLineEdit;path->setPlaceholderText("Click on the button to choose...");auto* browse=new QPushButton("...");auto* pathLayout=new QHBoxLayout;pathLayout->addWidget(path,1);pathLayout->addWidget(browse);
+ auto* form=new QFormLayout(container);form->setContentsMargins(LayoutConstants::WideHMargin,LayoutConstants::WideVMargin,LayoutConstants::WideHMargin,LayoutConstants::WideVMargin);form->setVerticalSpacing(LayoutConstants::NarrowVMargin);form->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);form->addRow("Name",name);form->addRow("Path",pathLayout);stacked->addWidget(container);
+ auto* wrapper=new QWidget;auto* wrap=new QVBoxLayout(wrapper);wrap->setContentsMargins(QMargins{});wrap->addWidget(stacked);auto* rl=new QHBoxLayout;rl->setContentsMargins(QMargins{});rl->setSpacing(0);rl->addWidget(wrapper);right->getPanel()->setLayout(rl);
+ auto* middle=new QHBoxLayout;middle->setContentsMargins(QMargins{});middle->setSpacing(0);middle->addWidget(left,1);middle->addWidget(new BorderLine(BorderLine::Direction::Vertical));middle->addWidget(right,1);
+ auto* box=new QDialogButtonBox(QDialogButtonBox::Close);auto* layout=new QVBoxLayout(d);layout->setContentsMargins(QMargins{});layout->setSpacing(0);layout->addWidget(gameIndicator(state));layout->addWidget(new BorderLine);layout->addLayout(middle,1);layout->addLayout(wrapDialogButtonBox(box));
+ connect(list,&ControlListBox::itemSelectionChanged,d,[=]{int row=list->selectedRow();bool valid=row>=0&&row<int(data->size());stacked->setCurrentIndex(valid?1:0);remove->setEnabled(valid);name->setText(valid?qs((*data)[row].value("name",std::string{})):QString{});path->setText(valid?qs((*data)[row].value("path",std::string{})):QString{});});
+ connect(name,&QLineEdit::textEdited,d,[=](const QString& value){int row=list->selectedRow();if(row>=0){(*data)[row]["name"]=utf8(value);list->refresh();}});
+ auto updatePath=[=]{int row=list->selectedRow();if(row<0)return;QFileInfo file(path->text());if(file.isFile()){(*data)[row]["path"]=utf8(file.filePath());if((*data)[row].value("name",std::string{}).empty()){(*data)[row]["name"]=utf8(file.completeBaseName());name->setText(file.completeBaseName());}setDefaultStyle(path);list->refresh();}else if(path->text().isEmpty())setDefaultStyle(path);else setErrorStyle(path);};
+ connect(path,&QLineEdit::editingFinished,d,updatePath);connect(browse,&QPushButton::clicked,d,[=]{auto next=QFileDialog::getOpenFileName(d,"Choose Game Engine",path->text());if(!next.isEmpty()){path->setText(next);updatePath();}});
+ connect(add,&QAbstractButton::clicked,d,[=]{data->push_back({{"id",utf8(QUuid::createUuid().toString(QUuid::WithoutBraces))},{"name",""},{"path",""},{"parameters",""}});list->rebuild();list->setCurrentRow(int(data->size()-1));});
+ connect(remove,&QAbstractButton::clicked,d,[=]{int row=list->selectedRow();if(row>=0){data->erase(data->begin()+row);list->rebuild();list->setCurrentRow(std::min(row,int(data->size()-1)));}});
+ connect(box,&QDialogButtonBox::rejected,d,&QDialog::accept);connect(d,&QDialog::finished,d,[=]{check(request({{"action","engineProfiles"},{"engines",*data}}),d);});d->show();
+}
 void CompileDialog::showLaunch(){
  pull();auto* d=new QDialog(this);d->setAttribute(Qt::WA_DeleteOnClose);d->setWindowTitle("Launch Engine");setWindowIconTB(d);
- auto* list=new QListWidget;list->setMinimumSize(250,280);auto* header=new QLabel("Launch Engine");setHeaderStyle(header);auto* message=new QLabel("Select a game engine from the list on the right and edit the commandline parameters in the text box below. You can use variables to refer to the map name and other values.");message->setWordWrap(true);auto* configure=new QPushButton("Configure engines...");auto* label=new QLabel("Parameters");setEmphasizedStyle(label);auto* parameters=new MultiCompletionLineEdit;parameters->setFont(Fonts::fixedWidthFont());complete(parameters);
+ auto engineState=std::make_shared<J>(J::array());auto* list=new EngineList(*engineState);list->setEmptyText("Click the 'Configure engines...' button to create a game engine profile.");list->setMinimumSize(250,280);auto* header=new QLabel("Launch Engine");setHeaderStyle(header);auto* message=new QLabel("Select a game engine from the list on the right and edit the commandline parameters in the text box below. You can use variables to refer to the map name and other values.");message->setWordWrap(true);auto* configure=new QPushButton("Configure engines...");auto* label=new QLabel("Parameters");setEmphasizedStyle(label);auto* parameters=new MultiCompletionLineEdit;parameters->setFont(Fonts::fixedWidthFont());complete(parameters);
  auto* left=new QVBoxLayout;left->setContentsMargins(0,0,0,0);left->setSpacing(0);left->addSpacing(20);left->addWidget(header);left->addSpacing(20);left->addWidget(message);left->addSpacing(10);left->addWidget(configure,0,Qt::AlignHCenter);left->addStretch();left->addWidget(label);left->addSpacing(LayoutConstants::NarrowVMargin);left->addWidget(parameters);left->addSpacing(20);
  auto* middle=new QHBoxLayout;middle->setContentsMargins(0,0,0,0);middle->setSpacing(0);middle->addSpacing(20);middle->addLayout(left,1);middle->addSpacing(20);middle->addWidget(new BorderLine{BorderLine::Direction::Vertical});middle->addWidget(list);
- auto* buttons=new QDialogButtonBox;auto* launch=buttons->addButton("Launch",QDialogButtonBox::AcceptRole);auto* close=buttons->addButton("Close",QDialogButtonBox::RejectRole);auto* l=new QVBoxLayout(d);l->setContentsMargins(0,0,0,0);l->setSpacing(0);auto* indicator=new QLabel(qs(snapshot.value("gameName",std::string{})));l->addWidget(indicator);l->addWidget(new BorderLine);l->addLayout(middle,1);l->addLayout(wrapDialogButtonBox(buttons));d->resize(660,360);
- auto engineState=std::make_shared<J>(J::array());auto rebuild=[this,list,parameters,launch,engineState]{auto state=request({{"action","state"}});auto next=state.value("engines",J::array());if(next==*engineState)return;int index=list->currentRow();*engineState=next;list->clear();for(const auto& e:next){auto* item=new QListWidgetItem(qs(e.value("name",std::string{}))+"\n"+qs(e.value("path",std::string{})),list);item->setSizeHint(QSize(250,36));}list->setCurrentRow(next.empty()?-1:std::clamp(index,0,int(next.size())-1));parameters->setEnabled(!next.empty());launch->setEnabled(!next.empty());};
- connect(list,&QListWidget::currentRowChanged,d,[parameters,engineState](int i){parameters->setText(i>=0&&i<int(engineState->size())?qs((*engineState)[i].value("parameters",std::string{})):QString{});});
- connect(parameters,&QLineEdit::textEdited,d,[list,engineState](const QString& t){int i=list->currentRow();if(i>=0)(*engineState)[i]["parameters"]=utf8(t);});
- auto start=[d,list,parameters,engineState]{int i=list->currentRow();if(i<0)return;auto e=(*engineState)[i];e["parameters"]=utf8(parameters->text());check(request({{"action","launchEngine"},{"engine",e}}),d);};connect(launch,&QPushButton::clicked,d,start);connect(parameters,&QLineEdit::returnPressed,d,start);connect(list,&QListWidget::itemDoubleClicked,d,[start](QListWidgetItem*){start();});connect(close,&QPushButton::clicked,d,&QDialog::close);connect(configure,&QPushButton::clicked,d,[this]{showSettings();});auto* timer=new QTimer(d);connect(timer,&QTimer::timeout,d,rebuild);timer->start(200);rebuild();d->show();
+ auto* buttons=new QDialogButtonBox;auto* launch=buttons->addButton("Launch",QDialogButtonBox::AcceptRole);auto* close=buttons->addButton("Close",QDialogButtonBox::RejectRole);auto* l=new QVBoxLayout(d);l->setContentsMargins(0,0,0,0);l->setSpacing(0);auto* indicator=gameIndicator(snapshot);l->addWidget(indicator);l->addWidget(new BorderLine);l->addLayout(middle,1);l->addLayout(wrapDialogButtonBox(buttons));d->resize(660,360);
+ auto lastSource=std::make_shared<J>(J::array());auto rebuild=[this,list,parameters,launch,engineState,lastSource]{auto state=request({{"action","state"}});auto next=state.value("engines",J::array());if(next==*lastSource)return;*lastSource=next;int index=list->selectedRow();*engineState=next;list->rebuild();list->setCurrentRow(next.empty()?-1:std::clamp(index,0,int(next.size())-1));parameters->setEnabled(!next.empty());launch->setEnabled(!next.empty());};
+ connect(list,&ControlListBox::itemSelectionChanged,d,[list,parameters,engineState]{int i=list->selectedRow();parameters->setText(i>=0&&i<int(engineState->size())?qs((*engineState)[i].value("parameters",std::string{})):QString{});});
+ connect(d,&QDialog::finished,d,[engineState]{request({{"action","engineParameters"},{"engines",*engineState}});});
+ connect(parameters,&QLineEdit::textEdited,d,[list,engineState](const QString& t){int i=list->selectedRow();if(i>=0)(*engineState)[i]["parameters"]=utf8(t);});
+ auto start=[d,list,parameters,engineState]{int i=list->selectedRow();if(i<0)return;auto e=(*engineState)[i];e["parameters"]=utf8(parameters->text());check(request({{"action","launchEngine"},{"engine",e}}),d);};connect(launch,&QPushButton::clicked,d,start);connect(parameters,&QLineEdit::returnPressed,d,start);list->activate=start;connect(close,&QPushButton::clicked,d,&QDialog::close);connect(configure,&QPushButton::clicked,d,[this,engineState]{request({{"action","engineParameters"},{"engines",*engineState}});showEngineSettings();});auto* timer=new QTimer(d);connect(timer,&QTimer::timeout,d,rebuild);timer->start(200);rebuild();d->show();
 }
 std::unique_ptr<CompileDialog> dialog;
 std::unique_ptr<QWindow> editorOwner;

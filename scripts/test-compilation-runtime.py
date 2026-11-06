@@ -61,5 +61,8 @@ with (out/'atlas.log').open('wb') as stream:
         '-window', '-width', '1280', '-height', '800', '-basedir', str(root), '+exec', 'profile-atlas.cfg'],
         cwd=root, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}, stdout=stream, stderr=subprocess.STDOUT,
         timeout=65, check=True)
+atlas_log=(out/'atlas.log').read_text(errors='replace')
+if 'FTEBROOM_PARITY_FAIL' in atlas_log or not (data/'compile-ui-atlas').is_dir():
+    raise RuntimeError('Native Qt capture failed: '+atlas_log[-5000:])
 shutil.copytree(data/'compile-ui-atlas', out/'ui-atlas', dirs_exist_ok=True)
 assert len(list((out/'ui-atlas').glob('*/compile.png'))) == 4

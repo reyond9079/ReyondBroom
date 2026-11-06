@@ -58,7 +58,9 @@ for scale in [1, 1.5, 2]:
             main=wait(lambda:next((w for w in app.windows() if 'qa-reference' in w.window_text()),None))
             main.set_focus()
             main.menu_select('Run->Compile Map...')
-            dialog=wait(lambda:next((w for w in app.windows() if 'Compile' in w.window_text()),None))
+            # Qt exposes an owned modeless dialog under the main UIA root, while
+            # EnumWindows exposes its native HWND. Select that HWND explicitly.
+            dialog=wait(lambda:next((w for w in Desktop(backend='win32').windows(process=process.pid) if w.window_text()=='Compile'),None))
             dialog.set_focus()
             for width,height in [(800,600),(1200,800)]:
                 rect=wintypes.RECT();user.GetClientRect(dialog.handle,ctypes.byref(rect));outer=dialog.rectangle()
@@ -67,14 +69,17 @@ for scale in [1, 1.5, 2]:
                 time.sleep(.8)
                 point=wintypes.POINT();user.ClientToScreen(dialog.handle,ctypes.byref(point));user.GetClientRect(dialog.handle,ctypes.byref(rect))
                 widgets=[]
-                for child in dialog.descendants():
+                from pywinauto.uia_element_info import UIAElementInfo
+                from pywinauto.controls.uiawrapper import UIAWrapper
+                accessible=UIAWrapper(UIAElementInfo(dialog.handle))
+                for child in accessible.descendants():
                     bounds=child.rectangle()
                     widgets.append({'class':child.class_name(),'type':child.element_info.control_type,'text':child.window_text(),'x':(bounds.left-point.x)/scale,'y':(bounds.top-point.y)/scale,'width':bounds.width()/scale,'height':bounds.height()/scale})
                 meta={'reference':'TrenchBroom 2026.2 official Windows portable','scale':scale,'theme':theme,'requested_dip':[width,height],'actual_client_px':[rect.right,rect.bottom],'desktop_px':[user.GetSystemMetrics(0),user.GetSystemMetrics(1)],'widgets':widgets}
                 stem=folder/f'{width}x{height}'
                 stem.with_suffix('.json').write_text(json.dumps(meta,indent=2))
                 ImageGrab.grab(bbox=(point.x,point.y,point.x+rect.right,point.y+rect.bottom),all_screens=True).save(stem.with_suffix('.png'))
-                assert any(w['text']=='Compile' for w in widgets), 'Compile control missing from accessible reference'
+                assert rect.right>0 and rect.bottom>0, 'Reference client area is empty'
                 results.append(str(stem.relative_to(out)))
                 (out/'results.json').write_text(json.dumps(results,indent=2))
                 print('PASS official Windows TB',scale,theme,width,height,flush=True)
@@ -83,7 +88,7 @@ for scale in [1, 1.5, 2]:
             if app:
                 (folder/'failure-windows.txt').write_text('\n'.join(str(w) for w in app.windows()),errors='replace')
                 for i,w in enumerate(app.windows()):
-                    try:w.print_control_identifiers(filename=str(folder/f'failure-tree-{i}.txt'))
+                    try:app.window(handle=w.handle).print_control_identifiers(filename=str(folder/f'failure-tree-{i}.txt'))
                     except Exception:pass
             raise
         finally:

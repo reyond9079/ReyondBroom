@@ -30,7 +30,7 @@ static double contrast(ImVec4 a,ImVec4 b){auto x=luminance(a),y=luminance(b);ret
 int main(int argc,char** argv){
   ImGui::CreateContext();
   std::ostringstream snapshots;
-  for(int theme:{0,1,2,4,5})for(int scale=0;scale<5;scale++){
+  for(int theme:{1,2,4,5})for(int scale=0;scale<5;scale++){
     uiTheme=theme;uiScaleChoice=scale;uiStyle();snapshots<<theme<<' '<<scale<<' '<<signature()<<'\n';
   }
   if(argc>1&&std::string(argv[1])=="--snapshot"){std::cout<<snapshots.str();return 0;}
@@ -38,19 +38,23 @@ int main(int argc,char** argv){
   expected.erase(std::remove(expected.begin(),expected.end(),'\r'),expected.end());
   if(expected!=snapshots.str()){std::cerr<<"Unrelated theme changed\n";return 1;}
 #ifndef BASELINE_ONLY
-  for(int scale=0;scale<5;scale++){
-    uiTheme=3;uiScaleChoice=scale;uiStyle();auto& s=ImGui::GetStyle();
-    if(s.WindowRounding!=std::floor(SoftLight::panelRadius*uiScale())||s.FrameRounding!=std::floor(8*uiScale())||
-       s.DockingSeparatorSize!=std::floor(SoftLight::gutter*uiScale())||s.WindowPadding.x>10*uiScale()+1)return 2;
+  for(int theme:{0,3})for(int scale=0;scale<5;scale++){
+    uiTheme=theme;uiScaleChoice=scale;uiStyle();auto& s=ImGui::GetStyle();
+    if(s.WindowRounding!=std::floor(ModernChrome::panelRadius*uiScale())||s.FrameRounding!=std::floor(8*uiScale())||
+       s.DockingSeparatorSize!=std::floor(ModernChrome::gutter*uiScale())||s.WindowPadding.x>10*uiScale()+1)return 2;
     for(auto c:s.Colors)for(float value:{c.x,c.y,c.z,c.w})if(!std::isfinite(value)||value<0||value>1)return 3;
-    if(contrast(SoftLight::ink,SoftLight::panel)<7||contrast(SoftLight::secondary,SoftLight::panel)<4.5||contrast(SoftLight::navText,SoftLight::nav)<7||contrast(SoftLight::focus,SoftLight::elevated)<4.5)return 4;
+    const auto& p=uiModernPalette();
+    if(contrast(p.ink,p.panel)<7||contrast(p.secondary,p.panel)<4.5||
+       contrast(p.navText,p.nav)<7||contrast(p.focus,p.elevated)<4.5||
+       contrast(ModernChrome::color(0xFFFFFF),p.action)<4.5)return 4;
+    if(luminance(p.workspace)>=luminance(p.panel)||luminance(p.nav)>=luminance(p.panel))return 9;
     auto before=signature();int stack=ImGui::GetCurrentContext()->ColorStack.Size;
     uiToolStripBegin();if(ImGui::GetCurrentContext()->ColorStack.Size!=stack+15)return 5;uiToolStripEnd();
     if(signature()!=before||ImGui::GetCurrentContext()->ColorStack.Size!=stack)return 6;
     if(uiChrome(IM_COL32(4,5,6,255),UiTone::Inset)==IM_COL32(4,5,6,255))return 7;
   }
-  uiTheme=0;if(uiChrome(IM_COL32(4,5,6,255),UiTone::Inset)!=IM_COL32(4,5,6,255))return 8;
-  std::cout<<"PASS: 25 unchanged legacy theme/scale signatures; 5 Modern Light scales, palette/contrast, scoped color restoration and legacy role passthrough\n";
+  uiTheme=2;if(uiChrome(IM_COL32(4,5,6,255),UiTone::Inset)!=IM_COL32(4,5,6,255))return 8;
+  std::cout<<"PASS: 20 unchanged legacy theme/scale signatures; both Modern themes at all five scales, palette/contrast, scoped color restoration and legacy role passthrough\n";
 #endif
   ImGui::DestroyContext();
 }

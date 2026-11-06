@@ -13,7 +13,7 @@ static const char* preferenceVariables[] = {
   "ftebroom_grid_color","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
   "ftebroom_show_entity_names","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
-  "ftebroom_texture_lock","ftebroom_uv_lock","ftebroom_auto_integer_snap","ftebroom_sky_overlays","ftebroom_bounds_visible",
+  "ftebroom_texture_lock","ftebroom_uv_lock","ftebroom_auto_integer_snap","ftebroom_sky_overlays","ftebroom_bounds_visible","ftebroom_map_bounds",
   "ftebroom_new_scale_x","ftebroom_new_scale_y","ftebroom_new_angle",
   "ftebroom_new_offset_x","ftebroom_new_offset_y","ftebroom_extrude_handle_radius","ftebroom_grid_rotation",
   "ftebroom_symmetry_angle","ftebroom_symmetry_custom_center","ftebroom_symmetry_center_x","ftebroom_symmetry_center_y","ftebroom_symmetry_center_z","ftebroom_symmetry_guides","ftebroom_symmetry_relink"
@@ -122,7 +122,7 @@ static void preferencesKeyboard()
     {
       if(!a.command||*a.gesture||(*search&&!std::strstr(a.id,search)))continue;
       ImGui::PushID(a.id);ImGui::TableNextRow();ImGui::TableNextColumn();
-      bool conflict=conflicts.count(a.id);if(conflict)ImGui::PushStyleColor(ImGuiCol_Text,uiSoftLight()?SoftLight::danger:ImVec4(1,.35f,.3f,1));
+      bool conflict=conflicts.count(a.id);if(conflict)ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().danger:ImVec4(1,.35f,.3f,1));
       ImGui::TextWrapped("%s",a.label);ImGui::TableNextColumn();
       if(ImGui::Selectable(a.shortcutText.empty()?"Click to assign":a.shortcutText.c_str(),captureShortcut==a.id))captureShortcut=a.id;
       if(ImGui::BeginPopupContextItem()){if(ImGui::MenuItem("Clear shortcut")){shortcutApply(a,"");shortcutOverrides[shortcutVariable(a.id)]="";}ImGui::EndPopup();}

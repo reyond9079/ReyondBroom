@@ -397,7 +397,7 @@ static void entityPanel()
       const char* groupedLabel="Group by prefix";const char* groupedEnd=nullptr;
       FteBroomTranslate(groupedLabel,groupedEnd);
       const auto& style=ImGui::GetStyle();
-      if(!uiSoftLight()||ImGui::GetItemRectSize().x+style.ItemSpacing.x+ImGui::GetFrameHeight()
+      if(!uiModern()||ImGui::GetItemRectSize().x+style.ItemSpacing.x+ImGui::GetFrameHeight()
          +style.ItemInnerSpacing.x+ImGui::CalcTextSize(groupedLabel,groupedEnd).x<=filterWidth)
         ImGui::SameLine();
       ImGui::Checkbox("Group by prefix", &grouped);
@@ -469,9 +469,9 @@ static void entityPanel()
         // Clip every preview path, including the fallback bounds and thick lines.
         drawList->PushClipRect(tile,{tile.x+size,tile.y+cellHeight-4},true);
         const ImVec2 tileEnd{tile.x+size,tile.y+cellHeight-4};
-        if(!uiSoftLight()||selected||ImGui::IsItemHovered())
-          drawList->AddRectFilled(tile,tileEnd,uiSoftLight()?ImGui::GetColorU32(
-            selected?SoftLight::active:SoftLight::hover):IM_COL32(55,58,62,255),(uiSoftLight()?8:6)*uiScale());
+        if(!uiModern()||selected||ImGui::IsItemHovered())
+          drawList->AddRectFilled(tile,tileEnd,uiModern()?ImGui::GetColorU32(
+            selected?uiModernPalette().active:uiModernPalette().hover):IM_COL32(55,58,62,255),(uiModern()?8:6)*uiScale());
         ImVec2 preview{tile.x+size*.15f,tile.y+size*.15f};
         if(ImGui::IsRectVisible(tile,{tile.x+size,tile.y+size}))++entityVisiblePreviewCount;
         if(!entityModelTile(*def,preview,size*.70f)) {
@@ -486,8 +486,8 @@ static void entityPanel()
         for(int corner=0;corner<8;corner++)for(int axis=0;axis<3;axis++)if(!(corner&(1<<axis)))
           drawList->AddLine(points[corner],points[corner|(1<<axis)],color,uiScale());
         }
-        if(selected)drawList->AddRect(tile,tileEnd,uiSoftLight()?ImGui::GetColorU32(SoftLight::color(0xFFFFFF,.48f)):
-          IM_COL32(225,95,55,255),uiSoftLight()?8*uiScale():6*uiScale(),0,1.5f*uiScale());
+        if(selected)drawList->AddRect(tile,tileEnd,uiModern()?ImGui::GetColorU32(uiModernPalette().tileOutline):
+          IM_COL32(225,95,55,255),uiModern()?8*uiScale():6*uiScale(),0,1.5f*uiScale());
         drawList->PopClipRect();
         drawList->PushClipRect({tile.x,tile.y+size+2},{tile.x+size,tile.y+cellHeight-2},true);
         ImVec2 label{tile.x+std::max(0.f,(size-ImGui::CalcTextSize(def->name.c_str()).x)*.5f),tile.y+size+2};

@@ -285,8 +285,8 @@ static void projectResourceFields()
   // Empty inputs must remain distinguishable from the resource panel in every theme.
   const bool light=uiTheme==1||uiTheme==3;
   ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,std::max(1.f,ImGui::GetStyle().FrameBorderSize));
-  ImGui::PushStyleColor(ImGuiCol_Border,uiSoftLight()?SoftLight::border:(light?uiColor(120,128,140):uiColor(110,120,135)));
-  ImGui::PushStyleColor(ImGuiCol_FrameBg,uiSoftLight()?SoftLight::elevated:(light?uiColor(255,255,255):uiColor(42,46,52)));
+  ImGui::PushStyleColor(ImGuiCol_Border,uiModern()?uiModernPalette().border:(light?uiColor(120,128,140):uiColor(110,120,135)));
+  ImGui::PushStyleColor(ImGuiCol_FrameBg,uiModern()?uiModernPalette().elevated:(light?uiColor(255,255,255):uiColor(42,46,52)));
   gameProfileFields(firstSetupStep>=0);
   if(gameProfile<2) {
     ImGui::TextUnformatted("Map format: Quake 3 (Valve 220)");
@@ -408,6 +408,8 @@ static void projectSetup()
 }
 
 static void importMaterialControls();
+static void materialDropTarget();
+static void fileBrowserTestItem(const std::string& name);
 #include "ftebroom_materials.h"
 
 static void q2ReferenceMapMaterials(const std::string& source){

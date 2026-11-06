@@ -126,8 +126,10 @@ static void importSaveImage(){
 }catch(...){std::error_code e;std::filesystem::remove(temp,e);throw;}
  importAddWads({target});cvars->SetString("ftebroom_reveal_material",texture.name.c_str());importNotice="Added "+texture.name+" to "+target.u8string();importImages.erase(importImages.begin());importName[0]=0;
 }
-static void importMaterialControls(){
+static void materialDropTarget(){
  materialDropVisible=true;materialDropMin=ImGui::GetWindowPos();auto size=ImGui::GetWindowSize();materialDropMax={materialDropMin.x+size.x,materialDropMin.y+size.y};
+}
+static void importMaterialControls(){
  if(gameWad()){
 #ifdef _WIN32
  if(ImGui::Button("Add WAD(s)...")){try{importAddWads(importPick(false));}catch(const std::exception& e){importError=e.what();}}

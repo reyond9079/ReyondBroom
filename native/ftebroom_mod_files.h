@@ -144,8 +144,8 @@ static void modFilesPaste() {
 }
 static void modFileIcon(ImVec2 p,float size,bool folder) {
   auto d=ImGui::GetWindowDrawList();
-  if(uiSoftLight()) {
-    auto c=ImGui::GetColorU32(SoftLight::secondary);float line=1.5f*uiScale();
+  if(uiModern()) {
+    auto c=ImGui::GetColorU32(uiModernPalette().secondary);float line=1.5f*uiScale();
     if(folder){
       d->PathLineTo({p.x+size*.08f,p.y+size*.25f});d->PathLineTo({p.x+size*.38f,p.y+size*.25f});
       d->PathLineTo({p.x+size*.48f,p.y+size*.36f});d->PathLineTo({p.x+size*.9f,p.y+size*.36f});
@@ -236,7 +236,7 @@ static void modFilesTree(const std::filesystem::path& folder,std::filesystem::pa
       auto flags=ImGuiTreeNodeFlags_OpenOnArrow|ImGuiTreeNodeFlags_SpanAvailWidth;
       if(!entry.first)flags|=ImGuiTreeNodeFlags_Leaf|ImGuiTreeNodeFlags_NoTreePushOnOpen;
       if(path==modFilesFolder)flags|=ImGuiTreeNodeFlags_Selected;
-      const bool soft=uiSoftLight();
+      const bool soft=uiModern();
       const auto start=ImGui::GetCursorScreenPos();
       const float labelOffset=ImGui::GetTreeNodeToLabelSpacing();
       bool expanded=ImGui::TreeNodeEx("node",flags,"%s%s%s",soft?"     ":"",

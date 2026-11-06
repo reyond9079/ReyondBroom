@@ -191,12 +191,12 @@ static void viewOverlay()
       0,
       0,
       i == viewFocus ? 2 : 1);
-    if(uiSoftLight()) {
+    if(uiModern()) {
       const auto label=ImGui::CalcTextSize(names[r.type]);
       ImVec2 lo{r.x+3,r.y+3},hi{r.x+std::min(r.w-3,label.x+16*uiScale()),r.y+label.y+11*uiScale()};
-      list->AddRectFilled(lo,hi,ImGui::GetColorU32(SoftLight::panel),4*uiScale());
-      list->AddRect(lo,hi,ImGui::GetColorU32(SoftLight::border),4*uiScale());
-      list->AddText({lo.x+6*uiScale(),lo.y+4*uiScale()},ImGui::GetColorU32(SoftLight::ink),names[r.type]);
+      list->AddRectFilled(lo,hi,ImGui::GetColorU32(uiModernPalette().panel),4*uiScale());
+      list->AddRect(lo,hi,ImGui::GetColorU32(uiModernPalette().border),4*uiScale());
+      list->AddText({lo.x+6*uiScale(),lo.y+4*uiScale()},ImGui::GetColorU32(uiModernPalette().ink),names[r.type]);
     } else {
     list->AddRectFilled(
       {r.x + 3, r.y + 3}, {r.x + 100, r.y + 23}, IM_COL32(25, 25, 30, 210));

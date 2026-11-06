@@ -67,7 +67,7 @@ static void testWorkspace()
     const float sy = viewArea.y + viewArea.h * .5f;
     expect(!uiBlocksScene(sx, sy), "central_mouse_passthrough");
     auto map = ImGui::FindWindowByName("Map");
-    auto material = ImGui::FindWindowByName("Material");
+    auto material = ImGui::FindWindowByName("Face");
     expect(map->DockId && map->DockId == material->DockId, "default_tab_group");
     auto right = ImGui::DockBuilderGetNode(map->DockId);
     const float divider = right->Pos.x - 2;

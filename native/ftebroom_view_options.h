@@ -44,10 +44,12 @@ static void serviceOpacityControls(){
   field.active=ImGui::IsItemActive();
   if(ImGui::IsItemHovered())ImGui::SetTooltip("Clip, trigger, hint, origin, caulk and portal surfaces. 0 hides their fill, 1 is opaque. Release to apply. Game previews are unchanged.");
 }
+static bool viewOptionsOpen=false;
 static void viewOptionsPanel()
 {
-  if (!ImGui::CollapsingHeader("View options"))
-    return;
+  if(!viewOptionsOpen)return;
+  ImGui::SetNextWindowSize({490*uiScale(),600*uiScale()},ImGuiCond_FirstUseEver);
+  if(ImGui::Begin("Viewport options",&viewOptionsOpen)){
   if(ImGui::TreeNode("Brightness")){displayBrightnessControls();ImGui::TreePop();}
   if(ImGui::TreeNode("Antialiasing and texture filtering")) {
     int samples=(int)cvars->GetFloat("vid_multisample");int choice=samples>=8?3:samples>=4?2:samples>=2?1:0;
@@ -184,4 +186,6 @@ static void viewOptionsPanel()
       command(("ftebroom_tag " + std::string(type) + " 0\n").c_str());
     ImGui::PopID();
   }
+  }
+  ImGui::End();
 }

@@ -143,9 +143,9 @@ static void setupDiscordInvitation(){
   const char* label="Join Discord";const char* end=nullptr;FteBroomTranslate(label,end);
   const float width=std::min(available,std::max(300*scale,ImGui::CalcTextSize(label,end).x+112*scale));
   ImGui::SetCursorPosX(std::max(0.f,(available-width)*.5f));
-  ImGui::PushStyleColor(ImGuiCol_Button,uiSoftLight()?SoftLight::focus:ImVec4(88/255.f,101/255.f,242/255.f,1));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiSoftLight()?SoftLight::teal:ImVec4(71/255.f,82/255.f,196/255.f,1));
-  ImGui::PushStyleColor(ImGuiCol_ButtonActive,uiSoftLight()?SoftLight::focus:ImVec4(60/255.f,69/255.f,165/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_Button,uiModern()?uiModernPalette().action:ImVec4(88/255.f,101/255.f,242/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiModern()?uiModernPalette().actionHover:ImVec4(71/255.f,82/255.f,196/255.f,1));
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive,uiModern()?uiModernPalette().action:ImVec4(60/255.f,69/255.f,165/255.f,1));
   ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1,1,1,1));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,10*scale);
   ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign,ImVec2(.6f,.5f));

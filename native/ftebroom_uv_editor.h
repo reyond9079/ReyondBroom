@@ -4,7 +4,7 @@
 static ImVec2 uvTestDragPoint;
 static bool uvTestDragReady;
 static double uvTestZoom;
-static void graphicalUVEditor()
+static void graphicalUVEditor(float height)
 {
   static UVFace face,start;
   static int epoch=-1,drag=0,subdivisions[2]={1,1};
@@ -12,16 +12,17 @@ static void graphicalUVEditor()
   static UVPoint pan,origin,down,appliedOffset;
   static bool haveFace=false,shearVertical=true;
   static std::string lastCommand;
-  bool valid=cvars->GetFloat("ftebroom_uv_face")!=0;
+  uvTestDragReady=false;
+  const bool valid=cvars->GetFloat("ftebroom_uv_face")!=0;
   if(!valid)
   {
     if(drag>=1 && drag<=5)command("ftebroom_uv cancel\n");
     drag=0;haveFace=false;face.points.clear();
-    ImGui::TextDisabled("Select exactly one face to edit UVs.");return;
+    epoch=-1;
   }
   int nextEpoch=(int)cvars->GetFloat("ftebroom_uv_epoch");
   bool fit=false;
-  if(nextEpoch!=epoch)
+  if(valid&&nextEpoch!=epoch)
   {
     qhandle_t handle;int length=files->Open("data/ftebroom-uv.txt",&handle,1);
     std::string text;
@@ -44,9 +45,15 @@ static void graphicalUVEditor()
       }
     }
   }
-  if(!haveFace)return;
-  uiSectionHeading("UV Editor");
-  ImGui::BeginChild("UV canvas",{0,270*uiScale()},ImGuiChildFlags_Borders|ImGuiChildFlags_ResizeY,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
+  ImGui::BeginChild("UV canvas",{0,height},ImGuiChildFlags_Borders|ImGuiChildFlags_ResizeY,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
+  if(!haveFace){
+    const char* message=cvars->GetFloat("ftebroom_face_count")>1?"Multiple faces selected":"Select a face to preview UVs";
+    const auto room=ImGui::GetContentRegionAvail(),position=ImGui::GetCursorPos();
+    const auto label=ImGui::CalcTextSize(message);
+    ImGui::SetCursorPos({position.x+std::max(0.f,(room.x-label.x)*.5f),position.y+std::max(0.f,(room.y-label.y)*.5f)});
+    ImGui::TextDisabled("%s",message);
+    ImGui::EndChild();
+  }else{
   ImVec2 top=ImGui::GetCursorScreenPos(),size=ImGui::GetContentRegionAvail();size.x=std::max(size.x,40.f);size.y=std::max(size.y,40.f);
   ImGui::InvisibleButton("UV interaction",size,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);
   // Reserve wheel input for the canvas instead of scrolling its inspector ancestors.
@@ -181,8 +188,35 @@ static void graphicalUVEditor()
   dl->AddCircleFilled(screen(origin),5*uiScale(),IM_COL32(255,215,50,255));dl->AddCircle(screen(origin),65*uiScale(),IM_COL32(255,215,50,210),64);
   auto cuv=uvMap(face.matrix,center);line(cuv,cuv+UVPoint{20/zoom,0},IM_COL32(255,60,60,255));line(cuv,cuv+UVPoint{0,20/zoom},IM_COL32(60,255,60,255));
   dl->PopClipRect();ImGui::EndChild();
-  if(ImGui::InputInt2("UV subdivisions",subdivisions)){subdivisions[0]=std::clamp(subdivisions[0],1,32);subdivisions[1]=std::clamp(subdivisions[1],1,32);}
-  for(auto item:{std::pair{"Reset","reset 1 0"},{"World","world 1 0"},{"Flip H","fliph 1 0"},{"Flip V","flipv 1 0"},{"90 CCW","rotate -1 1"},{"90 CW","rotate 1 1"}})
-  {if(item.first!=std::string("Reset"))ImGui::SameLine();if(ImGui::SmallButton(item.first))action((std::string("ftebroom_texture_key ")+item.second+"\n").c_str());}
-  ImGui::TextWrapped("Drag: offset | Ctrl: disable snap | ring: rotate | grid: scale | Alt+grid: shear | wheel: zoom | RMB/MMB: pan");
+  }
+  ImGui::BeginDisabled(cvars->GetFloat("ftebroom_face_count")==0);
+  const float right=ImGui::GetCursorScreenPos().x+ImGui::GetContentRegionAvail().x;
+  for(const auto& item:{std::array<const char*,3>{"Reset","reset 1 0","Reset texture alignment"},
+      {"Flip H","fliph 1 0","Flip horizontally"},{"Flip V","flipv 1 0","Flip vertically"},
+      {"-90","rotate -1 1","Rotate left 90 degrees"},{"+90","rotate 1 1","Rotate right 90 degrees"},
+      {"Fit","", "Fit one texture repeat to the face"}}){
+    const float width=ImGui::CalcTextSize(item[0]).x+2*ImGui::GetStyle().FramePadding.x;
+    if(item[0]!=std::string_view("Reset")&&
+       ImGui::GetItemRectMax().x+width+ImGui::GetStyle().ItemSpacing.x<right)
+      ImGui::SameLine();
+    ImGui::PushID(item[0]);
+    if(ImGui::Button(item[0])){
+      if(*item[1])action((std::string("ftebroom_texture_key ")+item[1]+"\n").c_str());
+      else action("ftebroom_texture_align auto 1 0\n");
+    }
+    if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))ImGui::SetTooltip("%s",item[2]);
+    ImGui::PopID();
+  }
+  ImGui::EndDisabled();
+  const float gridWidth=127*uiScale();
+  if(ImGui::GetItemRectMax().x+gridWidth+ImGui::GetStyle().ItemSpacing.x<right)
+    ImGui::SameLine(right-ImGui::GetWindowPos().x-gridWidth);
+  for(int i=0;i<2;++i){
+    if(i)ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s",i?"Y":"Grid X");ImGui::SameLine();
+    ImGui::SetNextItemWidth(28*uiScale());
+    ImGui::InputInt(i?"##grid_y":"##grid_x",&subdivisions[i],0,0);
+    subdivisions[i]=std::clamp(subdivisions[i],1,32);
+  }
 }

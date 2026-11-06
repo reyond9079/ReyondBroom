@@ -1,27 +1,25 @@
-# Modern Light appearance
+# Modern appearance
 
-Modern Light retains theme identifier `3` and the existing appearance settings
+Modern Dark and Modern Light retain theme identifiers `0` and `3` and the existing appearance settings
 format. It changes interface chrome only. It does not reset workspace layouts,
 select a different default theme, modify map data, or alter scene rendering.
 
-The palette and surface helpers live in `native/ftebroom_light_theme.h`. The
-UI Lab design uses a neutral gray workspace (#AAA9A7), separate rounded panels
-(#BABAB8), recessed groups (#B2B2B0), and charcoal Tools chrome (#242426).
-At 100% scale the workspace has 18 px side margins and 16 px dock dividers.
+The palette and surface helpers live in `native/ftebroom_modern_theme.h`. The
+themes share rounded panels, recessed groups, and a charcoal Tools strip. Modern Dark uses graphite panels and muted teal accents.
+At 100% scale the workspace has 17 px side margins and 15 px dock dividers.
 The background shows through the dividers, which remain draggable. Lightweight
 draw-list geometry adds subtle shading, rims, and shadows. The 3D viewport is
 framed outside its render rectangle and uses the same rectangle for picking
 and camera input. Existing fonts and multilingual fallback glyphs are reused.
 
-A fresh Modern Light workspace uses a slim Tools rail on the left where space
+A fresh Modern workspace uses a slim Tools rail on the left where space
 allows. Choose **Workspace > Reset panel layout** to apply this arrangement to
 an existing workspace. The rail shows compact tool and build icons. The separate
 Tool options button opens the active tool's controls in a wider popup. A saved
 top toolbar still works, including its inline options.
 
 Hardcoded interface colors in browsers, sound controls, viewport headers,
-notifications, onboarding and model timeline labels now use semantic roles for
-Modern Light. Asset pixels, geometry overlays, axes and diagnostic scene colors
+notifications, onboarding and model timeline labels now use semantic roles for both Modern themes. Asset pixels, geometry overlays, axes and diagnostic scene colors
 retain their existing rendering. Other themes receive their original colors.
 
 All dimensions are applied before the existing UI scale conversion. Docked and
@@ -39,10 +37,10 @@ clip region and centered captions. File manager/model preview sizing is unchange
 
 `tests/test-modern-light.cpp` uses the pinned ImGui dependency. It checks:
 
-- All 25 legacy theme/scale signatures against the pre-change fixture.
-- Modern Light at all five UI scales.
+- All 20 legacy theme/scale signatures against the pre-change fixture.
+- Both Modern themes at all five UI scales.
 - Palette ranges, text contrast and scoped color-stack restoration.
-- Exact legacy color passthrough outside Modern Light.
+- Exact legacy color passthrough outside the Modern themes.
 
 Compile the test with the same ImGui sources and headers used by the editor,
 then run it from the repository root. The fixture is intentionally fixed: do not

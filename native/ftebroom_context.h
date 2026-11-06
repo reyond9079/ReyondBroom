@@ -66,6 +66,8 @@ static void sceneContextPanel()
       organize("move", group);
     if (ImGui::MenuItem("Remove objects from group", nullptr, false, selected))
       organize("removefromgroup");
+    if(ImGui::MenuItem("Hide selection",nullptr,false,selected))command("ftebroom_visibility hide\n");
+    if(ImGui::MenuItem("Isolate selection",nullptr,false,selected))command("ftebroom_visibility isolate\n");
     if (ImGui::BeginMenu("Move to layer", selected))
     {
       for (const auto& n : organizationNodes)

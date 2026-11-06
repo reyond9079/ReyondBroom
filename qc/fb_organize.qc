@@ -9,11 +9,18 @@ string fb_organize_escape(string value);
 void fb_organize_publish()
 {
     filestream stream=fopen("ftebroom-ui-tree.txt",FILE_WRITE);if((float)stream<0) return;
+    int *objectCounts=memalloc(max(2,fb_node_count)*sizeof(int));
+    for(int n=2;n<fb_node_count;n++) if(fb_nodes[n].kind>=FB_NODE_GROUP) {
+        int parent=fb_nodes[n].parent;
+        if(parent>=1 && parent<fb_node_count && fb_nodes[parent].kind==FB_NODE_LAYER)
+            objectCounts[parent]++;
+    }
     for(int n=1;n<fb_node_count;n++) if(fb_nodes[n].kind==FB_NODE_LAYER || fb_nodes[n].kind==FB_NODE_GROUP) {
         int id=0;hashtable fields=(hashtable)fb_nodes[0].fields;
         if(n>1) {id=fb_nodes[n].id;fields=(hashtable)fb_nodes[n].fields;}
-        fputs(stream,sprintf("%i %i %i %i %i \"%s\"\n",fb_nodes[n].kind,id,fb_nodes[n].flags,stoi(fields["_tb_layer_omit_from_export"]),stoi(fields["_tb_layer_sort_index"]),fb_organize_escape(fb_nodes[n].name)));
+        fputs(stream,sprintf("%i %i %i %i %i \"%s\" %i\n",fb_nodes[n].kind,id,fb_nodes[n].flags,stoi(fields["_tb_layer_omit_from_export"]),stoi(fields["_tb_layer_sort_index"]),fb_organize_escape(fb_nodes[n].name),objectCounts[n]));
     }
+    memfree(objectCounts);
     fclose(stream);
     stream=fopen("ftebroom-entity-list.txt",FILE_WRITE);
     if((float)stream>=0) {
@@ -281,7 +288,7 @@ void fb_organize_action(string operation,int target,string value)
         memfree(selection);
     } else if(op=="layerremove") {
         if(node<=1 || fb_nodes[node].kind!=FB_NODE_LAYER) valid=FALSE;
-        else {valid=fb_group_release(node,1);if(fb_active_layer==target) fb_active_layer=0;}
+        else {valid=fb_group_release(node,1);if(valid && fb_active_layer==target) {fb_active_layer=0;cvar_set("ftebroom_active_layer","0");}}
     } else if(op=="layerselect") {
         if(node<1 || fb_nodes[node].kind!=FB_NODE_LAYER) valid=FALSE;
         else {fb_selection_clear();fb_selection_set(node,TRUE);}

@@ -20,7 +20,35 @@ static ImVec4 uiColor(int r, int g, int b)
 {
   return {r / 255.f, g / 255.f, b / 255.f, 1};
 }
-#include "ftebroom_light_theme.h"
+#include "ftebroom_modern_theme.h"
+static bool inspectorIcon(const char* id,const char* tooltip,char glyph,bool active=false){
+  const float side=ImGui::GetFrameHeight();
+  if(active)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
+  const bool pressed=ImGui::Button(id,{side,side});
+  if(active)ImGui::PopStyleColor();
+  const auto p=ImGui::GetItemRectMin();
+  const float x=p.x+side*.5f,y=p.y+side*.5f,r=side*.24f;
+  const auto color=ImGui::GetColorU32(ImGuiCol_Text);
+  auto* draw=ImGui::GetWindowDrawList();
+  auto line=[&](float a,float b,float c,float e){draw->AddLine({x+a*r,y+b*r},{x+c*r,y+e*r},color,1.4f*uiScale());};
+  switch(glyph){
+    case '+': case '-':
+      line(-1,0,1,0);if(glyph=='+')line(0,-1,0,1);break;
+    case '^': case 'v':{
+      const float direction=glyph=='^'?1.f:-1.f;
+      line(-1,direction*.55f,0,-direction*.65f);line(0,-direction*.65f,1,direction*.55f);break;}
+    case 'e': case 'h':
+      draw->AddEllipse({x,y},{r,r*.57f},color,0,14,1.3f*uiScale());
+      draw->AddCircleFilled({x,y},r*.26f,color);
+      if(glyph=='h')line(-1,1,1,-1);break;
+    case 'l': case 'u':
+      draw->AddRect({x-r*.75f,y-r*.1f},{x+r*.75f,y+r*.85f},color,2*uiScale());
+      draw->PathArcTo({x+(glyph=='u'?r*.34f:0.f),y-r*.17f},r*.47f,IM_PI,IM_PI*2,10);
+      draw->PathStroke(color,0,1.3f*uiScale());break;
+  }
+  if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))ImGui::SetTooltip("%s",tooltip);
+  return pressed;
+}
 static void uiStyle()
 {
   // Match the dark palette's panel, button, text and highlight roles.
@@ -89,7 +117,7 @@ static void uiStyle()
     s.WindowRounding=s.ChildRounding=s.FrameRounding=s.GrabRounding=s.PopupRounding=s.TabRounding=s.ScrollbarRounding=0;
     s.FrameBorderSize=2;s.WindowBorderSize=2;s.ChildBorderSize=2;s.TabBorderSize=1;
   }
-  if(uiTheme==3) SoftLight::apply(s);
+  if(uiModern())ModernChrome::apply(s,uiTheme);
   if(uiTheme==4) {
     // Original olive/orange palette inspired by classic Half-Life VGUI.
     for(auto slot:{ImGuiCol_WindowBg,ImGuiCol_PopupBg,ImGuiCol_MenuBarBg,ImGuiCol_Tab,ImGuiCol_TabDimmed})c[slot]=uiColor(63,68,52);
@@ -129,7 +157,7 @@ static void uiReachableWindows(){
   auto display=ImGui::GetIO().DisplaySize;float margin=12*uiScale(),top=ImGui::GetFrameHeight()+margin;
   for(auto window:ImGui::GetCurrentContext()->Windows){
     if(!window->Active||window->DockIsActive||window->DockNode||window->Flags&(ImGuiWindowFlags_ChildWindow|ImGuiWindowFlags_Tooltip)||(window->Flags&ImGuiWindowFlags_NoDecoration)==ImGuiWindowFlags_NoDecoration)continue;
-    std::string name=window->Name;if(name=="First-time setup"||name=="Tools"||name=="Map"||name=="Material"||name=="Entity"||name=="FTE Engine terrain")continue;
+    std::string name=window->Name;if(name=="First-time setup"||name=="Tools"||name=="Map"||name=="Face"||name=="Entity"||name=="FTE Engine terrain")continue;
     ImVec2 size=window->SizeFull;
     if(window->Appearing){auto ideal=ImGui::CalcWindowNextAutoFitSize(window);size.x=std::max(size.x,ideal.x);size.y=std::max(size.y,ideal.y);ImGui::SetWindowCollapsed(window,false,ImGuiCond_Always);}
     size.x=std::clamp(size.x,std::min(280.f,display.x-2*margin),std::max(1.f,display.x-2*margin));
@@ -154,7 +182,8 @@ static bool uiDialog(const char* title, ImVec2 initial = {560, 240})
 
 // A top pane with its own scrollbar leaves a draggable boundary above the browser.
 static void uiInspectorTopBegin(const char* id,float& height) {
-  height=std::clamp(height,60.f,std::max(60.f,ImGui::GetContentRegionAvail().y-160));
+  const float minimum=60*uiScale();
+  height=std::clamp(height,minimum,std::max(minimum,ImGui::GetContentRegionAvail().y-158*uiScale()));
   ImGui::BeginChild(id,{0,height},ImGuiChildFlags_None);
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(5,3));
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(5,2));
@@ -163,7 +192,8 @@ static void uiInspectorTopEnd(const char* id,float& height) {
   ImGui::PopStyleVar(2);ImGui::EndChild();
   ImGui::InvisibleButton(id,{ImGui::GetContentRegionAvail().x,8});
   auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
-  ImGui::GetWindowDrawList()->AddLine({a.x,(a.y+b.y)*.5f},{b.x,(a.y+b.y)*.5f},ImGui::GetColorU32(ImGuiCol_SeparatorHovered),2);
+  const auto color=ImGui::IsItemHovered()||ImGui::IsItemActive()?ImGuiCol_SeparatorHovered:ImGuiCol_Separator;
+  ImGui::GetWindowDrawList()->AddLine({a.x,(a.y+b.y)*.5f},{b.x,(a.y+b.y)*.5f},ImGui::GetColorU32(color),uiModern()?1:2);
   if(ImGui::IsItemHovered()||ImGui::IsItemActive())ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
   if(ImGui::IsItemActive())height+=ImGui::GetIO().MouseDelta.y;
 }

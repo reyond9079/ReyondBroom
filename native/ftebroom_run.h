@@ -8,7 +8,8 @@
 #include <unistd.h>
 extern char** environ;
 #endif
-struct RunTask {int kind=0;std::string source,destination;bool enabled=true;};
+enum RunTaskFlags {RunCopyToDirectory=1,RunAllowNonzero=2,RunLaunchEngine=4,RunAllowLaunchFailure=8};
+struct RunTask {int kind=0;std::string source,destination;bool enabled=true;int flags=0;};
 struct RunProfile {std::string name="New profile",work="${MAP_DIR_PATH}";bool launch=false;std::vector<RunTask> tasks;};
 static std::vector<RunProfile> runProfiles;
 static std::map<std::string,std::string> runVariables;
@@ -26,6 +27,7 @@ static void (*runStageHook)()=nullptr;
 static HANDLE runProcess,runPipe,runJob,runInput;
 #else
 static pid_t runProcess=-1;static int runPipe=-1;
+static std::vector<pid_t> runLaunchedEngines;
 #endif
 static void (*runPreviewSettings)(const std::string&)=nullptr;
 static void runAppend(const std::string& text)
@@ -63,7 +65,7 @@ static void runLoad()
   {
     std::istringstream row(line);std::string type;row>>type;
     if(type=="profile") {RunProfile profile;if(row>>std::quoted(profile.name)>>profile.launch>>std::quoted(profile.work))runProfiles.push_back(profile);}
-    else if(type=="task"&&!runProfiles.empty()){RunTask task;if(row>>task.kind>>std::quoted(task.source)>>std::quoted(task.destination) && task.kind>=0&&task.kind<=4){int enabled=1;if(row>>enabled)task.enabled=enabled!=0;runProfiles.back().tasks.push_back(task);}}
+    else if(type=="task"&&!runProfiles.empty()){RunTask task;if(row>>task.kind>>std::quoted(task.source)>>std::quoted(task.destination) && task.kind>=0&&task.kind<=4){int enabled=1;if(row>>enabled){task.enabled=enabled!=0;row>>task.flags;}runProfiles.back().tasks.push_back(task);}}
     else if(type=="variable"){std::string name,value;if(row>>std::quoted(name)>>std::quoted(value))runVariables[name]=value;}
   }
   if(runProfiles.empty())
@@ -123,7 +125,7 @@ static bool runSaveProfiles()
   auto path=documentPath("ftebroom-run-profiles.txt"),temporary=path;temporary+=".tmp";
   std::ofstream stream(temporary);
   for(const auto& profile:runProfiles){stream<<"profile "<<std::quoted(profile.name)<<' '<<profile.launch<<' '<<std::quoted(profile.work)<<'\n';
-    for(const auto& task:profile.tasks)stream<<"task "<<task.kind<<' '<<std::quoted(task.source)<<' '<<std::quoted(task.destination)<<' '<<task.enabled<<'\n';}
+    for(const auto& task:profile.tasks)stream<<"task "<<task.kind<<' '<<std::quoted(task.source)<<' '<<std::quoted(task.destination)<<' '<<task.enabled<<' '<<task.flags<<'\n';}
   for(const auto& variable:runVariables)stream<<"variable "<<std::quoted(variable.first)<<' '<<std::quoted(variable.second)<<'\n';
   stream.close();if(!stream){runError="Cannot write run profiles.";return false;}
 #ifdef _WIN32
@@ -143,6 +145,8 @@ static std::string runExpand(const std::string& text)
     if(end==std::string::npos)throw std::runtime_error("Unclosed profile variable.");
     auto name=text.substr(begin+2,end-begin-2);auto found=activeVariables.find(name);
     if(found==activeVariables.end())throw std::runtime_error("Unknown profile variable: "+name);
+    if(found->second.empty() && (name=="TB_GAME_ROOT" || name=="TB_ACTIVE_MOD"))
+      throw std::runtime_error("Configure the active game or mod folder in Game / resources.");
     out+=found->second;cursor=end+1;
   }
   // Preserve saved launch profiles from distributions with the engine at root.
@@ -176,16 +180,24 @@ static std::wstring runWide(const std::string& text)
   std::wstring out(count,0);MultiByteToWideChar(CP_UTF8,0,text.data(),(int)text.size(),out.data(),count);return out;
 }
 #endif
-static void runStartProcess(std::string executable,const std::string& arguments,const std::filesystem::path& working)
+static void runStartProcess(std::string executable,const std::string& arguments,const std::filesystem::path& working,bool launchEngine=false)
 {
   if(executable.empty())throw std::runtime_error("Set the executable path in the profile's tool variables.");
   auto configuredExecutable=std::filesystem::u8path(executable);
   if(configuredExecutable.is_relative()&&configuredExecutable.has_parent_path())executable=std::filesystem::absolute(configuredExecutable).lexically_normal().u8string();
 #ifdef _WIN32
+  auto exe=runWide(executable),line=L"\""+exe+L"\" "+runWide(arguments);
+  if(launchEngine){
+    STARTUPINFOW startup{};startup.cb=sizeof startup;
+    PROCESS_INFORMATION process{};
+    if(!CreateProcessW(exe.c_str(),line.data(),nullptr,nullptr,FALSE,0,nullptr,working.c_str(),&startup,&process))
+      throw std::runtime_error("Cannot launch engine (Windows error "+std::to_string(GetLastError())+").");
+    CloseHandle(process.hThread);CloseHandle(process.hProcess);
+    return;
+  }
   SECURITY_ATTRIBUTES security{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};HANDLE writer=nullptr;
   if(!CreatePipe(&runPipe,&writer,&security,0))throw std::runtime_error("Cannot create compiler output pipe.");
   SetHandleInformation(runPipe,HANDLE_FLAG_INHERIT,0);
-  auto exe=runWide(executable),line=L"\""+exe+L"\" "+runWide(arguments);
   STARTUPINFOW startup{};startup.cb=sizeof startup;startup.dwFlags=STARTF_USESTDHANDLES;
   HANDLE reader=nullptr;
   if(arguments.find("-ftebroom-preview")!=std::string::npos){
@@ -209,18 +221,28 @@ static void runStartProcess(std::string executable,const std::string& arguments,
   }
   ResumeThread(process.hThread);CloseHandle(process.hThread);
 #else
-  int descriptors[2];if(pipe(descriptors))throw std::runtime_error("Cannot create compiler output pipe.");
+  int descriptors[2];if(!launchEngine&&pipe(descriptors))throw std::runtime_error("Cannot create compiler output pipe.");
   std::vector<std::string> words{executable};std::istringstream args(arguments);std::string word;
   while(args>>std::quoted(word))words.push_back(word);std::vector<char*> argv;
   for(auto& value:words)argv.push_back(value.data());argv.push_back(nullptr);
   posix_spawn_file_actions_t fileActions;posix_spawn_file_actions_init(&fileActions);
-  posix_spawn_file_actions_adddup2(&fileActions,descriptors[1],STDOUT_FILENO);posix_spawn_file_actions_adddup2(&fileActions,descriptors[1],STDERR_FILENO);
-  posix_spawn_file_actions_addclose(&fileActions,descriptors[0]);posix_spawn_file_actions_addclose(&fileActions,descriptors[1]);
+  if(!launchEngine){
+    posix_spawn_file_actions_adddup2(&fileActions,descriptors[1],STDOUT_FILENO);posix_spawn_file_actions_adddup2(&fileActions,descriptors[1],STDERR_FILENO);
+    posix_spawn_file_actions_addclose(&fileActions,descriptors[0]);posix_spawn_file_actions_addclose(&fileActions,descriptors[1]);
+  }
   posix_spawn_file_actions_addchdir_np(&fileActions,working.c_str());
   posix_spawnattr_t attributes;posix_spawnattr_init(&attributes);posix_spawnattr_setflags(&attributes,POSIX_SPAWN_SETPGROUP);posix_spawnattr_setpgroup(&attributes,0);
-  int result=posix_spawnp(&runProcess,executable.c_str(),&fileActions,&attributes,argv.data(),environ);
-  posix_spawnattr_destroy(&attributes);posix_spawn_file_actions_destroy(&fileActions);close(descriptors[1]);
+  pid_t process=-1;
+  int result=posix_spawnp(&process,executable.c_str(),&fileActions,&attributes,argv.data(),environ);
+  posix_spawnattr_destroy(&attributes);posix_spawn_file_actions_destroy(&fileActions);
+  if(launchEngine){
+    if(result)throw std::runtime_error("Cannot launch engine: "+std::to_string(result));
+    runLaunchedEngines.push_back(process);
+    return;
+  }
+  close(descriptors[1]);
   if(result){close(descriptors[0]);runProcess=-1;throw std::runtime_error("Cannot launch tool: "+std::to_string(result));}
+  runProcess=process;
   runPipe=descriptors[0];fcntl(runPipe,F_SETFL,O_NONBLOCK);
 #endif
 }
@@ -240,6 +262,12 @@ static void runBegin(const RunProfile& profile)
     activeVariables["MAP_DIR_PATH"]=ftebroom::pak::diskFolder(documentFile.parent_path()).u8string();activeVariables["GAME_DIR_PATH"]=baseq3;
     auto base=std::filesystem::u8path(baseq3);if(gameProfile==3){auto sibling=base.parent_path()/"baseq2";if(std::filesystem::is_directory(sibling))base=sibling;}activeVariables["BASE_GAME_DIR_PATH"]=base.u8string();
     activeVariables["GAME_DIR"]=baseq3;activeVariables["MODS"]="baseq3";
+    auto runtime=gameProfile==0?std::string(baseq3):gameRuntime();
+    if(runtime.empty())runtime=baseq3;
+    auto modFolder=std::filesystem::u8path(runtime).lexically_normal();
+    if(!modFolder.empty()&&modFolder.filename().empty())modFolder=modFolder.parent_path();
+    activeVariables["TB_GAME_ROOT"]=modFolder.has_filename()&&!modFolder.has_parent_path()?".":modFolder.parent_path().generic_u8string();
+    activeVariables["TB_ACTIVE_MOD"]=modFolder.filename().generic_u8string();
     activeVariables["CPU_COUNT"]=std::to_string(std::max(1u,std::thread::hardware_concurrency()));
     activeVariables["APP_DIR_PATH"]=documentPath("ftebroom.cfg").parent_path().parent_path().u8string();
     activeVariables["APP_DIR"]=activeVariables["APP_DIR_PATH"];
@@ -282,7 +310,7 @@ static bool runGlobMatch(const std::string& pattern,const std::string& name)
   while(p<pattern.size()&&pattern[p]=='*')++p;
   return p==pattern.size();
 }
-static void runFileTask(int kind,const std::string& source,const std::string& destination)
+static void runFileTask(int kind,const std::string& source,const std::string& destination,bool targetDirectory=false)
 {
   auto from=runFilePath(source),to=runFilePath(destination);
   const auto pattern=from.filename().u8string();
@@ -301,7 +329,7 @@ static void runFileTask(int kind,const std::string& source,const std::string& de
   std::vector<std::filesystem::path> outputs;
   for(const auto& path:inputs)
   {
-    auto output=(wildcard||std::filesystem::is_directory(to))?to/path.filename():to;
+    auto output=(wildcard||targetDirectory||std::filesystem::is_directory(to))?to/path.filename():to;
     if(!std::filesystem::is_regular_file(path))throw std::runtime_error("File tasks accept regular files only.");
     if(runIsWorkingMap(path)||(kind!=4&&runIsWorkingMap(output)))throw std::runtime_error("File tasks must not replace or delete the working map.");
     outputs.push_back(output);
@@ -312,13 +340,23 @@ static void runFileTask(int kind,const std::string& source,const std::string& de
     else
     {
       std::filesystem::create_directories(outputs[i].parent_path());
-      if(kind==2)std::filesystem::copy_file(inputs[i],outputs[i],std::filesystem::copy_options::overwrite_existing);
+      if(kind==2){
+        std::error_code ignored;
+        if(!targetDirectory||!std::filesystem::equivalent(inputs[i],outputs[i],ignored))
+          std::filesystem::copy_file(inputs[i],outputs[i],std::filesystem::copy_options::overwrite_existing);
+      }
       else std::filesystem::rename(inputs[i],outputs[i]);
     }
   }
 }
 static void runTick()
 {
+#ifndef _WIN32
+  runLaunchedEngines.erase(std::remove_if(runLaunchedEngines.begin(),runLaunchedEngines.end(),[](pid_t pid){
+    const auto result=waitpid(pid,nullptr,WNOHANG);
+    return result==pid||(result<0&&errno==ECHILD);
+  }),runLaunchedEngines.end());
+#endif
   if(!runActive||runMissingAwaiting)return;
   try
   {
@@ -333,7 +371,11 @@ static void runTick()
       if(PeekNamedPipe(runPipe,nullptr,0,nullptr,&available,nullptr)&&available)return;
       DWORD code=1;GetExitCodeProcess(runProcess,&code);CloseHandle(runProcess);runProcess=nullptr;
       CloseHandle(runPipe);runPipe=nullptr;if(runInput){CloseHandle(runInput);runInput=nullptr;}if(runJob){CloseHandle(runJob);runJob=nullptr;}
-      if(code)throw std::runtime_error("Tool exited with code "+std::to_string(code));
+      if(code){
+        auto message="Tool exited with code "+std::to_string(code);
+        if(!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error(message);
+        runAppend(message+"; continuing as configured.\n");
+      }
       if(runStageHook)runStageHook();
       ++runStep;
     }
@@ -341,7 +383,11 @@ static void runTick()
     if(runProcess>0){char buffer[4096];ssize_t count;while((count=read(runPipe,buffer,sizeof buffer))>0)runAppend(std::string(buffer,count));
       int status=0;auto waited=waitpid(runProcess,&status,WNOHANG);if(waited==0 || (waited<0&&errno==EINTR))return;runProcess=-1;close(runPipe);runPipe=-1;
       if(waited<0)throw std::runtime_error("Cannot read tool exit status. Start with Launch-ReyondBroom.sh so the editor owns compiler processes.");
-      if(!WIFEXITED(status)||WEXITSTATUS(status))throw std::runtime_error("Tool failed.");if(runStageHook)runStageHook();++runStep;}
+      if(!WIFEXITED(status)||WEXITSTATUS(status)){
+        if(!WIFEXITED(status)||!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error("Tool failed.");
+        runAppend("Tool exited with code "+std::to_string(WEXITSTATUS(status))+"; continuing as configured.\n");
+      }
+      if(runStageHook)runStageHook();++runStep;}
 #endif
     if(runExportWaiting)
     {
@@ -359,8 +405,24 @@ static void runTick()
     const auto& task=runningProfile.tasks[runStep];auto source=runExpand(task.source),destination=runExpand(task.destination);
     runAppend("Step "+std::to_string(runStep+1)+": "+source+" "+destination+"\n");
     if(task.kind==0){cvars->SetFloat("ftebroom_export_status",0);command(task.destination=="@selected-brushes"?"ftebroom_export_selected_bsp\n":"ftebroom_export_map\n");runExportWaiting=true;return;}
-    if(task.kind==1){runStartProcess(source,destination,std::filesystem::u8path(activeVariables["WORK_DIR_PATH"]));return;}
-    runFileTask(task.kind,source,destination);
+    if(task.kind==1){
+      auto working=std::filesystem::u8path(activeVariables["WORK_DIR_PATH"]);
+      const bool launchEngine=(task.flags&RunLaunchEngine)!=0;
+      if(launchEngine){
+        if(source.empty())throw std::runtime_error("Set the engine executable path.");
+        auto executable=runFilePath(source);
+        source=executable.u8string();
+        working=executable.parent_path();
+      }
+      try{
+        runStartProcess(source,destination,working,launchEngine);
+        if(!launchEngine)return;
+      }
+      catch(const std::exception& error){
+        if(!(task.flags&RunAllowLaunchFailure))throw;
+        runAppend(std::string(error.what())+" Continuing as configured.\n");
+      }
+    }else runFileTask(task.kind,source,destination,(task.flags&RunCopyToDirectory)!=0);
     ++runStep;
   }
   catch(const std::exception& error){runError=error.what();runHadError=true;runActive=runExportWaiting=false;runAppend("ERROR: "+runError+"\n");}
@@ -370,6 +432,7 @@ static bool runText(const char* label,std::string& value)
   std::vector<char> buffer(std::max<size_t>(4096,value.size()+256));std::copy(value.begin(),value.end(),buffer.begin());
   if(ImGui::InputText(label,buffer.data(),buffer.size())){value=buffer.data();return true;}return false;
 }
+#include "ftebroom_run_import.h"
 static void runPanel()
 {
   if(!runWindow)return;runLoad();
@@ -383,15 +446,20 @@ static void runPanel()
     if(ImGui::BeginCombo("Profile",runProfiles[runSelected].name.c_str())){for(int i=0;i<(int)runProfiles.size();++i)if(ImGui::Selectable(runProfiles[i].name.c_str(),i==runSelected))runSelected=i;ImGui::EndCombo();}
     if(ImGui::Button("New profile")){runProfiles.push_back(RunProfile{});runSelected=(int)runProfiles.size()-1;}
     ImGui::SameLine();if(ImGui::Button("Save profiles"))runSaveProfiles();
+    ImGui::SameLine();if(ImGui::Button("Import TrenchBroom profiles..."))runImportOpen();
+    runImportPanel();
     auto& profile=runProfiles[runSelected];runText("Name",profile.name);runText("Working directory",profile.work);ImGui::Checkbox("Engine launch profile",&profile.launch);
     const char* kinds[]={"Export Map","Run Tool","Copy Files","Rename File","Delete Files"};
     if(ImGui::BeginChild("Profile tasks",{0,200},ImGuiChildFlags_Borders))
     {
       for(size_t i=0;i<profile.tasks.size();++i){ImGui::PushID((int)i);auto& task=profile.tasks[i];
         ImGui::Checkbox("Enabled",&task.enabled);
-        ImGui::Combo("Task",&task.kind,kinds,5);runText(task.kind==1?"Executable":"Source / export path",task.source);
+        if(ImGui::Combo("Task",&task.kind,kinds,5))task.flags=0;
+        runText(task.kind==1?"Executable":"Source / export path",task.source);
         if(task.kind==2||task.kind==4)ImGui::TextDisabled("Filename patterns: * and ? (current folder only)");
         if(task.kind!=0&&task.kind!=4)runText(task.kind==1?"Arguments":"Destination",task.destination);
+        if(task.kind==2&&(task.flags&RunCopyToDirectory))ImGui::TextDisabled("Destination is a folder.");
+        if(task.kind==1&&(task.flags&RunLaunchEngine))ImGui::TextDisabled("Uses the engine's folder as the working directory.");
         if(ImGui::Button("Remove")){profile.tasks.erase(profile.tasks.begin()+i);ImGui::PopID();break;}
         ImGui::SameLine();if(i&&ImGui::Button("Move up"))std::swap(profile.tasks[i],profile.tasks[i-1]);ImGui::Separator();ImGui::PopID();}
       if(ImGui::Button("Add task"))profile.tasks.push_back(RunTask{});
@@ -404,10 +472,11 @@ static void runPanel()
     if(ImGui::Button("Run profile")&&runSaveProfiles())runBegin(profile);ImGui::EndDisabled();
     ImGui::SameLine();ImGui::BeginDisabled(!runActive);if(ImGui::Button("Stop"))runStop();ImGui::EndDisabled();
     ImGui::SameLine();if(ImGui::Button("Copy log"))ImGui::SetClipboardText(runLog.c_str());
-    if(!runError.empty())ImGui::TextColored(uiSoftLight()?SoftLight::danger:ImVec4(1,.3f,.25f,1),"%s",runError.c_str());
+    if(!runImportStatus.empty())ImGui::TextWrapped("%s",runImportStatus.c_str());
+    if(!runError.empty())ImGui::TextColored(uiModern()?uiModernPalette().danger:ImVec4(1,.3f,.25f,1),"%s",runError.c_str());
     if(ImGui::BeginChild("Tool output",{0,0},ImGuiChildFlags_Borders)){std::istringstream lines(runLog);std::string line;
       while(std::getline(lines,line)){bool error=line.find("ERROR")!=std::string::npos||line.find("error")!=std::string::npos||line.find("Error")!=std::string::npos;
-        if(error)ImGui::TextColored(uiSoftLight()?SoftLight::danger:ImVec4(1,.3f,.25f,1),"%s",line.c_str());else ImGui::TextUnformatted(line.c_str());}}
+        if(error)ImGui::TextColored(uiModern()?uiModernPalette().danger:ImVec4(1,.3f,.25f,1),"%s",line.c_str());else ImGui::TextUnformatted(line.c_str());}}
     ImGui::EndChild();
   }
   ImGui::End();
@@ -485,5 +554,64 @@ static void testRunProfiles()
   {
     expect(!runActive&&!runHadError&&runStep==2,"real_q3map2_profile");
     expect(std::filesystem::exists(root/"build.bsp")&&std::filesystem::file_size(root/"build.bsp")>100,"real_q3map2_bsp");
+  }
+  else if(stage==8)
+  {
+    const auto file=root/"CompilationProfiles.cfg";
+    const auto engines=root/"GameEngineProfiles.cfg";
+    std::ofstream(file)<<R"({
+      // TrenchBroom compilation profile fixture
+      "version":2,"profiles":[{"name":"Pipeline test","workdir":"","tasks":[
+        {"type":"export","target":"${MAP_BASE_NAME}-compile.map"},
+        {"type":"tool","tool":"${rb_test_tool}","parameters":"\"a b.bsp\""},
+        {"type":"copy","source":"source.txt","target":"${GAME_DIR_PATH}/${MODS[-1]}/maps","enabled":false},
+        {"type":"launchEngine","engineProfileId":"external","treatLaunchFailureAsError":true},
+        {"type":"rename","source":"source.txt","target":"renamed.txt"},
+        {"type":"delete","target":"renamed.txt","enabled":false}
+      ]},{"name":"Unsupported profile","workdir":"","tasks":[
+        {"type":"export","target":"map.map","stripEntityPattern":"light*"}
+      ]}]})";
+    nlohmann::json launch={{"id","external"},{"name","Engine"},{"path",shell},{"parameters",""}};
+    std::ofstream(engines)<<nlohmann::json{{"version",1},{"profiles",nlohmann::json::array({launch})}};
+    runLoad();
+    try{
+      auto imported=runReadTrenchBroom(file);
+      if(imported.profiles.size()!=1||imported.profiles.front().tasks.size()!=6)
+        throw std::runtime_error("Unexpected imported profile count");
+      const auto& profile=imported.profiles.front();
+      expect(profile.work=="${MAP_DIR_PATH}"&&profile.tasks[0].source=="${MAP_BASE_NAME}-compile.map"&&
+             profile.tasks[1].destination=="\"a b.bsp\""&&imported.missingVariables.count("rb_test_tool")==1&&
+             imported.notices.size()==1,"trenchbroom_profiles_parsed");
+      expect(!profile.tasks[2].enabled&&profile.tasks[2].destination=="${TB_GAME_ROOT}/${TB_ACTIVE_MOD}/maps"&&
+             (profile.tasks[2].flags&RunCopyToDirectory)&&profile.tasks[3].source==shell&&
+             profile.tasks[3].flags==RunLaunchEngine,"trenchbroom_variables_copy_and_engine");
+      std::filesystem::remove(engines);
+      auto missing=runReadTrenchBroom(file);
+      expect(!missing.profiles.front().tasks[3].enabled&&missing.notices.size()==2,"trenchbroom_missing_engine");
+      const auto count=runProfiles.size();
+      imported.profiles.front().name=runProfiles.front().name;
+      imported.missingVariables["rb_test_tool"]=shell;
+      bool saved=runSaveImported(imported);
+      expect(saved&&runProfiles.size()==count+1&&runProfiles.back().name!=runProfiles.front().name&&
+             runVariables.at("rb_test_tool")==shell,"trenchbroom_saved_alongside_existing");
+      auto test=imported.profiles.front();
+      test.work=root.u8string();
+      test.launch=true;
+      test.tasks={test.tasks[1],test.tasks[3],{2,"source.txt","new maps",true,RunCopyToDirectory}};
+      test.tasks[0].destination=
+#ifdef _WIN32
+        "/d /c exit /b 7";
+      test.tasks[1].destination="/d /c exit /b 0";
+#else
+        "-c \"exit 7\"";
+      test.tasks[1].destination="-c \"exit 0\"";
+#endif
+      runBegin(test);
+    }catch(const std::exception& error){core->Print((std::string(error.what())+"\n").c_str());expect(false,"trenchbroom_import_exception");}
+  }
+  else if(stage==9)
+  {
+    expect(!runActive&&!runHadError&&runStep==3&&runLog.find("continuing as configured")!=std::string::npos&&
+           std::filesystem::is_regular_file(root/"new maps/source.txt"),"trenchbroom_imported_pipeline_ran");
   }
 }

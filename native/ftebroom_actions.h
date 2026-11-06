@@ -429,13 +429,19 @@ static std::string historyActionLabel(const Action& a)
     sizeof name);
   return std::string(a.label) + (*name ? " " + std::string(name) : "");
 }
-static void actionMenuGroup(const char* group)
+static bool visibilityAction(const Action& a)
+{
+  return std::string_view(a.id)=="Menu/View/Isolate"||std::string_view(a.id)=="Menu/View/Hide"||
+         std::string_view(a.id)=="Menu/View/Show All";
+}
+static void actionMenuGroup(const char* group,bool visibility=false)
 {
   std::string prefix = std::string("Menu/") + group + "/";
   for (auto& a : actions)
     if (
       std::string(a.id).rfind(prefix, 0) == 0
-      && std::string(a.id).find('/', prefix.size()) == std::string::npos)
+      && std::string(a.id).find('/', prefix.size()) == std::string::npos
+      && visibilityAction(a)==visibility)
     {
       if(gameClassic() && std::string(a.id)=="Menu/Tools/Control Point")continue;
       bool held = a.command && std::string(a.command).rfind("ftebroom_hold ", 0) == 0;
@@ -497,6 +503,8 @@ static void actionMenus()
       if(std::string(group)=="Edit" && gameProfile==1)ImGui::MenuItem("Create FTE Engine terrain...",nullptr,&terrainCreateWindow);
       if(std::string(group)=="Help" && ImGui::BeginMenu("Updates")){updatePanel();ImGui::EndMenu();}
       if(std::string(group)=="View") {
+        if(ImGui::BeginMenu("Visibility")){actionMenuGroup("View",true);ImGui::EndMenu();}
+        if(ImGui::MenuItem("Viewport options..."))viewOptionsOpen=true;
         if(ImGui::MenuItem("Preferences...")){preferencesRequest=true;preferencesAppearanceRequest=true;}
         bool outlines=cvars->GetFloat("ftebroom_show_edges")!=0;
         if(ImGui::MenuItem("Brush outlines",nullptr,outlines))cvars->SetFloat("ftebroom_show_edges",!outlines);
@@ -516,6 +524,9 @@ static void actionMenus()
       if (std::string(group) == "View" && ImGui::BeginMenu("Grid"))
       {
         actionMenuGroup("View/Grid");
+        float opacity=cvars->GetFloat("ftebroom_grid_alpha");
+        if(ImGui::SliderFloat("Grid opacity",&opacity,0,1))cvars->SetFloat("ftebroom_grid_alpha",opacity);
+        if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
         int angle=(int)std::round(cvars->GetFloat("ftebroom_grid_rotation"));
         if(ImGui::SliderInt("Grid rotation",&angle,-180,180,"%d degrees")){cvars->SetFloat("ftebroom_grid_rotation",angle);preferencesSave();}
         if(ImGui::MenuItem("Reset grid rotation")){command("ftebroom_grid reset\n");}

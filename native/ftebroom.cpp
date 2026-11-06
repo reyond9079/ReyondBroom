@@ -252,6 +252,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_run.h"
 #include "ftebroom_build.h"
 #include "ftebroom_terrain.h"
+#include "ftebroom_map_panel.h"
 #include "ftebroom_bb_host.h"
 #include "ftebroom_model_viewer.h"
 #include "ftebroom_mod_files.h"
@@ -328,9 +329,9 @@ static void panel(float w, float h)
   const float menuHeight = ImGui::GetFrameHeight();
   const float toolbarHeight = ImGui::GetFrameHeight() + 18 * uiScale();
   const float statusHeight = ImGui::GetTextLineHeight() + 16 * uiScale();
-  const bool softChrome=uiSoftLight();
-  const float margin=softChrome?SoftLight::margin*uiScale():0;
-  const float gap=softChrome?SoftLight::gutter*uiScale():0;
+  const bool softChrome=uiModern();
+  const float margin=softChrome?ModernChrome::margin*uiScale():0;
+  const float gap=softChrome?ModernChrome::gutter*uiScale():0;
   const float toolbarY=menuHeight+(softChrome?6*uiScale():0);
   const float statusY=h-statusHeight-margin;
   uiWorkspace(w,h,toolbarY+toolbarHeight+gap,statusHeight+margin+gap,margin);
@@ -468,7 +469,7 @@ static void panel(float w, float h)
   cvars->SetFloat("ftebroom_up", float(moveHeld[4]) - float(moveHeld[5]));
   cameraTick();
   ImGui::BeginDisabled(modEmbedded);
-  if(softChrome)ImGui::PushStyleColor(ImGuiCol_WindowBg,SoftLight::transparent);
+  if(softChrome)ImGui::PushStyleColor(ImGuiCol_WindowBg,ModernChrome::transparent);
   const bool mainMenuVisible=ImGui::BeginMainMenuBar();
   if(softChrome)ImGui::PopStyleColor();
   if (mainMenuVisible)
@@ -485,7 +486,7 @@ static void panel(float w, float h)
         uiReset = true;
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 123");
+    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 124");
     ImGui::EndMainMenuBar();
   }
   const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
@@ -605,10 +606,25 @@ static void panel(float w, float h)
     ImGui::GetWindowDrawList()->AddLine(p,{p.x,p.y+34*uiScale()},ImGui::GetColorU32(ImGuiCol_Separator));
     ImGui::Dummy({1,34*uiScale()});
   }else ImGui::Separator();
-  bool snapInteger=cvars->GetFloat("ftebroom_auto_integer_snap")!=0;
-  toolFlow(ImGui::GetFrameHeight()+ImGui::GetStyle().ItemInnerSpacing.x+ImGui::CalcTextSize("Int",nullptr,true).x);
-  if(ImGui::Checkbox("Int",&snapInteger))cvars->SetFloat("ftebroom_auto_integer_snap",snapInteger);
-  if(ImGui::IsItemHovered())ImGui::SetTooltip("Automatically snap edited brush vertices to integer coordinates");
+  const bool snapInteger=cvars->GetFloat("ftebroom_auto_integer_snap")!=0;
+  toolFlow(32*uiScale());
+  if(snapInteger)ImGui::PushStyleColor(ImGuiCol_Button,uiActiveToolColor());
+  if(ImGui::Button("##integer-snap",{32*uiScale(),toolHeight}))
+    cvars->SetFloat("ftebroom_auto_integer_snap",!snapInteger);
+  if(snapInteger)ImGui::PopStyleColor();
+  const auto snapButton=ImGui::GetItemRectMin();
+  const ImVec2 snapCenter{snapButton.x+16*uiScale(),snapButton.y+toolHeight*.5f};
+  auto* snapDraw=ImGui::GetWindowDrawList();
+  const auto snapColor=ImGui::GetColorU32(ImGuiCol_Text);
+  const float cross=8*uiScale(),point=3.5f*uiScale(),stroke=1.5f*uiScale();
+  const ImVec2 snapDiamond[]={{snapCenter.x,snapCenter.y-point},{snapCenter.x+point,snapCenter.y},
+    {snapCenter.x,snapCenter.y+point},{snapCenter.x-point,snapCenter.y}};
+  snapDraw->AddPolyline(snapDiamond,4,snapColor,ImDrawFlags_Closed,stroke);
+  for(const ImVec2 axis: {ImVec2{1,0},ImVec2{-1,0},ImVec2{0,1},ImVec2{0,-1}})
+    snapDraw->AddLine({snapCenter.x+axis.x*point,snapCenter.y+axis.y*point},
+      {snapCenter.x+axis.x*cross,snapCenter.y+axis.y*cross},snapColor,stroke);
+  if(cvars->GetFloat("ftebroom_skip_setup"))entityTestItem("integer_snap");
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr("Automatically snap edited brush vertices to integer coordinates"));
   for (auto name : {"ftebroom_texture_lock", "ftebroom_uv_lock"})
   {
     bool uv = std::string(name) == "ftebroom_uv_lock";
@@ -637,7 +653,7 @@ static void panel(float w, float h)
     ImGui::Dummy({0,8*uiScale()});
     toolFlow(32*uiScale());
     uiToolStripBegin();
-    ImGui::PushStyleColor(ImGuiCol_Button,SoftLight::nav);
+    ImGui::PushStyleColor(ImGuiCol_Button,uiModernPalette().nav);
     if(compileButton("Tool options",1,true))ImGui::OpenPopup("##rail-tool-options");
     if(cvars->GetFloat("ftebroom_skip_setup"))entityTestItem("rail_options");
     ImGui::PopStyleColor();
@@ -939,128 +955,15 @@ static void panel(float w, float h)
   ImGui::End();
   if (selectMapTab)
     ImGui::SetNextWindowFocus();
-  if (uiSoftPanelBegin("Map",nullptr,uiPanelFlags()))
-  {
-    if (cvars->GetFloat("ftebroom_ctx_selection") == 2)
-      ImGui::Text(
-        "Face selection: %i faces", (int)cvars->GetFloat("ftebroom_face_count"));
-    ImGui::Text(
-      "Selection: %i brush(es), %i entities",
-      (int)cvars->GetFloat("ftebroom_selection_count"),
-      (int)cvars->GetFloat("ftebroom_entity_selection_count"));
-    char openedGroup[256] = {};
-    cvars->GetString("ftebroom_open_group", openedGroup, sizeof openedGroup);
-    if (openedGroup[0])
-      ImGui::Text("Open group: %s", openedGroup);
-    char selectedEntity[160] = {};
-    cvars->GetString("ftebroom_selected_entity", selectedEntity, sizeof selectedEntity);
-    if (*selectedEntity)
-      ImGui::Text("Entity: %s", selectedEntity);
-    if ((int)cvars->GetFloat("ftebroom_tool") == 2)
-    {
-      uiSectionHeading("Clip / Cut");
-      int keep = (int)cvars->GetFloat("ftebroom_clip_keep");
-      if (ImGui::Combo("Keep", &keep, "Front\0Both sides\0Back\0"))
-        cvars->SetFloat("ftebroom_clip_keep", float(keep));
-      ImGui::Text("Cut points: %i / 3", (int)cvars->GetFloat("ftebroom_clip_points"));
-      if (ImGui::Button("Apply cut (Enter)"))
-        command("ftebroom_clip apply\n");
-      ImGui::SameLine();
-      if (ImGui::Button("Reset"))
-        command("ftebroom_clip reset\n");
-      ImGui::TextWrapped(
-        "Orange transparent volume is discarded. Ctrl+Enter changes sides. "
-        "Select brushes first. Click or drag cut points on brush faces. Drag a point to "
-        "adjust it; "
-        "double-click a face to use its plane. Two points use the face/view normal; "
-        "three define "
-        "an arbitrary plane. Escape removes the last point.");
-    }
-    organizationPanel();
-    viewOptionsPanel();
-    uiSectionHeading("Grid");
-    gridControl("Spacing");
-    bool visible = cvars->GetFloat("ftebroom_grid_visible") != 0;
-    if (ImGui::Checkbox("Show grid", &visible))
-      cvars->SetFloat("ftebroom_grid_visible", visible);
-    bool snap = cvars->GetFloat("ftebroom_grid_snap") != 0;
-    if (ImGui::Checkbox("Snap to grid", &snap))
-      cvars->SetFloat("ftebroom_grid_snap", snap);
-    float alpha = cvars->GetFloat("ftebroom_grid_alpha");
-    if (ImGui::SliderFloat("Grid opacity", &alpha, 0.f, 1.f))
-      cvars->SetFloat("ftebroom_grid_alpha", alpha);
-    uiSectionHeading("Document");
-    static bool boundsWasOpen = false;
-    bool boundsOpen = ImGui::CollapsingHeader("Soft map bounds");
-    if (boundsOpen)
-    {
-      static float low[3] = {-65536, -65536, -65536};
-      static float high[3] = {65536, 65536, 65536};
-      if (!boundsWasOpen)
-      {
-        char current[256] = {};
-        if (cvars->GetString("ftebroom_map_bounds", current, sizeof current))
-          std::sscanf(
-            current,
-            "%f %f %f %f %f %f",
-            &low[0],
-            &low[1],
-            &low[2],
-            &high[0],
-            &high[1],
-            &high[2]);
-      }
-      ImGui::InputFloat3("Minimum", low);
-      ImGui::InputFloat3("Maximum", high);
-      bool valid = true;
-      for (int a = 0; a < 3; ++a)
-        valid &= std::isfinite(low[a]) && std::isfinite(high[a]) && low[a] < high[a]
-                 && std::abs(low[a]) <= 65536 && std::abs(high[a]) <= 65536;
-      ImGui::BeginDisabled(!valid);
-      if (ImGui::Button("Apply bounds"))
-      {
-        char value[256];
-        std::snprintf(
-          value,
-          sizeof value,
-          "%g %g %g %g %g %g",
-          low[0],
-          low[1],
-          low[2],
-          high[0],
-          high[1],
-          high[2]);
-        cvars->SetString("ftebroom_map_bounds", value);
-      }
-      ImGui::EndDisabled();
-    }
-    boundsWasOpen = boundsOpen;
-    ImGui::Text(
-      "%s.map%s", documentName.c_str(), cvars->GetFloat("ftebroom_dirty") ? "*" : "");
-    ImGui::TextWrapped("%s", documentFile.u8string().c_str());
-    if (ImGui::Button("Save .map"))
-    {
-      if (documentUntitled)
-        saveRequest = true;
-      else
-        documentSave(documentName);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Open .map"))
-      openRequest = true;
-    ImGui::TextWrapped(
-      "Drag in the scene while this inspector stays open. "
-      "Esc cancels the current gesture.");
-  }
+  if(uiSoftPanelBegin("Map",nullptr,uiPanelFlags()))mapInspector();
   ImGui::End();
+  entityPanel();
   if (
     selectMaterialTab
     || (cvars->GetFloat("ftebroom_test_material_tab") && cvars->GetFloat("ftebroom_skip_setup")))
     ImGui::SetNextWindowFocus();
-#ifdef _WIN32
   materialDropVisible=false;
-#endif
-  if (uiSoftPanelBegin("Material",nullptr,uiPanelFlags()))
+  if (uiSoftPanelBegin("Face",nullptr,uiPanelFlags()))
     materialBrowser();
   ImGui::End();
   selectMapTab = selectMaterialTab = false;
@@ -1079,12 +982,27 @@ static void panel(float w, float h)
                        "Esc removes last point"
                      : "Click selects | Drag creates / moves | Shift+Esc exits tool"));
   else
-    ImGui::TextColored({1, .65f, .15f, 1}, "%s", selectionStatus);
+    ImGui::TextColored(uiModern()?uiModernPalette().warning:ImVec4{1,.65f,.15f,1},"%s",selectionStatus);
   ImGui::SameLine();
   if(ImGui::SmallButton(modFilesOpen ? "Hide files" : "Show files"))modFilesOpen=!modFilesOpen;
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s.map%s",documentName.c_str(),cvars->GetFloat("ftebroom_dirty")?" *":"");
+  if(ImGui::IsItemHovered()){
+    ImGui::BeginTooltip();
+    if(!documentFile.empty())ImGui::TextUnformatted(documentFile.u8string().c_str());
+    char group[256]{},entity[160]{};
+    cvars->GetString("ftebroom_open_group",group,sizeof group);
+    cvars->GetString("ftebroom_selected_entity",entity,sizeof entity);
+    if(*group)ImGui::Text("Open group: %s",group);
+    if(*entity)ImGui::Text("Entity: %s",entity);
+    ImGui::Text("Selection: %d brushes, %d entities, %d faces",
+      int(cvars->GetFloat("ftebroom_selection_count")),int(cvars->GetFloat("ftebroom_entity_selection_count")),
+      int(cvars->GetFloat("ftebroom_face_count")));
+    ImGui::EndTooltip();
+  }
   ImGui::End();
-  entityPanel();
   issuesPanel();
+  viewOptionsPanel();
   runPanel();
   runMissingPanel();
   buildPanel();
@@ -1181,7 +1099,7 @@ static void panel(float w, float h)
     if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
-      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 123");
+      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 124");
       ImGui::TextLinkOpenURL("Check published releases","https://github.com/reyond9079/ReyondBroom/releases");
       updatePanel();
       ImGui::EndTabItem();

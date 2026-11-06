@@ -53,13 +53,14 @@ static void setupThemeTiles()
       rect(tile.x-side-pad*.5f,y,side-pad,11*uiScale(),ImGuiCol_FrameBg,retro?0:2);
       if(retro)draw->AddRect({pos.x+pad*1.5f,pos.y+y},{pos.x+side+pad*.5f,pos.y+y+11*uiScale()},color(ImGuiCol_BorderShadow));
     }
-    if(theme==3){
-      draw->AddRectFilled({pos.x+pad,pos.y+top},{pos.x+pad+side,pos.y+pad+previewHeight},ImGui::ColorConvertFloat4ToU32(SoftLight::nav),4*uiScale());
+    if(ModernChrome::usesModern(theme)){
+      const auto& palette=ModernChrome::palette(theme);
+      draw->AddRectFilled({pos.x+pad,pos.y+top},{pos.x+pad+side,pos.y+pad+previewHeight},ImGui::ColorConvertFloat4ToU32(palette.nav),4*uiScale());
       for(int row=0;row<3;row++){
         float y=pos.y+top+6*uiScale()+row*18*uiScale();
-        if(row==0)draw->AddRectFilled({pos.x+pad*1.5f,y},{pos.x+side+pad*.5f,y+11*uiScale()},ImGui::ColorConvertFloat4ToU32(SoftLight::navActive),3*uiScale());
-        draw->AddLine({pos.x+pad*2,y+3*uiScale()},{pos.x+side,y+3*uiScale()},ImGui::ColorConvertFloat4ToU32(SoftLight::navText));
-        draw->AddLine({pos.x+pad*2,y+7*uiScale()},{pos.x+side-pad*.5f,y+7*uiScale()},ImGui::ColorConvertFloat4ToU32(SoftLight::navText));
+        if(row==0)draw->AddRectFilled({pos.x+pad*1.5f,y},{pos.x+side+pad*.5f,y+11*uiScale()},ImGui::ColorConvertFloat4ToU32(palette.navActive),3*uiScale());
+        draw->AddLine({pos.x+pad*2,y+3*uiScale()},{pos.x+side,y+3*uiScale()},ImGui::ColorConvertFloat4ToU32(palette.navText));
+        draw->AddLine({pos.x+pad*2,y+7*uiScale()},{pos.x+side-pad*.5f,y+7*uiScale()},ImGui::ColorConvertFloat4ToU32(palette.navText));
       }
     }
     // A tiny viewport with a grid and a selected brush gives the previews context.

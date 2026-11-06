@@ -9,6 +9,88 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string_view(mode)=="inspect125map"||std::string_view(mode)=="inspect125face"){
+    auto click=[&](const char* key){
+      const auto p=fileBrowserTestItems.at(key);
+      event(0,0,0,p.x,p.y,testW,testH);
+      event(1,mouseKeys[0],0,p.x,p.y,testW,testH);
+      event(0,0,0,p.x,p.y,testW,testH);
+      event(2,mouseKeys[0],0,p.x,p.y,testW,testH);
+      frame();frame();
+    };
+    if(std::string_view(mode)=="inspect125map"){
+      selectMapTab=true;frame();frame();
+      const auto* map=ImGui::FindWindowByName("Map");
+      const auto* face=ImGui::FindWindowByName("Face");
+      const auto* entity=ImGui::FindWindowByName("Entity");
+      expect(map&&face&&entity&&map->DockId==face->DockId&&map->DockId==entity->DockId&&
+             map->DockOrder<entity->DockOrder&&entity->DockOrder<face->DockOrder,"inspect125_tab_order");
+      expect(std::any_of(organizationNodes.begin(),organizationNodes.end(),[](const auto& layer){
+        return layer.kind==1&&layer.id==0&&layer.objectCount>0;
+      }),"inspect125_layer_object_count");
+      click("map_create_layer");
+      expect(ImGui::IsPopupOpen("Layer name",ImGuiPopupFlags_AnyPopupId),"inspect125_create_layer_popup");
+      ImGui::ClosePopupsOverWindow(nullptr,false);frame();
+      click("map_groups");
+      expect(ImGui::IsPopupOpen("Group management",ImGuiPopupFlags_AnyPopupId),"inspect125_groups_popup");
+      ImGui::ClosePopupsOverWindow(nullptr,false);frame();
+      click("map_bounds_disabled");char bounds[256]{};
+      cvars->GetString("ftebroom_map_bounds",bounds,sizeof bounds);
+      expect(!*bounds,"inspect125_disable_bounds");
+      click("map_bounds_default");cvars->GetString("ftebroom_map_bounds",bounds,sizeof bounds);
+      expect(*bounds,"inspect125_restore_game_bounds");
+      const auto splitter=fileBrowserTestItems.at("map_layer_splitter");
+      const float before=uiLayerFraction;
+      auto at=[&](float y){event(0,0,0,splitter.x,y,testW,testH);};
+      at(splitter.y);event(1,mouseKeys[0],0,splitter.x,splitter.y,testW,testH);at(splitter.y);
+      at(splitter.y+45);at(splitter.y+45);
+      event(2,mouseKeys[0],0,splitter.x,splitter.y+45,testW,testH);frame();
+      expect(uiLayerFraction>before,"inspect125_resize_layers");
+      uiLayerFraction=before;frame();
+    }else{
+      selectMaterialTab=true;frame();frame();
+      const auto* face=ImGui::FindWindowByName("Face");
+      const auto footer=fileBrowserTestItems.at("face_search");
+      const auto offsetY=materialTestItems.at("oy"),scaleY=materialTestItems.at("sy");
+      expect(face&&footer.y<face->Pos.y+face->Size.y&&footer.y>face->Pos.y+face->Size.y*.65f,
+             "inspect125_face_footer_visible");
+      expect(face&&offsetY.x<face->Pos.x+face->Size.x&&scaleY.x<face->Pos.x+face->Size.x,
+             "inspect125_both_uv_columns_visible");
+      expect(cvars->GetFloat("ftebroom_uv_face")!=0&&uvTestDragReady,"inspect125_interactive_uv_preview");
+      click("face_settings");
+      expect(ImGui::IsPopupOpen("Material Browser settings",ImGuiPopupFlags_AnyPopupId),"inspect125_browser_settings");
+      ImGui::ClosePopupsOverWindow(nullptr,false);frame();
+    }
+    return;
+  }
+  if(std::string_view(mode)=="modern124dark"||std::string_view(mode)=="modern124reload"){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;
+    if(std::string_view(mode)=="modern124reload"){
+      uiTheme=3;uiLoaded=false;
+      cvars->SetFloat("ftebroom_skip_setup",0);uiLoad();
+      cvars->SetFloat("ftebroom_skip_setup",1);frame();
+      expect(uiTheme==0&&uiModern(),"modern124_saved_dark_theme");
+      return;
+    }
+    uiTheme=0;uiScaleChoice=0;uiStyle();uiReset=true;
+    modFilesOpen=true;modFilesVisible=true;selectMapTab=true;frame();frame();
+    const auto* center=ImGui::DockBuilderGetCentralNode(uiDockId);
+    const auto* map=ImGui::FindWindowByName("Map");
+    expect(center&&map&&map->Pos.x-center->Pos.x-center->Size.x>=ModernChrome::gutter-1,
+           "modern124_dark_workspace_gutter");
+    const auto p=entityTestItems.at("integer_snap");
+    const bool snap=cvars->GetFloat("ftebroom_auto_integer_snap")!=0;
+    auto clickSnap=[&](){
+      event(0,0,0,p.x,p.y,testW,testH);event(1,mouseKeys[0],0,p.x,p.y,testW,testH);
+      event(0,0,0,p.x,p.y,testW,testH);event(2,mouseKeys[0],0,p.x,p.y,testW,testH);frame();frame();
+    };
+    clickSnap();const bool toggled=(cvars->GetFloat("ftebroom_auto_integer_snap")!=0)!=snap;
+    clickSnap();expect(toggled&&(cvars->GetFloat("ftebroom_auto_integer_snap")!=0)==snap,
+                       "modern124_integer_snap_icon_toggles");
+    cvars->SetFloat("ftebroom_skip_setup",0);uiSaveAppearance();
+    cvars->SetFloat("ftebroom_skip_setup",1);
+    return;
+  }
   if(std::string(mode).rfind("soft122",0)==0){
     recentWindow=false;setupNeeded=false;firstSetupStep=-1;
     if(std::string(mode)=="soft122open"){
@@ -32,7 +114,7 @@ static void testDesktop(){
     if(std::string(mode)=="soft122check"){
       auto colors=ImGui::GetCurrentContext()->ColorStack.Size,vars=ImGui::GetCurrentContext()->StyleVarStack.Size;
       frame();frame();expect(colors==ImGui::GetCurrentContext()->ColorStack.Size&&vars==ImGui::GetCurrentContext()->StyleVarStack.Size,"soft122_style_stacks_balanced");
-      expect(uiTheme==3&&ImGui::GetStyle().WindowRounding==SoftLight::panelRadius*uiScale(),"soft122_existing_id_and_scaled_style");
+      expect(uiTheme==3&&ImGui::GetStyle().WindowRounding==ModernChrome::panelRadius*uiScale(),"soft122_existing_id_and_scaled_style");
       selectEntityTab=true;frame();frame();
       expect(!entityAdvancedSearch&&entityVisiblePreviewCount>0&&entityPreviewMarginsValid,"soft122_compact_entity_default_and_margins");
       auto window=ImGui::FindWindowByName("Entity");expect(window&&entityFooterMax.y<=window->Pos.y+window->Size.y&&entityFooterMax.x<=window->Pos.x+window->Size.x,"soft122_footer_inside_panel");
@@ -41,7 +123,7 @@ static void testDesktop(){
         const float before=window->Size.x;
         const float x=(center->Pos.x+center->Size.x+window->Pos.x)*.5f;
         const float y=center->Pos.y+center->Size.y*.5f;
-        expect(window->Pos.x-center->Pos.x-center->Size.x>=SoftLight::gutter-1 &&
+        expect(window->Pos.x-center->Pos.x-center->Size.x>=ModernChrome::gutter-1 &&
                viewHit(x,y)<0 && viewHit(uiScenePos.x+uiSceneSize.x*.5f,y)>=0,
                "soft122_workspace_gutter_excludes_viewport_input");
         event(0,0,0,x,y,testW,testH);
@@ -52,7 +134,7 @@ static void testDesktop(){
         event(2,mouseKeys[0],0,x-32,y,testW,testH);
         frame();
         expect(window->Size.x>before+16 &&
-               window->Pos.x-center->Pos.x-center->Size.x>=SoftLight::gutter-1,
+               window->Pos.x-center->Pos.x-center->Size.x>=ModernChrome::gutter-1,
                "soft122_dock_resize_preserves_gutter");
         uiReset=true;selectEntityTab=true;frame();frame();
         center=ImGui::DockBuilderGetCentralNode(uiDockId);

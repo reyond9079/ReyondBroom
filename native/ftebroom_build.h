@@ -448,8 +448,8 @@ static void buildToolbar(bool inlineTools=false,bool iconOnly=false)
       return compileButton(label,icon,iconOnly);
     };
     ImGui::BeginDisabled(runActive||buildRunning);
-    ImGui::PushStyleColor(ImGuiCol_Button,uiSoftLight()?SoftLight::focus:uiColor(47,99,160));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiSoftLight()?SoftLight::teal:uiColor(58,122,195));
+    ImGui::PushStyleColor(ImGuiCol_Button,uiModern()?uiModernPalette().action:uiColor(47,99,160));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiModern()?uiModernPalette().actionHover:uiColor(58,122,195));
     ImGui::PushStyleColor(ImGuiCol_Text,uiColor(255,255,255));
     if(control("Compile",0))buildBegin();
     ImGui::PopStyleColor(3);ImGui::EndDisabled();next("Setup compile");
@@ -488,14 +488,14 @@ static void buildOverlay()
       auto end=runLog.find_last_not_of("\r\n");if(end!=std::string::npos){auto start=runLog.find_last_of("\r\n",end);auto line=runLog.substr(start==std::string::npos?0:start+1,end-(start==std::string::npos?0:start+1)+1);ImGui::TextWrapped("%s",line.substr(0,240).c_str());}
       if(ImGui::SmallButton("Cancel build"))runStop();ImGui::SameLine();if(ImGui::SmallButton("Log"))runWindow=true;
     }else if(!buildMessage.empty()){
-      if(documentFile.empty())ImGui::TextColored(uiSoftLight()?SoftLight::warning:ImVec4(1,.75f,.25f,1),"Map not saved");
-      if(runHadError)ImGui::PushStyleColor(ImGuiCol_Text,uiSoftLight()?SoftLight::danger:ImVec4(1,.35f,.3f,1));
+      if(documentFile.empty())ImGui::TextColored(uiModern()?uiModernPalette().warning:ImVec4(1,.75f,.25f,1),"Map not saved");
+      if(runHadError)ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().danger:ImVec4(1,.35f,.3f,1));
       ImGui::TextWrapped("%s",buildMessage.c_str());if(runHadError)ImGui::PopStyleColor();
       if(runHadError && ImGui::SmallButton("Show error log"))runWindow=true;
       if(ImGui::SmallButton("Dismiss"))buildMessage.clear();
     }
     if(!buildResult.empty()&&buildResultDocument==documentFile&&buildResultRevision!=(int)cvars->GetFloat("ftebroom_revision"))
-      ImGui::TextColored(uiSoftLight()?SoftLight::warning:ImVec4(1,.75f,.25f,1),"BSP is from an earlier document revision.");
+      ImGui::TextColored(uiModern()?uiModernPalette().warning:ImVec4(1,.75f,.25f,1),"BSP is from an earlier document revision.");
   }ImGui::End();
 }
 static void testBuild()

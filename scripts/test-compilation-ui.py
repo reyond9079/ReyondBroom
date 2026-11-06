@@ -36,8 +36,16 @@ def wait_for(fn,timeout=10):
   except (FileNotFoundError,json.JSONDecodeError,KeyError):pass
   time.sleep(.1)
  raise AssertionError('Timed out waiting for editor state')
-def live():return json.loads((data/'compilation-ui-live.json').read_text())
-def profiles():return json.loads(store.read_text())['games'][live()['game']]['profiles']
+def shared_json(path):
+ # Windows may briefly deny a reader while the editor replaces its snapshot.
+ deadline=time.monotonic()+2
+ while True:
+  try:return json.loads(path.read_text(encoding='utf-8'))
+  except (FileNotFoundError,PermissionError,json.JSONDecodeError):
+   if time.monotonic()>=deadline:raise
+   time.sleep(.02)
+def live():return shared_json(data/'compilation-ui-live.json')
+def profiles():return shared_json(store)['games'][live()['game']]['profiles']
 def expect(value,name):
  assert value,name
  checks.append(name);(out/'ui-results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
@@ -166,7 +174,10 @@ else:
   ox,oy=position();xtest.fake_input(d,X.MotionNotify,x=int(ox+x),y=int(oy+y));d.sync();time.sleep(.08);button=3 if right else 1
   xtest.fake_input(d,X.ButtonPress,button);d.sync();time.sleep(.06);xtest.fake_input(d,X.ButtonRelease,button);d.sync();time.sleep(.25)
 def click(name,right=False):
- state=wait_for(lambda:live() if name in live()['widgets'] or name in live().get('globalWidgets',{}) else None)
+ def target_state():
+  state=live()
+  return state if name in state['widgets'] or name in state.get('globalWidgets',{}) else None
+ state=wait_for(target_state)
  if name in state.get('globalWidgets',{}):
   r=state['globalWidgets'][name];mouse(r['x']+r['width']*.5,r['y']+r['height']*.5,right)
  else:

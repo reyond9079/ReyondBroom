@@ -26,8 +26,12 @@ jobs:
           if command -v g++ && command -v cmake && command -v Xvfb && command -v xauth && test -f /usr/include/X11/Xlib.h && test -f /usr/include/zlib.h; then
             echo "Build and QA prerequisites are already present in the runner image."
           else
+            # The Azure package mirror can stall on cmake downloads.
+            if test -f /etc/apt/apt-mirrors.txt; then
+              printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
+            fi
             sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
-            sudo timeout 180s apt-get install -y build-essential cmake libx11-dev zlib1g-dev xvfb xauth
+            sudo timeout 180s apt-get install -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -y build-essential cmake libx11-dev zlib1g-dev xvfb xauth
           fi
       - name: Fetch and verify base release
         run: |

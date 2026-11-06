@@ -92,7 +92,7 @@ struct SoundState {
   std::string afterSave, focusField;
   double lastAutosave = 0;
   bool autosaveWarning = false;
-  rbAudio::Frame dragAt = 0;
+  rbAudio::Frame dragAt = 0, contextAt = 0;
   rbAudio::Id dragClip = 0;
   int dragMode = 0, rangeDrag = 0;
   bool dragging = false;
@@ -462,6 +462,17 @@ static void soundExport(const std::filesystem::path &target,
   auto &s = soundState;
   if (soundBusy())
     throw std::runtime_error("Wait for the current audio operation");
+  if (!update) {
+    auto destination = std::filesystem::weakly_canonical(target);
+    for (const auto &source : s.project.sources)
+      for (const auto &uri : {source.uri, source.resourceUri})
+        if (!uri.empty() && !modFileMember(std::filesystem::u8path(uri)) &&
+            std::filesystem::weakly_canonical(std::filesystem::u8path(uri)) ==
+                destination)
+          throw std::runtime_error(
+              "Export would overwrite a project source. Choose another file or "
+              "use Update source with backup.");
+  }
   auto project = s.project;
   auto previous = s.mixer;
   auto roots = soundRoots();

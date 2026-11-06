@@ -447,7 +447,8 @@ static void soundWaveDraw(ImDrawList *draw, const ImRect &bounds,
           mid = (bounds.Min.y + bounds.Max.y) * .5f;
     draw->AddLine({x, mid - peak.hi * amp * bounds.GetHeight() * .46f},
                   {x, mid - peak.lo * amp * bounds.GetHeight() * .46f},
-                  ImGui::GetColorU32(ImGuiCol_CheckMark));
+                  clip ? IM_COL32(120, 224, 224, 255)
+                       : ImGui::GetColorU32(ImGuiCol_CheckMark));
   }
   draw->PopClipRect();
 }
@@ -842,13 +843,15 @@ static void soundTimeline() {
     s.revision++;
   }
 
+  if (ImGui::IsItemClicked(1))
+    s.contextAt = toFrame(ImGui::GetIO().MousePos.x);
   if (ImGui::BeginPopupContextItem("Range menu")) {
     if (ImGui::MenuItem("Set In here")) {
-      s.cursor = toFrame(ImGui::GetIO().MousePos.x);
+      s.cursor = s.contextAt;
       soundExecute("range.in");
     }
     if (ImGui::MenuItem("Set Out here")) {
-      s.cursor = toFrame(ImGui::GetIO().MousePos.x);
+      s.cursor = s.contextAt;
       soundExecute("range.out");
     }
     if (ImGui::MenuItem("Clear range"))
@@ -951,7 +954,7 @@ static void soundTimeline() {
                       2 * scale);
       draw->PushClipRect(r.Min, r.Max, true);
       draw->AddText({r.Min.x + 7 * scale, r.Min.y + 4 * scale},
-                    ImGui::GetColorU32(ImGuiCol_Text),
+                    IM_COL32(235, 239, 239, 255),
                     source ? source->name.c_str() : "Missing source");
       if (t.visible)
         soundWaveDraw(
@@ -1047,6 +1050,8 @@ static void soundTimeline() {
         }
       }
       if (ImGui::BeginPopupContextItem("Clip menu")) {
+        s.source = c.source;
+        s.track = t.id;
         if (!s.selected.count(c.id))
           s.selected = {c.id};
         if (hoveredKey >= 0 && ImGui::MenuItem("Delete volume keyframe")) {

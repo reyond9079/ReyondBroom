@@ -203,6 +203,14 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     finish();
     expect(rbAudio::serialize(p) == saved,
            "audio4_failed_load_retains_project");
+    bool overwriteRejected = false;
+    try {
+      soundExport(folder / "voice.wav");
+    } catch (...) {
+      overwriteRejected = true;
+    }
+    expect(overwriteRejected && !soundBusy(),
+           "audio4_export_cannot_overwrite_source");
     auto roots = soundRoots();
     auto target = folder / "conflict.wav";
     rbAudio::writeBytes(target, "external");

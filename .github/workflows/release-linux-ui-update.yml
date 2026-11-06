@@ -1,77 +1,150 @@
-name: Release Linux UI update
+# Keep the existing workflow filename so it can be dispatched from a fix branch.
+name: Release native editor update
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version without v (UI-only update, engine and CSQC unchanged)
+        description: Version without v; draft release must already exist
         required: true
-        default: '0.5.0-alpha.125'
+        default: '0.5.0-alpha.126'
       base_tag:
-        description: Official release supplying unchanged runtime and dependency sources
+        description: Compatible engine/dependency base for Windows and SDL2
         required: true
         default: 'v0.5.0-alpha.124'
+      linux_base_tag:
+        description: Native Linux base
+        required: true
+        default: 'v0.5.0-alpha.125'
 permissions:
   contents: write
 jobs:
-  build:
+  linux:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [Linux-x64, Linux-SDL2-x64]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      PLATFORM: ${{ matrix.platform }}
+      BASE_TAG: ${{ matrix.platform == 'Linux-x64' && inputs.linux_base_tag || inputs.base_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build and validation tools
+        run: |
+          if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! test -f /usr/include/X11/Xlib.h; then
+            if test -f /etc/apt/apt-mirrors.txt; then
+              printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
+            fi
+            sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
+            sudo timeout 180s apt-get install -y build-essential cmake libx11-dev zlib1g-dev xvfb xauth ffmpeg libsdl2-2.0-0 ripgrep
+          fi
+      - name: Fetch and verify compatible runtime and complete sources
+        run: |
+          mkdir base deps
+          gh release download "$BASE_TAG" --repo "$GITHUB_REPOSITORY" --dir base --pattern "*-$PLATFORM.tar.gz" --pattern "*-$PLATFORM.tar.gz.sha256" --pattern "*-$PLATFORM-Sources.zip" --pattern "*-$PLATFORM-Sources.zip.sha256"
+          (cd base && sha256sum -c ./*.sha256)
+          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
+          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+      - name: Build and test the native module and profile importer
+        run: |
+          cmake -S deps/bullet -B deps/bullet-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
+          cmake --build deps/bullet-build -j2 --target BulletDynamics BulletCollision LinearMath
+          g++ -std=c++17 -O2 tests/trenchbroom-profiles.cpp -o deps/profile-test
+          deps/profile-test tests/fixtures/CompilationProfiles-cpu-count.cfg
+          g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
+          scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
+      - name: Package native runtime and corresponding sources
+        run: |
+          python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --version "$VERSION" --output out/release
+          (cd out/release && sha256sum -c ./*.sha256)
+      - name: Validate the packaged editor
+        run: |
+          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
+          xvfb-run -a -s '-screen 0 1920x1080x24' scripts/test-trenchbroom-linux.sh "$bundle" "$PWD/qa/profiles"
+          xvfb-run -a -s '-screen 0 1920x1080x24' scripts/test-audio-editor-linux.sh "$bundle" "$PWD/qa/audio"
+      - name: Upload validated packages to the draft release
+        run: |
+          test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
+          gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 --clobber
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-${{ matrix.platform }}
+          path: |
+            qa/**/*.log
+            qa/**/*.png
+  windows:
+    runs-on: windows-2022
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
       BASE_TAG: ${{ inputs.base_tag }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install build and QA tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-pkgconf git curl diffutils tar make
+      - name: Fetch and verify runtime, converter source and native dependencies
+        shell: pwsh
         run: |
-          if command -v g++ && command -v cmake && command -v Xvfb && command -v xauth && test -f /usr/include/X11/Xlib.h && test -f /usr/include/zlib.h; then
-            echo "Build and QA prerequisites are already present in the runner image."
-          else
-            # The Azure package mirror can stall on cmake downloads.
-            if test -f /etc/apt/apt-mirrors.txt; then
-              printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
-            fi
-            sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
-            sudo timeout 180s apt-get install -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -y build-essential cmake libx11-dev zlib1g-dev xvfb xauth
-          fi
-      - name: Fetch and verify base release
+          New-Item -ItemType Directory -Force base, sdk, deps, audio-deps | Out-Null
+          gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' --pattern '*-Windows-x64-Sources.zip' --pattern '*-Windows-x64-Sources.zip.sha256'
+          if ($LASTEXITCODE -ne 0) { throw 'Base runtime download failed' }
+          gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY --dir sdk --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+          if ($LASTEXITCODE -ne 0) { throw 'SDK download failed' }
+          foreach ($checksum in Get-ChildItem base/*.sha256,sdk/*.sha256) {
+            $parts = (Get-Content $checksum.FullName) -split '\s+'
+            $file = Join-Path $checksum.DirectoryName $parts[1]
+            if ((Get-FileHash $file -Algorithm SHA256).Hash.ToLower() -ne $parts[0]) { throw "Checksum mismatch: $file" }
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = (Get-ChildItem base/*-Sources.zip).FullName
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
+          try { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz'), "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true) } finally { $zip.Dispose() }
+          Expand-Archive (Get-ChildItem sdk/*-Sources.zip).FullName deps/base
+          foreach ($name in @('bullet','fteqw','imgui')) { Expand-Archive "deps/base/sources/$name-source.zip" "deps/$name" }
+      - name: Rebuild and test the complete audio helper
+        shell: msys2 {0}
         run: |
-          mkdir base deps
-          gh release download "$BASE_TAG" --repo "$GITHUB_REPOSITORY" --dir base --pattern '*-Linux-x64.tar.gz' --pattern '*-Linux-x64.tar.gz.sha256' --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
-          (cd base && sha256sum -c ./*.sha256)
-          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
-          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
-      - name: Build pinned Bullet libraries and editor module
+          scripts/build-audio.sh "$PWD/audio-deps"
+          scripts/test-audio-core.sh "$PWD/audio-qa" "$(cygpath -m "$PWD/tools/audio/ffmpeg.exe")"
+      - name: Build native editor and test the profile importer
+        shell: msys2 {0}
         run: |
-          cmake -S deps/bullet -B deps/bullet-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
-          cmake --build deps/bullet-build -j2 --target BulletDynamics BulletCollision LinearMath
-          g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
-          g++ -std=c++17 -O2 -Ideps/imgui tests/test-modern-light.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/test-modern-light
-          deps/test-modern-light
+          cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
+          cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
+          g++ -std=c++17 -O2 tests/trenchbroom-profiles.cpp -o audio-qa/profile-test.exe
+          audio-qa/profile-test.exe tests/fixtures/CompilationProfiles-cpu-count.cfg
+          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
       - name: Package runtime and complete corresponding sources
+        shell: msys2 {0}
         run: |
-          python3 scripts/package-linux-ui-update.py --base-runtime base/*-Linux-x64.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --version "$VERSION" --output out/release
+          python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --audio-dir tools/audio --version "$VERSION" --output out/release
           (cd out/release && sha256sum -c ./*.sha256)
-      - name: Test the actual packaged runtime
+      - name: Upload validated packages to the draft release
+        shell: pwsh
         run: |
-          mkdir qa
-          tar -xzf out/release/*-Linux-x64.tar.gz -C qa
-          cp tests/setup61.cfg qa/ReyondBroom-Linux-x64/ftebroom/
-          printf 'exec ftebroom.cfg\nset ftebroom_skip_setup 1\nin 7 ftebroom_test_desktop modern124dark\nin 10 screenshot reyon2-dark.png\nin 13 quit force\n' > qa/ReyondBroom-Linux-x64/ftebroom/release-dark.cfg
-          cd qa/ReyondBroom-Linux-x64
-          xvfb-run -a -s '-screen 0 1920x1080x24' env LIBGL_ALWAYS_SOFTWARE=1 timeout 80s ./fteqw-gl64 -ftebroom-child-processes -nohome -noupdates -nosound -window -width 1280 -height 800 -condebug +exec setup61.cfg > setup.log 2>&1
-          for check in setup61_game_choice setup_recommended_libre_default_without_mount setup61_libre_choice setup61_own_choice setup_recommended_manual_choice_retained setup_recommended_existing_mod_retained setup61_wizard_close setup61_resources_open setup61_resources_stays_closed; do grep "DESKTOP_PASS $check" setup.log; done
-          ! grep -E 'DESKTOP_FAIL|CSQC_Abort' setup.log
-          xvfb-run -a -s '-screen 0 1920x1080x24' env LIBGL_ALWAYS_SOFTWARE=1 timeout 80s ./fteqw-gl64 -ftebroom-child-processes -nohome -noupdates -nosound -window -width 1920 -height 1080 -condebug +exec release-dark.cfg > dark.log 2>&1
-          for check in modern124_dark_workspace_gutter modern124_integer_snap_icon_toggles; do grep "DESKTOP_PASS $check" dark.log; done
-          ! grep -E 'DESKTOP_FAIL|CSQC_Abort' dark.log
-      - name: Upload validated archives and screenshots to the draft release
-        run: |
-          test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
-          gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 qa/ReyondBroom-Linux-x64/ftebroom/reyon2-dark.png qa/ReyondBroom-Linux-x64/ftebroom/setup61-games.png qa/ReyondBroom-Linux-x64/ftebroom/setup61-mods.png --clobber
+          if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
+          gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: release-qa
+          name: qa-Windows-x64
           path: |
-            qa/**/*.log
-            qa/**/*.png
+            audio-deps/ffmpeg-8.0.1/ffbuild/config.log
+            audio-deps/lame-source/config.log

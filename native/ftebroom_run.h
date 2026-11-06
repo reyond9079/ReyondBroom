@@ -8,9 +8,8 @@
 #include <unistd.h>
 extern char** environ;
 #endif
-enum RunTaskFlags {RunCopyToDirectory=1,RunAllowNonzero=2,RunLaunchEngine=4,RunAllowLaunchFailure=8};
-struct RunTask {int kind=0;std::string source,destination;bool enabled=true;int flags=0;};
-struct RunProfile {std::string name="New profile",work="${MAP_DIR_PATH}";bool launch=false;std::vector<RunTask> tasks;};
+#include "ftebroom_run_profile.h"
+#include "ftebroom_run_variables.h"
 static std::vector<RunProfile> runProfiles;
 static std::map<std::string,std::string> runVariables;
 static RunProfile runningProfile,lastRunProfile;
@@ -137,18 +136,7 @@ static bool runSaveProfiles()
 }
 static std::string runExpand(const std::string& text)
 {
-  std::string out;size_t cursor=0;
-  while(cursor<text.size())
-  {
-    auto begin=text.find("${",cursor);if(begin==std::string::npos){out+=text.substr(cursor);break;}
-    out+=text.substr(cursor,begin-cursor);auto end=text.find('}',begin+2);
-    if(end==std::string::npos)throw std::runtime_error("Unclosed profile variable.");
-    auto name=text.substr(begin+2,end-begin-2);auto found=activeVariables.find(name);
-    if(found==activeVariables.end())throw std::runtime_error("Unknown profile variable: "+name);
-    if(found->second.empty() && (name=="TB_GAME_ROOT" || name=="TB_ACTIVE_MOD"))
-      throw std::runtime_error("Configure the active game or mod folder in Game / resources.");
-    out+=found->second;cursor=end+1;
-  }
+  auto out=ftebroom::expandRunVariables(text,activeVariables);
   // Preserve saved launch profiles from distributions with the engine at root.
 #ifdef _WIN32
   auto legacy=documentPath("ftebroom.cfg").parent_path().parent_path()/"fteqw64.exe";
@@ -468,7 +456,7 @@ static void runPanel()
     if(ImGui::CollapsingHeader("Tool paths and variables")){
       for(auto& variable:runVariables)runText(variable.first.c_str(),variable.second);
       static char name[128]={};ImGui::InputText("New variable",name,sizeof name);ImGui::SameLine();if(ImGui::Button("Add variable")&&*name){runVariables[name]="";name[0]=0;}
-      ImGui::TextWrapped("Variables: ${MAP_BASE_NAME}, ${MAP_FULL_NAME}, ${MAP_DIR_PATH}, ${GAME_DIR_PATH}, ${MODS}, ${CPU_COUNT}, ${WORK_DIR_PATH}, ${APP_DIR_PATH}. Quote path variables in arguments.");}
+      ImGui::TextWrapped("Variables: ${MAP_BASE_NAME}, ${MAP_FULL_NAME}, ${MAP_DIR_PATH}, ${GAME_DIR_PATH}, ${MODS}, ${CPU_COUNT}, ${CPU_COUNT - 1} (at least 1), ${WORK_DIR_PATH}, ${APP_DIR_PATH}. Quote path variables in arguments.");}
     if(ImGui::Button("Run profile")&&runSaveProfiles())runBegin(profile);ImGui::EndDisabled();
     ImGui::SameLine();ImGui::BeginDisabled(!runActive);if(ImGui::Button("Stop"))runStop();ImGui::EndDisabled();
     ImGui::SameLine();if(ImGui::Button("Copy log"))ImGui::SetClipboardText(runLog.c_str());
@@ -614,4 +602,25 @@ static void testRunProfiles()
     expect(!runActive&&!runHadError&&runStep==3&&runLog.find("continuing as configured")!=std::string::npos&&
            std::filesystem::is_regular_file(root/"new maps/source.txt"),"trenchbroom_imported_pipeline_ran");
   }
+  else if(stage==12){runLoad();runWindow=true;}
+  else if(stage==10){
+    auto imported=runReadTrenchBroom(documentPath("CompilationProfiles-regression.cfg"));
+    expect(imported.profiles.size()==5&&imported.notices.empty()&&imported.missingVariables.empty(),"customer_five_profiles_imported");
+    bool tasks=imported.profiles.size()==5;for(const auto& profile:imported.profiles)tasks&=profile.tasks.size()==14;
+    expect(tasks,"customer_seventy_tasks_preserved");
+    runLoad();auto count=runProfiles.size();bool saved=runSaveImported(imported);
+    expect(saved&&runProfiles.size()==count+5,"customer_profiles_saved");
+    runWindow=true;
+  }
+  else if(stage==11){
+    runLoad();int found=0;bool arguments=true;
+    auto old=activeVariables;activeVariables={{"CPU_COUNT","8"},{"MAP_BASE_NAME","example"}};
+    for(const auto& profile:runProfiles)if(profile.name=="VKQuake_Full"||profile.name=="VK-Quake_Disturb (schnell)"||profile.name=="VKQuake_Full_with_Music"||profile.name=="IronWail_Full"||profile.name=="IronWail_Disturb (schnell)"){
+      found++;arguments&=profile.tasks.size()==14;
+      for(const auto& task:profile.tasks)if(task.destination.find("${CPU_COUNT - 1}")!=std::string::npos)arguments&=runExpand(task.destination).find("-threads 7 ")==0;
+    }
+    expect(found==5,"customer_profiles_restored");expect(arguments,"customer_expression_expanded_after_restore");
+    activeVariables["CPU_COUNT"]="1";expect(runExpand("${CPU_COUNT - 1}")=="1","customer_single_core_uses_one_thread");activeVariables=old;
+  }
+
 }

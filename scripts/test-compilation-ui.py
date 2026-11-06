@@ -81,9 +81,39 @@ if os.name=='nt':
  # Hosted desktops can accept mouse input while dropping globally injected
  # keyboard events. Send native window messages, with scan codes and shared
  # keyboard state, through FTE's real WM_KEYDOWN/UP handler instead.
+ user.SendMessageW.argtypes=[wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM]
+ user.SendMessageW.restype=wintypes.LPARAM
+ user.AttachThreadInput.argtypes=[wintypes.DWORD,wintypes.DWORD,wintypes.BOOL]
+ user.MapVirtualKeyW.argtypes=[wintypes.UINT,wintypes.UINT]
+ user.VkKeyScanW.argtypes=[wintypes.WCHAR];user.VkKeyScanW.restype=ctypes.c_short
  def strokes(text):
+  from pywinauto import keyboard
   window_diagnostics()
-  Desktop(backend='win32').window(handle=hwnd).send_keystrokes(text)
+  target=user.GetWindowThreadProcessId(hwnd,None);current=ctypes.windll.kernel32.GetCurrentThreadId()
+  assert user.AttachThreadInput(current,target,True),'Cannot share target keyboard state'
+  state=(ctypes.c_ubyte*256)();assert user.GetKeyboardState(state)
+  initial=bytes(state);stack=[]
+  try:
+   for action in keyboard.parse_keys(text,with_spaces=True,with_tabs=True,with_newlines=True):
+    vk,scan,flags=action.get_key_info();modifiers=0
+    if flags&4:
+     mapped=user.VkKeyScanW(chr(scan));assert mapped!=-1,'Unsupported keyboard character'
+     vk=mapped&255;modifiers=(mapped>>8)&255;scan=user.MapVirtualKeyW(vk,0)
+    if action.down:
+     stack.append(bytes(state));state[vk]|=128
+     for mask,modifier in [(1,16),(2,17),(4,18)]:
+      if modifiers&mask:state[modifier]|=128
+     assert user.SetKeyboardState(state)
+     context=bool(state[18]&128)
+     # ToUnicode runs inside FTE's window handler. Synchronous delivery keeps
+     # this character's Shift/Ctrl state alive until translation has finished.
+     user.SendMessageW(hwnd,0x104 if context else 0x100,vk,1|(scan<<16)|((flags&1)<<24)|(int(context)<<29))
+    if action.up:
+     context=bool(state[18]&128)
+     user.SendMessageW(hwnd,0x105 if context else 0x101,vk,1|(scan<<16)|((flags&1)<<24)|(int(context)<<29)|(3<<30))
+     state=(ctypes.c_ubyte*256).from_buffer_copy(stack.pop());assert user.SetKeyboardState(state)
+  finally:
+   user.SetKeyboardState((ctypes.c_ubyte*256).from_buffer_copy(initial));user.AttachThreadInput(current,target,False)
   # A software-rendered frame may outlast the fixed input pauses. Wait for
   # two subsequent UI snapshots so queued messages and ImGui edits are both
   # observed before the next operation/assertion.

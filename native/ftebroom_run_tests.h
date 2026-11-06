@@ -100,6 +100,16 @@ static void testRunParity(int stage){
  else if(stage==91)expect(!runActive&&runHadError&&runStep==0,"crash_not_masked_by_nonzero_policy");
  else if(stage==92)finishProfile({{1,probe,"exit 7"},{1,probe,"must-not-run"}});
  else if(stage==93)expect(!runActive&&runHadError&&runStep==0,"strict_nonzero_error_stops");
+ else if(stage==94)finishProfile({{1,probe,"breakpoint",true,RunAllowNonzero},{1,probe,"must-not-run"}});
+ else if(stage==95)expect(!runActive&&runHadError&&runStep==0,"breakpoint_crash_not_masked_by_nonzero_policy");
+ else if(stage==96)finishProfile({{1,probe,"exit 62097",true,RunAllowNonzero},{1,probe,"after-exit"}});
+ else if(stage==97){
+#ifdef _WIN32
+  expect(!runActive&&runHadError&&runStep==0,"reference_reserved_termination_code_stops");
+#else
+  expect(!runActive&&!runHadError&&runStep==2,"linux_normal_exit_is_not_windows_termination_status");
+#endif
+ }
 
  else if(stage==100){
   runLoad();auto folder=documentPath("maps/strict-compiler");

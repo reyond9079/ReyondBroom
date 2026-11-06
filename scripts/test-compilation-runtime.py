@@ -51,7 +51,7 @@ for case in ['run', 'trenchbroom-native', 'trenchbroom-restore', 'compilation-pa
     print(case, 'exit', code, 'passed', len(passes), 'failed', fails, flush=True)
     if code or fails:
         raise RuntimeError(case+' failed; see '+str(log))
-    expected = {'run': 15, 'trenchbroom-native': 3, 'trenchbroom-restore': 3, 'compilation-parity-native': 30}[case]
+    expected = {'run': 15, 'trenchbroom-native': 3, 'trenchbroom-restore': 3, 'compilation-parity-native': 32}[case]
     if len(passes) < expected:
         raise RuntimeError(f'{case}: missing checks ({len(passes)} < {expected})')
 # Exercise migration and its second-start idempotence with actual saved legacy records.

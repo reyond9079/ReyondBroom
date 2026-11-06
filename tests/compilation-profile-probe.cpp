@@ -14,11 +14,11 @@
 #include <windows.h>
 #endif
 int probeMain(const std::vector<std::string>& args){
- if(args.size()>1&&args[1]=="crash"){
+ if(args.size()>1&&(args[1]=="crash"||args[1]=="breakpoint")){
 #ifdef _WIN32
-  SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);RaiseException(EXCEPTION_ACCESS_VIOLATION,EXCEPTION_NONCONTINUABLE,0,nullptr);
+  SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);RaiseException(args[1]=="breakpoint"?EXCEPTION_BREAKPOINT:EXCEPTION_ACCESS_VIOLATION,EXCEPTION_NONCONTINUABLE,0,nullptr);
 #else
-  rlimit limit{0,0};setrlimit(RLIMIT_CORE,&limit);std::raise(SIGSEGV);
+  rlimit limit{0,0};setrlimit(RLIMIT_CORE,&limit);std::raise(args[1]=="breakpoint"?SIGTRAP:SIGSEGV);
 #endif
   return 255;
  }

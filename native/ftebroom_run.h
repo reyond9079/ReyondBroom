@@ -418,7 +418,9 @@ static void runTick()
       CloseHandle(runPipe);runPipe=nullptr;if(runInput){CloseHandle(runInput);runInput=nullptr;}if(runJob){CloseHandle(runJob);runJob=nullptr;}
       if(code){
         auto message="Tool exited with code "+std::to_string(code);
-        if((code>=0xC0000000UL&&code<0xD0000000UL)||!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error(message);
+        // Match the reference process status mapping, including breakpoint /
+        // guard-page exceptions and its reserved forced-termination code.
+        if(code==0xf291UL||(code>=0x80000000UL&&code<0xD0000000UL)||!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error(message);
         runAppend(message+"; continuing as configured.\n");
       }
       if(runStageHook)runStageHook();

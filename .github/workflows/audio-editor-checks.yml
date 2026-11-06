@@ -69,6 +69,8 @@ jobs:
           name: audio-windows-qa
           path: |
             audio-qa/
+            audio-deps/ffmpeg-8.0.1/ffbuild/config.log
+            audio-deps/lame-source/config.log
             tools/audio/ffmpeg.exe
             tools/audio/*LICENSE*
             tools/audio/*LGPL*

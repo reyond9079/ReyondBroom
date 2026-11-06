@@ -28,7 +28,7 @@ PKG_CONFIG_PATH="$PWD/../prefix/lib/pkgconfig" ./configure \
  --enable-encoder=pcm_s16le,pcm_s24le,pcm_f32le,vorbis,flac,libmp3lame --enable-libmp3lame \
  --enable-filter=aresample,volume,atrim,asetpts,asetrate,aformat,anull,atempo,loudnorm,afftdn,highpass,lowpass,acompressor,aecho,tremolo \
  --enable-parser=mpegaudio,flac,vorbis \
- --extra-cflags="-I$PWD/../prefix/include" --extra-ldflags="-static -L$PWD/../prefix/lib"
+ --extra-cflags="-I$PWD/../prefix/include" --extra-ldflags="-static -L$PWD/../prefix/lib" || { tail -n 100 ffbuild/config.log; exit 1; }
 mingw32-make -j8 MAKE=mingw32-make SHELL=C:/msys64/usr/bin/sh.exe
 cp ffmpeg.exe "$destination/ffmpeg.exe"
 cp COPYING.LGPLv2.1 "$destination/FFmpeg-LGPL-2.1.txt"

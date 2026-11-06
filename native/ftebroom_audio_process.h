@@ -339,8 +339,18 @@ inline Prepared prepareClip(const fs::path &exe, const Clip &c,
     if (c.pitchLinked)
       filters.push_back("asetrate=" + number(rate * c.speed) +
                         ",aresample=" + std::to_string(rate));
-    else
-      filters.push_back("atempo=" + number(c.speed));
+    else {
+      double tempo = c.speed;
+      while (tempo < .5) {
+        filters.push_back("atempo=0.5");
+        tempo *= 2;
+      }
+      while (tempo > 2) {
+        filters.push_back("atempo=2");
+        tempo /= 2;
+      }
+      filters.push_back("atempo=" + number(tempo));
+    }
   }
   if (!c.fx.bypass) {
     if (c.fx.denoise)

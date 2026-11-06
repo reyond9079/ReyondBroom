@@ -266,7 +266,12 @@ static void soundExecute(const std::string &id) {
     if (id == "timeline.zoomIn" || id == "timeline.zoomOut" ||
         id == "timeline.fit") {
       if (id == "timeline.fit") {
-        s.zoom = 1;
+        s.zoom = p.duration() > 0
+                     ? std::clamp(
+                           float(std::max(30., double(p.duration()) / p.rate) /
+                                 std::max(.03, double(p.duration()) / p.rate)),
+                           .25f, 1000.f)
+                     : 1;
         s.viewStart = 0;
       } else
         s.zoom = std::clamp(s.zoom * (id == "timeline.zoomIn" ? 1.25f : .8f),

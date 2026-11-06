@@ -103,6 +103,11 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     ImGui::SetWindowFocus("Sound editor");
     frame();
     s.focused = s.timelineFocused = true;
+    soundBindings();
+    bool catalog = s.bindings.size() == 71;
+    for (auto &binding : s.bindings)
+      catalog &= soundChord(binding.chord).valid;
+    expect(catalog, "audio4_all_approved_bindings_resolve");
     auto before = rbAudio::serialize(p);
     auto previous = s.cursor;
     s.cursor = 4 * p.rate;

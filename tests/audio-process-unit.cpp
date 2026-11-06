@@ -60,6 +60,13 @@ int main(int argc, char **argv) {
   p.clip(id)->pitchLinked = false;
   m = prepare(exe, p);
   assert(std::abs(frequency(*m.prepared.at(id).pcm, 44100) - 440) < 3);
+  for (float speed : {.25f, 4.f}) {
+    p.clip(id)->speed = speed;
+    m = prepare(exe, p);
+    assert(std::abs(frequency(*m.prepared.at(id).pcm, 44100) - 440) < 4);
+    assert(m.prepared.at(id).pcm->size() ==
+           size_t(std::llround(data->size() / speed)));
+  }
   p.clip(id)->speed = 1;
   p.clip(id)->fx.normalize = true;
   m = prepare(exe, p);

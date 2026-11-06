@@ -47,7 +47,11 @@ int main(int argc,char** argv){
     if(contrast(p.ink,p.panel)<7||contrast(p.secondary,p.panel)<4.5||
        contrast(p.navText,p.nav)<7||contrast(p.focus,p.elevated)<4.5||
        contrast(ModernChrome::color(0xFFFFFF),p.action)<4.5)return 4;
-    if(luminance(p.workspace)>=luminance(p.panel)||luminance(p.nav)>=luminance(p.panel))return 9;
+    if(luminance(p.workspace)>=luminance(p.panel))return 9;
+    if(theme==0) {
+      if(luminance(p.nav)<=luminance(p.panel)||contrast(p.navText,p.navTop)<7||
+         contrast(p.navText,p.navActive)<4.5||contrast(p.navMuted,p.nav)<4.5)return 9;
+    } else if(luminance(p.nav)>=luminance(p.panel))return 9;
     auto before=signature();int stack=ImGui::GetCurrentContext()->ColorStack.Size;
     uiToolStripBegin();if(ImGui::GetCurrentContext()->ColorStack.Size!=stack+15)return 5;uiToolStripEnd();
     if(signature()!=before||ImGui::GetCurrentContext()->ColorStack.Size!=stack)return 6;

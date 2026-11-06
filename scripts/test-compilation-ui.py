@@ -138,10 +138,11 @@ def paste(text):
   kernel.GlobalAlloc.argtypes=[wintypes.UINT,ctypes.c_size_t];kernel.GlobalAlloc.restype=wintypes.HANDLE
   kernel.GlobalLock.argtypes=[wintypes.HANDLE];kernel.GlobalLock.restype=ctypes.c_void_p
   kernel.GlobalUnlock.argtypes=[wintypes.HANDLE]
+  user.OpenClipboard.argtypes=[wintypes.HWND]
   user.SetClipboardData.argtypes=[wintypes.UINT,wintypes.HANDLE];user.SetClipboardData.restype=wintypes.HANDLE
   payload=(text+'\0').encode('utf-16-le');handle=kernel.GlobalAlloc(2,len(payload));assert handle
   pointer=kernel.GlobalLock(handle);assert pointer;ctypes.memmove(pointer,payload,len(payload));kernel.GlobalUnlock(handle)
-  wait_for(lambda:user.OpenClipboard(None))
+  wait_for(lambda:user.OpenClipboard(hwnd))
   try:user.EmptyClipboard();assert user.SetClipboardData(13,handle)
   finally:user.CloseClipboard()
   chord(86,[17])

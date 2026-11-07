@@ -45,7 +45,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Quercus robur",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -73,7 +76,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Quercus suber",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "evergreen"
       ]
     },
     {
@@ -105,7 +111,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Betula pendula",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -137,7 +146,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Betula papyrifera",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -163,7 +175,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Acer campestre",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -191,7 +206,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Acer palmatum",
         "tree",
-        "woodland"
+        "woodland",
+        "medium",
+        "umbrella",
+        "deciduous"
       ]
     },
     {
@@ -219,7 +237,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Salix babylonica",
         "tree",
-        "woodland"
+        "wetland",
+        "large",
+        "weeping",
+        "deciduous"
       ]
     },
     {
@@ -246,7 +267,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Salix alba",
         "tree",
-        "woodland"
+        "wetland",
+        "large",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -273,7 +297,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Populus nigra italica",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "columnar",
+        "deciduous"
       ]
     },
     {
@@ -299,7 +326,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Populus tremula",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -325,7 +355,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Fagus sylvatica",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -357,7 +390,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Tilia cordata",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -385,7 +421,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Fraxinus excelsior",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -411,7 +451,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Ulmus procera",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -437,7 +480,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Platanus acerifolia",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -465,7 +511,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Aesculus hippocastanum",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -492,7 +542,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Juglans regia",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -517,7 +571,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Alnus glutinosa",
         "tree",
-        "woodland"
+        "wetland",
+        "large",
+        "pyramidal",
+        "deciduous"
       ]
     },
     {
@@ -543,7 +600,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Sorbus aucuparia",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -571,7 +632,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Malus domestica",
         "tree",
-        "woodland"
+        "woodland",
+        "medium",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -598,7 +662,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Prunus avium",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -627,7 +694,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Magnolia grandiflora",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "evergreen"
       ]
     },
     {
@@ -657,7 +727,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Adansonia digitata",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "umbrella",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -686,7 +760,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Vachellia tortilis",
         "tree",
-        "woodland"
+        "savanna",
+        "large",
+        "umbrella",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -717,7 +795,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Pinus sylvestris",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "umbrella",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -743,7 +825,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Pinus pinaster",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -769,7 +855,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Pinus sibirica",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -801,7 +891,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Picea abies",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -833,7 +927,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Picea pungens",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -860,7 +958,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Abies alba",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -887,7 +989,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Larix decidua",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles"
       ]
     },
     {
@@ -914,7 +1019,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Cedrus libani",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "layered",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -940,7 +1049,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Cupressus sempervirens",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "columnar",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -967,7 +1080,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Juniperus excelsa",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -993,7 +1110,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Sequoia sempervirens",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -1020,7 +1141,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Araucaria araucana",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -1048,7 +1173,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Buxus sempervirens",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "spreading",
+        "evergreen"
       ]
     },
     {
@@ -1077,7 +1205,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Carpinus betulus",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "columnar",
+        "deciduous"
       ]
     },
     {
@@ -1104,7 +1235,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Crataegus monogyna",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -1138,7 +1272,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Rosa canina",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -1178,7 +1316,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Syringa vulgaris",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -1211,7 +1352,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Hydrangea macrophylla",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -1245,7 +1389,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Rhododendron ponticum",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "spreading",
+        "evergreen"
       ]
     },
     {
@@ -1279,7 +1426,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Calluna vulgaris",
         "shrub",
-        "garden"
+        "garden",
+        "small",
+        "pyramidal",
+        "evergreen"
       ]
     },
     {
@@ -1308,7 +1458,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Viburnum opulus",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -1336,7 +1489,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Ribes nigrum",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -1364,7 +1520,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Ribes uva-crispa",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -1392,7 +1551,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Rubus fruticosus",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "weeping",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -1420,7 +1583,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Juniperus horizontalis",
         "shrub",
-        "garden"
+        "garden",
+        "small",
+        "umbrella",
+        "evergreen"
       ]
     },
     {
@@ -1448,7 +1614,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Berberis vulgaris",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -1472,7 +1641,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Poa pratensis",
         "grass",
-        "garden"
+        "meadow",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1496,7 +1667,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Festuca rubra",
         "grass",
-        "garden"
+        "meadow",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1520,7 +1693,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Festuca glauca",
         "grass",
-        "garden"
+        "meadow",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1544,7 +1719,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Stipa pennata",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1568,7 +1745,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Miscanthus sinensis",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1592,7 +1771,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Cortaderia selloana",
         "grass",
-        "garden"
+        "meadow",
+        "large",
+        "clumping"
       ]
     },
     {
@@ -1616,7 +1797,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Carex cespitosa",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1640,7 +1823,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Deschampsia cespitosa",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1664,7 +1849,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Alopecurus pratensis",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1688,7 +1875,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Elymus repens",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1712,7 +1901,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Secale cereale",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1736,7 +1927,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Stipa capillata",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1760,7 +1953,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Pteridium aquilinum",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1784,7 +1979,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Matteuccia struthiopteris",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1808,7 +2005,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Dryopteris filix-mas",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1832,7 +2031,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Athyrium filix-femina",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1856,7 +2057,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Adiantum capillus-veneris",
         "fern",
-        "woodland"
+        "woodland",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1880,7 +2083,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Asplenium nidus",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -1904,7 +2110,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Polypodium vulgare",
         "fern",
-        "woodland"
+        "woodland",
+        "small",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -1928,7 +2137,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Dicksonia antarctica",
         "fern",
-        "woodland"
+        "woodland",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -1959,7 +2171,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Leucanthemum vulgare",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -1990,7 +2204,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Helianthus annuus",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2021,7 +2237,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Rosa gallica",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering",
+        "compound leaves"
       ]
     },
     {
@@ -2052,7 +2271,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Papaver rhoeas",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2083,7 +2304,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Tulipa gesneriana",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering"
       ]
     },
     {
@@ -2114,7 +2337,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Narcissus pseudonarcissus",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering"
       ]
     },
     {
@@ -2145,7 +2370,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Iris germanica",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2176,7 +2403,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Lilium candidum",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2207,7 +2436,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Lavandula angustifolia",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2238,7 +2469,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Lupinus polyphyllus",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering",
+        "compound leaves"
       ]
     },
     {
@@ -2269,7 +2503,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Digitalis purpurea",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2300,7 +2536,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Campanula persicifolia",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2331,7 +2569,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Trifolium pratense",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering",
+        "compound leaves"
       ]
     },
     {
@@ -2362,7 +2603,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Taraxacum officinale",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering"
       ]
     },
     {
@@ -2393,7 +2636,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Amanita muscaria",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2424,7 +2668,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Boletus edulis",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2455,7 +2700,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Pleurotus ostreatus",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2486,7 +2732,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Cantharellus cibarius",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2517,7 +2764,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Coprinus comatus",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2548,7 +2796,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Armillaria mellea",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2579,7 +2828,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Fomes fomentarius",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2610,7 +2860,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Morchella esculenta",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2641,7 +2892,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Legacy fantasy variety",
         "mushroom",
-        "garden"
+        "woodland",
+        "large"
       ]
     },
     {
@@ -2671,7 +2923,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Carnegiea gigantea",
         "cactus",
-        "dryland"
+        "dryland",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2701,7 +2955,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Echinocactus grusonii",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2731,7 +2987,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Opuntia ficus-indica",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2761,7 +3019,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Cereus repandus",
         "cactus",
-        "dryland"
+        "dryland",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2791,7 +3051,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Agave tequilana",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2821,7 +3083,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Aloe barbadensis",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2851,7 +3115,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Echeveria elegans",
         "cactus",
-        "dryland"
+        "dryland",
+        "small",
+        "evergreen"
       ]
     },
     {
@@ -2881,7 +3147,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Yucca filamentosa",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2908,7 +3176,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Phoenix dactylifera",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2935,7 +3205,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Cocos nucifera",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2962,7 +3234,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Washingtonia robusta",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2989,7 +3263,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Chamaerops humilis",
         "palm",
-        "tropical"
+        "tropical",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -3016,7 +3292,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Roystonea regia",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -3043,7 +3321,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Rhapis excelsa",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -3070,7 +3350,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Hedera helix",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -3097,7 +3379,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Parthenocissus quinquefolia",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "compound leaves"
       ]
     },
     {
@@ -3124,7 +3408,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Vitis vinifera",
         "vine",
-        "garden"
+        "garden",
+        "large"
       ]
     },
     {
@@ -3151,7 +3436,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Wisteria sinensis",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "compound leaves"
       ]
     },
     {
@@ -3178,7 +3465,8 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Humulus lupulus",
         "vine",
-        "garden"
+        "garden",
+        "large"
       ]
     },
     {
@@ -3205,7 +3493,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Clematis vitalba",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "compound leaves"
       ]
     },
     {
@@ -3235,7 +3525,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Phyllostachys aurea",
         "bamboo",
-        "garden"
+        "garden",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3265,7 +3558,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Phyllostachys nigra",
         "bamboo",
-        "garden"
+        "garden",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3295,7 +3591,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Pleioblastus pygmaeus",
         "bamboo",
-        "garden"
+        "garden",
+        "medium",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3325,7 +3624,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Dendrocalamus giganteus",
         "bamboo",
-        "garden"
+        "garden",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3351,7 +3653,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Phragmites australis",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -3377,7 +3681,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Typha latifolia",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -3403,7 +3709,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Schoenoplectus lacustris",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -3429,7 +3737,9 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "tags": [
         "Equisetum arvense",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     }
   ],

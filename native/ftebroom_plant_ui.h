@@ -155,7 +155,7 @@ static void plantLibrary() {
   std::string search=entityLower(s.search.data());
   for(auto& d:s.library) {
     if(s.category>=0&&int(d.family)!=s.category&&!(s.category==int(plants::Family::Custom)&&s.userFiles.count(d.preset)))continue;
-    std::string searchable=d.name+" "+d.species;for(auto& tag:d.tags)searchable+=" "+tag;
+    std::string searchable=d.name+" "+d.species+" "+plants::familyName(d.family);for(auto& tag:d.tags)searchable+=" "+tag;
     if(!search.empty()&&entityLower(searchable).find(search)==std::string::npos)continue;
     if(s.filter==1&&std::find(s.favorites.begin(),s.favorites.end(),d.preset)==s.favorites.end())continue;
     if(s.filter==2&&std::find(s.recent.begin(),s.recent.end(),d.preset)==s.recent.end())continue;
@@ -166,6 +166,7 @@ static void plantLibrary() {
     if(thumb)ImGui::GetWindowDrawList()->AddImage((ImTextureID)thumb,start,{start.x+52,start.y+52});
     auto color=ImGui::GetColorU32(ImGuiCol_Text);ImGui::GetWindowDrawList()->AddText({start.x+58,start.y+5},color,d.name.c_str());
     ImGui::GetWindowDrawList()->AddText({start.x+58,start.y+24},ImGui::GetColorU32(ImGuiCol_TextDisabled),s.userFiles.count(d.preset)?"User preset":plants::familyName(d.family));
+    if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)){ImGui::BeginTooltip();ImGui::PushTextWrapPos(ImGui::GetFontSize()*22);std::string tags;for(auto& tag:d.tags){if(!tags.empty())tags+=", ";tags+=tag;}ImGui::TextWrapped("%s",tags.c_str());ImGui::PopTextWrapPos();ImGui::EndTooltip();}
     if(selected)plantSelect(d);ImGui::PopID();
   }ImGui::EndChild();
   bool favorite=std::find(s.favorites.begin(),s.favorites.end(),s.doc.preset)!=s.favorites.end();

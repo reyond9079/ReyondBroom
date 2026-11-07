@@ -59,7 +59,7 @@ after opening the editor does not move the eventual object.
 
 The first **Save** writes the editable source and its MD3/material dependencies,
 then creates exactly one authoring **func_model**. Later Save / Save As update
-that entity and preserve its transforms and layer. Runtime bundles are immutable
+that entity and preserve its transforms and layer. Opening a versioned source snapshot starts an editable copy and requires Save As, preserving the original history asset. Runtime bundles are immutable
 and content-addressed, so map Undo/Redo restores the previous geometry. Deleting
 or undoing the inserted entity cancels its binding; another Save does not revive
 it. Changing map/profile cancels pending placement. Ordinary Open/Save has no
@@ -77,7 +77,7 @@ Shader lists keep existing entries. Build snapshots include their dependencies.
 | --- | --- |
 | Quake III | `func_model` in source; only the disposable q3map2 copy uses `misc_model` |
 | FTE Custom | `func_model`, using the existing model pipeline |
-| Quake 1 with FTE | Explicit **Use FTE static models for Quake 1** opt-in; the disposable copy uses FTE `misc_model` |
+| Quake 1 with FTE | Explicit **Use FTE static models for Quake 1** opt-in; the disposable copy uses FTE `misc_model` and effective uniform scale. Bake nonuniform scale into the source geometry or use a compatible custom mod; otherwise the build stops with a diagnostic. |
 | Vanilla Quake / Quake II / GoldSrc | Authoring is allowed; an explicit build diagnostic requires conversion / a compatible mod entity |
 
 Quake III baked plants use vertex lighting; FTE/Quake 1 extension models use

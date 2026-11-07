@@ -114,6 +114,7 @@ try:
     edit('Seed',137);ready();orbit(135,18)
     for lod in [0,1,2]:click('lod');click('lod/'+str(lod));record(key+'-lod'+str(lod))
     click('lod');click('lod/0');click('display');click('display/1');record(key+'-untextured');click('display');click('display/0')
+    v=live()['widgets']['viewport'];ui.move(v['x']+v['width']*.5,v['y']+v['height']*.5);ui.scroll(4);record(key+'-closeup');click('frame')
  metadata={'platform':platform.platform(),'machine':platform.machine(),'processor':platform.processor(),'build_label':os.environ.get('RB_QA_BUILD','unspecified'),'module_sha256':hashlib.sha256((root/('fteplug_ftebroom_x64.dll' if os.name=='nt' else 'fteplug_ftebroom_amd64.so')).read_bytes()).hexdigest(),'build_info':(root/'build-info.txt').read_text(errors='replace'),'screen':live()['display'],'renderer_note':'Inspect editor.log for actual renderer; software-renderer frame rates are not hardware guarantees'}
  if os.name!='nt':metadata['cpu']=next((x for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith('model name')),'unknown')
  (out/'hardware.json').write_text(json.dumps(metadata,indent=2))

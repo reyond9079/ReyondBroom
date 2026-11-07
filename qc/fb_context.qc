@@ -61,9 +61,10 @@ void fb_authoring_save()
     int epoch=stoi(argv(2)),create=stoi(argv(6)),layer=stoi(argv(8));vector origin=stov(argv(7));
     string optin=strzone(argv(9)),status="stale";float normalization=stof(argv(10));
     if(epoch==cvar("ftebroom_map_instance")){
-        fb_tool_refresh();fb_document_tick();int id=-1;
-        for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY)if(fb_nodes[n].fields["_reyondbroom_placement"]==guid)id=fb_nodes[n].id;
-        if(id<0 && !create)status="missing";
+        fb_tool_refresh();fb_document_tick();int id=-1,matches=0;
+        for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY)if(fb_nodes[n].fields["_reyondbroom_placement"]==guid){id=fb_nodes[n].id;matches++;}
+        if(matches>1 || (create && matches))status="ambiguous";
+        else if(id<0 && !create)status="missing";
         else {
             int parent=fb_organize_node(layer),valid=TRUE;
             if(parent<1 && layer)valid=FALSE;
@@ -73,15 +74,16 @@ void fb_authoring_save()
                 fb_tx_begin(id<0?"Create authoring model":"Update authoring model");
                 if(id<0){
                     id=terrain_edit(TEREDIT_ENT_ADD,"");
-                    fb_tx_entity_set(id,sprintf("\"classname\" \"func_model\"\n\"origin\" \"%g %g %g\"\n",origin_x,origin_y,origin_z),HIST_ENTITY);
+                    fb_tx_entity_set(id,sprintf("\"classname\" \"func_model\"\n\"origin\" \"%.9g %.9g %.9g\"\n",origin_x,origin_y,origin_z),HIST_ENTITY);
                     fb_organize_parent(id,parent<1?1:parent);fb_selection_clear();fb_entity_select(id,TRUE);
                 }
-                float oldNormalization=1,oldScale=1;
+                float oldNormalization=1,oldScale=1;string scaleKey="modelscale";
                 for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY && fb_nodes[n].id==id){
                     if(fb_nodes[n].fields["_reyondbroom_normalization"]!="")oldNormalization=stof(fb_nodes[n].fields["_reyondbroom_normalization"]);
                     if(fb_nodes[n].fields["modelscale"]!="")oldScale=stof(fb_nodes[n].fields["modelscale"]);
+                    if(fb_nodes[n].fields["scale"]!=""){oldScale=stof(fb_nodes[n].fields["scale"]);scaleKey="scale";}
                 }
-                if(normalization>0 && oldNormalization>0){fb_tx_set_key(id,"modelscale",ftos(oldScale*normalization/oldNormalization),HIST_ENTITY);fb_tx_set_key(id,"_reyondbroom_normalization",ftos(normalization),HIST_ENTITY);}
+                if(normalization>0 && oldNormalization>0){fb_tx_set_key(id,scaleKey,ftos(oldScale*normalization/oldNormalization),HIST_ENTITY);fb_tx_set_key(id,"_reyondbroom_normalization",ftos(normalization),HIST_ENTITY);}
                 fb_tx_set_key(id,"model",model,HIST_ENTITY);
                 fb_tx_set_key(id,"_reyondbroom_authoring","1",HIST_ENTITY);
                 fb_tx_set_key(id,"_reyondbroom_placement",guid,HIST_ENTITY);

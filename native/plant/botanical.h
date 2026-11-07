@@ -146,9 +146,14 @@ struct Botanical : Generator {
     size_t allowance=std::max<size_t>(100,b.budget*.31);
     auto rings=[&](Part part){return std::max(3,int(radial*(part==Part::Twigs?.35:part==Part::Secondary?.5:part==Part::Primary?.72:1.)));};
     auto steps=[&](Part part){return std::max(1,int(segments*(part==Part::Twigs?.27:part==Part::Secondary?.45:part==Part::Primary?.65:1.)));};
-    auto estimate=[&](){size_t sum=0;for(auto& span:skeleton)sum+=size_t(std::min<int>(steps(span.part),span.path.size()-1)+1)*rings(span.part)*2;return sum;};
+    auto estimate=[&](){size_t sum=0;for(auto& span:skeleton){if(span.part==Part::Twigs&&lod>0)sum+=doc.family==Family::Conifer&&lod==2?0:2;else sum+=size_t(std::min<int>(steps(span.part),span.path.size()-1)+1)*rings(span.part)*2;}return sum;};
     while(estimate()>allowance&&(segments>1||radial>3)){if(segments>2)--segments;else if(radial>3)--radial;else --segments;}
     for(auto& span:skeleton){
+      if(span.part==Part::Twigs&&lod>0){
+        if(doc.family==Family::Conifer&&lod==2)continue; // needle cards carry their shoot axis
+        auto from=span.path.front(),to=span.path.back(),axis=unit(sub(to,from));V side=unit(cross(axis,V{0,0,1}));if(length(side)<.01)side={1,0,0};side=mul(side,std::max(.02,span.radius));auto normal=unit(cross(side,axis));
+        if(b.room(2)){b.organ++;auto a=b.vertex(sub(from,side),normal,0,0,Bark),c=b.vertex(add(from,side),normal,1,0,Bark),d=b.vertex(add(to,mul(side,.12)),normal,1,1,Bark),e=b.vertex(sub(to,mul(side,.12)),normal,0,1,Bark);b.quad(a,c,d,e,Bark,Part::Twigs);}continue;
+      }
       int n=std::max(1,std::min<int>(steps(span.part),span.path.size()-1));std::vector<V> path;
       for(int i=0;i<=n;i++)path.push_back(span.path[size_t(double(i)*(span.path.size()-1)/n)]);
       b.tube(path,span.radius,span.tip,rings(span.part),Bark,span.part);
@@ -157,10 +162,11 @@ struct Botanical : Generator {
   void emitFoliage(bool needles=false) {
     // Stable spatial sampling covers the whole planned crown at all LODs.
     std::stable_sort(foliage.begin(),foliage.end(),[](auto& a,auto& b){return mix(a.id,13)<mix(b.id,13);});
-    auto capacity=(b.budget-b.mesh.faces.size())/std::max<size_t>(1,needles?(lod==2?4:8):leafCost()+2);
-    size_t count=std::min(capacity,size_t(foliage.size()*std::min(1.,phenology())));
+    auto capacity=(b.budget-b.mesh.faces.size())/std::max<size_t>(1,needles?8:leafCost()+2);
+    size_t survivors=std::min(capacity,foliage.size()),count=size_t(survivors*std::min(1.,phenology()));
+    double compensation=lod&&survivors?std::clamp(std::sqrt(double(foliage.size())/survivors)/(lod==2?1.85:1.18),1.,1.65):1.;
     for(size_t i=0;i<count;i++){
-      auto& s=foliage[i*foliage.size()/count];double size=p.leafSize*(.5+.5*p.age)*s.size*(needles?1.:1.20);
+      auto& s=foliage[i*foliage.size()/count];double size=p.leafSize*(.5+.5*p.age)*s.size*(needles?1.:1.20)*compensation;
       if(needles){Rng r(mix(s.id,doc.seed));V tilt=unit({r.range(-.65,.65),r.range(-.65,.65),1});lamina(s.p,s.aim,tilt,size,p.leafWidth,s.id,5,foliageMaterial(s.id,true));continue;}
       V end=add(s.p,mul(s.aim,size*p.petiole));
       V side=unit(cross(s.aim,V{0,0,1}));if(length(side)<.01)side={1,0,0};side=mul(side,std::max(.015,size*.005));

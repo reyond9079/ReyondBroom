@@ -177,8 +177,19 @@ def emit():
     for name,count in minimum.items():assert sum(r['category']==name for r in ROWS)>=count
     for row in ROWS:
         if row['category'] in ('tree','shrub','fern','palm','bamboo','vine','riparian'):row['parameters'].setdefault('foliageMode',1)
-        row['tags']=[row['scientificName'],row['category'],
-                     'wetland' if row['category']=='riparian' else 'tropical' if row['category']=='palm' else 'dryland' if row['category']=='cactus' else 'woodland' if row['category'] in ('tree','conifer','fern') else 'garden']
+        category=row['category'];traits=row['parameters'];habitat='wetland' if category=='riparian' else 'tropical' if category=='palm' else 'dryland' if category=='cactus' else 'meadow' if category=='grass' else 'woodland' if category in ('tree','conifer','fern','mushroom') else 'garden'
+        if row['id'] in ('willow','white-willow','alder'):habitat='wetland'
+        if row['id'] in ('umbrella-acacia','acacia'):habitat='savanna'
+        tags=[row['scientificName'],category,habitat,'small' if traits['height']<=40 else 'medium' if traits['height']<=140 else 'large']
+        if category in ('tree','conifer','shrub'):
+            tags.append(['spreading','oval','columnar','weeping','umbrella','pyramidal','vase','multiple leaders','layered'][traits.get('crown',0)])
+        if category in ('grass','fern','bamboo','riparian'):tags.append('clumping')
+        if category=='flower':tags.append('flowering')
+        if traits.get('leafShape')==7:tags.append('compound leaves')
+        if category=='conifer':tags.append('needles')
+        if traits.get('evergreen')==1:tags.append('evergreen')
+        elif category in ('tree','shrub'):tags.append('deciduous')
+        row['tags']=tags
     document={'format':'ReyondBroomBotanicalCatalog','version':2,'generatorVersion':2,
               'license':'Original procedural descriptors; GPL-3.0-or-later', 'minimumByCategory':minimum,'presets':ROWS}
     text=json.dumps(document,ensure_ascii=False,sort_keys=True,indent=2)+'\n'

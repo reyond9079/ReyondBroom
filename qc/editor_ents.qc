@@ -507,6 +507,14 @@ void(entedit_t *nent) editor_ents_updated =
 		}
 	}
 
+    // Authoring objects share one transform convention across scene/build views.
+    if(nent->fields["_reyondbroom_authoring"]=="1"){
+        nent->scale=1;if(nent->fields["modelscale"]!="")nent->scale=stof(nent->fields["modelscale"]);
+        if(nent->fields["scale"]!="")nent->scale=stof(nent->fields["scale"]);
+        if(nent->scale==0)nent->scale=1;
+        nent->modelaxes='1 1 1';if(nent->fields["modelscale_vec"]!="")nent->modelaxes=stov(nent->fields["modelscale_vec"]);
+        if(nent->modelaxes!='1 1 1')nent->modelaxes*=nent->scale;
+    }
     // Definitions without a model must not erase the standard Quake player marker.
     string playerClass=nent->fields["classname"];
     if(!nent->modelindex && cvar("ftebroom_game_profile")==2 &&

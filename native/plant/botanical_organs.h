@@ -177,7 +177,7 @@ inline void Botanical::blossoms() {
       }
       b.tube({stem.back(),add(stem.back(),{0,0,spike})},p.radius*.4,.03,3,Bark,Part::Trunk);
     }else if(p.organ==8){
-      int florets=lod?15:30;
+      int florets=lod==2?5:lod==1?12:30;
       for(int k=0;k<florets;k++){double z=1-2*(k+.5)/florets,az=k*2.399963,span=std::sqrt(1-z*z)*p.flowerSize*.5;
         auto at=add(stem.back(),{std::cos(az)*span,std::sin(az)*span,z*p.flowerSize*.5});botanicalCorolla(*this,at,p.flowerSize*.30,mix(i,k),10);}
     }else if(p.organ==7){
@@ -267,42 +267,37 @@ inline void Botanical::succulents() {
 }
 inline void Botanical::reedsAndBamboo() {
   bool bamboo=doc.family==Family::Bamboo;
+  struct Node {V tip;int stem,index;double az,height;uint64_t id;};std::vector<Node> nodes,heads;
+  // Emit every culm first. Internode caps and early leaf sprays must never
+  // consume the last culm's budget, especially in the distant LOD.
   for(int stem=0;stem<p.clumps;stem++){
-    b.check();Rng r(mix(doc.seed,stem+69));double a=stem*2.399963,h=height*r.range(.72,1);
-    V base{std::cos(a)*height*.16,std::sin(a)*height*.16,0},last=base;
-    int nodes=p.branches;
-    for(int j=0;j<nodes;j++){
-      double t=double(j+1)/nodes;auto tip=add(base,{std::cos(a)*h*p.curvature*.13*t*t,std::sin(a)*h*p.curvature*.13*t*t,h*t});
-      auto path=arc(last,tip,0,std::max(2,count(p.segments,2)),mix(stem,j));
-      b.tube(path,p.radius*(1-t*.30),p.radius*(1-t*.34),bamboo?sides():p.organ==2?3:std::max(3,sides()-3),Bark,Part::Trunk);
-      b.lathe(tip,{{p.radius*.9,-p.radius*.2},{p.radius*1.12,0},{p.radius*.86,p.radius*.25}},std::max(4,sides()),Wood,Part::Primary);
-      double az=leafAngle(j)+a;
-      if(!bamboo&&p.organ==3){
-        for(int k=0;k<7;k++){
-          double turn=k*2*pi/7;auto end=add(tip,{std::cos(turn)*height*.17,std::sin(turn)*height*.17,height*.08});
-          b.tube({tip,end},p.radius*.18,.008,3,Leaf,Part::Leaves);
-        }
-      }else if(j>nodes/4&&(bamboo||p.organ==0)){
-        for(int side:{-1,1}){
-          for(int shoot=0;shoot<(bamboo?3:1);shoot++){
-            double turn=az+side*(.35+shoot*.36);V aim{std::cos(turn),std::sin(turn),.12+shoot*.10};auto end=add(tip,mul(aim,p.leafSize*(bamboo?1.7:.5)));
-            b.tube({tip,end},p.radius*.18,.012,3,Bark,Part::Twigs);
-            int blades=bamboo?(lod==2?3:lod==1?4:6):1;
-            for(int k=0;k<blades;k++){double t=(k+.5)/blades,spread=(k%2?1:-1)*.62;
-              lamina(add(tip,mul(sub(end,tip),t)),{std::cos(turn+spread),std::sin(turn+spread),-.18-.22*t},{0,0,1},p.leafSize*(1-.25*t),p.leafWidth,mix(stem*71+j,shoot*31+k+side+5),2);}
-          }
-        }
-      }last=tip;
+    b.check();Rng r(mix(doc.seed,stem+69));double az=stem*2.399963,h=height*r.range(.72,1);
+    V base{std::cos(az)*height*.16,std::sin(az)*height*.16,0},last=base;std::vector<V> stalk{base};
+    for(int j=0;j<p.branches;j++){
+      double t=double(j+1)/p.branches;auto tip=add(base,{std::cos(az)*h*p.curvature*.13*t*t,std::sin(az)*h*p.curvature*.13*t*t,h*t});
+      auto path=arc(last,tip,0,std::max(1,count(p.segments,1)),mix(stem,j));stalk.insert(stalk.end(),path.begin()+1,path.end());
+      nodes.push_back({tip,stem,j,leafAngle(j)+az,h,mix(doc.seed,stem*97+j+19)});last=tip;
     }
-    if(!bamboo){
-      if(p.organ==1){
-        for(int k=0;k<5;k++){double turn=k*2.399963;lamina(base,{std::cos(turn)*.22,std::sin(turn)*.22,1},{1,0,0},h*.85,p.leafWidth,mix(stem,k),2,Grass);}
-        double size=p.flowerSize;b.lathe(last,{{.01,0},{size*.13,size*.1},{size*.13,size*.95},{.01,size}},8,Wood,Part::Flowers);b.tube({add(last,{0,0,size}),add(last,{0,0,size*1.45})},.10,.01,3,Wood,Part::Flowers);
-      }else if(p.organ==0)for(int k=0;k<(lod?5:10);k++){
-        double turn=k*2.399963;lamina(add(last,{0,0,p.flowerSize*k/12}),{std::cos(turn)*.25,std::sin(turn)*.25,1},{1,0,0},p.flowerSize*.7,.20,mix(stem,k),2,Wood,Part::Flowers);
-      }else if(p.organ==2)for(int k=0;k<5;k++){double turn=k*2.399963;auto at=add(last,{std::cos(turn)*3,std::sin(turn)*3,0});b.lathe(at,{{.01,0},{1.,1.},{.02,3.}},5,Wood,Part::Flowers);}
+    b.tube(stalk,p.radius,p.radius*.66,bamboo?sides():p.organ==2?3:std::max(3,sides()-3),Bark,Part::Trunk);
+    heads.push_back({last,stem,p.branches-1,az,h,mix(doc.seed,stem+903)});
+  }
+  if(lod<2&&(bamboo||p.organ==3))for(auto& n:nodes)b.lathe(n.tip,{{p.radius*.9,-p.radius*.2},{p.radius*1.12,0},{p.radius*.86,p.radius*.25}},std::max(4,sides()),Wood,Part::Primary);
+  // Reed heads are structural organs, emitted before optional foliage detail.
+  if(!bamboo)for(auto& n:heads){auto tip=n.tip;
+    if(p.organ==1){double size=p.flowerSize;b.lathe(tip,{{.01,0},{size*.13,size*.1},{size*.13,size*.95},{.01,size}},lod==2?5:8,Wood,Part::Flowers);b.tube({add(tip,{0,0,size}),add(tip,{0,0,size*1.45})},.10,.01,3,Wood,Part::Flowers);}
+    else if(p.organ==0)for(int k=0;k<(lod?5:10);k++){double turn=k*2.399963;lamina(add(tip,{0,0,p.flowerSize*k/12}),{std::cos(turn)*.25,std::sin(turn)*.25,1},{1,0,0},p.flowerSize*.7,.20,mix(n.stem,k),2,Wood,Part::Flowers);}
+    else if(p.organ==2)for(int k=0;k<5;k++){double turn=k*2.399963;auto at=add(tip,{std::cos(turn)*3,std::sin(turn)*3,0});b.lathe(at,{{.01,0},{1.,1.},{.02,3.}},5,Wood,Part::Flowers);}
+  }
+  std::stable_sort(nodes.begin(),nodes.end(),[](auto& a,auto& c){return mix(a.id,51)<mix(c.id,51);});
+  for(auto& n:nodes){auto tip=n.tip;int j=n.index,stem=n.stem;double az=n.az;
+    if(!bamboo&&p.organ==3){for(int k=0;k<7;k++){double turn=k*2*pi/7;auto end=add(tip,{std::cos(turn)*height*.17,std::sin(turn)*height*.17,height*.08});b.tube({tip,end},p.radius*.18,.008,3,Leaf,Part::Leaves);}}
+    else if(j>p.branches/4&&(bamboo||p.organ==0))for(int side:{-1,1})for(int shoot=0;shoot<(bamboo?3:1);shoot++){
+      double turn=az+side*(.35+shoot*.36);V aim{std::cos(turn),std::sin(turn),.12+shoot*.10};auto end=add(tip,mul(aim,p.leafSize*(bamboo?1.7:.5)));
+      b.tube({tip,end},p.radius*.18,.012,3,Bark,Part::Twigs);int blades=bamboo?(lod==2?3:lod==1?4:6):1;
+      for(int k=0;k<blades;k++){double t=(k+.5)/blades,spread=(k%2?1:-1)*.62;lamina(add(tip,mul(sub(end,tip),t)),{std::cos(turn+spread),std::sin(turn+spread),-.18-.22*t},{0,0,1},p.leafSize*(1-.25*t),p.leafWidth,mix(stem*71+j,shoot*31+k+side+5),2);}
     }
   }
+  if(!bamboo&&p.organ==1)for(auto& n:heads)for(int k=0;k<5;k++){double turn=k*2.399963;V base{std::cos(n.az)*height*.16,std::sin(n.az)*height*.16,0};lamina(base,{std::cos(turn)*.22,std::sin(turn)*.22,1},{1,0,0},n.height*.85,p.leafWidth,mix(n.stem,k),2,Grass);}
 }
 inline void Botanical::climbers() {
   std::vector<V> stem;int steps=std::max(12,count(p.segments*4,12));

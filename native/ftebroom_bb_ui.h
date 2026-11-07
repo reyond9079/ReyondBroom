@@ -269,9 +269,10 @@ static void bbOpen(const std::string &path) {
           return modFileBytes(path);
         return modelImportTexture(texture);
       });
-      if (!modFilePacked(file))
-        p.path = file.u8string();
+      bool snapshot=!modFilePacked(file)&&placementSnapshotPath(file);
+      if (!modFilePacked(file)&&!snapshot)p.path = file.u8string();else p.path.clear();
       bbActivate(std::move(p));
+      if(snapshot)bbMessage="Opened an immutable source snapshot. Save As creates an editable copy; history assets stay intact.";
     } catch (const std::exception &e) {
       bbNotice(e);
     }
@@ -318,6 +319,7 @@ static void bbChoose(bool save, std::filesystem::path initial,
   bbChooseFolder = initial.has_extension() ? initial.parent_path() : initial;
   if (!std::filesystem::is_directory(bbChooseFolder))
     bbChooseFolder = modFileRoot();
+  if (!std::filesystem::is_directory(bbChooseFolder)&&gameProfile==1)bbChooseFolder=std::filesystem::u8path(baseq3);
   if (!std::filesystem::is_directory(bbChooseFolder))
     bbChooseFolder = documentPath("").parent_path();
   std::snprintf(bbChoosePath, sizeof bbChoosePath, "%s", bbChooseFolder.u8string().c_str());

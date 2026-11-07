@@ -105,6 +105,24 @@ class NativeInput:
   self.settle()
 
  def text(self,text):
+  if any(ord(c)>127 for c in text):
+   # Clipboard paste is real OS input and preserves UTF-8 paths that cannot be
+   # represented by the active keyboard layout. ASCII still uses key events.
+   if os.name=='nt':
+    from ctypes import wintypes
+    u,k=self.user,ctypes.windll.kernel32;k.GlobalAlloc.argtypes=[wintypes.UINT,ctypes.c_size_t];k.GlobalAlloc.restype=wintypes.HGLOBAL;k.GlobalLock.argtypes=[wintypes.HGLOBAL];k.GlobalLock.restype=ctypes.c_void_p;k.GlobalUnlock.argtypes=[wintypes.HGLOBAL];u.SetClipboardData.argtypes=[wintypes.UINT,wintypes.HANDLE];u.SetClipboardData.restype=wintypes.HANDLE
+    for attempt in range(20):
+     if u.OpenClipboard(None):break
+     time.sleep(.03)
+    else:raise AssertionError('Cannot acquire OS clipboard for Unicode input')
+    try:
+     assert u.EmptyClipboard();data=text.encode('utf-16-le')+b'\0\0';handle=k.GlobalAlloc(2,len(data));assert handle;pointer=k.GlobalLock(handle);assert pointer;ctypes.memmove(pointer,data,len(data));k.GlobalUnlock(handle);assert u.SetClipboardData(13,handle)
+    finally:u.CloseClipboard()
+   else:
+    import shutil,subprocess
+    executable=os.environ.get('RB_QA_XCLIP') or shutil.which('xclip');assert executable,'Unicode OS-input QA requires xclip'
+    subprocess.run([executable,'-selection','clipboard'],input=text.encode('utf-8'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True,timeout=10)
+   self.key('v',('ctrl',));return
   if os.name=='nt':self.strokes(''.join('{'+c+'}' if c in '+^%~(){}' else c for c in text));return
   shift=self.d.keysym_to_keycode(self.XK.string_to_keysym('Shift_L'))
   for char in text:

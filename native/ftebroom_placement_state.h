@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "plant/schema.h"
+#include <chrono>
 // A context request owns world coordinates and a map instance, never a screen
 // coordinate that could be reprojected after the user moves the camera.
 struct AssetPlacement {
@@ -18,6 +19,7 @@ static void placementCreate(bool plant);
 static void placementModelSaved();
 static void placementAfterModelSave(std::function<void()> next);
 static void placementShutdown();
+static bool placementSnapshotPath(const std::filesystem::path& path);
 static void placementPlantSaved();
 static void placementTick();
 static void placementAfterPlantSave(std::function<void()> next);
@@ -28,7 +30,7 @@ static void placementCapture() {
   p.layer=int(cvars->GetFloat("ftebroom_context_active_layer"));p.grid=cvars->GetFloat("ftebroom_context_grid");
   p.point=read("ftebroom_context_point");p.normal=read("ftebroom_context_normal");
   if(ftebroom::plant::length(p.normal)<.1)p.normal={0,0,1};else p.normal=ftebroom::plant::unit(p.normal);
-  p.id="placement-"+std::to_string(core->GetMilliseconds())+"-"+std::to_string(++placementSerial);
+  p.id="placement-"+std::to_string(std::chrono::system_clock::now().time_since_epoch().count())+"-"+std::to_string(++placementSerial);
   p.gridOrigin=read("ftebroom_context_grid_origin");
   for(int i=0;i<3;i++)p.basis[i]=read(("ftebroom_context_basis"+std::to_string(i)).c_str());
   contextPlacement=std::move(p);

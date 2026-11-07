@@ -42,7 +42,10 @@
       "tags": [
         "Quercus robur",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -70,7 +73,10 @@
       "tags": [
         "Quercus suber",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "evergreen"
       ]
     },
     {
@@ -102,7 +108,10 @@
       "tags": [
         "Betula pendula",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -134,7 +143,10 @@
       "tags": [
         "Betula papyrifera",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -160,7 +172,10 @@
       "tags": [
         "Acer campestre",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -188,7 +203,10 @@
       "tags": [
         "Acer palmatum",
         "tree",
-        "woodland"
+        "woodland",
+        "medium",
+        "umbrella",
+        "deciduous"
       ]
     },
     {
@@ -216,7 +234,10 @@
       "tags": [
         "Salix babylonica",
         "tree",
-        "woodland"
+        "wetland",
+        "large",
+        "weeping",
+        "deciduous"
       ]
     },
     {
@@ -243,7 +264,10 @@
       "tags": [
         "Salix alba",
         "tree",
-        "woodland"
+        "wetland",
+        "large",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -270,7 +294,10 @@
       "tags": [
         "Populus nigra italica",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "columnar",
+        "deciduous"
       ]
     },
     {
@@ -296,7 +323,10 @@
       "tags": [
         "Populus tremula",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -322,7 +352,10 @@
       "tags": [
         "Fagus sylvatica",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -354,7 +387,10 @@
       "tags": [
         "Tilia cordata",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "deciduous"
       ]
     },
     {
@@ -382,7 +418,11 @@
       "tags": [
         "Fraxinus excelsior",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -408,7 +448,10 @@
       "tags": [
         "Ulmus procera",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -434,7 +477,10 @@
       "tags": [
         "Platanus acerifolia",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -462,7 +508,11 @@
       "tags": [
         "Aesculus hippocastanum",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -489,7 +539,11 @@
       "tags": [
         "Juglans regia",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "spreading",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -514,7 +568,10 @@
       "tags": [
         "Alnus glutinosa",
         "tree",
-        "woodland"
+        "wetland",
+        "large",
+        "pyramidal",
+        "deciduous"
       ]
     },
     {
@@ -540,7 +597,11 @@
       "tags": [
         "Sorbus aucuparia",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -568,7 +629,10 @@
       "tags": [
         "Malus domestica",
         "tree",
-        "woodland"
+        "woodland",
+        "medium",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -595,7 +659,10 @@
       "tags": [
         "Prunus avium",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -624,7 +691,10 @@
       "tags": [
         "Magnolia grandiflora",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "evergreen"
       ]
     },
     {
@@ -654,7 +724,11 @@
       "tags": [
         "Adansonia digitata",
         "tree",
-        "woodland"
+        "woodland",
+        "large",
+        "umbrella",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -683,7 +757,11 @@
       "tags": [
         "Vachellia tortilis",
         "tree",
-        "woodland"
+        "savanna",
+        "large",
+        "umbrella",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -714,7 +792,11 @@
       "tags": [
         "Pinus sylvestris",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "umbrella",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -740,7 +822,11 @@
       "tags": [
         "Pinus pinaster",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "vase",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -766,7 +852,11 @@
       "tags": [
         "Pinus sibirica",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "oval",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -798,7 +888,11 @@
       "tags": [
         "Picea abies",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -830,7 +924,11 @@
       "tags": [
         "Picea pungens",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -857,7 +955,11 @@
       "tags": [
         "Abies alba",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -884,7 +986,10 @@
       "tags": [
         "Larix decidua",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles"
       ]
     },
     {
@@ -911,7 +1016,11 @@
       "tags": [
         "Cedrus libani",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "layered",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -937,7 +1046,11 @@
       "tags": [
         "Cupressus sempervirens",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "columnar",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -964,7 +1077,11 @@
       "tags": [
         "Juniperus excelsa",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "multiple leaders",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -990,7 +1107,11 @@
       "tags": [
         "Sequoia sempervirens",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -1017,7 +1138,11 @@
       "tags": [
         "Araucaria araucana",
         "conifer",
-        "woodland"
+        "woodland",
+        "large",
+        "pyramidal",
+        "needles",
+        "evergreen"
       ]
     },
     {
@@ -1045,7 +1170,10 @@
       "tags": [
         "Buxus sempervirens",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "spreading",
+        "evergreen"
       ]
     },
     {
@@ -1074,7 +1202,10 @@
       "tags": [
         "Carpinus betulus",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "columnar",
+        "deciduous"
       ]
     },
     {
@@ -1101,7 +1232,10 @@
       "tags": [
         "Crataegus monogyna",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -1135,7 +1269,11 @@
       "tags": [
         "Rosa canina",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -1175,7 +1313,10 @@
       "tags": [
         "Syringa vulgaris",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -1208,7 +1349,10 @@
       "tags": [
         "Hydrangea macrophylla",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "spreading",
+        "deciduous"
       ]
     },
     {
@@ -1242,7 +1386,10 @@
       "tags": [
         "Rhododendron ponticum",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "spreading",
+        "evergreen"
       ]
     },
     {
@@ -1276,7 +1423,10 @@
       "tags": [
         "Calluna vulgaris",
         "shrub",
-        "garden"
+        "garden",
+        "small",
+        "pyramidal",
+        "evergreen"
       ]
     },
     {
@@ -1305,7 +1455,10 @@
       "tags": [
         "Viburnum opulus",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -1333,7 +1486,10 @@
       "tags": [
         "Ribes nigrum",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -1361,7 +1517,10 @@
       "tags": [
         "Ribes uva-crispa",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "multiple leaders",
+        "deciduous"
       ]
     },
     {
@@ -1389,7 +1548,11 @@
       "tags": [
         "Rubus fruticosus",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "weeping",
+        "compound leaves",
+        "deciduous"
       ]
     },
     {
@@ -1417,7 +1580,10 @@
       "tags": [
         "Juniperus horizontalis",
         "shrub",
-        "garden"
+        "garden",
+        "small",
+        "umbrella",
+        "evergreen"
       ]
     },
     {
@@ -1445,7 +1611,10 @@
       "tags": [
         "Berberis vulgaris",
         "shrub",
-        "garden"
+        "garden",
+        "medium",
+        "vase",
+        "deciduous"
       ]
     },
     {
@@ -1469,7 +1638,9 @@
       "tags": [
         "Poa pratensis",
         "grass",
-        "garden"
+        "meadow",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1493,7 +1664,9 @@
       "tags": [
         "Festuca rubra",
         "grass",
-        "garden"
+        "meadow",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1517,7 +1690,9 @@
       "tags": [
         "Festuca glauca",
         "grass",
-        "garden"
+        "meadow",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1541,7 +1716,9 @@
       "tags": [
         "Stipa pennata",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1565,7 +1742,9 @@
       "tags": [
         "Miscanthus sinensis",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1589,7 +1768,9 @@
       "tags": [
         "Cortaderia selloana",
         "grass",
-        "garden"
+        "meadow",
+        "large",
+        "clumping"
       ]
     },
     {
@@ -1613,7 +1794,9 @@
       "tags": [
         "Carex cespitosa",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1637,7 +1820,9 @@
       "tags": [
         "Deschampsia cespitosa",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1661,7 +1846,9 @@
       "tags": [
         "Alopecurus pratensis",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1685,7 +1872,9 @@
       "tags": [
         "Elymus repens",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1709,7 +1898,9 @@
       "tags": [
         "Secale cereale",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1733,7 +1924,9 @@
       "tags": [
         "Stipa capillata",
         "grass",
-        "garden"
+        "meadow",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1757,7 +1950,9 @@
       "tags": [
         "Pteridium aquilinum",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1781,7 +1976,9 @@
       "tags": [
         "Matteuccia struthiopteris",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1805,7 +2002,9 @@
       "tags": [
         "Dryopteris filix-mas",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1829,7 +2028,9 @@
       "tags": [
         "Athyrium filix-femina",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -1853,7 +2054,9 @@
       "tags": [
         "Adiantum capillus-veneris",
         "fern",
-        "woodland"
+        "woodland",
+        "small",
+        "clumping"
       ]
     },
     {
@@ -1877,7 +2080,10 @@
       "tags": [
         "Asplenium nidus",
         "fern",
-        "woodland"
+        "woodland",
+        "medium",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -1901,7 +2107,10 @@
       "tags": [
         "Polypodium vulgare",
         "fern",
-        "woodland"
+        "woodland",
+        "small",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -1925,7 +2134,10 @@
       "tags": [
         "Dicksonia antarctica",
         "fern",
-        "woodland"
+        "woodland",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -1956,7 +2168,9 @@
       "tags": [
         "Leucanthemum vulgare",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -1987,7 +2201,9 @@
       "tags": [
         "Helianthus annuus",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2018,7 +2234,10 @@
       "tags": [
         "Rosa gallica",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering",
+        "compound leaves"
       ]
     },
     {
@@ -2049,7 +2268,9 @@
       "tags": [
         "Papaver rhoeas",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2080,7 +2301,9 @@
       "tags": [
         "Tulipa gesneriana",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering"
       ]
     },
     {
@@ -2111,7 +2334,9 @@
       "tags": [
         "Narcissus pseudonarcissus",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering"
       ]
     },
     {
@@ -2142,7 +2367,9 @@
       "tags": [
         "Iris germanica",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2173,7 +2400,9 @@
       "tags": [
         "Lilium candidum",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2204,7 +2433,9 @@
       "tags": [
         "Lavandula angustifolia",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2235,7 +2466,10 @@
       "tags": [
         "Lupinus polyphyllus",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering",
+        "compound leaves"
       ]
     },
     {
@@ -2266,7 +2500,9 @@
       "tags": [
         "Digitalis purpurea",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2297,7 +2533,9 @@
       "tags": [
         "Campanula persicifolia",
         "flower",
-        "garden"
+        "garden",
+        "medium",
+        "flowering"
       ]
     },
     {
@@ -2328,7 +2566,10 @@
       "tags": [
         "Trifolium pratense",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering",
+        "compound leaves"
       ]
     },
     {
@@ -2359,7 +2600,9 @@
       "tags": [
         "Taraxacum officinale",
         "flower",
-        "garden"
+        "garden",
+        "small",
+        "flowering"
       ]
     },
     {
@@ -2390,7 +2633,8 @@
       "tags": [
         "Amanita muscaria",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2421,7 +2665,8 @@
       "tags": [
         "Boletus edulis",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2452,7 +2697,8 @@
       "tags": [
         "Pleurotus ostreatus",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2483,7 +2729,8 @@
       "tags": [
         "Cantharellus cibarius",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2514,7 +2761,8 @@
       "tags": [
         "Coprinus comatus",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2545,7 +2793,8 @@
       "tags": [
         "Armillaria mellea",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2576,7 +2825,8 @@
       "tags": [
         "Fomes fomentarius",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2607,7 +2857,8 @@
       "tags": [
         "Morchella esculenta",
         "mushroom",
-        "garden"
+        "woodland",
+        "small"
       ]
     },
     {
@@ -2638,7 +2889,8 @@
       "tags": [
         "Legacy fantasy variety",
         "mushroom",
-        "garden"
+        "woodland",
+        "large"
       ]
     },
     {
@@ -2668,7 +2920,9 @@
       "tags": [
         "Carnegiea gigantea",
         "cactus",
-        "dryland"
+        "dryland",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2698,7 +2952,9 @@
       "tags": [
         "Echinocactus grusonii",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2728,7 +2984,9 @@
       "tags": [
         "Opuntia ficus-indica",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2758,7 +3016,9 @@
       "tags": [
         "Cereus repandus",
         "cactus",
-        "dryland"
+        "dryland",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2788,7 +3048,9 @@
       "tags": [
         "Agave tequilana",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2818,7 +3080,9 @@
       "tags": [
         "Aloe barbadensis",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2848,7 +3112,9 @@
       "tags": [
         "Echeveria elegans",
         "cactus",
-        "dryland"
+        "dryland",
+        "small",
+        "evergreen"
       ]
     },
     {
@@ -2878,7 +3144,9 @@
       "tags": [
         "Yucca filamentosa",
         "cactus",
-        "dryland"
+        "dryland",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -2905,7 +3173,9 @@
       "tags": [
         "Phoenix dactylifera",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2932,7 +3202,9 @@
       "tags": [
         "Cocos nucifera",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2959,7 +3231,9 @@
       "tags": [
         "Washingtonia robusta",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -2986,7 +3260,9 @@
       "tags": [
         "Chamaerops humilis",
         "palm",
-        "tropical"
+        "tropical",
+        "medium",
+        "evergreen"
       ]
     },
     {
@@ -3013,7 +3289,9 @@
       "tags": [
         "Roystonea regia",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -3040,7 +3318,9 @@
       "tags": [
         "Rhapis excelsa",
         "palm",
-        "tropical"
+        "tropical",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -3067,7 +3347,9 @@
       "tags": [
         "Hedera helix",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "evergreen"
       ]
     },
     {
@@ -3094,7 +3376,9 @@
       "tags": [
         "Parthenocissus quinquefolia",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "compound leaves"
       ]
     },
     {
@@ -3121,7 +3405,8 @@
       "tags": [
         "Vitis vinifera",
         "vine",
-        "garden"
+        "garden",
+        "large"
       ]
     },
     {
@@ -3148,7 +3433,9 @@
       "tags": [
         "Wisteria sinensis",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "compound leaves"
       ]
     },
     {
@@ -3175,7 +3462,8 @@
       "tags": [
         "Humulus lupulus",
         "vine",
-        "garden"
+        "garden",
+        "large"
       ]
     },
     {
@@ -3202,7 +3490,9 @@
       "tags": [
         "Clematis vitalba",
         "vine",
-        "garden"
+        "garden",
+        "large",
+        "compound leaves"
       ]
     },
     {
@@ -3232,7 +3522,10 @@
       "tags": [
         "Phyllostachys aurea",
         "bamboo",
-        "garden"
+        "garden",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3262,7 +3555,10 @@
       "tags": [
         "Phyllostachys nigra",
         "bamboo",
-        "garden"
+        "garden",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3292,7 +3588,10 @@
       "tags": [
         "Pleioblastus pygmaeus",
         "bamboo",
-        "garden"
+        "garden",
+        "medium",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3322,7 +3621,10 @@
       "tags": [
         "Dendrocalamus giganteus",
         "bamboo",
-        "garden"
+        "garden",
+        "large",
+        "clumping",
+        "evergreen"
       ]
     },
     {
@@ -3348,7 +3650,9 @@
       "tags": [
         "Phragmites australis",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -3374,7 +3678,9 @@
       "tags": [
         "Typha latifolia",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -3400,7 +3706,9 @@
       "tags": [
         "Schoenoplectus lacustris",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     },
     {
@@ -3426,7 +3734,9 @@
       "tags": [
         "Equisetum arvense",
         "riparian",
-        "wetland"
+        "wetland",
+        "medium",
+        "clumping"
       ]
     }
   ],

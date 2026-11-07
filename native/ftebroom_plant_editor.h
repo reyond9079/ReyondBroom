@@ -201,7 +201,7 @@ static void plantOpenFile(const std::filesystem::path& file) {
   if(std::filesystem::file_size(file)>4*1024*1024)throw std::runtime_error("Plant project exceeds 4 MiB");
   auto d=plants::deserialize(plants::Json::parse(q1Read(file)));
   if(!d.texture.empty()&&std::filesystem::u8path(d.texture).is_relative())d.texture=(file.parent_path()/std::filesystem::u8path(d.texture)).u8string();
-  placementCancel(plantPlacement);plantSelect(d);plantState.file=file;plantState.saved=plants::serialize(d).dump();plantState.undo.clear();plantState.redo.clear();
+  placementCancel(plantPlacement);plantSelect(d);plantState.file=placementSnapshotPath(file)?std::filesystem::path{}:file;plantState.saved=plants::serialize(d).dump();plantState.undo.clear();plantState.redo.clear();
 }
 static void plantWriteNew(const std::filesystem::path& file,const std::string& bytes) {
   if(std::filesystem::exists(file)){if(q1Read(file)==bytes)return;throw std::runtime_error("Existing asset differs; choose a new export name: "+file.filename().u8string());}

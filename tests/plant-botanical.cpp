@@ -13,8 +13,11 @@ int main(int argc,char** argv)try{
  for(auto& row:catalogManifest()["presets"]){categories[row["category"]]++;check(ids.insert(row["id"]).second,"unique stable ID");auto p=row["parameters"];for(auto key:{"bark","leaf","flower","seed"})p.erase(key);check(traits.insert(p.dump()).second,"architectural diversity, not recolors or seeds");}
  for(auto it=catalogManifest()["minimumByCategory"].begin();it!=catalogManifest()["minimumByCategory"].end();++it)check(categories[it.key()]>=it.value().get<int>(),"category minimum "+it.key());
  for(auto d:catalog){Json entry={{"id",d.preset},{"seeds",Json::array()}};
-  for(unsigned seed:{137u,138u,424242u}){d.seed=seed;Json row={{"seed",seed},{"triangles",Json::array()},{"fingerprints",Json::array()}};size_t previous=SIZE_MAX;
+  for(unsigned seed:{137u,138u,424242u}){d.seed=seed;Json row={{"seed",seed},{"triangles",Json::array()},{"fingerprints",Json::array()}};size_t previous=SIZE_MAX;bool hasFoliage=false;size_t stems=0;
    for(int l=0;l<3;l++){auto mesh=generate(d,l);validate(mesh);check(!mesh.faces.empty(),"nonempty "+d.preset);check(mesh.faces.size()<previous,"strict LOD reduction "+d.preset);previous=mesh.faces.size();check(mesh.faces.size()<=size_t(d.p.budget*(l==0?1:l==1?d.p.lod1Ratio:d.p.lod2Ratio)),"budget "+d.preset);
+    auto foliage=std::count_if(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves&&(f.material==Leaf||f.material==Needle||f.material==Grass||f.material>=LeafLight);});
+    std::set<unsigned> trunkOrgans;for(auto& face:mesh.faces)if(face.part==Part::Trunk)trunkOrgans.insert(face.organ);
+    if(l==0){hasFoliage=foliage>0;stems=trunkOrgans.size();}else{check(!hasFoliage||foliage>0,"LOD retains foliage "+d.preset);if(d.family==Family::Bamboo||d.family==Family::Riparian)check(trunkOrgans.size()==stems,"LOD retains all culms "+d.preset);}
     auto key=fingerprint(mesh);check(fingerprint(generate(d,l))==key,"exact deterministic regeneration "+d.preset);for(auto& f:mesh.faces)check(f.material>=0&&f.material<Count,"valid material slot");row["triangles"].push_back(mesh.faces.size());row["fingerprints"].push_back(key);
    }entry["seeds"].push_back(row);
   }report.push_back(entry);std::cout<<"PASS matrix "<<d.preset<<std::endl;

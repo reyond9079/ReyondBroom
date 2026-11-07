@@ -30,7 +30,28 @@ inline std::string prepareStaticModels(const std::string& bytes,int profile,size
   if(!marked&&!legacy)continue;
   if(marked&&(profile==3||profile==4))throw std::runtime_error("This map contains ReyondBroom authoring func_model entities. Quake II / GoldSrc runtime export is unsupported; convert the source model and use a compatible mod entity before compiling.");
   if(marked&&profile==2&&e.get("_reyondbroom_fte_q1")!="1")throw std::runtime_error("Authoring func_model requires the explicit FTE static-model extension for Quake 1. Enable it in Plant Editor and Save, or convert the model for a compatible mod; vanilla Quake cannot spawn this entity.");
-  if((profile==0&&marked)||(profile==2&&(marked||legacy))){e.fields["classname"]="misc_model";changed++;}
+  if(marked&&profile==2){
+   double scale=1;auto value=e.get("scale");if(value.empty())value=e.get("modelscale");
+   if(!value.empty()){std::istringstream in(value);in.imbue(std::locale::classic());if(!(in>>scale)||!std::isfinite(scale))throw std::runtime_error("Invalid authoring model scale in Quake 1 build copy.");}
+   auto axes=e.get("modelscale_vec");if(!axes.empty()){
+    std::istringstream in(axes);in.imbue(std::locale::classic());std::array<double,3> v{};for(auto& x:v)if(!(in>>x)||!std::isfinite(x))throw std::runtime_error("Invalid authoring model vector scale in Quake 1 build copy.");
+    if(v[0]!=v[1]||v[0]!=v[2])throw std::runtime_error("Quake 1/FTE static-model fallback supports uniform scale only. Apply the non-uniform scale to the source geometry or use a compatible custom mod before compiling.");
+    scale*=v[0];
+   }
+   std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<scale;e.fields["scale"]=out.str();
+  }
+  if((profile==0&&marked)||(profile==2&&(marked||legacy))){
+   e.fields["classname"]="misc_model";changed++;
+   if(profile==0){
+    double scale=1;auto value=e.get("scale");if(value.empty())value=e.get("modelscale");
+    if(!value.empty()){std::istringstream in(value);in.imbue(std::locale::classic());if(!(in>>scale)||!std::isfinite(scale))throw std::runtime_error("Invalid authoring model scale in build copy.");}
+    auto axes=e.get("modelscale_vec");
+    if(!axes.empty()){
+     std::istringstream in(axes);in.imbue(std::locale::classic());std::array<double,3> vector{};for(auto& n:vector)if(!(in>>n)||!std::isfinite(n))throw std::runtime_error("Invalid authoring model vector scale in build copy.");
+     std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<vector[0]*scale<<' '<<vector[1]*scale<<' '<<vector[2]*scale;e.fields["modelscale_vec"]=out.str();e.fields["modelscale"]="1";
+    }else{std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<scale;e.fields["modelscale"]=out.str();}
+   }
+  }
  }
  if(!changed)return bytes;std::string result;
  for(auto& e:entities){result+="{\n";for(auto& f:e.fields)result+=prefab::quote(f.first)+" "+prefab::quote(f.second)+"\n";result+=e.geometry+"}\n";}

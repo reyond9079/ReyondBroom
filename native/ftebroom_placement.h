@@ -31,6 +31,7 @@ static void placementPublish(const std::map<std::string,std::string>& bundle){
       else{size_t size=0;auto data=static_cast<char*>(files->LoadFile("scripts/shaderlist.txt",&size));if(data){previous.assign(data,size);core->Free(data);}}
       auto next=ftebroom::appendShaderList(previous,shaderNames);if(next!=previous){lists.emplace_back(list,std::filesystem::exists(list),previous);bb::atomicWrite(list,next);}
     }
+    command("fs_flush\n");
   }catch(...){for(auto i=lists.rbegin();i!=lists.rend();++i){try{if(std::get<1>(*i))bb::atomicWrite(std::get<0>(*i),std::get<2>(*i));else{std::error_code ec;std::filesystem::remove(std::get<0>(*i),ec);}}catch(...){}}for(auto& path:added){std::error_code ec;std::filesystem::remove(path,ec);}throw;}
 }
 static void placementSend(AssetPlacement& p,const std::string& model,const std::string& source,plants::V low,plants::V high,double scale,bool optin){
@@ -41,8 +42,17 @@ static void placementSend(AssetPlacement& p,const std::string& model,const std::
   auto correction=plants::dot(p.point,p.normal)-plants::dot(origin,p.normal)-support;
   origin=plants::add(origin,plants::mul(p.normal,correction));
   p.request=p.id+"-"+std::to_string(++placementSerial);
-  std::string q="fs_flush\nftebroom_authoring_save "+organizationQuote(p.request)+" "+std::to_string(p.epoch)+" "+organizationQuote(p.id)+" "+organizationQuote(model)+" "+organizationQuote(source)+" "+(p.created?"0":"1")+" "+organizationQuote(placementVector(origin))+" "+std::to_string(p.layer)+" "+(optin?"1":"0")+" "+std::to_string(scale)+"\n";
+  std::string q="ftebroom_authoring_save "+organizationQuote(p.request)+" "+std::to_string(p.epoch)+" "+organizationQuote(p.id)+" "+organizationQuote(model)+" "+organizationQuote(source)+" "+(p.created?"0":"1")+" "+organizationQuote(placementVector(origin))+" "+std::to_string(p.layer)+" "+(optin?"1":"0")+" "+std::to_string(scale)+"\n";
   p.created=true;p.awaiting=true;p.runtimeSupported=p.profile==0||p.profile==1||(p.profile==2&&optin);command(q.c_str());
+}
+static bool placementSnapshotPath(const std::filesystem::path& file){
+  auto name=file.filename().u8string();std::string stem;
+  if(name.size()>8&&name.substr(name.size()-8)==".bbmodel")stem=name.substr(0,name.size()-8);
+  else if(name.size()>11&&name.substr(name.size()-11)==".plant.json")stem=name.substr(0,name.size()-11);
+  else return false;
+  auto manifest=file.parent_path()/std::filesystem::u8path(stem+".md3.reyond.json");
+  if(!std::filesystem::is_regular_file(manifest)||std::filesystem::file_size(manifest)>4*1024*1024)return false;
+  try{auto j=plants::Json::parse(q1Read(manifest));if(j.value("kind","")!="reyondbroom-authoring-model"||!j.contains("dependencies"))return false;for(auto& dependency:j["dependencies"])if(std::filesystem::u8path(dependency.get<std::string>()).filename()==file.filename())return true;}catch(const std::exception&){}return false;
 }
 static void placementCreate(bool plant){
   auto captured=contextPlacement;
@@ -150,9 +160,9 @@ static void placementTick(){
     if(p->request!=ack)continue;cvars->GetString("ftebroom_placement_status",status,sizeof status);p->awaiting=false;
     auto& message=p==&plantPlacement?plantState.message:bbMessage;
     if(std::string(status)=="ok"){message="Saved linked func_model. Undo/Redo restores its previous model and assets.";if(!p->runtimeSupported)message+=" Authoring only: this runtime requires a compatible model/mod, or the explicit Quake 1 FTE extension. Compilation will report the unsupported entity.";}
-    else{p->active=false;message=std::string(status)=="missing"?"Source saved. Linked entity was deleted or undone; placement cancelled.":"Source saved. Placement cancelled: map, layer or position is no longer valid.";}
+    else{p->active=false;message=std::string(status)=="ambiguous"?"Source saved. Placement cancelled: multiple entities share the source link; no entity was changed.":std::string(status)=="missing"?"Source saved. Linked entity was deleted or undone; placement cancelled.":"Source saved. Placement cancelled: map, layer or position is no longer valid.";}
     auto& after=p==&plantPlacement?placementPlantNext:placementModelNext;
-    if(std::string(status)=="ok"&&after){auto next=std::move(after);after={};next();}else if(std::string(status)!="ok")after={};
+    if(std::string(status)=="ok"&&after){auto next=std::move(after);after={};try{next();}catch(const std::exception& e){message=e.what();}}else if(std::string(status)!="ok")after={};
   }
   if(placementPlantPending){
     if(!plantPlacement.active||placementPlantRevision!=plantState.revision||(!plantBusy()&&!plantState.error.empty())){placementPlantPending=false;placementPlantNext={};plantState.message="Source saved. Pending placement cancelled because the document changed or generation failed; Save again when ready.";}

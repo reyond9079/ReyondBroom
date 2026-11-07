@@ -330,7 +330,7 @@ static void plantPanel() {
     ImGui::BeginDisabled(!plantReady());
     if(plantButton("Export...","export"))runUiChoose((plantFolder()/(plants::assetId(s.doc,s.lod)+".glb")).u8string(),[](const std::string& path){plantExport(std::filesystem::u8path(path));},true);ImGui::SameLine();
     if(plantButton("Add to Map","add-map"))plantAction(plantAddToMap);
-    ImGui::EndDisabled();ImGui::SameLine();if(plantButton("Generate","generate"))plantSchedule(true);ImGui::SameLine();
+    ImGui::EndDisabled();if(ImGui::GetWindowWidth()>=850*u)ImGui::SameLine();if(plantButton("Generate","generate"))plantSchedule(true);ImGui::SameLine();
     ImGui::BeginDisabled(s.undo.empty());if(plantButton("Undo","undo"))plantUndo();ImGui::EndDisabled();ImGui::SameLine();
     ImGui::BeginDisabled(s.redo.empty());if(plantButton("Redo","redo"))plantUndo(true);ImGui::EndDisabled();ImGui::SameLine();
     if(ImGui::Checkbox("Advanced",&s.advanced))plantLibrarySave();plantRect("advanced");

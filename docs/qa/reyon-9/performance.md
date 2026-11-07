@@ -5,15 +5,16 @@ running. AMD EPYC 9V74 host, container quota 4 CPUs / 16 GiB, Linux 6.18.57,
 glibc 2.41, GCC 14.2.0. Both standalone binaries use `-std=c++17 -O2` and the
 same `tests/plant-performance.cpp`; baseline headers are frozen at `9e5b30a`.
 Seed 137, factory presets, unchanged 32,000 tree triangle budgets. Each LOD has
-one warmup and 15 measured samples. Values below are median generation wall
+one warmup and 15 measured samples. The CPU tables were rerun sequentially
+after the final grass LOD height correction; no local editor/compiler was active. Values below are median generation wall
 milliseconds. Texture generation is measured separately, once, at the default
 1024×1024 atlas size; it runs on the background worker in the editor.
 
 | Preset | Before LOD0 / 1 / 2 ms | After LOD0 / 1 / 2 ms | Before → after triangles LOD0 / 1 / 2 |
 | --- | --- | --- | --- |
-| oak | 11.94 / 6.35 / 2.60 | 20.69 / 10.17 / 4.54 | 31988 / 15988 / 5856 → 31994 / 16000 / 6396 |
-| spruce | 20.35 / 8.92 / 3.32 | 16.92 / 9.51 / 4.79 | 32000 / 16000 / 6396 → 31998 / 15998 / 6400 |
-| meadow-grass | 1.00 / 0.50 / 0.19 | 0.75 / 0.31 / 0.12 | 2176 / 1184 / 496 → 1632 / 568 / 168 |
+| oak | 11.66 / 6.41 / 2.69 | 18.20 / 9.63 / 4.57 | 31988 / 15988 / 5856 → 31994 / 16000 / 6396 |
+| spruce | 20.45 / 8.66 / 3.30 | 17.14 / 9.09 / 4.65 | 32000 / 16000 / 6396 → 31998 / 15998 / 6400 |
+| meadow-grass | 0.87 / 0.47 / 0.19 | 0.79 / 0.32 / 0.12 | 2176 / 1184 / 496 → 1632 / 568 / 168 |
 
 The maximum default LOD0 triangle count is 32,000 on both catalogues. The
 first maximum is spruce in the 30-preset baseline and paper-birch in the
@@ -23,17 +24,17 @@ that it is the slowest seed or the worst case for arbitrary user settings.
 
 | Version / preset | LOD0 vertices | Materials used | Texture time ms | Three CPU RGBA maps bytes |
 | --- | ---: | ---: | ---: | ---: |
-| generator 1 / oak | 24896 | 2 | 104.34 | 12582912 |
-| generator 1 / spruce | 36868 | 2 | 120.32 | 12582912 |
-| generator 1 / meadow-grass | 2040 | 1 | 109.47 | 12582912 |
-| generator 1 / spruce | 36868 | 2 | 135.58 | 12582912 |
-| generator 2 / oak | 38326 | 5 | 353.28 | 12582912 |
-| generator 2 / spruce | 32676 | 4 | 306.89 | 12582912 |
-| generator 2 / meadow-grass | 1530 | 1 | 292.04 | 12582912 |
-| generator 2 / paper-birch | 36818 | 5 | 342.10 | 12582912 |
+| generator 1 / oak | 24896 | 2 | 107.02 | 12582912 |
+| generator 1 / spruce | 36868 | 2 | 108.50 | 12582912 |
+| generator 1 / meadow-grass | 2040 | 1 | 103.77 | 12582912 |
+| generator 1 / spruce | 36868 | 2 | 119.68 | 12582912 |
+| generator 2 / oak | 38326 | 5 | 292.30 | 12582912 |
+| generator 2 / spruce | 32676 | 4 | 361.80 | 12582912 |
+| generator 2 / meadow-grass | 1530 | 1 | 309.99 | 12582912 |
+| generator 2 / paper-birch | 36818 | 5 | 307.14 | 12582912 |
 
 Standalone peak RSS, including scanning each whole catalogue to identify its
-largest mesh: 21,668 → 25,540 KiB. These figures are
+largest mesh: 21,584 → 27,672 KiB. These figures are
 not the full editor's memory usage. Mesh byte estimates, vertices/materials for
 every LOD, all 15 timing samples, compiler/host and peak-RSS metadata are retained
 in the adjacent JSON files.
@@ -57,9 +58,9 @@ alpha.129 binaries. Packaged-platform evidence is collected separately.
 
 | Selection | Before recent frame p95 ms | After recent frame p95 ms | Before → after peak RSS KiB |
 | --- | ---: | ---: | ---: |
-| oak | 53.0 | 71.0 | 319,256 → 333,520 |
-| spruce | 50.0 | 62.0 | 359,680 → 367,784 |
-| meadow-grass | 54.0 | 63.0 | 359,960 → 367,784 |
+| oak | 11.66 / 6.41 / 2.69 | 18.20 / 9.63 / 4.57 | 31988 / 15988 / 5856 → 31994 / 16000 / 6396 |
+| spruce | 20.45 / 8.66 / 3.30 | 17.14 / 9.09 / 4.65 | 32000 / 16000 / 6396 → 31998 / 15998 / 6400 |
+| meadow-grass | 0.87 / 0.47 / 0.19 | 0.79 / 0.32 / 0.12 | 2176 / 1184 / 496 → 1632 / 568 / 168 |
 | date-palm | 49.0 | 55.0 | 358,960 → 367,784 |
 
 Across the final 12-control run, baseline recorded 1 frame above 100 ms / 1,009

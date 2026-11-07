@@ -55,8 +55,8 @@ and [same-machine performance data](performance.md).
   hierarchy, original/new parameters, materials and real model codecs.
 - `tests/plant-botanical.cpp`: all 121 × 3 seeds × 3 LODs, exact regeneration,
   finite meshes/winding/bounds/materials/budgets, strict LOD reduction, leaf and
-  culm survival, connected Opuntia pads at every LOD; frozen legacy corpus, atlases and catalogue parity. The local
-  complete matrix passes 10,678,987 assertions. The independent platform corpus
+  culm survival, connected Opuntia pads at every LOD and bounded grass/riparian height; frozen legacy corpus, atlases and catalogue parity. The local
+  complete matrix passes 10,679,083 assertions. The independent platform corpus
   retains the original 30 × 3 × 3 geometry outputs and texture fingerprints.
 - `tests/test-static-models.cpp`: build-only adaptation, source preservation,
   unsupported-profile and nonuniform-scale diagnostics, portable dependencies,

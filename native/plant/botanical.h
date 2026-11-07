@@ -42,7 +42,11 @@ struct Botanical : Generator {
     if(length(cross(direction,up))<.01)up={0,1,0};
     shape=shape<0?p.leafShape:shape;material=material<0?foliageMaterial(id):material;
     const int mode=lod==2?2:p.foliageMode>=2?p.foliageMode:p.quality==2?1:lod==1?1:p.foliageMode;
+    // A grass blade defines plant height, unlike a leaf at the tip of a twig.
+    // Compensate sparse distant blades sideways, never by growing the plant.
+    bool bladeHeight=doc.family==Family::Grass||material==Grass;
     double scale=lod==2?1.85:lod==1?1.18:1;
+    if(bladeHeight){width*=std::min(1.65,scale);scale=1;}
     size*=scale*r.range(.86,1.13);
     auto first=b.mesh.vertices.size();
     if(material==Needle||material==NeedleLight||material==NeedleMature){

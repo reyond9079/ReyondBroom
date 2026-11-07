@@ -1,8 +1,8 @@
 {
-  "elapsed_seconds": 4.369439544010675,
-  "peak_rss_kib": 25540,
-  "user_seconds": 4.157118,
-  "system_seconds": 0.20072199999999998,
+  "elapsed_seconds": 4.173789733002195,
+  "peak_rss_kib": 27672,
+  "user_seconds": 5.980539,
+  "system_seconds": 0.3005,
   "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
   "flags": "-std=c++17 -O2",
   "platform": "Linux-6.18.57-x86_64-with-glibc2.41",

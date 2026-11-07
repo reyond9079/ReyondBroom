@@ -32,6 +32,12 @@ renderer or generated illustration.
 | saguaro | Continuous ribbed stem and rising arms replace flower-like terminal artifacts | Thicker rounded arms with taper | Irregular but coherent arm positions | Ribs, areoles/spines and species skin, without imported assets | More geometry is used (11,048 → 31,992), still bounded; low LOD retains the arms and full height |
 | date-palm | Pinnate fronds replace broad repeating fan-like strips | Separate rachis and tapered pinnae, scarred trunk | Fronds arranged around the crown, naturally falling outward | Original stem scars and leaf material; this preview does not add HDRI/translucent subsurface lighting | Fewer default triangles (10,260 → 8,112); reduced LOD retains crown/frond directions |
 
+LOD review also found a grass silhouette defect: generic leaf compensation
+made LOD2 blades up to 1.85 times taller. Grass and full-height grass-material
+blades now compensate width only; their length remains fixed. The independent
+matrix rejects a height increase above 12% for every grass/riparian preset and
+seed. This also protects the basal blades of cattails.
+
 The full-size catalogue review also found disconnected Opuntia pads. The final
 generator attaches each child inside its parent shoulder, flattens and orients
 the pads with corrected normals, and uses smooth areole skin rather than

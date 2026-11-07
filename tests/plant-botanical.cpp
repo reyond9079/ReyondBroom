@@ -13,8 +13,9 @@ int main(int argc,char** argv)try{
  for(auto& row:catalogManifest()["presets"]){categories[row["category"]]++;check(ids.insert(row["id"]).second,"unique stable ID");auto p=row["parameters"];for(auto key:{"bark","leaf","flower","seed"})p.erase(key);check(traits.insert(p.dump()).second,"architectural diversity, not recolors or seeds");}
  for(auto it=catalogManifest()["minimumByCategory"].begin();it!=catalogManifest()["minimumByCategory"].end();++it)check(categories[it.key()]>=it.value().get<int>(),"category minimum "+it.key());
  for(auto d:catalog){Json entry={{"id",d.preset},{"seeds",Json::array()}};
-  for(unsigned seed:{137u,138u,424242u}){d.seed=seed;Json row={{"seed",seed},{"triangles",Json::array()},{"fingerprints",Json::array()}};size_t previous=SIZE_MAX;bool hasFoliage=false;size_t stems=0;
+  for(unsigned seed:{137u,138u,424242u}){d.seed=seed;Json row={{"seed",seed},{"triangles",Json::array()},{"fingerprints",Json::array()}};size_t previous=SIZE_MAX;bool hasFoliage=false;size_t stems=0;double nearHeight=0;
    for(int l=0;l<3;l++){auto mesh=generate(d,l);validate(mesh);check(!mesh.faces.empty(),"nonempty "+d.preset);check(mesh.faces.size()<previous,"strict LOD reduction "+d.preset);previous=mesh.faces.size();check(mesh.faces.size()<=size_t(d.p.budget*(l==0?1:l==1?d.p.lod1Ratio:d.p.lod2Ratio)),"budget "+d.preset);
+    if(l==0)nearHeight=mesh.high[2];else if(d.family==Family::Grass||d.family==Family::Riparian)check(mesh.high[2]<=nearHeight*1.12+.1,"LOD never stretches full-height grass/riparian blades "+d.preset);
     auto foliage=std::count_if(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves&&(f.material==Leaf||f.material==Needle||f.material==Grass||f.material>=LeafLight);});
     std::set<unsigned> trunkOrgans;for(auto& face:mesh.faces)if(face.part==Part::Trunk)trunkOrgans.insert(face.organ);
     if(d.family==Family::Cactus&&d.p.organ==2){

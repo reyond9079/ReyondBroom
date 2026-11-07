@@ -9,6 +9,7 @@ class NativeInput:
  def __init__(self,process,live_path,live,wait,output):
   self.process,self.path,self.live,self.wait,self.output=process,live_path,live,wait,output
   self.hwnd=None
+  self.in_console=False
   if os.name=='nt':
    from ctypes import wintypes
    from pywinauto import Desktop,keyboard
@@ -25,6 +26,7 @@ class NativeInput:
    self.X,self.XK,self.xtest,self.d=X,XK,xtest,display.Display()
 
  def settle(self):
+  if self.in_console:return
   for _ in range(2):
    stamp=self.path.stat().st_mtime_ns
    self.wait(lambda:self.path.stat().st_mtime_ns!=stamp)
@@ -119,4 +121,8 @@ class NativeInput:
    button=4 if steps>0 else 5;self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.xtest.fake_input(self.d,self.X.ButtonRelease,button)
   self.d.sync();time.sleep(.25)
 
- def console(self,command):self.key('grave');self.text(command);self.key('enter');self.key('grave');time.sleep(.25)
+ def console(self,command):
+  self.in_console=True
+  try:self.key('esc',('shift',));self.text(command);self.key('enter');self.key('esc');time.sleep(.25)
+  finally:self.in_console=False
+  self.settle()

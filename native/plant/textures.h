@@ -91,7 +91,7 @@ inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const
         auto sample=texel(d,mat,u,v);size_t at=((mat/4*tile+y)*size+mat%4*tile+x)*4;
         for(int a=0;a<3;a++)out.albedo.rgba[at+a]=unsigned(std::round(sample.color[a]*255));
         out.albedo.rgba[at+3]=unsigned(sample.alpha*255);heights[y*tile+x]=sample.height;
-        if(imported&&mat==Leaf&&imported->width>0&&imported->height>0&&imported->rgba.size()==size_t(imported->width)*imported->height*4) {
+        if(imported&&(mat==Leaf||mat==Needle||mat==Grass)&&imported->width>0&&imported->height>0&&imported->rgba.size()==size_t(imported->width)*imported->height*4) {
           int sx=std::clamp(int(u*(imported->width-1)),0,imported->width-1),sy=std::clamp(int(v*(imported->height-1)),0,imported->height-1);
           for(int a=0;a<4;a++)out.albedo.rgba[at+a]=imported->rgba[(sy*imported->width+sx)*4+a];
         }

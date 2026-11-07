@@ -82,6 +82,7 @@ static void shaderPackStage(const std::filesystem::path& directory){
  shaderPackCopy(directory,true);
  size_t length=0;auto bytes=static_cast<char*>(files->LoadFile("scripts/shaderlist.txt",&length));
  std::string list=bytes?std::string(bytes,length):std::string();if(bytes)core->Free(bytes);
+ auto staged=directory/"scripts/shaderlist.txt";if(std::filesystem::is_regular_file(staged))list+="\n"+q1Read(staged);
  if(list.find("reyond-pack")==list.npos)list+="\nreyond-pack\n";
  std::ofstream(directory/"scripts/shaderlist.txt")<<list;
 }

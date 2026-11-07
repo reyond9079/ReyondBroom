@@ -3,6 +3,12 @@
 #include "ftebroom_raw_preview.h"
 #include "ftebroom_quake1.h"
 namespace ftebroom {
+inline std::string appendShaderList(std::string list,const std::set<std::string>& names){
+ std::set<std::string> present;std::istringstream in(list);std::string name;
+ while(in>>name){if(name.rfind("//",0)==0){std::getline(in,name);continue;}present.insert(name);}
+ for(auto& value:names)if(!present.count(value))list+="\n"+value+"\n";
+ return list;
+}
 inline bool generatedIvyPath(const std::string& name){
  if(name.rfind("models/reyond-plugins/ivy-",0)!=0||name.find_first_of("\\:\r\n")!=name.npos)return false;
  for(auto& part:std::filesystem::u8path(name))if(part==".."||part==".")return false;

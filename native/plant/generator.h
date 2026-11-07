@@ -251,7 +251,7 @@ struct Generator {
       std::vector<std::array<double,2>> profile;
       for(int i=0;i<=p.segments*2;i++){double t=double(i)/(p.segments*2);profile.push_back({std::max(.01,p.radius*(p.spread/.72)*std::pow(std::sin(pi*t),.40)),height*t});}
       b.lathe({},profile,std::max(12,int(p.ribs)*2),CactusSkin,Part::Trunk,.04+p.irregularity*.18);
-      for(int i=0;i<count(100,12);i++) {double t=(i+.5)/count(100,12),a=i*2.399963;double r=p.radius*std::pow(std::sin(pi*t),.40);
+      for(int i=0;i<count(100,12);i++) {double t=(i+.5)/count(100,12),a=i*2.399963;double r=p.radius*(p.spread/.72)*std::pow(std::sin(pi*t),.40);
         b.leaf({std::cos(a)*r,std::sin(a)*r,height*t},{std::cos(a),std::sin(a),.3},{0,0,1},p.radius*p.spines*.28,.035,2,1,Wood,Part::Leaves,0,0,p.leafProfile);}
       flower({0,0,height},p.flowerSize,doc.seed);
     }else {
@@ -273,7 +273,8 @@ struct Generator {
       double h=height*r.range(.95-p.irregularity*.7,1);int nodes=p.branches;V last=base;
       for(int j=0;j<nodes;j++) {
         double t=double(j+1)/nodes;V tip=add(base,{std::cos(a)*h*p.curvature*.16*t*t,std::sin(a)*h*p.curvature*.16*t*t,h*t});
-        b.tube({last,tip},p.radius*(1-.4*t),p.radius*(1-.45*t),sides(),Bark,Part::Trunk);
+        std::vector<V> section;int subdivisions=count(p.segments,2);for(int k=0;k<=subdivisions;k++)section.push_back(add(last,mul(sub(tip,last),double(k)/subdivisions)));
+        b.tube(section,p.radius*(1-.4*t),p.radius*(1-.45*t),sides(),Bark,Part::Trunk);
         b.lathe(tip,{{p.radius*.9,-p.radius*.2},{p.radius*1.13,0},{p.radius*.86,p.radius*.25}},sides(),Wood,Part::Primary);
         double az=j*2.399963+a;
         if(j>nodes/4) {
@@ -285,12 +286,12 @@ struct Generator {
     }
   }
   void vine() {
-    std::vector<V> path;int n=std::max(12,p.leaves);
+    std::vector<V> path;int n=std::max(12,count(p.segments*4,12));
     for(int i=0;i<=n;i++){double t=double(i)/n;V q=trunk(t);q[0]+=height*p.spread*.20*std::sin(t*pi*3);q[1]+=height*p.spread*.15*std::cos(t*pi*2)+height*p.irregularity*.04*std::sin(t*13);path.push_back(q);}
     b.tube(path,p.radius,p.radius*.25,sides(),Bark,Part::Trunk);
-    for(int i=1;i<n;i++) {
+    for(int i=1;i<p.leaves;i++) {
       double a=i*2.399963;V aim=unit({std::cos(a),std::sin(a),-.18});
-      auto q=path[i],tip=add(q,mul(aim,p.leafSize*.32));b.tube({q,tip},p.radius*.25,.03,3,Bark,Part::Twigs);
+      auto q=path[size_t(double(i)*n/p.leaves)],tip=add(q,mul(aim,p.leafSize*.32));b.tube({q,tip},p.radius*.25,.03,3,Bark,Part::Twigs);
       if(i%std::max(1,lod+1)==0)addLeaf(tip,aim,{0,0,1},mix(doc.seed,i));
     }
   }

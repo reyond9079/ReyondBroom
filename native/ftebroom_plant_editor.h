@@ -219,6 +219,10 @@ static void plantAddToMap() {
   for(auto& root:destinations) {
     plantWriteNew(root/std::filesystem::u8path(material+".tga"),plants::tga(s.result->maps->albedo));
     plantWriteNew(root/std::filesystem::u8path(script),plants::shader(material,material+".tga"));
+    auto list=root/"scripts/shaderlist.txt";std::string shaderNames;
+    if(std::filesystem::is_regular_file(list))shaderNames=q1Read(list);
+    else {size_t size=0;auto data=static_cast<char*>(files->LoadFile("scripts/shaderlist.txt",&size));if(data){shaderNames.assign(data,size);core->Free(data);}}
+    bb::atomicWrite(list,ftebroom::appendShaderList(shaderNames,{id}));
     plantWriteNew(root/std::filesystem::u8path(model),bytes);
     plantWriteNew(root/std::filesystem::u8path(model+".reyond.json"),metadata.dump(2));
   }
@@ -240,6 +244,18 @@ static bool plantBeforeDocument(const std::string& next) {
 static void QDECL plantCommand() {
   char action[64]={},argument[160]={};commands->Argv(1,action,sizeof action);commands->Argv(2,argument,sizeof argument);
   plantAction([&](){
+    if(std::string(action)=="qa-assets") {
+      if(!plantState.qa||!cvars->GetFloat("ftebroom_skip_setup"))throw std::runtime_error("Asset QA requires a disposable plant session");
+      auto source=q1Read(documentPath("maps/plant-reopened.map"));auto models=ftebroom::generatedIvyModels(source);
+      if(models.empty())throw std::runtime_error("No placed plant in the reopened map");
+      auto folder=documentPath("plant-qa-build");stageGeneratedModels(source,folder);bb::atomicWrite(folder/"plant.map",source);
+      auto entities=ftebroom::rawPreviewEntities(source);std::string classic;
+      for(auto& e:entities){if(e.get("_reyondbroom_authoring")=="1")e.fields["classname"]="func_model";classic+="{\n";for(auto& f:e.fields)classic+=ftebroom::prefab::quote(f.first)+" "+ftebroom::prefab::quote(f.second)+"\n";classic+=e.geometry+"}\n";}
+      size_t migrated=0;auto adapted=ftebroom::prepareStaticModels(classic,2,migrated);
+      if(migrated!=models.size()||adapted.find("misc_model")==adapted.npos)throw std::runtime_error("Quake 1 static-model adaptation failed");
+      bb::atomicWrite(folder/"q1-fte-static.map",adapted);
+      bb::atomicWrite(documentPath("plant-asset-qa.json"),plants::Json{{"models",models},{"q1_migrated",migrated},{"staged",folder.u8string()}}.dump(2));return;
+    }
     if(std::string(action)=="shader") {
       auto& pending=plantState.pendingShaders;auto found=pending.find(argument);
       if(found!=pending.end()){draw->LoadImageShader(found->second.first.c_str(),found->second.second.c_str());pending.erase(found);}return;

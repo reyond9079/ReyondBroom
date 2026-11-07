@@ -135,7 +135,7 @@ inline void validate(const Project& d) {
   for(auto color:{p.bark,p.leaf,p.flower})for(double x:color)bounded(x,0,1);
   for(double x:p.growth)bounded(x,0,2);for(double x:p.leafProfile)bounded(x,0,2);
   for(auto v:p.controls)for(double x:v)bounded(x,-2,2);
-  if(p.height<.1||p.height>2048||p.radius<.01||p.radius>200||p.branches<1||p.branches>48||p.depth<1||p.depth>4||
+  if(p.height<.1||p.height>2048||p.radius<.01||p.radius>200||p.branches<(d.family==Family::Cactus?0:1)||p.branches>48||p.depth<1||p.depth>4||
     p.segments<3||p.segments>20||p.sides<3||p.sides>20||p.leaves<1||p.leaves>40||p.clumps<1||p.clumps>40||
     p.budget<256||p.budget>180000||p.petals<3||p.petals>40||p.flowerLayers<1||p.flowerLayers>8||
     p.season<0||p.season>3||p.quality<0||p.quality>3||p.foliageMode<0||p.foliageMode>4||p.leafShape<0||p.leafShape>7||

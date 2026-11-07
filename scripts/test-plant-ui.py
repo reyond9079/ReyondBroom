@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,6 +19,9 @@ settings=data/'plants/library.json'
 if settings.exists():
  value=json.loads(settings.read_text());value['advanced']=False;settings.write_text(json.dumps(value))
 path=data/'plant-ui-live.json';path.unlink(missing_ok=True)
+for name in ['plant-placed','plant-undo','plant-redo','plant-reopened']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
+(data/'plant-asset-qa.json').unlink(missing_ok=True)
+shutil.rmtree(data/'plant-qa-build',ignore_errors=True)
 (data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\nin 12 ftebroom_plant qa dark\n')
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
@@ -89,13 +93,26 @@ try:
  click('add-map');wait(lambda:live()['model']);model=Path(live()['model']);expect(model.is_file() and model.read_bytes()[:4]==b'IDP3','Add to Map writes a native MD3 asset')
  manifest=json.loads(Path(str(model)+'.reyond.json').read_text());expect(any(s.endswith('.shader') for s in manifest['dependencies']),'placed asset retains its alpha-cutout shader dependency')
  placed=data/'maps/plant-placed.map';placed.unlink(missing_ok=True)
- console('mod_terrain_save "" maps/plant-placed.map');wait(lambda:placed.exists());map_text=placed.read_text(errors='replace');relative=model.relative_to(data).as_posix()
+ console('mod_terrain_save "" plant-placed');wait(lambda:placed.exists());map_text=placed.read_text(errors='replace');relative=model.relative_to(data).as_posix()
  expect(relative in map_text and '"_reyondbroom_authoring" "1"' in map_text,'map save retains the generated model reference and authoring marker')
- console('ftebroom_undo');console('mod_terrain_save "" maps/plant-undo.map');undone=data/'maps/plant-undo.map';wait(lambda:undone.exists());expect(relative not in undone.read_text(errors='replace'),'map Undo removes the inserted entity')
- console('ftebroom_redo');console('mod_terrain_save "" maps/plant-redo.map');redone=data/'maps/plant-redo.map';wait(lambda:redone.exists());expect(relative in redone.read_text(errors='replace'),'map Redo restores the inserted entity')
- console('mapedit maps/plant-redo.map');time.sleep(2);console('mod_terrain_save "" maps/plant-reopened.map');reopened=data/'maps/plant-reopened.map';wait(lambda:reopened.exists());expect(relative in reopened.read_text(errors='replace'),'map reopen preserves the installed model')
+ console('ftebroom_undo');console('mod_terrain_save "" plant-undo');undone=data/'maps/plant-undo.map';wait(lambda:undone.exists());expect(relative not in undone.read_text(errors='replace'),'map Undo removes the inserted entity')
+ console('ftebroom_redo');console('mod_terrain_save "" plant-redo');redone=data/'maps/plant-redo.map';wait(lambda:redone.exists());expect(relative in redone.read_text(errors='replace'),'map Redo restores the inserted entity')
+ console('mapedit maps/plant-redo.map');time.sleep(2);console('mod_terrain_save "" plant-reopened');reopened=data/'maps/plant-reopened.map';wait(lambda:reopened.exists());expect(relative in reopened.read_text(errors='replace'),'map reopen preserves the installed model')
+ console('ftebroom_plant qa-assets');asset_report=data/'plant-asset-qa.json';wait(lambda:asset_report.exists());assets=json.loads(asset_report.read_text());staged=Path(assets['staged'])
+ expect(assets['q1_migrated']==1,'Quake 1 build copy adapts the authoring entity to the FTE static-model fallback')
+ expect((staged/relative).read_bytes()==model.read_bytes(),'build snapshot stages the exact MD3 bytes')
+ for dep in manifest['dependencies']:expect((staged/dep).read_bytes()==(data/dep).read_bytes(),'build snapshot dependency '+dep)
+ expect(model.stem in (staged/'scripts/shaderlist.txt').read_text(),'Quake III shader list includes the generated cutout material')
+ shutil.copytree(staged,out/'build-snapshot',dirs_exist_ok=True);shutil.copy2(asset_report,out/asset_report.name)
  for f in [placed,undone,redone,reopened]:shutil.copy2(f,out/f.name)
- screenshot('plant-in-editor');(out/'final-state.json').write_text(json.dumps(live(),indent=2));shutil.copy2(source,out/source.name)
+ (out/'final-state.json').write_text(json.dumps(live(),indent=2));shutil.copy2(source,out/source.name)
+ # Close the authoring window and capture the installed model in the map viewport.
+ window=live()['widgets']['window'];ui.click(window['x']+window['width']-16,window['y']+14);click('confirm-discard');wait(lambda:not live()['open'])
+ entities=re.findall(r'\{([^{}]*)\}',reopened.read_text(errors='replace'))
+ entity=next(e for e in entities if relative in e);origin=re.search(r'"origin"\s+"([^"]+)"',entity)
+ xyz=[float(x) for x in origin.group(1).split()] if origin else [0,0,0]
+ console('ftebroom_camera_restore '+' '.join(str(x+d) for x,d in zip(xyz,[320,-400,260]))+' 20 130 0 75');time.sleep(1)
+ screenshot('plant-placed-map');expect(not live()['open'],'placed model remains in the map after closing Plant Editor')
  print('Plant UI:',len(checks),'checks passed',flush=True)
 finally:
  try:(out/'last-state.json').write_text(json.dumps(live(),indent=2));ImageGrab.grab().save(out/'last-desktop.png')

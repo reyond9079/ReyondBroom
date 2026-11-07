@@ -8,6 +8,7 @@ inline std::vector<Project> presets() {
     Project d;d.preset=d.species=id;d.name=name;d.family=family;d.nodes=defaultNodes();d.p.height=height;
     if(family==Family::Flower||family==Family::Vine||family==Family::Fern)d.p.bark={.20,.34,.10};
     if(family==Family::Mushroom)d.p.bark={.82,.77,.65};
+    if(family==Family::Bush)d.p.depth=2;
     out.push_back(d);return out.back();
   };
   out.reserve(32);

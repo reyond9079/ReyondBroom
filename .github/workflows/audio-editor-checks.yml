@@ -12,9 +12,13 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
+          path-type: inherit
           update: false
           install: >-
             mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
@@ -62,7 +66,8 @@ jobs:
         run: |
           cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
           cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
-          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+          python scripts/build-profile-support.py core --build-dir deps/profile-core --generator "MinGW Makefiles"
+          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
       - uses: actions/upload-artifact@v4
         if: always()
         with:

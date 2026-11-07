@@ -10,18 +10,20 @@ static bool runSaveImported(RunImport imported)
 {
   auto oldVariables=runVariables;
   const auto oldCount=runProfiles.size();
-  for(auto& profile:imported.profiles){
-    const auto base=profile.name;
-    for(int suffix=1;std::any_of(runProfiles.begin(),runProfiles.end(),[&](const auto& p){return p.name==profile.name;});++suffix)
-      profile.name=base+" (TrenchBroom "+std::to_string(suffix)+")";
-    runProfiles.push_back(std::move(profile));
+  const auto oldEngines=runEngines;
+  for(auto engine:imported.engines){
+    const auto id=engine.id;int suffix=1;
+    while(std::any_of(runEngines.begin(),runEngines.end(),[&](const auto& e){return e.id==engine.id;}))engine.id=id+"-import-"+std::to_string(suffix++);
+    if(id!=engine.id)for(auto& p:imported.profiles)for(auto& t:p.tasks)if(t.engineProfileId==id)t.engineProfileId=engine.id;
+    runEngines.push_back(std::move(engine));
   }
+  for(auto& profile:imported.profiles)runProfiles.push_back(std::move(profile));
   for(const auto& variable:imported.missingVariables){
     auto& value=runVariables[variable.first];
     if(value.empty())value=variable.second;
   }
   if(!runSaveProfiles()){
-    runProfiles.resize(oldCount);
+    runProfiles.resize(oldCount);runEngines=oldEngines;
     runVariables=std::move(oldVariables);
     return false;
   }
@@ -64,8 +66,9 @@ static void runImportPanel()
   ImGui::SetNextWindowSize({660*uiScale(),520*uiScale()},ImGuiCond_FirstUseEver);
   bool open=true;
   if(!ImGui::BeginPopupModal("Import TrenchBroom profiles",&open))return;
+  if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
   ImGui::TextWrapped("Select a local CompilationProfiles.cfg from TrenchBroom. Imported steps are saved without running them.");
-  if(runText("Profile file",runImportPath))runImportReviewed=false;
+  if(runText("Profile file",runImportPath))runImportReviewed=false;runUiRecord("import-path");
   if(ImGui::CollapsingHeader("Browse files")){
     runText("Folder",runImportDirectory);
     if(ImGui::Button("Up one level")){
@@ -108,7 +111,7 @@ static void runImportPanel()
       runImportReviewed=true;
     }catch(const std::exception& error){runImportMessage=error.what();}
   }
-  ImGui::EndDisabled();
+  runUiRecord("import-review");ImGui::EndDisabled();
   ImGui::SameLine();
   ImGui::BeginDisabled(!runImportReviewed||runImportPreview.profiles.empty());
   if(ImGui::Button("Import profiles")){
@@ -117,9 +120,9 @@ static void runImportPanel()
       ImGui::CloseCurrentPopup();
     }else runImportMessage=runError;
   }
-  ImGui::EndDisabled();
+  runUiRecord("import-commit");ImGui::EndDisabled();
   ImGui::SameLine();
-  if(ImGui::Button("Cancel"))ImGui::CloseCurrentPopup();
+  if(ImGui::Button("Cancel"))ImGui::CloseCurrentPopup();runUiRecord("import-cancel");
   if(!runImportMessage.empty())ImGui::TextWrapped("%s",runImportMessage.c_str());
   if(runImportReviewed){
     ImGui::BeginChild("Profile review",{0,0},ImGuiChildFlags_Borders);

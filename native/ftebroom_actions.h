@@ -257,8 +257,9 @@ static void executeAction(const Action& a, bool down = true)
       documentRequest("__new");
     else if (name == "revert" && !documentFile.empty())
       documentRequest("@"+documentFile.u8string());
-    else if (name == "exit")
-      documentRequest("exit");
+    else if (name == "exit") {
+      if(runActive)runUiShow(3);else documentRequest("exit");
+    }
     else if (name == "save" && !documentUntitled)
       documentSave(documentName);
     else if (name == "save" || name == "saveas")
@@ -452,6 +453,7 @@ static void actionMenuGroup(const char* group,bool visibility=false)
           false,
           actionAvailable(a) && !held))
         executeAction(a);
+      runUiRecordGlobal(a.id);
     }
 }
 static bool symmetryWindow=false;
@@ -478,8 +480,10 @@ static void symmetryPanel(){
 static void actionMenus()
 {
   initActions();
-  for (auto group : {"File", "Edit", "View", "Run", "Help"})
-    if (ImGui::BeginMenu(group))
+  if(runUiLive)runUiGlobalRects=nlohmann::json::object();
+  for (auto group : {"File", "Edit", "View", "Run", "Help"}){
+    const bool opened=ImGui::BeginMenu(group);runUiRecordGlobal(std::string("menu/")+group);
+    if (opened)
     {
       actionMenuGroup(group);
       if(std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
@@ -546,6 +550,7 @@ static void actionMenus()
       }
       ImGui::EndMenu();
     }
+  }
 }
 static void actionReferenceWindow()
 {

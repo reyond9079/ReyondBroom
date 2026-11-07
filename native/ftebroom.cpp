@@ -319,6 +319,7 @@ static void panel(float w, float h)
   linuxPlatformPump(ctrlHeld);
   io.MouseDrawCursor = false;
 #endif
+  if(runUiNavigation())io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::NewFrame();
   if(tourActive){
     uiHasScene=true;uiScenePos={0,0};uiSceneSize={w,h};popupOpen=false;viewCompute(w,h);
@@ -1143,6 +1144,10 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
 {
   initialize();
   auto& io = ImGui::GetIO();
+  if(runUiLive&&(type==1||type==2)){
+    if(runUiInputTrace.size()>=100)runUiInputTrace.erase(runUiInputTrace.begin());
+    runUiInputTrace.push_back({{"type",type},{"key",key},{"unicode",unicode},{"ctrlCode",input->GetKeyCode("ctrl",nullptr)},{"backspaceCode",input->GetKeyCode("backspace",nullptr)},{"ctrl",io.KeyCtrl},{"active",ImGui::GetActiveID()},{"nav",runUiNavigation()}});
+  }
   if(modelEditorInput(type,key,x,y)){
     if(type==0){io.AddMousePosEvent(modelEditCameraCursor.x,modelEditCameraCursor.y);panel(w,h);}
     return qtrue;
@@ -1440,6 +1445,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
       {"backspace", ImGuiKey_Backspace},
       {"enter", ImGuiKey_Enter},
       {"tab", ImGuiKey_Tab},
+      {"space", ImGuiKey_Space},
       {"del", ImGuiKey_Delete},
       {"ins", ImGuiKey_Insert},
       {"leftarrow", ImGuiKey_LeftArrow},
@@ -1462,7 +1468,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    if (!soundKeyboardEvent(key, down)) dispatchAction(key, down, inScene);
+    if (!soundKeyboardEvent(key, down)&&(!down||!runUiNavigation())) dispatchAction(key, down, inScene);
   }
   return qtrue;
 }

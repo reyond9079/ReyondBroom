@@ -32,3 +32,30 @@ index 3540236..e061bd2 100644
  	Key_Dest_Remove(kdm_console);
  	if (Cmd_Exists("menu_quit") || Cmd_AliasExist("menu_quit", RESTRICT_LOCAL))
  		Cmd_ExecuteString("menu_quit prompt", RESTRICT_LOCAL);	//our builtin menus use this form
+diff --git a/engine/client/in_sdl.c b/engine/client/in_sdl.c
+--- a/engine/client/in_sdl.c
++++ b/engine/client/in_sdl.c
+@@ -1884,7 +1884,10 @@
+ 				vid.activeapp = false;
+ 				break;
+ 			case SDL_WINDOWEVENT_CLOSE:
+-				Cbuf_AddText("quit prompt\n", RESTRICT_LOCAL);
++				if (Cmd_Exists("ftebroom_ui"))
++					M_Window_ClosePrompt();
++				else
++					Cbuf_AddText("quit prompt\n", RESTRICT_LOCAL);
+ 				break;
+ 			}
+ 			break;
+@@ -2043,7 +2046,10 @@
+ 			break;
+ #endif
+ 		case SDL_QUIT:
+-			Cbuf_AddText("quit\n", RESTRICT_LOCAL);
++			if (Cmd_Exists("ftebroom_ui"))
++				M_Window_ClosePrompt();
++			else
++				Cbuf_AddText("quit\n", RESTRICT_LOCAL);
+ 			break;
+ 
+ #if SDL_VERSION_ATLEAST(2,0,0)

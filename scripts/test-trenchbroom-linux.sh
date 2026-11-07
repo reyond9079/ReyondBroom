@@ -13,6 +13,6 @@ for case in run trenchbroom-native trenchbroom-restore; do
   if rg 'FTEBROOM_RUN_FAIL|CSQC_Abort|Assertion .*failed' "$qa/$case.log"; then exit 1; fi
 done
 for check in customer_five_profiles_imported customer_seventy_tasks_preserved customer_profiles_saved; do rg "FTEBROOM_RUN_PASS $check" "$qa/trenchbroom-native.log"; done
-for check in customer_profiles_restored customer_expression_expanded_after_restore customer_single_core_uses_one_thread; do rg "FTEBROOM_RUN_PASS $check" "$qa/trenchbroom-restore.log"; done
+for check in customer_profiles_restored customer_expression_expanded_after_restore customer_single_core_matches_trenchbroom; do rg "FTEBROOM_RUN_PASS $check" "$qa/trenchbroom-restore.log"; done
 test "$(rg -c 'FTEBROOM_RUN_PASS ' "$qa/run.log")" = 15
 cp "$bundle/ftebroom/trenchbroom-import.png" "$qa/"

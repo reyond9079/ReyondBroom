@@ -116,9 +116,19 @@ try:
  xyz=[float(x) for x in origin.group(1).strip("'").split()] if origin else [0,0,0]
  console('ftebroom_camera_restore '+' '.join(str(x+d) for x,d in zip(xyz,[320,-400,260]))+' 20 130 0 75');time.sleep(1)
  screenshot('plant-placed-map');expect(not live()['open'],'placed model remains in the map after closing Plant Editor')
+ if os.name=='nt':
+  console('ftebroom_show_models');console('r_drawentities');console('modellist')
+  console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
+  console('fs_flush');console('r_reloadshaders');time.sleep(2);screenshot('plant-shaders-reloaded')
+  console('modellist');console('condump plant-diagnostic')
  print('Plant UI:',len(checks),'checks passed',flush=True)
 finally:
  try:(out/'last-state.json').write_text(json.dumps(live(),indent=2));ImageGrab.grab().save(out/'last-desktop.png')
  except Exception:pass
  if process.poll() is None:process.terminate();process.wait(timeout=20)
  stream.close()
+ for log in root.rglob('qconsole.log'):
+  try:shutil.copy2(log,out/'engine-qconsole.log');break
+  except OSError:pass
+ for log in data.glob('plant-diagnostic*'):
+  if log.is_file():shutil.copy2(log,out/log.name)

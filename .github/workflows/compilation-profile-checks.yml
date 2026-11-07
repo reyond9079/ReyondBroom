@@ -58,9 +58,18 @@ jobs:
           if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
           Copy-Item mesa/extracted/x64/*.dll bundle/ReyondBroom-Windows-x64/bin -Force
           Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
-          python -m pip install Pillow pywinauto
+          python -m pip install Pillow==12.0.0 pywinauto trimesh==4.8.3 numpy==2.3.4
       - name: Exercise actual Windows controls with OS input
         run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
+      - name: Exercise the prepared Plant Editor with OS input
+        shell: pwsh
+        run: |
+          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Prepared Plant UI acceptance failed' }
+          python scripts/test-plant-exports.py qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Prepared plant reimport failed' }
+          python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Prepared plant BSP failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

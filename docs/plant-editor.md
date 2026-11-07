@@ -107,7 +107,8 @@ trimesh/Pillow independently load OBJ materials and round-trip embedded GLBs.
 `scripts/test-plant-ui.py` drives the actual app through OS mouse/keyboard input;
 its JSON observations contain state and widget rectangles, never UI mutations.
 It exercises projects, controls, history, exports, presets, themes, placement,
-map history/reopen and build dependency staging. `scripts/test-plant-map.py`
+map history/reopen, build dependency staging and a screenshot assertion that the
+placed foliage is actually visible after reopening the map. `scripts/test-plant-map.py`
 invokes the bundled q3map2 and checks plant triangles/materials in the resulting
 BSP. These checks run alongside the existing compilation-profile regression on
 Windows, native Linux and Linux SDL2. Screenshots come from the running app.

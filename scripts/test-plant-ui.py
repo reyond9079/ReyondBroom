@@ -143,6 +143,10 @@ try:
   console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
   if a.scene_only:
    console('coredump_csqc')
+   console('r_showshader textures/reyond-plugins/'+model.stem)
+   console('r_shaderlist')
+   console('r_showtris 1');screenshot('plant-wire-diagnostic');console('r_showtris 0')
+   console('r_novis 1');console('r_nocull 1');screenshot('plant-no-cull-diagnostic')
   console('condump plant-diagnostic')
  pixels=visible_foliage(out/'plant-placed-map.png');(out/'scene-render-result.json').write_text(json.dumps({'visible_foliage_pixels':pixels},indent=2));expect(pixels>250,'placed plant visibly renders in the map after reopen')
  print('Plant UI:',len(checks),'checks passed',flush=True)

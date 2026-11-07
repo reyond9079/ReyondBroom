@@ -75,7 +75,9 @@ class NativeInput:
  def mod(self,name,down):
   if os.name=='nt':
    code={'ctrl':17,'shift':16,'alt':18}[name];scan=self.user.MapVirtualKeyW(code,0)
-   self.user.SendMessageW(self.hwnd,0x100 if down else 0x101,code,1|(scan<<16)|(0 if down else 3<<30));self.settle()
+   # Mouse events below enter the OS queue. Their modifier state must come
+   # from that same queue, rather than an isolated WM_KEYDOWN to the window.
+   self.user.keybd_event(code,scan,0 if down else 2,0);time.sleep(.05);self.settle()
   else:
    code=self.d.keysym_to_keycode(self.XK.string_to_keysym({'ctrl':'Control_L','shift':'Shift_L','alt':'Alt_L'}[name]));self.xtest.fake_input(self.d,self.X.KeyPress if down else self.X.KeyRelease,code);self.d.sync();time.sleep(.07)
 
@@ -87,11 +89,13 @@ class NativeInput:
  def click(self,x,y,button=1,mods=()):
   self.move(x,y)
   for mod in mods:self.mod(mod,True)
-  if os.name=='nt':
-   self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0);time.sleep(.10);self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
-  else:
-   self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync();time.sleep(.08);self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
-  for mod in reversed(mods):self.mod(mod,False)
+  try:
+   if os.name=='nt':
+    self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0);time.sleep(.10);self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
+   else:
+    self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync();time.sleep(.08);self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
+  finally:
+   for mod in reversed(mods):self.mod(mod,False)
   time.sleep(.25)
   self.settle()
 
@@ -105,9 +109,10 @@ class NativeInput:
   self.settle()
 
  def text(self,text):
-  if any(ord(c)>127 for c in text):
+  if any(ord(c)>127 for c in text) or (os.name=='nt' and len(text)>20):
    # Clipboard paste is real OS input and preserves UTF-8 paths that cannot be
-   # represented by the active keyboard layout. ASCII still uses key events.
+   # represented by the active keyboard layout. Long Windows paths/commands
+   # also paste through the OS; short ASCII probes still use key events.
    if os.name=='nt':
     from ctypes import wintypes
     u,k=self.user,ctypes.windll.kernel32;k.GlobalAlloc.argtypes=[wintypes.UINT,ctypes.c_size_t];k.GlobalAlloc.restype=wintypes.HGLOBAL;k.GlobalLock.argtypes=[wintypes.HGLOBAL];k.GlobalLock.restype=ctypes.c_void_p;k.GlobalUnlock.argtypes=[wintypes.HGLOBAL];u.SetClipboardData.argtypes=[wintypes.UINT,wintypes.HANDLE];u.SetClipboardData.restype=wintypes.HANDLE

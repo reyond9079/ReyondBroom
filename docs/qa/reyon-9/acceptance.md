@@ -64,9 +64,10 @@ and [same-machine performance data](performance.md).
 - `scripts/test-plant-ui.py`, `test-plant-exports.py`, `test-plant-map.py`:
   OS controls, project/variation/preset operations, independent import, real
   q3map2 compilation, dependency staging and visible map reopen/Undo/Redo.
-- `scripts/test-viewport-create.py`: 39 OS-input assertions for both commands,
+- `scripts/test-viewport-create.py`: 40 OS-input assertions for both commands,
   3D/orthographic views, frozen click after camera movement, Save/update/Save As,
-  Unicode paths, overwrite refusal, failed empty export, dirty-guard Save,
+  Unicode paths, short ASCII typing after the console, overwrite refusal,
+  failed empty export, dirty-guard Save,
   history-source copies, stale maps, deleted entities, tree/shrub/grass routes
   and real scene pixels. Clicking visible crown pixels verifies full transformed
   model bounds rather than only the origin marker. Screenshots retain menu,

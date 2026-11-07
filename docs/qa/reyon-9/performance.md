@@ -75,6 +75,25 @@ wall timings and slow-event preset names to distinguish the panel's work from
 whole-engine/render/scheduler stalls. Inspect that evidence before interpreting
 a slow software-rendered frame as synchronous mesh generation.
 
+These frame/RSS comparisons precede the final auxiliary-map upload optimization.
+The final editor caches the uploaded atlas across geometry/LOD/display changes;
+normal and ORM upload only when their texture inspector is opened. The packaged
+QA JSON records the resulting `plant_main_thread` timings independently of the
+whole-frame renderer timings; the albedo/normal/ORM inspector is exercised with
+real OS input in the platform regression suite.
+
 All shader/engine calls remain on the main thread. Texture generation's hundreds
 of milliseconds occur on the worker. Camera changes do not regenerate meshes.
 No claim of zero warmup stalls or universally sub-100 ms engine frames is made.
+
+## Final upload-cache check
+
+A further 12-control run of the final upload-cache candidate records
+**37.12 ms maximum Plant Editor panel work, 0 frames above 100 ms / 604 frames**;
+its recent panel p95 is 14.60 ms. This run was deliberately
+concurrent with the other native catalogue capture and does **not** replace the
+isolated whole-frame/FPS comparison above. See [ui-final-panel.json](ui-final-panel.json)
+for per-selection panel timings, geometry/cache/texture counts and module hash.
+Whole-engine frame jitter remains visible separately in the same telemetry.
+The earlier roughly 109 ms first-plant panel upload is no longer observed in
+this control run after deferring the unused maps and caching unchanged atlases.

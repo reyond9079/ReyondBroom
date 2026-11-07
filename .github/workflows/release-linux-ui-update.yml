@@ -37,7 +37,7 @@ jobs:
           python-version: '3.12'
       - name: Install build and validation tools
         run: |
-          if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h; then
+          if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! command -v xclip || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h; then
             if test -f /etc/apt/apt-mirrors.txt; then
               printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
             fi
@@ -192,6 +192,7 @@ jobs:
       - name: Validate packaged Create / Save in both themes and window sizes
         shell: pwsh
         run: |
+          $env:RB_QA_RENDERER = 'gl rb_qa_opengl.dll'
           python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
           foreach ($theme in @('dark','light')) {
             foreach ($width in @(1920,1024)) {

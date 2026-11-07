@@ -1,7 +1,7 @@
 name: Compilation profile parity
 on:
   pull_request:
-    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', '.github/workflows/compilation-profile-checks.yml']
+    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', 'docs/qa/reyon-9/**', '.github/workflows/compilation-profile-checks.yml', '.github/workflows/release-linux-ui-update.yml']
   workflow_dispatch:
     inputs:
       prepared_run_id:

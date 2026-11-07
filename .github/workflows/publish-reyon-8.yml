@@ -29,9 +29,15 @@ jobs:
             const repo = context.repo;
             const source = '5f352468c4a0ad2b033709db451902ce6436aaab';
             const required = ['windows', 'linux (Linux-x64)', 'linux (Linux-SDL2-x64)'];
-            for (const run_id of [42375925014, 42375919998]) {
+            const {data: pr} = await github.rest.pulls.get({...repo, pull_number: 11});
+            if (!pr.merged || pr.merge_commit_sha !== context.sha) throw new Error('Expected merged PR 11');
+            const {data: checks} = await github.rest.actions.listWorkflowRuns({...repo,
+              workflow_id: 'compilation-profile-checks.yml', head_sha: pr.head.sha, status: 'completed', per_page: 100});
+            const ci = checks.workflow_runs.find(r => r.head_sha === pr.head.sha && r.conclusion === 'success');
+            if (!ci) throw new Error('The final PR head has no successful platform CI');
+            for (const [run_id, expected_sha] of [[ci.id, pr.head.sha], [42375919998, source]]) {
               const {data: run} = await github.rest.actions.getWorkflowRun({...repo, run_id});
-              if (run.head_sha !== source || run.status !== 'completed' || run.conclusion !== 'success')
+              if (run.head_sha !== expected_sha || run.status !== 'completed' || run.conclusion !== 'success')
                 throw new Error(`Required run ${run_id} did not pass for the packaged source`);
               const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...repo, run_id});
               for (const name of required)
@@ -78,7 +84,7 @@ jobs:
               'Проверены Windows x64, Linux x64 и Linux SDL2: сборка, тесты ядра, реальный ввод ОС, цвета/перезапуск и compile → BSP → argv/workdir процесса. Настоящие VKQuake 1.37.0 и Ironwail 0.8.2 загрузили собранную карту с LibreQuake на Linux. Windows-рендеры этих игр отдельно не проверялись.',
               '',
               `Упакованные бинарные файлы и соответствующие исходники: ${source}. В main дополнительно добавлен только этот проверяющий публикацию workflow.`,
-              'CI: https://github.com/reyond9079/ReyondBroom/actions/runs/42375925014',
+              `CI: https://github.com/reyond9079/ReyondBroom/actions/runs/${ci.id}`,
               'Пакеты: https://github.com/reyond9079/ReyondBroom/actions/runs/42375919998',
               'Инструкция: https://github.com/reyond9079/ReyondBroom/blob/main/docs/compilation-profiles-build.md',
               'Задача: https://reyond.atlassian.net/browse/REYON-8'

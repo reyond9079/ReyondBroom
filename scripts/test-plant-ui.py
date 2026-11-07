@@ -142,11 +142,14 @@ try:
   console('ftebroom_show_models');console('r_drawentities');console('version_modelformats')
   console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
   if a.scene_only:
-   console('coredump_csqc')
-   console('r_showshader textures/reyond-plugins/'+model.stem)
-   console('r_shaderlist')
-   console('r_showtris 1');screenshot('plant-wire-diagnostic');console('r_showtris 0')
-   console('r_novis 1');console('r_nocull 1');screenshot('plant-no-cull-diagnostic')
+   console('r_fullbright');console('r_forceprogramify');console('r_glsl_offsetmapping')
+   console('r_fullbright 1');screenshot('plant-fullbright-diagnostic')
+   shader_paths=[data/dep for dep in manifest['dependencies'] if dep.endswith('.shader')]
+   if live()['profile']==1:shader_paths += [Path(live()['assetSource'])/dep for dep in manifest['dependencies'] if dep.endswith('.shader')]
+   original=shader_paths[0].read_text()
+   for variant,text in [('identity',original.replace('rgbGen vertex','rgbGen identity')),('opaque',original.replace('rgbGen vertex','rgbGen identity').replace('alphaFunc GE128','')),('plain-program',original.replace('cull none','cull none\n program default2d#MASK=0.5#MASKLT=1').replace('rgbGen vertex','rgbGen identity'))]:
+    for path in shader_paths:path.write_text(text)
+    console('fs_restart');time.sleep(1);screenshot('plant-'+variant+'-diagnostic')
   console('condump plant-diagnostic')
  pixels=visible_foliage(out/'plant-placed-map.png');(out/'scene-render-result.json').write_text(json.dumps({'visible_foliage_pixels':pixels},indent=2));expect(pixels>250,'placed plant visibly renders in the map after reopen')
  print('Plant UI:',len(checks),'checks passed',flush=True)

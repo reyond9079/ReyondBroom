@@ -75,7 +75,9 @@ def start(label):
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
  ui.move(600,300);ui.settle()
 def stop():
- process.terminate();process.wait(timeout=15);stream.close()
+ # Preferences are explicitly saved and asserted above. End only this disposable
+ # QA process: SDL's SIGTERM handler opens the normal close-confirmation flow.
+ process.kill();process.wait(timeout=15);stream.close()
 def click(name,global_=False):
  r=wait(lambda:live()['globalWidgets' if global_ else 'widgets'].get(name));w={'x':0,'y':0} if global_ else live()['widgets']['window']
  ui.click(w['x']+r['x']+r['width']*.5,w['y']+r['y']+r['height']*.5)
@@ -133,5 +135,5 @@ try:
   time.sleep(8);ImageGrab.grab().save(out/'actual-engine.png')
  stop()
 finally:
- if 'process' in globals() and process.poll() is None:process.terminate();process.wait(timeout=15)
+ if 'process' in globals() and process.poll() is None:process.kill();process.wait(timeout=15)
  if 'stream' in globals():stream.close()

@@ -211,7 +211,7 @@ static void plantAddToMap() {
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
   if(gameProfile==3||gameProfile==4)throw std::runtime_error("This profile requires MD2 or studio MDL. Export OBJ, convert with Model Editor, then place its compatible model.");
   if(gameProfile==2&&!s.allowFteQ1)throw std::runtime_error("Enable the explicit FTE static-model extension for Quake 1, or export and convert to MDL for a compatible mod.");
-  auto id=plants::assetId(s.doc,s.lod),material="textures/reyond-plugins/"+id,model="models/reyond-plugins/"+id+".md3",script="scripts/"+id+".shader";
+  auto id=plants::assetId(s.doc,s.lod)+(gameProfile==0?"-q3":"-fte"),material="textures/reyond-plugins/"+id,model="models/reyond-plugins/"+id+".md3",script="scripts/"+id+".shader";
   auto& mesh=s.result->lods[s.lod];auto bytes=plants::md3(mesh,material); // Validate before writing anything.
   auto source=documentPath("ftebroom.cfg").parent_path();std::vector<std::filesystem::path> destinations{source};
   // FTE may have an authoring asset directory without a separate runtime mod.
@@ -221,7 +221,7 @@ static void plantAddToMap() {
   plants::Json metadata={{"kind","reyondbroom-authoring-model"},{"low",mesh.low},{"high",mesh.high},{"dependencies",{material+".tga",script}},{"plantProject",plants::serialize(s.doc)}};
   for(auto& root:destinations) {
     plantWriteNew(root/std::filesystem::u8path(material+".tga"),plants::tga(s.result->maps->albedo));
-    plantWriteNew(root/std::filesystem::u8path(script),plants::shader(material,material+".tga"));
+    plantWriteNew(root/std::filesystem::u8path(script),plants::shader(material,material+".tga",gameProfile!=0));
     auto list=root/"scripts/shaderlist.txt";std::string shaderNames;
     if(std::filesystem::is_regular_file(list))shaderNames=q1Read(list);
     else {size_t size=0;auto data=static_cast<char*>(files->LoadFile("scripts/shaderlist.txt",&size));if(data){shaderNames.assign(data,size);core->Free(data);}}
@@ -229,7 +229,7 @@ static void plantAddToMap() {
     plantWriteNew(root/std::filesystem::u8path(model),bytes);
     plantWriteNew(root/std::filesystem::u8path(model+".reyond.json"),metadata.dump(2));
   }
-  auto shader=plants::shader(material,material+".tga");shader=shader.substr(shader.find('{'));
+  auto shader=plants::shader(material,material+".tga",gameProfile!=0);shader=shader.substr(shader.find('{'));
   s.pendingShaders[id]={material,shader};
   auto path=source/std::filesystem::u8path(model);auto view=viewRects[viewFocus];
   auto vector=[](plants::V v){std::ostringstream out;out.imbue(std::locale::classic());out<<v[0]<<' '<<v[1]<<' '<<v[2];return out.str();};

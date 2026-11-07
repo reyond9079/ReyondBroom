@@ -67,6 +67,11 @@ snapshots together.
 | Quake 1 with FTE | Explicit **Use FTE static models for Quake 1** opt-in; the disposable build copy converts the authoring entity to FTE `misc_model` |
 | Vanilla Quake / Quake II / GoldSrc | Export OBJ and use Model Editor's target-format conversion with an entity supported by the intended mod |
 
+Quake III baked plants use vertex lighting; FTE/Quake 1 extension models use
+normal-based entity lighting because MD3 has no vertex color channel. Both
+materials take cutout transparency only from the atlas. Profile-specific asset
+keys prevent shader conflicts when the same project is placed in both targets.
+
 The inserted entity participates in ordinary selection, position/rotation/scale,
 map Undo/Redo and save/reopen. Removing it leaves reusable assets on disk.
 Vanilla Quake progs do not gain arbitrary MD3 support. No incompatible model is

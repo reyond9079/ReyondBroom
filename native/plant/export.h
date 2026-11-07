@@ -6,7 +6,7 @@
 #include <locale>
 namespace ftebroom::plant {
 inline uint64_t hash(const std::string& s) {uint64_t h=1469598103934665603ULL;for(unsigned char c:s){h^=c;h*=1099511628211ULL;}return h;}
-inline std::string assetId(const Project& d,int lod) {std::ostringstream s;s<<"plant-"<<std::hex<<hash("plant-export-v2:"+serialize(d).dump()+std::to_string(lod));return s.str();}
+inline std::string assetId(const Project& d,int lod) {std::ostringstream s;s<<"plant-"<<std::hex<<hash("plant-export-v3:"+serialize(d).dump()+std::to_string(lod));return s.str();}
 inline modelExport::Mesh modelMesh(const Mesh& mesh,const std::string& material) {
   modelExport::Mesh out;out.frames=1;out.frameNames={"plant"};
   for(size_t first=0;first<mesh.faces.size();first+=1200) {
@@ -31,10 +31,10 @@ inline std::string obj(const Mesh& mesh,const std::string& materialFile) {
   for(auto& v:mesh.vertices)out<<"vn "<<v.n[0]<<' '<<v.n[2]<<' '<<-v.n[1]<<'\n';
   for(auto& f:mesh.faces){out<<"f";for(unsigned i:f.i){i++;out<<' '<<i<<'/'<<i<<'/'<<i;}out<<'\n';}return out.str();
 }
-// MD3 has no vertex-alpha channel. rgbGen vertex implicitly enables
-// alphaGen vertex in Q3/FTE, so source the cutout only from the atlas.
-inline std::string shader(const std::string& material,const std::string& image) {
-  return material+"\n{\n qer_editorimage "+image+"\n q3map_nonplanar\n q3map_shadeangle 60\n surfaceparm trans\n surfaceparm alphashadow\n cull none\n {\n  map "+image+"\n  alphaFunc GE128\n  depthWrite\n  rgbGen vertex\n  alphaGen identity\n }\n}\n";
+// q3map2 bakes misc_model lighting into world vertices. FTE func_model stays
+// an MD3 entity: it has normals but no vertex RGBA, so use model lighting.
+inline std::string shader(const std::string& material,const std::string& image,bool dynamicModel=false) {
+  return material+"\n{\n qer_editorimage "+image+"\n q3map_nonplanar\n q3map_shadeangle 60\n surfaceparm trans\n surfaceparm alphashadow\n cull none\n {\n  map "+image+"\n  alphaFunc GE128\n  depthWrite\n  rgbGen "+(dynamicModel?"lightingDiffuse":"vertex")+"\n  alphaGen identity\n }\n}\n";
 }
 inline std::string glb(const Mesh& mesh,const Textures& maps) {
   using modelExport::Binary;Binary data;Json views=Json::array(),accessors=Json::array();

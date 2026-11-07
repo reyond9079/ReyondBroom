@@ -11,6 +11,7 @@ extern char** environ;
 #include "ftebroom_run_profile.h"
 #include "ftebroom_run_variables.h"
 #include "ftebroom_run_import_data.h"
+#include "ftebroom_engine_launch.h"
 #include "profile/files.h"
 #include "profile/export.h"
 static std::vector<RunProfile> runProfiles;
@@ -30,6 +31,7 @@ static void (*runExportHook)(const std::filesystem::path&)=nullptr;
 static void (*runStageHook)()=nullptr;
 #ifdef _WIN32
 static HANDLE runProcess,runPipe,runJob,runInput;
+static std::vector<HANDLE> runLaunchedEngines;
 #else
 static pid_t runProcess=-1;static int runPipe=-1;
 static std::vector<pid_t> runLaunchedEngines;
@@ -181,7 +183,7 @@ static void runStartProcess(std::string executable,const std::string& arguments,
     PROCESS_INFORMATION process{};
     if(!CreateProcessW(exe.c_str(),line.data(),nullptr,nullptr,FALSE,0,nullptr,working.empty()?nullptr:working.c_str(),&startup,&process))
       throw std::runtime_error("Cannot launch engine (Windows error "+std::to_string(GetLastError())+").");
-    CloseHandle(process.hThread);CloseHandle(process.hProcess);
+    CloseHandle(process.hThread);runLaunchedEngines.push_back(process.hProcess);
     return;
   }
   SECURITY_ATTRIBUTES security{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};HANDLE writer=nullptr;
@@ -368,11 +370,17 @@ static void runTrenchTask(){
   if(task.kind==5){
     try{
       auto engines=runEngines;
-      if(runActiveGame!=runStoreGame){engines.clear();for(const auto& e:runStore["games"][runActiveGame].value("engines",nlohmann::json::array()))engines.push_back({e.at("id"),e.at("name"),e.at("path"),e.at("parameters")});}
+      if(runActiveGame!=runStoreGame){engines.clear();for(const auto& e:runStore["games"][runActiveGame].value("engines",nlohmann::json::array()))engines.push_back(runEngineFromJson(e));}
       auto e=std::find_if(engines.begin(),engines.end(),[&](const auto& p){return p.id==task.engineProfileId;});
       if(e==engines.end())throw std::runtime_error("Engine profile '"+task.engineProfileId+"' was not found");
       runAppend("#### Launching engine profile '"+e->name+"' at '"+e->path+"'\n");
-      if(!runTesting){auto arguments=ftebroom::profile::interpolate(e->parameters,activeLaunchVariables);runStartProcess(e->path,arguments,std::filesystem::u8path(e->path).parent_path(),true);}
+      if(runTesting){ftebroom::profile::interpolate(e->path,activeTypedVariables);ftebroom::profile::parseArguments(ftebroom::profile::interpolate(e->parameters,activeTypedVariables));++runStep;return;}
+      auto vars=activeTypedVariables;
+      // Compilation launch uses the frozen document/workdir, including WORK_DIR_PATH.
+      auto plan=ftebroom::engineLaunchPlan(*e,vars,runApplicationDirectory());
+      runAppend("#### Engine command: "+plan.executable.u8string()+" "+plan.arguments+"\n#### Engine working directory: "+plan.working.u8string()+"\n");
+      if(!plan.target.empty())runAppend("#### Map: "+plan.source.u8string()+" -> "+plan.target.u8string()+"\n");
+      if(!runTesting){ftebroom::stageEngineMap(plan);runStartProcess(plan.executable.u8string(),plan.arguments,plan.working,true);runAppend("#### Engine process started (BSP compilation and game startup are separate results).\n");}
     }catch(const std::exception& e){runAppend("#### Launch failed: "+std::string(e.what())+"\n");if(!(task.flags&RunAllowLaunchFailure))throw;runAppend("#### Continuing despite launch failure\n");}
     ++runStep;return;
   }
@@ -396,12 +404,23 @@ static void runTrenchTask(){
 }
 static void runTick()
 {
-#ifndef _WIN32
-  runLaunchedEngines.erase(std::remove_if(runLaunchedEngines.begin(),runLaunchedEngines.end(),[](pid_t pid){
-    const auto result=waitpid(pid,nullptr,WNOHANG);
-    return result==pid||(result<0&&errno==ECHILD);
-  }),runLaunchedEngines.end());
+  // Keep launched games independent of compiler cancellation, but observe their
+  // exit status rather than reporting a failed startup as a successful compile.
+  runLaunchedEngines.erase(std::remove_if(runLaunchedEngines.begin(),runLaunchedEngines.end(),[](auto process){
+#ifdef _WIN32
+    if(WaitForSingleObject(process,0)==WAIT_TIMEOUT)return false;
+    DWORD code=1;GetExitCodeProcess(process,&code);CloseHandle(process);
+    const bool failed=code!=0;auto message="Engine exited with code "+std::to_string(code);
+#else
+    int status=0;const auto result=waitpid(process,&status,WNOHANG);
+    if(result==0||(result<0&&errno==EINTR))return false;
+    if(result<0)return errno==ECHILD;
+    const bool failed=!WIFEXITED(status)||WEXITSTATUS(status)!=0;
+    auto message=WIFEXITED(status)?"Engine exited with code "+std::to_string(WEXITSTATUS(status)):"Engine crashed with signal "+std::to_string(WTERMSIG(status));
 #endif
+    runAppend("#### "+message+"\n");if(failed){runError=message+". Check the engine's game data and console log.";runHadError=true;}
+    return true;
+  }),runLaunchedEngines.end());
   if(!runActive||runMissingAwaiting)return;
   try
   {
@@ -571,6 +590,11 @@ static void testRunProfiles()
   }
   else if(stage==8)
   {
+#ifdef _WIN32
+    // cmd.exe parses /c itself, unlike the native argv contract exercised here.
+    // Use the real test executable so engine exit monitoring observes code 0.
+    shell=(documentPath("ftebroom.cfg").parent_path().parent_path()/"tools/compilation-profile-probe.exe").u8string();
+#endif
     const auto file=root/"CompilationProfiles.cfg";
     const auto engines=root/"GameEngineProfiles.cfg";
     std::ofstream(file)<<R"({
@@ -615,8 +639,8 @@ static void testRunProfiles()
       test.tasks={test.tasks[1],test.tasks[3],{2,"source.txt","new maps",true,RunCopyToDirectory}};
       test.tasks[0].destination=
 #ifdef _WIN32
-        "/d /c exit /b 7";
-      test.tasks[1].destination="/d /c exit /b 0";
+        "exit 7";
+      test.tasks[1].destination="exit 0";
 #else
         "-c \"exit 7\"";
       test.tasks[1].destination="-c \"exit 0\"";
@@ -627,6 +651,7 @@ static void testRunProfiles()
   }
   else if(stage==9)
   {
+    if(runActive||runHadError||runStep!=3)core->Print(("FTEBROOM_RUN_DIAGNOSTIC step="+std::to_string(runStep)+" active="+std::to_string(runActive)+" error="+runError+"\n"+runLog).c_str());
     expect(!runActive&&!runHadError&&runStep==3&&runLog.find("continuing as configured")!=std::string::npos&&
            std::filesystem::is_regular_file(root/"new maps/source.txt"),"trenchbroom_imported_pipeline_ran");
   }

@@ -267,7 +267,7 @@ void fb_selection_wireframe(vector sizes)
             if(fabs(center*axis)>sizes[a]+radius) visible=FALSE;
         }
         if(visible) {
-            fb_visual_current_wire='0.65 0.65 0.7';
+            fb_visual_current_wire=autocvar_ftebroom_color_brush_edges;
             if(brush_isselected(node.model,node.id)) fb_visual_current_wire=stov(cvar_string("ftebroom_color_selected"));
             if(!fb_pick_allowed(i,0)) fb_visual_current_wire=stov(cvar_string("ftebroom_color_locked"));
             fb_wire_cache_draw(i);

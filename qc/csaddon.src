@@ -20,6 +20,7 @@ editor_terrain.qc
 brush_selection.qc
 brush_history.qc
 brush_manip.qc
+fb_view_colors.qc
 brush_draw.qc
 brush_vertedit.qc
 editor_brushes.qc

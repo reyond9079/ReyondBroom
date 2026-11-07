@@ -13,7 +13,7 @@ static bool runStoreInitialized=false;
 static uint64_t runStoreRevision=0;
 static nlohmann::json runWorkspaceJson(){
  using J=nlohmann::json;J p=J::array(),e=J::array();for(const auto& profile:runProfiles)p.push_back(runProfileToJson(profile));
- for(const auto& engine:runEngines)e.push_back({{"id",engine.id},{"name",engine.name},{"path",engine.path},{"parameters",engine.parameters}});
+ for(const auto& engine:runEngines)e.push_back(runEngineToJson(engine));
  return {{"profiles",p},{"engines",e},{"variables",runVariables},{"gameRoot",runGameRoot},{"baseMod",runBaseMod},{"enabledMods",runEnabledMods},{"modsConfigured",runModsConfigured}};
 }
 static void runReadWorkspace(const nlohmann::json& j){
@@ -23,7 +23,7 @@ static void runReadWorkspace(const nlohmann::json& j){
  runGameRoot.clear();runEnabledMods.clear();
  runBaseMod=gameProfile==2?"id1":gameProfile==3?"baseq2":gameProfile==4?"valve":"baseq3";
  for(const auto& p:j.value("profiles",nlohmann::json::array()))runProfiles.push_back(runProfileFromJson(p));
- for(const auto& e:j.value("engines",nlohmann::json::array()))runEngines.push_back({e.at("id"),e.at("name"),e.at("path"),e.at("parameters")});
+ for(const auto& e:j.value("engines",nlohmann::json::array()))runEngines.push_back(runEngineFromJson(e));
  if(j.contains("variables"))for(auto it=j["variables"].begin();it!=j["variables"].end();++it)runVariables[it.key()]=it.value().get<std::string>();
  runGameRoot=j.value("gameRoot",std::string{});runBaseMod=j.value("baseMod",runBaseMod);runEnabledMods=j.value("enabledMods",std::vector<std::string>{});runModsConfigured=j.value("modsConfigured",false);
  runSelected=runProfiles.empty()?-1:0;

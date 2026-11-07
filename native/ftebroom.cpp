@@ -1069,12 +1069,14 @@ static void panel(float w, float h)
     cameraPreferences();
     ImGui::EndTabItem();
     }
-    if(ImGui::BeginTabItem("Colors"))
+    bool colorsTab=ImGui::BeginTabItem("Colors");runUiRecordGlobal("preferences-colors-tab");
+    if(colorsTab)
     {
-      for(auto setting:{std::pair{"Grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
+      for(auto setting:{std::pair{"Brush edges","ftebroom_color_brush_edges"},std::pair{"2D viewport background","ftebroom_color_2d_background"},std::pair{"Grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
       {
         char text[128]={};float color[3]={};cvars->GetString(setting.second,text,sizeof text);std::sscanf(text,"%f %f %f",&color[0],&color[1],&color[2]);
-        if(ImGui::ColorEdit3(setting.first,color)){std::snprintf(text,sizeof text,"%.6g %.6g %.6g",color[0],color[1],color[2]);cvars->SetString(setting.second,text);if(!std::strcmp(setting.second,"ftebroom_color_entity_bounds"))cvars->SetFloat("ftebroom_entity_bounds_class_colors",0);}
+        if(ImGui::ColorEdit3(setting.first,color)){std::snprintf(text,sizeof text,"%.6g %.6g %.6g",color[0],color[1],color[2]);cvars->SetString(setting.second,text);if(!std::strcmp(setting.second,"ftebroom_color_entity_bounds"))cvars->SetFloat("ftebroom_entity_bounds_class_colors",0);preferencesSave();}
+        runUiRecordGlobal(std::string("preference-color-")+setting.second);
       }
       bool classColors=cvars->GetFloat("ftebroom_entity_bounds_class_colors")!=0;
       if(ImGui::Checkbox("Use entity class colors for bounds",&classColors))cvars->SetFloat("ftebroom_entity_bounds_class_colors",classColors);
@@ -1111,7 +1113,8 @@ static void panel(float w, float h)
     if(!preferenceError.empty())ImGui::TextWrapped("%s",preferenceError.c_str());
     bool canClosePreferences=shortcutConflicts().empty() && captureShortcut.empty();
     ImGui::BeginDisabled(!canClosePreferences);
-    if ((ImGui::Button("Close") || ImGui::IsKeyPressed(ImGuiKey_Escape)) && canClosePreferences && preferencesSave())
+    bool closePreferences=ImGui::Button("Close");runUiRecordGlobal("preferences-close");
+    if ((closePreferences || ImGui::IsKeyPressed(ImGuiKey_Escape)) && canClosePreferences && preferencesSave())
       ImGui::CloseCurrentPopup();
     ImGui::EndDisabled();
     ImGui::EndPopup();
@@ -1136,6 +1139,7 @@ static void panel(float w, float h)
 #endif
   uiCursorUpdate(sceneLook||modelEditCameraCaptured||modCaptured,uiCursorPercent/100.f);
   uiReachableWindows();
+  runUiWriteLive(); // Include widgets drawn after Compile, such as Preferences.
   render();
   modEmbedTick(w,h);
   uiSaveLayout();

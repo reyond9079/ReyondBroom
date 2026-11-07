@@ -275,6 +275,7 @@ static ImGuiWindowFlags uiPanelFlags()
 static void uiPreferences()
 {
   uiSectionHeading("Appearance and workspace");
+  ImGui::TextDisabled("Brush edges and 2D background: Colors tab.");
   if(ImGui::Combo("Interface theme",&uiTheme,uiThemeNames,6))uiSaveAppearance();
   float labelSize=cvars->GetFloat("ftebroom_label_size"),coordinateSize=cvars->GetFloat("ftebroom_coordinate_size");
   if(labelSize<8)labelSize=13;if(coordinateSize<8)coordinateSize=8;

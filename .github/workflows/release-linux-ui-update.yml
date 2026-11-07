@@ -76,6 +76,8 @@ jobs:
           xvfb-run -a -s '-screen 0 1920x1080x24' scripts/test-trenchbroom-linux.sh "$bundle" "$PWD/qa/profiles"
           xvfb-run -a -s '-screen 0 1920x1080x24' scripts/test-audio-editor-linux.sh "$bundle" "$PWD/qa/audio"
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-audio-archive.py "$bundle" "$PWD/qa/audio-archive"
+          python -m pip install python-xlib Pillow
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py "$bundle" "$PWD/qa/engine-viewport" --probe "$PWD/deps/profile-core/compilation-profile-probe"
       - name: Upload validated packages to the draft release
         run: |
           test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
@@ -147,7 +149,11 @@ jobs:
           (cd out/release && sha256sum -c ./*.sha256)
       - name: Validate PK3 import and the inner audio window in the packaged editor
         shell: pwsh
-        run: ./scripts/test-audio-archive-windows.ps1 -Runtime out/release/ReyondBroom-Windows-x64 -Output qa/audio-archive
+        run: |
+          ./scripts/test-audio-archive-windows.ps1 -Runtime out/release/ReyondBroom-Windows-x64 -Output qa/audio-archive
+          python -m pip install Pillow pywinauto
+          python scripts/test-engine-viewport.py out/release/ReyondBroom-Windows-x64 qa/engine-viewport --probe deps/profile-core/compilation-profile-probe.exe
+          if ($LASTEXITCODE) { throw 'Windows engine/viewport acceptance failed' }
       - name: Upload validated packages to the draft release
         shell: pwsh
         run: |

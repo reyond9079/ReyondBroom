@@ -335,26 +335,35 @@ static std::string runUiEngineGame;
 static void runUiEngines(){
  static bool wasOpen=false;if(!runEngineWindow){wasOpen=false;return;}
  if(!wasOpen||runUiEngineGame!=runStoreGame){runUiEngineDraft=runEngines;runUiEngineGame=runStoreGame;runUiEngineSelected=-1;wasOpen=true;}
- ImGui::SetNextWindowSize({600*uiScale(),400*uiScale()},ImGuiCond_FirstUseEver);bool open=true;
+ ImGui::SetNextWindowSize({820*uiScale(),520*uiScale()},ImGuiCond_FirstUseEver);bool open=true;
  if(ImGui::Begin("Game Engines",&open,ImGuiWindowFlags_NoDocking)){
   if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Escape)&&!ImGui::IsPopupOpen("",ImGuiPopupFlags_AnyPopupId|ImGuiPopupFlags_AnyPopupLevel)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);open=false;}
   float u=uiScale();runUiTitle(gameProfileName());auto available=ImGui::GetContentRegionAvail();float body=available.y-44*u;
-  ImGui::BeginChild("Engine profiles",{std::min(250*u,available.x*.45f),body});runUiTitle("Profiles");ImGui::BeginChild("Engine list",{0,-20*u});
+  ImGui::BeginChild("Engine profiles",{std::min(250*u,available.x*.45f),body});runUiTitle("Profiles");ImGui::BeginChild("Engine list",{0,gameProfile==2?-50*u:-20*u});
   for(int i=0;i<int(runUiEngineDraft.size());++i)if(runUiListItem("engine/"+std::to_string(i),runUiEngineDraft[i].name,runUiEngineDraft[i].path,i==runUiEngineSelected))runUiEngineSelected=i;
   if(runUiEngineDraft.empty())ImGui::TextWrapped("Click the '+' button to create a game engine profile.");ImGui::EndChild();
   if(runUiIcon("engine-add",'+',"Add profile")){runUiEngineDraft.push_back({"engine-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()),"","",""});runUiEngineSelected=int(runUiEngineDraft.size()-1);}
-  ImGui::SameLine(0,0);if(runUiIcon("engine-remove",'-',"Remove the selected profile",runUiEngineSelected>=0&&runUiEngineSelected<int(runUiEngineDraft.size()))){runUiEngineDraft.erase(runUiEngineDraft.begin()+runUiEngineSelected);runUiEngineSelected=std::min(runUiEngineSelected,int(runUiEngineDraft.size())-1);}ImGui::EndChild();ImGui::SameLine(0,u);
+  ImGui::SameLine(0,0);if(runUiIcon("engine-remove",'-',"Remove the selected profile",runUiEngineSelected>=0&&runUiEngineSelected<int(runUiEngineDraft.size()))){runUiEngineDraft.erase(runUiEngineDraft.begin()+runUiEngineSelected);runUiEngineSelected=std::min(runUiEngineSelected,int(runUiEngineDraft.size())-1);}
+  if(gameProfile==2){for(const char* name:{"VKQuake","Ironwail"}){if(ImGui::SmallButton(name)){RunEngineProfile e;e.id="engine-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());e.name=name;ftebroom::quakeEngineDefaults(e);runUiEngineDraft.push_back(std::move(e));runUiEngineSelected=int(runUiEngineDraft.size()-1);}ImGui::SameLine();}ImGui::NewLine();}
+  ImGui::EndChild();ImGui::SameLine(0,u);
   ImGui::BeginChild("Engine details",{0,body});runUiTitle("Details");
   if(runUiEngineSelected>=0&&runUiEngineSelected<int(runUiEngineDraft.size())){
    auto& e=runUiEngineDraft[runUiEngineSelected];ImGui::SetCursorPos({8*u,28*u});ImGui::BeginGroup();
    if(ImGui::BeginTable("Engine fields",2,ImGuiTableFlags_SizingFixedFit,{ImGui::GetContentRegionAvail().x-8*u,0})){
-    ImGui::TableSetupColumn("Labels",ImGuiTableColumnFlags_WidthFixed,36*u);ImGui::TableSetupColumn("Fields",ImGuiTableColumnFlags_WidthStretch);runUiFormRow("Name");runUiEdit("##Engine name",e.name,"Choose a name");
-    runUiFormRow("Path");ImGui::SetNextItemWidth(std::max(10*u,ImGui::GetContentRegionAvail().x-58*u));runUiEdit("##Engine path",e.path,"Click on the button to choose...");ImGui::SameLine(0,2*u);if(ImGui::Button("...",{56*u,0})){int selected=runUiEngineSelected;runUiChoose(e.path,[selected](const std::string& path){if(selected<int(runUiEngineDraft.size())){auto& e=runUiEngineDraft[selected];e.path=path;if(e.name.empty())e.name=std::filesystem::u8path(path).stem().u8string();}});}ImGui::EndTable();
+    ImGui::TableSetupColumn("Labels",ImGuiTableColumnFlags_WidthFixed,86*u);ImGui::TableSetupColumn("Fields",ImGuiTableColumnFlags_WidthStretch);runUiFormRow("Name");runUiEdit("##Engine name",e.name,"Choose a name");
+    runUiFormRow("Path");ImGui::SetNextItemWidth(std::max(10*u,ImGui::GetContentRegionAvail().x-58*u));runUiEdit("##Engine path",e.path,"Click on the button to choose...");ImGui::SameLine(0,2*u);if(ImGui::Button("...",{56*u,0})){int selected=runUiEngineSelected;runUiChoose(e.path,[selected](const std::string& path){if(selected<int(runUiEngineDraft.size())){auto& e=runUiEngineDraft[selected];e.path=path;auto stem=std::filesystem::u8path(path).stem().u8string();if(e.name.empty())e.name=stem;for(auto& c:stem)c=char(std::tolower(static_cast<unsigned char>(c)));if(e.parameters.empty()&&(stem=="vkquake"||stem=="ironwail"))ftebroom::quakeEngineDefaults(e);}});}
+    runUiFormRow("Working dir");runUiEdit("##Engine workdir",e.work,"Blank uses the executable directory; variables allowed.",1);
+    runUiFormRow("Arguments");runUiEdit("##Engine arguments",e.parameters,"Editable command line; quote paths with spaces.",1);
+    runUiFormRow("Compiled map");runUiEdit("##Engine map file",e.mapFile,"Optional Quake BSP to copy to -basedir/-game/maps before launch.",1);
+    ImGui::EndTable();
+    ImGui::TextWrapped("Compiled map enables Quake 1 BSP validation and automatic deployment using -basedir, -game and +map. Leave blank for existing engines or your own Copy tasks.");
+    if(gameProfile==2&&ImGui::Button("Use Quake launch template"))ftebroom::quakeEngineDefaults(e);
+    ImGui::TextWrapped("Variables include GAME_DIR_PATH (game root), MODS[-1] (active mod), MAP_BASE_NAME, WORK_DIR_PATH and ENGINE_DIR_PATH.");
    }ImGui::EndGroup();
   }else ImGui::TextWrapped("Select a game engine profile");ImGui::EndChild();
   ImGui::SetCursorPosX(std::max(8*u,ImGui::GetContentRegionAvail().x-88*u));if(ImGui::Button("Close",{80*u,24*u}))open=false;runUiRecord("engine-close");
  }
- ImGui::End();if(!open){nlohmann::json engines=nlohmann::json::array();for(const auto& e:runUiEngineDraft)engines.push_back({{"id",e.id},{"name",e.name},{"path",e.path},{"parameters",e.parameters}});if(!runUiExecute({{"action","engineProfiles"},{"engines",engines}}).contains("error"))runEngineWindow=false;}
+ ImGui::End();if(!open){nlohmann::json engines=nlohmann::json::array();for(const auto& e:runUiEngineDraft)engines.push_back(runEngineToJson(e));if(!runUiExecute({{"action","engineProfiles"},{"engines",engines}}).contains("error"))runEngineWindow=false;}
 }
 static void runUiLaunch(){
  if(!runLaunchWindow)return;float u=uiScale();ImGui::SetNextWindowSize({660*u,360*u},ImGuiCond_FirstUseEver);bool open=true;
@@ -383,7 +392,7 @@ static void runUiConfirmClose(){
  }
 }
 static void runUiWriteLive(){
- if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";std::ofstream(temp)<<nlohmann::json{{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError},{"inputTrace",runUiInputTrace}}.dump();
+ if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";nlohmann::json views=nlohmann::json::array(),colors=nlohmann::json::object();for(int i=0;i<viewLayout;i++){auto& v=viewRects[i];views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});}for(const char* name:{"ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_selected","ftebroom_color_locked"}){char text[128]{};cvars->GetString(name,text,sizeof text);colors[name]=text;}std::ofstream(temp)<<nlohmann::json{{"views",views},{"viewportColors",colors},{"log",runLog},{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError},{"inputTrace",runUiInputTrace}}.dump();
 #ifdef _WIN32
   MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
 #else
@@ -396,5 +405,5 @@ static void runImGuiPanel(){
  if(!runUiLive&&!runWindow&&!runSettingsWindow&&!runLaunchWindow&&!runEngineWindow&&!runUiCloseRequest&&!runUiBrowseOpen&&!ImGui::IsPopupOpen("Stop compilation?"))return;runLoad();
  if(runUiAtlasWidth&&runUiAtlasTheme>=0){uiTheme=runUiAtlasTheme;uiStyle();}
  if(!runWindow){runUiOrigin={0,0};runUiRects=nlohmann::json::object();runUiRects["window"]={{"x",0},{"y",0},{"width",ImGui::GetIO().DisplaySize.x},{"height",ImGui::GetIO().DisplaySize.y}};}
- RunUiStyle style;if(runWindow)runUiCompile();runUiSettings();runUiEngines();runUiLaunch();runUiBrowsePanel();runUiConfirmClose();runUiWriteLive();
+ RunUiStyle style;if(runWindow)runUiCompile();runUiSettings();runUiEngines();runUiLaunch();runUiBrowsePanel();runUiConfirmClose();
 }

@@ -1,0 +1,96 @@
+name: Publish validated REYON-8 release
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-reyon-8.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-reyon-8
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require the exact validated editor and corresponding sources
+        run: |
+          # Only CI/publication workflows changed since the packaged revision.
+          # Keep the build-info/source revision truthful; no binary is replaced.
+          git diff --exit-code 5f352468c4a0ad2b033709db451902ce6436aaab HEAD -- . ':!.github/workflows/publish-reyon-8.yml' ':!.github/workflows/compilation-profile-checks.yml'
+      - name: Verify all platform checks and assets, then publish alpha.128
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {createHash} = require('node:crypto');
+            const repo = context.repo;
+            const source = '5f352468c4a0ad2b033709db451902ce6436aaab';
+            const required = ['windows', 'linux (Linux-x64)', 'linux (Linux-SDL2-x64)'];
+            const {data: pr} = await github.rest.pulls.get({...repo, pull_number: 11});
+            if (!pr.merged || pr.merge_commit_sha !== context.sha) throw new Error('Expected merged PR 11');
+            const {data: checks} = await github.rest.actions.listWorkflowRuns({...repo,
+              workflow_id: 'compilation-profile-checks.yml', head_sha: pr.head.sha, status: 'completed', per_page: 100});
+            const ci = checks.workflow_runs.find(r => r.head_sha === pr.head.sha && r.conclusion === 'success');
+            if (!ci) throw new Error('The final PR head has no successful platform CI');
+            for (const [run_id, expected_sha] of [[ci.id, pr.head.sha], [42375919998, source]]) {
+              const {data: run} = await github.rest.actions.getWorkflowRun({...repo, run_id});
+              if (run.head_sha !== expected_sha || run.status !== 'completed' || run.conclusion !== 'success')
+                throw new Error(`Required run ${run_id} did not pass for the packaged source`);
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...repo, run_id});
+              for (const name of required)
+                if (!jobs.some(j => j.name === name && j.status === 'completed' && j.conclusion === 'success'))
+                  throw new Error(`Missing successful platform ${name} in ${run_id}`);
+            }
+            const release_id = 437567104;
+            const {data: release} = await github.rest.repos.getRelease({...repo, release_id});
+            if (!release.draft || release.tag_name !== 'v0.5.0-alpha.128')
+              throw new Error('Expected the reserved alpha.128 draft');
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {...repo, release_id});
+            const byName = new Map(assets.map(a => [a.name, a]));
+            const payloads = [];
+            for (const platform of ['Windows-x64', 'Linux-x64', 'Linux-SDL2-x64']) {
+              const prefix = `ReyondBroom-0.5.0-alpha.128-${platform}`;
+              payloads.push(prefix + (platform === 'Windows-x64' ? '.zip' : '.tar.gz'), prefix + '-Sources.zip');
+            }
+            if (assets.length !== 12 || assets.some(a => a.state !== 'uploaded' || !a.size))
+              throw new Error('Expected twelve complete runtime/source/checksum assets');
+            for (const name of payloads) {
+              const payload = byName.get(name), checksum = byName.get(name + '.sha256');
+              if (!payload || !checksum) throw new Error(`Missing ${name}`);
+              const response = await fetch(checksum.url, {headers: {
+                Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                Accept: 'application/octet-stream', 'X-GitHub-Api-Version': '2022-11-28'
+              }});
+              if (!response.ok) throw new Error(`Cannot download checksum: ${response.status}`);
+              const bytes = Buffer.from(await response.arrayBuffer());
+              const match = bytes.toString('utf8').trim().match(/^([a-f0-9]{64})\s+([^\s]+)$/);
+              if (!match || match[2] !== name || payload.digest !== 'sha256:' + match[1] ||
+                  checksum.digest !== 'sha256:' + createHash('sha256').update(bytes).digest('hex'))
+                throw new Error(`Checksum mismatch for ${name}`);
+              core.info(`Verified ${name}`);
+            }
+            const body = [
+              'REYON-8: запуск VKQuake/Ironwail из профиля компиляции и настройки цветов вьюпорта.',
+              '',
+              '- Сохраняются путь движка, аргументы, рабочая папка и путь к собранной карте. Для Quake 1 добавлены шаблоны VKQuake и Ironwail.',
+              '- Проверка BSP и доставка карты/дополнительных файлов в выбранный мод; пути с пробелами и переменные профиля. Импорт TrenchBroom и ручные команды сохранены.',
+              '- Лог отдельно сообщает о компиляции, старте процесса и ошибках завершения игры.',
+              '- Preferences → Colors: цвет рёбер кистей в 2D/3D и фон 2D-вьюпортов. Фон по умолчанию #303238; собственные цвета сохраняются.',
+              '- Исправлены ложные конфликты клавиш Model Editor, блокировавшие закрытие Preferences, и смешивание цветов в кэше 2D.',
+              '',
+              'Проверены Windows x64, Linux x64 и Linux SDL2: сборка, тесты ядра, реальный ввод ОС, цвета/перезапуск и compile → BSP → argv/workdir процесса. Настоящие VKQuake 1.37.0 и Ironwail 0.8.2 загрузили собранную карту с LibreQuake на Linux. Windows-рендеры этих игр отдельно не проверялись.',
+              '',
+              `Упакованные бинарные файлы и соответствующие исходники: ${source}. Последующие изменения касаются только CI/publication workflows (поддерживаемое разрешение рабочего стола Windows и проверка публикации).`,
+              `CI: https://github.com/reyond9079/ReyondBroom/actions/runs/${ci.id}`,
+              'Пакеты: https://github.com/reyond9079/ReyondBroom/actions/runs/42375919998',
+              'Инструкция: https://github.com/reyond9079/ReyondBroom/blob/main/docs/compilation-profiles-build.md',
+              'Задача: https://reyond.atlassian.net/browse/REYON-8'
+            ].join('\n');
+            const {data: published} = await github.rest.repos.updateRelease({...repo, release_id,
+              target_commitish: context.sha, body, draft: false, prerelease: false, make_latest: 'true'});
+            core.info(`Published ${published.html_url}`);
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

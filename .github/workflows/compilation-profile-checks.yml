@@ -263,7 +263,9 @@ jobs:
         shell: pwsh
         run: |
           if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) {
-            Set-DisplayResolution -Width 3840 -Height 2160 -Force
+            # Hosted Windows rejects 4K and otherwise stays at 1024x768.
+            # Match the supported desktop used by packaged-release acceptance.
+            Set-DisplayResolution -Width 1920 -Height 1080 -Force
           }
       - name: Run real Windows editor checks and UI atlas
         shell: pwsh

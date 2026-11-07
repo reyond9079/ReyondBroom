@@ -18,9 +18,9 @@ jobs:
           fetch-depth: 0
       - name: Require the exact validated editor and corresponding sources
         run: |
-          # The only addition since the packaged revision is this publisher.
+          # Only CI/publication workflows changed since the packaged revision.
           # Keep the build-info/source revision truthful; no binary is replaced.
-          git diff --exit-code 5f352468c4a0ad2b033709db451902ce6436aaab HEAD -- . ':!.github/workflows/publish-reyon-8.yml'
+          git diff --exit-code 5f352468c4a0ad2b033709db451902ce6436aaab HEAD -- . ':!.github/workflows/publish-reyon-8.yml' ':!.github/workflows/compilation-profile-checks.yml'
       - name: Verify all platform checks and assets, then publish alpha.128
         uses: actions/github-script@v7
         with:
@@ -83,7 +83,7 @@ jobs:
               '',
               'Проверены Windows x64, Linux x64 и Linux SDL2: сборка, тесты ядра, реальный ввод ОС, цвета/перезапуск и compile → BSP → argv/workdir процесса. Настоящие VKQuake 1.37.0 и Ironwail 0.8.2 загрузили собранную карту с LibreQuake на Linux. Windows-рендеры этих игр отдельно не проверялись.',
               '',
-              `Упакованные бинарные файлы и соответствующие исходники: ${source}. В main дополнительно добавлен только этот проверяющий публикацию workflow.`,
+              `Упакованные бинарные файлы и соответствующие исходники: ${source}. Последующие изменения касаются только CI/publication workflows (поддерживаемое разрешение рабочего стола Windows и проверка публикации).`,
               `CI: https://github.com/reyond9079/ReyondBroom/actions/runs/${ci.id}`,
               'Пакеты: https://github.com/reyond9079/ReyondBroom/actions/runs/42375919998',
               'Инструкция: https://github.com/reyond9079/ReyondBroom/blob/main/docs/compilation-profiles-build.md',

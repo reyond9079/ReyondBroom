@@ -360,9 +360,11 @@ static void documentSaveFinished()
   }
 }
 static bool runBeforeDocument(const std::string& next);
+static bool plantBeforeDocument(const std::string& next);
 static void documentRequest(const std::string& next)
 {
   if(runBeforeDocument(next))return;
+  if(plantBeforeDocument(next))return;
   if(bbBeforeDocument(next))return;
   if (savingDocument)
     return;

@@ -43,6 +43,7 @@ An independent map editor built on FTE Quake, csaddon and Dear ImGui. Menus and 
 
 ## Available features
 
+- Native [Plant Editor](docs/plant-editor.md): thirty procedural vegetation presets, editable projects, material atlases, three LODs, OBJ/GLB export and compatible model placement.
 - Dark palette, dockable/resizable panels and tabs, 100–200% UI/font scaling, saved layouts, panel locking and reset.
 
 - Quake 1: WAD2/palette resources, 99 entity classes, standard/Valve 220 MAP, BSP29/BSP2 builds and free-camera/play preview. [Guide](docs/quake1.md).

@@ -8,6 +8,10 @@ on:
         description: Reuse a Windows-editor artifact to reproduce OS input without recompiling unchanged C++
         required: false
         default: ''
+      plant_scene_only:
+        description: Focus a prepared Windows run on plant map rendering diagnostics
+        required: false
+        default: ''
 permissions:
   contents: read
   actions: read
@@ -58,9 +62,25 @@ jobs:
           if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
           Copy-Item mesa/extracted/x64/*.dll bundle/ReyondBroom-Windows-x64/bin -Force
           Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
-          python -m pip install Pillow pywinauto
+          python -m pip install Pillow==12.0.0 pywinauto trimesh==4.8.3 numpy==2.3.4
       - name: Exercise actual Windows controls with OS input
+        if: inputs.plant_scene_only != 'true'
         run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
+      - name: Exercise the prepared Plant Editor with OS input
+        shell: pwsh
+        run: |
+          $plantArgs = @()
+          if ('${{ inputs.plant_scene_only }}' -eq 'true') {
+            python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
+            if ($LASTEXITCODE) { throw 'FTE source-directory fixture failed' }
+            $plantArgs += '--scene-only'
+          }
+          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui @plantArgs
+          if ($LASTEXITCODE) { throw 'Prepared Plant UI acceptance failed' }
+          python scripts/test-plant-exports.py qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Prepared plant reimport failed' }
+          python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Prepared plant BSP failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -150,6 +170,17 @@ jobs:
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
       - name: Exercise actual ImGui controls with OS input
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-ui.py bundle/ReyondBroom-Linux-x64 qa/ui
+      - name: Validate plant generators, codecs, materials and all preset LODs
+        run: |
+          g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests
+          deps/plant-editor-tests qa/plants/core
+          python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+          python scripts/test-plant-exports.py qa/plants/core
+      - name: Exercise native Plant Editor and map placement with OS input
+        run: |
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-ui.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
+          python scripts/test-plant-exports.py qa/plants/ui
+          python scripts/test-plant-map.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -236,6 +267,24 @@ jobs:
       - name: Exercise actual Windows ImGui controls with OS input
         shell: pwsh
         run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
+      - name: Validate Windows plant generators, codecs, materials and preset LODs
+        shell: msys2 {0}
+        run: |
+          g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests.exe
+          deps/plant-editor-tests.exe qa/plants/core
+      - name: Exercise actual Windows Plant Editor and independent model import
+        shell: pwsh
+        run: |
+          python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+          if ($LASTEXITCODE) { throw 'Plant QA dependencies failed' }
+          python scripts/test-plant-exports.py qa/plants/core
+          if ($LASTEXITCODE) { throw 'Independent core model reimport failed' }
+          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Plant UI acceptance failed' }
+          python scripts/test-plant-exports.py qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Independent UI model reimport failed' }
+          python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Real plant BSP compilation failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

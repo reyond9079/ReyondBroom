@@ -8,6 +8,10 @@ on:
         description: Reuse a Windows-editor artifact to reproduce OS input without recompiling unchanged C++
         required: false
         default: ''
+      plant_scene_only:
+        description: Focus a prepared Windows run on plant map rendering diagnostics
+        required: false
+        default: ''
 permissions:
   contents: read
   actions: read
@@ -60,11 +64,14 @@ jobs:
           Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
           python -m pip install Pillow==12.0.0 pywinauto trimesh==4.8.3 numpy==2.3.4
       - name: Exercise actual Windows controls with OS input
+        if: inputs.plant_scene_only != 'true'
         run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
       - name: Exercise the prepared Plant Editor with OS input
         shell: pwsh
         run: |
-          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          $plantArgs = @()
+          if ('${{ inputs.plant_scene_only }}' -eq 'true') { $plantArgs += '--scene-only' }
+          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui @plantArgs
           if ($LASTEXITCODE) { throw 'Prepared Plant UI acceptance failed' }
           python scripts/test-plant-exports.py qa/plants/ui
           if ($LASTEXITCODE) { throw 'Prepared plant reimport failed' }

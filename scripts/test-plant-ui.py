@@ -11,7 +11,7 @@ import time
 from PIL import ImageGrab
 from editor_os_input import NativeInput
 
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--scene-only',action='store_true',help='Focus OS input on installed model visibility and map lifecycle');a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom'
 for file in out.glob('ui-plant*'):
  if file.is_file():file.unlink()
@@ -27,7 +27,13 @@ engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
 checks=[]
-def live():return json.loads(path.read_text(encoding='utf-8'))
+def live():
+ deadline=time.monotonic()+2
+ while True:
+  try:return json.loads(path.read_text(encoding='utf-8'))
+  except (FileNotFoundError,PermissionError,json.JSONDecodeError):
+   if time.monotonic()>=deadline:raise
+   time.sleep(.02)
 def wait(fn,timeout=25):
  deadline=time.monotonic()+timeout;last=None
  while time.monotonic()<deadline:
@@ -65,28 +71,34 @@ def console(command):ui.console(command);time.sleep(.25)
 try:
  ready();ui.position();expect(live()['open'] and len(live()['lods'])==3,'native Plant Editor opens with three real LODs')
  expect(live()['lods'][0]['triangles']>live()['lods'][1]['triangles']>live()['lods'][2]['triangles'],'live LOD statistics show real reduction')
- old_seed=live()['project']['seed'];click('randomize');ready();expect(live()['project']['seed']!=old_seed,'Randomize changes the generated seed')
- click('keep-variation');ready();expect(live()['project']['seed'] in live()['project']['variations'],'saved seed variation persists in editable project')
- source=data/'plants/projects/qa-editable.plant.json';source.unlink(missing_ok=True)
- click('save');choose(source);wait(lambda:source.exists());saved=json.loads(source.read_text());expect(saved==live()['project'],'Save writes the complete editable project')
- previous=live();height=previous['project']['parameters']['height'];edit('Height','180',True);ready();expect(abs(live()['project']['parameters']['height']-180)<.01,'Height control changes actual parameters')
- expect(live()['camera']==previous['camera'] and live()['cameraLow']==previous['cameraLow'] and live()['cameraHigh']==previous['cameraHigh'],'regeneration preserves camera orbit, zoom and target')
- click('undo');ready();expect(live()['project']['parameters']['height']==height,'Plant Undo restores the parameter edit')
- click('redo');ready();expect(live()['project']['parameters']['height']==180,'Plant Redo restores the generated change')
- click('new');click('confirm-discard');ready();expect(live()['project']['name']=='Untitled oak','New respects the unsaved-project confirmation')
- click('open');click('confirm-discard');choose(source);ready();expect(live()['project']==saved,'Open restores parameters, hierarchy, seed and saved variations')
- exported=out/'ui-plant.glb';exported.unlink(missing_ok=True);click('export');choose(exported);wait(lambda:exported.exists());expect(exported.read_bytes()[:4]==b'glTF','Export writes a real embedded GLB')
- obj=out/'ui-plant.obj';obj.unlink(missing_ok=True);click('export');choose(obj);wait(lambda:obj.exists());expect((out/'ui-plant.mtl').is_file() and (out/'ui-plant-albedo.png').is_file(),'OBJ export writes its real MTL and PNG dependencies')
- edit('Plant name','QA woodland');ready();click('save-preset');ready()
- user_id=live()['project']['preset'];user_file=data/'plants/presets'/user_id.removeprefix('user:');expect(user_id.startswith('user:') and user_file.exists() and json.loads(user_file.read_text())==live()['project'],'Save preset creates a versioned editable user preset')
- click('favorite');expect(''==live()['error'],'Favorite persists without model errors')
- # Select representative species through the actual search and preset rows.
- for preset,search in [('oak','English oak'),('pine','Scots pine'),('wild-shrub','Wild hawthorn'),('meadow-grass','Meadow grass'),('amanita','Fly agaric'),('daisy','Oxeye daisy'),('bracken','Common bracken')]:
-  edit('search',search);click('preset/'+preset);ready();expect(live()['project']['preset']==preset and live()['lods'][0]['triangles']>0,'native generation '+preset);screenshot(preset+'-dark')
- # Settings use the actual editor theme; geometry and project stay intact.
- console('ftebroom_plant qa light');wait(lambda:live()['theme']==3);screenshot('plant-editor-light');expect(live()['project']['preset']=='bracken','Modern Light changes the UI without replacing the plant')
- console('ftebroom_plant qa dark');wait(lambda:live()['theme']==0)
- edit('search','English oak');click('preset/oak');ready();click('advanced');expect('node/trunk' in live()['widgets'],'Advanced mode exposes the editable structure')
+ source=None
+ if not a.scene_only:
+  old_seed=live()['project']['seed'];click('randomize');ready();expect(live()['project']['seed']!=old_seed,'Randomize changes the generated seed')
+  click('keep-variation');ready();expect(live()['project']['seed'] in live()['project']['variations'],'saved seed variation persists in editable project')
+  source=data/'plants/projects/qa-editable.plant.json';source.unlink(missing_ok=True)
+  click('save');choose(source);wait(lambda:source.exists());saved=json.loads(source.read_text());expect(saved==live()['project'],'Save writes the complete editable project')
+  previous=live();height=previous['project']['parameters']['height'];edit('Height','180',True);ready();expect(abs(live()['project']['parameters']['height']-180)<.01,'Height control changes actual parameters')
+  expect(live()['camera']==previous['camera'] and live()['cameraLow']==previous['cameraLow'] and live()['cameraHigh']==previous['cameraHigh'],'regeneration preserves camera orbit, zoom and target')
+  click('undo');ready();expect(live()['project']['parameters']['height']==height,'Plant Undo restores the parameter edit')
+  click('redo');ready();expect(live()['project']['parameters']['height']==180,'Plant Redo restores the generated change')
+  click('new');click('confirm-discard');ready();expect(live()['project']['name']=='Untitled oak','New respects the unsaved-project confirmation')
+  click('open');click('confirm-discard');choose(source);ready();expect(live()['project']==saved,'Open restores parameters, hierarchy, seed and saved variations')
+  exported=out/'ui-plant.glb';exported.unlink(missing_ok=True);click('export');choose(exported);wait(lambda:exported.exists());expect(exported.read_bytes()[:4]==b'glTF','Export writes a real embedded GLB')
+  obj=out/'ui-plant.obj';obj.unlink(missing_ok=True);click('export');choose(obj);wait(lambda:obj.exists());expect((out/'ui-plant.mtl').is_file() and (out/'ui-plant-albedo.png').is_file(),'OBJ export writes its real MTL and PNG dependencies')
+  edit('Plant name','QA woodland');ready();click('save-preset');ready()
+  user_id=live()['project']['preset'];user_file=data/'plants/presets'/user_id.removeprefix('user:');expect(user_id.startswith('user:') and user_file.exists() and json.loads(user_file.read_text())==live()['project'],'Save preset creates a versioned editable user preset')
+  click('favorite');expect(''==live()['error'],'Favorite persists without model errors')
+  # Select representative species through the actual search and preset rows.
+  for preset,search in [('oak','English oak'),('pine','Scots pine'),('wild-shrub','Wild hawthorn'),('meadow-grass','Meadow grass'),('amanita','Fly agaric'),('daisy','Oxeye daisy'),('bracken','Common bracken')]:
+   edit('search',search);click('preset/'+preset);ready();expect(live()['project']['preset']==preset and live()['lods'][0]['triangles']>0,'native generation '+preset);screenshot(preset+'-dark')
+  # Settings use the actual editor theme; geometry and project stay intact.
+  console('ftebroom_plant qa light');wait(lambda:live()['theme']==3);screenshot('plant-editor-light');expect(live()['project']['preset']=='bracken','Modern Light changes the UI without replacing the plant')
+  console('ftebroom_plant qa dark');wait(lambda:live()['theme']==0)
+  edit('search','English oak');click('preset/oak');ready();click('advanced');expect('node/trunk' in live()['widgets'],'Advanced mode exposes the editable structure')
+ else:
+  click('advanced');click('keep-variation');ready()
+  click('export');choose(out/'ui-plant.glb');wait(lambda:(out/'ui-plant.glb').exists())
+  click('export');choose(out/'ui-plant.obj');wait(lambda:(out/'ui-plant.obj').exists())
  before=live()['lods'][0]['triangles'];click('node-visible/leaves');ready();expect(live()['lods'][0]['triangles']<before,'hiding Leaves removes actual geometry')
  click('undo');ready();expect(live()['lods'][0]['triangles']==before,'hierarchy visibility participates in Undo')
  # This profile is Quake III or FTE in the disposable fixture.
@@ -108,7 +120,8 @@ try:
  expect(model.stem in (staged/'scripts/shaderlist.txt').read_text(),'Quake III shader list includes the generated cutout material')
  shutil.copytree(staged,out/'build-snapshot',dirs_exist_ok=True);shutil.copy2(asset_report,out/asset_report.name)
  for f in [placed,undone,redone,reopened]:shutil.copy2(f,out/f.name)
- (out/'final-state.json').write_text(json.dumps(live(),indent=2));shutil.copy2(source,out/source.name)
+ (out/'final-state.json').write_text(json.dumps(live(),indent=2));
+ if source is not None:shutil.copy2(source,out/source.name)
  # Close the authoring window and capture the installed model in the map viewport.
  window=live()['widgets']['window'];ui.click(window['x']+window['width']-16,window['y']+14);click('confirm-discard');wait(lambda:not live()['open'])
  entities=re.findall(r'\{([^{}]*)\}',reopened.read_text(errors='replace'))
@@ -117,7 +130,7 @@ try:
  console('ftebroom_camera_restore '+' '.join(str(x+d) for x,d in zip(xyz,[320,-400,260]))+' 20 130 0 75');time.sleep(1)
  screenshot('plant-placed-map');expect(not live()['open'],'placed model remains in the map after closing Plant Editor')
  if os.name=='nt':
-  console('ftebroom_show_models');console('r_drawentities');console('modellist')
+  console('ftebroom_show_models');console('r_drawentities');console('cvarlist ftebroom_*');console('version_modelformats');console('modellist')
   console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
   console('fs_flush');console('r_reloadshaders');time.sleep(2);screenshot('plant-shaders-reloaded')
   console('modellist');console('condump plant-diagnostic')

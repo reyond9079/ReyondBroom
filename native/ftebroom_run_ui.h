@@ -109,20 +109,22 @@ static bool runUiEdit(const char* id,std::string& value,const char* hint="",int 
  return changed;
 }
 // A file chooser drawn with the editor's existing ImGui backend on every OS.
-static bool runUiBrowseRequested=false;
+static bool runUiBrowseRequested=false,runUiBrowseOpen=false,runUiBrowseAllowNew=false;
+static nlohmann::json runUiBrowseRects=nlohmann::json::object();
 static std::filesystem::path runUiBrowseFolder;
 static std::string runUiBrowsePath,runUiBrowseError;
 static std::function<void(const std::string&)> runUiBrowseAccept;
-static void runUiChoose(std::string initial,std::function<void(const std::string&)> accept){
+static void runUiChoose(std::string initial,std::function<void(const std::string&)> accept,bool allowNew=false){
  auto p=std::filesystem::u8path(initial);std::error_code error;runUiBrowseFolder=std::filesystem::is_directory(p,error)?p:p.parent_path();
  if(runUiBrowseFolder.empty()||!std::filesystem::is_directory(runUiBrowseFolder,error))runUiBrowseFolder=documentDefaultFolder();
- runUiBrowsePath=std::move(initial);runUiBrowseError.clear();runUiBrowseAccept=std::move(accept);runUiBrowseRequested=true;
+ runUiBrowsePath=std::move(initial);runUiBrowseError.clear();runUiBrowseAccept=std::move(accept);runUiBrowseRequested=runUiBrowseOpen=true;runUiBrowseAllowNew=allowNew;
 }
 static void runUiBrowsePanel(){
  if(runUiBrowseRequested){runUiBrowseRequested=false;ImGui::OpenPopup("Choose file");}
  ImGui::SetNextWindowSize({640*uiScale(),440*uiScale()},ImGuiCond_FirstUseEver);
  if(ImGui::BeginPopupModal("Choose file",nullptr,ImGuiWindowFlags_NoDocking)){
-  if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
+  auto record=[](const char* key){auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();runUiBrowseRects[key]={{"x",a.x},{"y",a.y},{"width",b.x-a.x},{"height",b.y-a.y},{"active",ImGui::IsItemActive()}};};
+  if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{8*uiScale(),8*uiScale()});
   if(ImGui::Button("Up"))runUiBrowseFolder=runUiBrowseFolder.parent_path();ImGui::SameLine();ImGui::TextUnformatted(runUiBrowseFolder.u8string().c_str());
   ImGui::BeginChild("Files",{0,-70*uiScale()},ImGuiChildFlags_Borders);
@@ -131,9 +133,14 @@ static void runUiBrowsePanel(){
   for(const auto& p:entries){bool folder=std::filesystem::is_directory(p,error);auto label=(folder?"[Folder] ":"")+p.filename().u8string();
    if(ImGui::Selectable(label.c_str(),runUiBrowsePath==p.u8string(),ImGuiSelectableFlags_AllowDoubleClick)){if(folder){runUiBrowseFolder=p;break;}runUiBrowsePath=p.u8string();}
   }
-  ImGui::EndChild();ImGui::SetNextItemWidth(-1);runUiEdit("##Selected file",runUiBrowsePath);
-  if(ImGui::Button("Choose",{80*uiScale(),0})){if(std::filesystem::is_regular_file(std::filesystem::u8path(runUiBrowsePath),error)){if(runUiBrowseAccept)runUiBrowseAccept(runUiBrowsePath);ImGui::CloseCurrentPopup();}else runUiBrowseError="Choose an existing file.";}
-  ImGui::SameLine();if(ImGui::Button("Cancel",{80*uiScale(),0}))ImGui::CloseCurrentPopup();if(!runUiBrowseError.empty())ImGui::TextWrapped("%s",runUiBrowseError.c_str());
+  ImGui::EndChild();ImGui::SetNextItemWidth(-1);runUiEdit("##Selected file",runUiBrowsePath);record("file-path");
+  if(ImGui::Button(runUiBrowseAllowNew?"Save":"Choose",{80*uiScale(),0})){
+   auto path=std::filesystem::u8path(runUiBrowsePath);
+   if(!runUiBrowsePath.empty()&&(runUiBrowseAllowNew?!std::filesystem::is_directory(path,error):std::filesystem::is_regular_file(path,error))){
+    try{if(runUiBrowseAccept)runUiBrowseAccept(runUiBrowsePath);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();}catch(const std::exception& e){runUiBrowseError=e.what();}
+   }else runUiBrowseError=runUiBrowseAllowNew?"Choose a file path.":"Choose an existing file.";
+  }record("file-choose");
+  ImGui::SameLine();if(ImGui::Button("Cancel",{80*uiScale(),0})){runUiBrowseOpen=false;ImGui::CloseCurrentPopup();}record("file-cancel");if(!runUiBrowseError.empty())ImGui::TextWrapped("%s",runUiBrowseError.c_str());
   ImGui::PopStyleVar();ImGui::EndPopup();
  }
 }
@@ -385,7 +392,8 @@ static void runUiWriteLive(){
  }}
  }
 static void runImGuiPanel(){
- if(!runUiLive&&!runWindow&&!runSettingsWindow&&!runLaunchWindow&&!runEngineWindow&&!runUiCloseRequest&&!ImGui::IsPopupOpen("Stop compilation?"))return;runLoad();
+ if(runUiBrowseOpen&&!runUiLive&&!runWindow&&!runSettingsWindow&&!runLaunchWindow&&!runEngineWindow&&!runUiCloseRequest){runUiBrowsePanel();return;}
+ if(!runUiLive&&!runWindow&&!runSettingsWindow&&!runLaunchWindow&&!runEngineWindow&&!runUiCloseRequest&&!runUiBrowseOpen&&!ImGui::IsPopupOpen("Stop compilation?"))return;runLoad();
  if(runUiAtlasWidth&&runUiAtlasTheme>=0){uiTheme=runUiAtlasTheme;uiStyle();}
  if(!runWindow){runUiOrigin={0,0};runUiRects=nlohmann::json::object();runUiRects["window"]={{"x",0},{"y",0},{"width",ImGui::GetIO().DisplaySize.x},{"height",ImGui::GetIO().DisplaySize.y}};}
  RunUiStyle style;if(runWindow)runUiCompile();runUiSettings();runUiEngines();runUiLaunch();runUiBrowsePanel();runUiConfirmClose();runUiWriteLive();

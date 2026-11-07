@@ -1,0 +1,176 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+#include "schema.h"
+#include <atomic>
+#include <map>
+namespace ftebroom::plant {
+enum Material { Bark, Leaf, Needle, Petal, Center, Cap, Gills, CactusSkin, Grass, Wood, Count };
+struct Vertex {V p,n;std::array<double,2> uv;double wind=0,phase=0;};
+struct Face {std::array<unsigned,3> i;int material;Part part;unsigned organ;};
+struct Mesh {
+  std::vector<Vertex> vertices;
+  std::vector<Face> faces;
+  V low{1e30,1e30,1e30}, high{-1e30,-1e30,-1e30};
+  bool budgetLimited=false;
+  void bounds() {low={1e30,1e30,1e30};high={-1e30,-1e30,-1e30};for(auto& v:vertices)for(int a=0;a<3;a++){low[a]=std::min(low[a],v.p[a]);high[a]=std::max(high[a],v.p[a]);}}
+};
+inline V bezier(V a,V b,V c,V d,double t) {
+  double s=1-t;return add(add(mul(a,s*s*s),mul(b,3*s*s*t)),add(mul(c,3*s*t*t),mul(d,t*t*t)));
+}
+inline std::array<double,2> atlasUV(int material,double u,double v) {
+  // Tiles have a four-pixel gutter; sampling never crosses into a neighbour.
+  constexpr double inset=4./256.;
+  return {(material%4+inset+u*(1-2*inset))/4.,(material/4+inset+v*(1-2*inset))/4.};
+}
+struct Builder {
+  Mesh mesh;
+  size_t budget;
+  const std::atomic<bool>* cancel;
+  unsigned organ=0;
+  explicit Builder(size_t b,const std::atomic<bool>* c=nullptr):budget(b),cancel(c){}
+  void check() const {if(cancel&&cancel->load())throw std::runtime_error("Plant generation cancelled");}
+  bool room(size_t faces) {check();if(mesh.faces.size()+faces>budget){mesh.budgetLimited=true;return false;}return true;}
+  unsigned vertex(V p,V n,double u,double v,int mat,double wind=0) {
+    auto uv=atlasUV(mat,std::clamp(u,0.,1.),std::clamp(v,0.,1.));
+    mesh.vertices.push_back({p,unit(n),uv,wind,double(organ%1024)*.618});return unsigned(mesh.vertices.size()-1);
+  }
+  void face(unsigned a,unsigned b,unsigned c,int mat,Part part) {
+    auto n=cross(sub(mesh.vertices[b].p,mesh.vertices[a].p),sub(mesh.vertices[c].p,mesh.vertices[a].p));
+    if(length(n)>1e-9)mesh.faces.push_back({{a,b,c},mat,part,organ});
+  }
+  void quad(unsigned a,unsigned b,unsigned c,unsigned d,int mat,Part part) {face(a,b,c,mat,part);face(a,c,d,mat,part);}
+  bool tube(const std::vector<V>& path,double radius,double tip,int sides,int mat,Part part,double ribs=0,double hold=0) {
+    if(path.size()<2||!room((path.size()-1)*sides*2+sides*2))return false;
+    organ++;unsigned first=mesh.vertices.size();V frame{1,0,0};
+    for(size_t i=0;i<path.size();i++) {
+      V tangent=unit(sub(path[std::min(i+1,path.size()-1)],path[i?i-1:0]));
+      frame=sub(frame,mul(tangent,dot(frame,tangent)));
+      if(length(frame)<1e-5)frame=cross(tangent,std::abs(tangent[2])<.9?V{0,0,1}:V{0,1,0});
+      frame=unit(frame);V binormal=unit(cross(tangent,frame));double t=double(i)/(path.size()-1);
+      double u=std::clamp((t-hold)/std::max(.01,1-hold),0.,1.);
+      double r=std::max(.002,radius*std::pow(1-u,1.1)+tip*u);
+      for(int j=0;j<=sides;j++) {
+        double angle=2*pi*j/sides;V radial=add(mul(frame,std::cos(angle)),mul(binormal,std::sin(angle)));
+        double ridge=ribs>0?1+.10*std::cos(angle*ribs):1;
+        V normal=unit(add(radial,mul(tangent,(radius-tip)/std::max(.01,length(sub(path.back(),path.front()))))));
+        vertex(add(path[i],mul(radial,r*ridge)),normal,double(j)/sides,t,mat,t);
+      }
+    }
+    for(unsigned i=0;i+1<path.size();i++)for(int j=0;j<sides;j++) {
+      unsigned a=first+i*(sides+1)+j,b=a+1,c=b+sides+1,d=a+sides+1;
+      quad(a,b,c,d,mat,part);
+    }
+    V startNormal=unit(sub(path.front(),path[1])),endNormal=unit(sub(path.back(),path[path.size()-2]));
+    unsigned start=vertex(path.front(),startNormal,.5,.5,mat),end=vertex(path.back(),endNormal,.5,.5,mat,1);
+    for(int j=0;j<sides;j++){face(start,first+j+1,first+j,mat,part);unsigned a=first+(path.size()-1)*(sides+1)+j;face(end,a,a+1,mat,part);}return true;
+  }
+  void leaf(V origin,V direction,V up,double size,double width,int shape,int mode,int mat,Part part,double curl,double twist,
+            const std::array<double,5>& profile) {
+    if(shape==7&&mode<2) {
+      direction=unit(direction);V right=unit(cross(direction,up));
+      for(int i=1;i<=4;i++)for(int side:{-1,1})leaf(add(origin,mul(direction,size*i*.18)),unit(add(mul(direction,.35),mul(right,side))),up,size*(.38-.04*i),width,2,1,mat,part,curl,twist,profile);
+      leaf(add(origin,mul(direction,size*.72)),direction,up,size*.35,width,2,1,mat,part,curl,twist,profile);return;
+    }
+    if(shape==4&&mode<2) {
+      int n=mode==1?10:20;if(!room(n))return;organ++;direction=unit(direction);V right=unit(cross(direction,up));up=unit(cross(right,direction));
+      V center=add(origin,mul(direction,size*.5));unsigned first=mesh.vertices.size();vertex(center,up,.5,.5,mat,.5);
+      for(int i=0;i<=n;i++) {
+        double angle=2*pi*i/n,radius=.5*(.69+.31*std::cos(angle*5));
+        double longitudinal=std::cos(angle)*radius,lateral=std::sin(angle)*radius;
+        V point=add(center,add(mul(direction,size*longitudinal),mul(right,size*width*lateral)));
+        point=add(point,mul(up,size*curl*longitudinal*longitudinal));
+        vertex(point,unit(sub(up,mul(direction,2*curl*longitudinal))),.5+lateral,.5+longitudinal,mat,.8);
+      }
+      for(int i=0;i<n;i++)face(first,first+i+2,first+i+1,mat,part);return;
+    }
+    const int segments=mode>=2?1:mode==1?2:4;
+    const int copies=mode==3?2:1;
+    if(!room(segments*4*copies))return;
+    direction=unit(direction);V right=unit(cross(direction,up));up=unit(cross(right,direction));
+    for(int copy=0;copy<copies;copy++) {
+      organ++;unsigned first=mesh.vertices.size();V r=copy?up:right,n=copy?mul(right,-1):up;
+      for(int i=0;i<=segments;i++) {
+        double t=double(i)/segments;
+        double silhouette=mode>=2?1:std::max(.012,std::sin(pi*t));
+        if(shape==1)silhouette=std::pow(silhouette,.62);
+        if(shape==2)silhouette=std::pow(silhouette,1.8);
+        if(shape==3)silhouette*=.68+.32*std::cos(t*pi*8);
+        if(shape==4)silhouette*=.55+.45*std::abs(std::cos(t*pi*5));
+        if(shape==5)silhouette=.08*std::pow(std::max(.01,std::sin(pi*t)),.25);
+        if(shape==6)silhouette=std::max(.01,curve(profile,t));
+        if(mode>=2)silhouette=1;
+        double bend=curl*size*t*t;
+        V center=add(origin,add(mul(direction,size*t),mul(n,bend)));
+        V normal=unit(sub(n,mul(direction,2*curl*t)));
+        for(int j=-1;j<=1;j++) {
+          double w=size*width*.5*silhouette*j;
+          V p=add(center,add(mul(r,w),mul(n,std::abs(w)*.14+twist*w*t)));
+          vertex(p,normal,(j*silhouette+1)*.5,t,mat,t);
+        }
+      }
+      for(int i=0;i<segments;i++)for(int j=0;j<2;j++) {
+        unsigned a=first+i*3+j,b=a+3;quad(a,a+1,b+1,b,mat,part);
+      }
+    }
+  }
+  void gill(V inner,V outer,double depth) {
+    if(!room(2))return;organ++;V radial=unit(sub(outer,inner)),normal=unit(cross(V{0,0,1},radial));
+    unsigned a=vertex(inner,normal,0,0,Gills),b=vertex(outer,normal,1,0,Gills),c=vertex(sub(outer,{0,0,depth*.3}),normal,1,1,Gills),d=vertex(sub(inner,{0,0,depth}),normal,0,1,Gills);
+    quad(a,b,c,d,Gills,Part::Surface);
+  }
+  void lathe(V center,const std::vector<std::array<double,2>>& profile,int sides,int mat,Part part,double ripple=0,double asymmetry=0) {
+    if(profile.size()<2||!room((profile.size()-1)*sides*2))return;
+    organ++;unsigned first=mesh.vertices.size();
+    for(size_t k=0;k<profile.size();k++)for(int j=0;j<=sides;j++) {
+      double a=2*pi*j/sides,t=double(k)/(profile.size()-1),r=profile[k][0]*(1+ripple*std::sin(a*7+k*.9));
+      auto prev=profile[k?k-1:0],next=profile[std::min(k+1,profile.size()-1)];
+      V n=unit({(next[1]-prev[1])*std::cos(a),(next[1]-prev[1])*std::sin(a),prev[0]-next[0]});
+      vertex(add(center,{r*std::cos(a),r*std::sin(a),profile[k][1]+asymmetry*r*std::cos(a)}),n,double(j)/sides,t,mat,t);
+    }
+    for(unsigned k=0;k+1<profile.size();k++)for(int j=0;j<sides;j++) {
+      unsigned a=first+k*(sides+1)+j;quad(a,a+1,a+sides+2,a+sides+1,mat,part);
+    }
+  }
+};
+inline Mesh hierarchy(const Mesh& source,const Project& d) {
+  Mesh out;out.budgetLimited=source.budgetLimited;
+  for(auto& node:d.nodes) {
+    std::vector<const Component*> chain{&node};auto parent=node.parent;bool visible=node.visible;
+    while(!parent.empty()) {auto it=std::find_if(d.nodes.begin(),d.nodes.end(),[&](auto& n){return n.id==parent;});visible&=it->visible;chain.push_back(&*it);parent=it->parent;}
+    if(!visible)continue;
+    std::map<unsigned,unsigned> indices;
+    auto transform=[&](Vertex v) {
+      for(auto c:chain) {
+        for(int i=0;i<3;i++){v.p[i]*=c->scale[i];v.n[i]/=c->scale[i];}
+        double a=c->rotation*pi/180,cs=std::cos(a),sn=std::sin(a);
+        auto rotate=[&](V p){return V{p[0]*cs-p[1]*sn,p[0]*sn+p[1]*cs,p[2]};};
+        v.p=add(rotate(v.p),c->offset);v.n=unit(rotate(v.n));
+      }return v;
+    };
+    for(auto& f:source.faces)if(f.part==node.kind) {
+      if(out.faces.size()>=size_t(d.p.budget)) {out.budgetLimited=true;break;}
+      auto copy=f;
+      for(int a=0;a<3;a++){unsigned i=f.i[a];if(!indices.count(i)){indices[i]=out.vertices.size();out.vertices.push_back(transform(source.vertices[i]));}copy.i[a]=indices[i];}
+      out.faces.push_back(copy);
+    }
+  }
+  out.bounds();return out;
+}
+inline void validate(const Mesh& m) {
+  if(m.faces.empty()||m.vertices.empty())throw std::runtime_error("Plant contains no visible geometry");
+  for(auto& v:m.vertices) {
+    for(double x:v.p)if(!std::isfinite(x)||std::abs(x)>100000)throw std::runtime_error("Invalid plant vertex");
+    for(double x:v.n)if(!std::isfinite(x))throw std::runtime_error("Invalid plant normal");
+    if(std::abs(length(v.n)-1)>.01)throw std::runtime_error("Plant normal is not normalized");
+    for(double x:v.uv)if(!std::isfinite(x)||x<0||x>1)throw std::runtime_error("Invalid plant UV");
+  }
+  for(auto& f:m.faces){for(unsigned i:f.i)if(i>=m.vertices.size())throw std::runtime_error("Invalid plant triangle index");
+    if(length(cross(sub(m.vertices[f.i[1]].p,m.vertices[f.i[0]].p),sub(m.vertices[f.i[2]].p,m.vertices[f.i[0]].p)))<1e-10)throw std::runtime_error("Degenerate plant triangle");}
+}
+inline V windPosition(const Vertex& v,const Params& p,double time,double height) {
+  double t=std::clamp(v.p[2]/std::max(1.,height),0.,1.),a=p.windDirection*pi/180;
+  double main=std::sin(time*p.windFrequency+v.p[2]*.013)*p.windStrength*(1-p.stiffness)*height*.045*t*t;
+  double flutter=std::sin(time*p.windFrequency*5+v.phase)*p.flutter*p.windStrength*v.wind*t*.7;
+  return add(v.p,{std::cos(a)*(main+flutter),std::sin(a)*(main+flutter),-.05*std::abs(main)*t});
+}
+}

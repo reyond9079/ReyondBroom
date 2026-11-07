@@ -18,7 +18,8 @@ void fb_bb_render()
  if(cvar("ftebroom_bb_ortho")){setproperty(VF_FOVX,max(16,vlen(high-low))*max(.1,cvar("ftebroom_modelviewer_zoom")));setproperty(VF_FOVY,max(16,vlen(high-low))*max(.1,cvar("ftebroom_modelviewer_zoom"))*size_y/size_x);}
  else{setproperty(VF_FOVY,45);setproperty(VF_FOVX,atan(tan(45*M_PI/360)*size_x/size_y)*360/M_PI);}
  if(cvar("ftebroom_modeleditor_player")){setproperty(VF_FOVX,90);setproperty(VF_FOVY,atan(size_y/size_x)*360/M_PI);}
- drawfill('0 0 0',size,'0.08 0.09 0.11',1,0);
+ vector background='0.08 0.09 0.11';if(cvar("ftebroom_plant_active"))background=stov(cvar_string("ftebroom_plant_background"));
+ drawfill('0 0 0',size,background,1,0);
  fb_modeleditor_guides(eye);
  if(cvar("ftebroom_bb_benchmark_b")){
   int vertices=cvar("ftebroom_bb_benchmark_vertices");

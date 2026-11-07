@@ -150,6 +150,16 @@ jobs:
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
       - name: Exercise actual ImGui controls with OS input
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-ui.py bundle/ReyondBroom-Linux-x64 qa/ui
+      - name: Validate plant generators, codecs, materials and all preset LODs
+        run: |
+          g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests
+          deps/plant-editor-tests qa/plants/core
+          python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+          python scripts/test-plant-exports.py qa/plants/core
+      - name: Exercise native Plant Editor and map placement with OS input
+        run: |
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-ui.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
+          python scripts/test-plant-exports.py qa/plants/ui
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -236,6 +246,22 @@ jobs:
       - name: Exercise actual Windows ImGui controls with OS input
         shell: pwsh
         run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
+      - name: Validate Windows plant generators, codecs, materials and preset LODs
+        shell: msys2 {0}
+        run: |
+          g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests.exe
+          deps/plant-editor-tests.exe qa/plants/core
+      - name: Exercise actual Windows Plant Editor and independent model import
+        shell: pwsh
+        run: |
+          python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+          if ($LASTEXITCODE) { throw 'Plant QA dependencies failed' }
+          python scripts/test-plant-exports.py qa/plants/core
+          if ($LASTEXITCODE) { throw 'Independent core model reimport failed' }
+          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Plant UI acceptance failed' }
+          python scripts/test-plant-exports.py qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Independent UI model reimport failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

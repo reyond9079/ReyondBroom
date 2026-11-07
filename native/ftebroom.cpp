@@ -268,6 +268,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_spawn_master.h"
 #include "ftebroom_unity.h"
 #include "ftebroom_plugins.h"
+#include "ftebroom_plant_editor.h"
 #include "ftebroom_texture_folders.h"
 #include "ftebroom_prefabs.h"
 #include "ftebroom_entity_list.h"
@@ -319,7 +320,7 @@ static void panel(float w, float h)
   linuxPlatformPump(ctrlHeld);
   io.MouseDrawCursor = false;
 #endif
-  if(runUiNavigation())io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
+  if(runUiNavigation()||plantFocused())io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::NewFrame();
   if(tourActive){
     uiHasScene=true;uiScenePos={0,0};uiSceneSize={w,h};popupOpen=false;viewCompute(w,h);
@@ -1122,7 +1123,7 @@ static void panel(float w, float h)
   terrainPanel();
   shaderPackPanel();
   modFilesPanel();
-  modelViewerPanel();bbBenchTick();
+  modelViewerPanel();bbBenchTick();plantPanel();
   softLightGalleryPanel();
   pluginsPanel();pluginPreviewDraw();
   symmetryPanel();generatorPanel();arrayPanel();settlePanel();spawnMasterPanel();unityPanel();textureFolderPanel();prefabPanel();entityListPanel();
@@ -1468,7 +1469,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    if (!soundKeyboardEvent(key, down)&&(!down||!runUiNavigation())) dispatchAction(key, down, inScene);
+    if (!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()))) dispatchAction(key, down, inScene);
   }
   return qtrue;
 }
@@ -1924,6 +1925,7 @@ static void testModControls()
 }
 static void shutdownEditor()
 {
+  plantShutdown();
   pluginsShutdown();
   settleCancel=true;if(settleJob.valid())settleJob.wait();
   textureFolderCancel=true;if(textureFolderJob.valid())textureFolderJob.wait();
@@ -1955,6 +1957,7 @@ static void QDECL videoChanged(int width,int height,qboolean restarted)
   thumbnailCache.clear();entityPreviews.clear();fileImages.clear();++fileImageGeneration;
   bbImages.clear();bbImageRevisions.clear();bbImageTimes.clear();bbCheckerReady=false;bbRenderRevision=0;
   modelViewerImage=0;modelViewerSkinTexture=0;modelViewerSkinTextureIndex=-1;
+  plantVideoChanged();
   uploadFontAtlas();
   ImGui::GetIO().DisplaySize={float(width),float(height)};
   core->Print("ReyondBroom: restored ImGui atlas after renderer restart.\n");
@@ -2043,6 +2046,7 @@ extern "C" qboolean NATIVEEXPORT FTEPlug_Init(plugcorefuncs_t* api)
   commands->AddCommand("ftebroom_test_mod_controls",testModControls,"Test embedded controls menu.");
   commands->AddCommand("ftebroom_test_uv_input", testUVInput, "Test UV canvas pointer routing.");
   commands->AddCommand("ftebroom_test_run", testRunProfiles, "Test run profiles in disposable runs.");
+  commands->AddCommand("ftebroom_plant",plantCommand,"Open the native Plant Editor or select a plant preset.");
   commands->AddCommand("ftebroom_test_desktop",testDesktop,"Test desktop integration in disposable installations.");
 #ifndef _WIN32
   commands->AddCommand("ftebroom_drop_hex",linuxDropCommand,"Import a local desktop WAD drop.");

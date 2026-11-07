@@ -488,6 +488,7 @@ static void actionMenus()
       actionMenuGroup(group);
       if(std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
       if(std::string(group)=="Edit") {
+        if(ImGui::MenuItem("Plant Editor..."))plantShow();
         if(ImGui::BeginMenu("Symmetry")){
           actionMenuGroup("Edit/Symmetry");ImGui::Separator();
           if(ImGui::MenuItem("Settings..."))symmetryWindow=true;

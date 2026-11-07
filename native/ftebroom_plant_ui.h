@@ -356,9 +356,14 @@ static void plantQaFrame(){
 }
 static plants::Json plantQaPerf(){auto sorted=plantQaFrameWindow;std::sort(sorted.begin(),sorted.end());auto main=plantQaMainWindow;std::sort(main.begin(),main.end());return plants::Json{{"frames",plantQaFrameCount},{"mean_ms",plantQaFrameCount?plantQaFrameSum/plantQaFrameCount:0},{"max_ms",plantQaFrameMax},{"over_100_ms",plantQaSlowFrames},{"recent_p95_ms",sorted.empty()?0:sorted[size_t((sorted.size()-1)*.95)]},{"plant_main_thread",{{"frames",plantQaMainCount},{"max_ms",plantQaMainMax},{"over_100_ms",plantQaMainSlow},{"recent_p95_ms",main.empty()?0:main[size_t((main.size()-1)*.95)]},{"slow_events",plantQaMainEvents}}}};}
 static void plantWriteQa() {
-  auto& s=plantState;if(!s.qa)return;static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
-  plants::Json counts=plants::Json::array();if(s.result)for(auto& m:s.result->lods)counts.push_back({{"triangles",m.faces.size()},{"vertices",m.vertices.size()},{"low",m.low},{"high",m.high}});
+  auto& s=plantState;if(!s.qa)return;
+  // Merge shared dialog rectangles every frame: the independently throttled
+  // placement snapshot also consumes widgets after plantPanel clears them.
+  // Merging only on this writer's 80 ms ticks could omit an open dialog forever
+  // when the two writers settle into different frame phases.
   if(runUiBrowseOpen)for(auto it=runUiBrowseRects.begin();it!=runUiBrowseRects.end();++it)s.widgets[it.key()]=it.value();
+  static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
+  plants::Json counts=plants::Json::array();if(s.result)for(auto& m:s.result->lods)counts.push_back({{"triangles",m.faces.size()},{"vertices",m.vertices.size()},{"low",m.low},{"high",m.high}});
   size_t meshBytes=0,textureBytes=0;if(s.result){for(auto* lods:{&s.result->lods,&s.result->baseLods})for(auto& m:*lods)meshBytes+=m.vertices.capacity()*sizeof(plants::Vertex)+m.faces.capacity()*sizeof(plants::Face);for(auto* m:{&s.result->maps->albedo,&s.result->maps->normal,&s.result->maps->orm})textureBytes+=m->rgba.capacity();}
   auto j=plants::Json{{"frame_stats",plantQaPerf()},{"generation_ms",s.result?s.result->milliseconds:0.},{"frame_ms",ImGui::GetIO().DeltaTime*1000},{"mesh_cache_bytes",meshBytes},{"texture_bytes",textureBytes},{"open",s.open},{"busy",plantBusy()},{"ready",plantReady()},{"widgets",s.widgets},{"project",plants::serialize(s.doc)},
     {"lods",counts},{"selected",s.selected},{"error",s.error},{"message",s.message},{"path",s.file.u8string()},{"model",s.lastModel.u8string()},

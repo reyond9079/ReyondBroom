@@ -142,12 +142,10 @@ try:
   console('ftebroom_show_models');console('r_drawentities');console('version_modelformats')
   console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
   if a.scene_only:
-   console('r_fullbright');console('r_forceprogramify');console('r_glsl_offsetmapping')
-   console('r_fullbright 1');screenshot('plant-fullbright-diagnostic')
    shader_paths=[data/dep for dep in manifest['dependencies'] if dep.endswith('.shader')]
    if live()['profile']==1:shader_paths += [Path(live()['assetSource'])/dep for dep in manifest['dependencies'] if dep.endswith('.shader')]
    original=shader_paths[0].read_text()
-   for variant,text in [('identity',original.replace('rgbGen vertex','rgbGen identity')),('opaque',original.replace('rgbGen vertex','rgbGen identity').replace('alphaFunc GE128','')),('plain-program',original.replace('cull none','cull none\n program default2d#MASK=0.5#MASKLT=1').replace('rgbGen vertex','rgbGen identity'))]:
+   for variant,text in [('reload-control',original),('alpha-identity',original.replace('rgbGen vertex','rgbGen vertex\n  alphaGen identity')),('diffuse',original.replace('rgbGen vertex','rgbGen lightingDiffuse'))]:
     for path in shader_paths:path.write_text(text)
     console('fs_restart');time.sleep(1);screenshot('plant-'+variant+'-diagnostic')
   console('condump plant-diagnostic')

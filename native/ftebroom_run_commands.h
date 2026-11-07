@@ -4,7 +4,7 @@ static std::string runImportReviewGame;
 static nlohmann::json runUiState(){
  using J=nlohmann::json;runLoad();J profiles=J::array(),engines=J::array(),presets=J::array();
  for(const auto& p:runProfiles)profiles.push_back(runProfileToJson(p));for(const auto& p:runBundledProfiles)presets.push_back(runProfileToJson(p));
- for(const auto& e:runEngines)engines.push_back({{"id",e.id},{"name",e.name},{"path",e.path},{"parameters",e.parameters}});
+ for(const auto& e:runEngines)engines.push_back(runEngineToJson(e));
  auto workvars=runWorkdirVariables(),taskvars=workvars;
  auto enabled=runCommonVariables().at("MODS");if(!enabled.empty())enabled.erase(enabled.begin());taskvars["CPU_COUNT"]=std::max(1u,std::thread::hardware_concurrency());taskvars["WORK_DIR_PATH"]="";
  if(runSelected>=0&&runSelected<int(runProfiles.size()))try{taskvars["WORK_DIR_PATH"]=ftebroom::profile::interpolate(runProfiles[runSelected].work,workvars);}catch(...){}
@@ -14,7 +14,12 @@ static nlohmann::json runUiState(){
 }
 static void runLaunchConfiguredEngine(const RunEngineProfile& engine){
  auto oldStrict=runStrict;runStrict=true;
- try{auto args=ftebroom::profile::interpolate(engine.parameters,runCommonVariables());runStartProcess(engine.path,args,std::filesystem::u8path(engine.path).parent_path(),true);runStrict=oldStrict;}
+ try{auto vars=runWorkdirVariables();
+  if(runSelected>=0&&runSelected<int(runProfiles.size()))vars["WORK_DIR_PATH"]=ftebroom::profile::interpolate(runProfiles[runSelected].work,vars);
+  else vars["WORK_DIR_PATH"]=vars["MAP_DIR_PATH"];
+  auto plan=ftebroom::engineLaunchPlan(engine,vars,runApplicationDirectory());
+  ftebroom::stageEngineMap(plan);runStartProcess(plan.executable.u8string(),plan.arguments,plan.working,true);
+  runAppend("#### Engine process started: "+plan.executable.u8string()+" "+plan.arguments+"\n");runStrict=oldStrict;}
  catch(...){runStrict=oldStrict;throw;}
 }
 static nlohmann::json runUiExecute(const nlohmann::json& q){
@@ -30,7 +35,7 @@ static nlohmann::json runUiExecute(const nlohmann::json& q){
    auto nextMods=q.at("enabledMods").get<std::vector<std::string>>();
    std::string joined;for(const auto& mod:nextMods){if(mod.find_first_of(";\r\n")!=std::string::npos)throw std::runtime_error("A mod name must not contain a separator or newline.");if(!joined.empty())joined+=';';joined+=mod;}
    std::vector<RunEngineProfile> nextEngines;std::set<std::string> ids;
-   for(const auto& e:q.at("engines")){RunEngineProfile p{e.at("id"),e.at("name"),e.at("path"),e.at("parameters")};if(p.id.empty()||!ids.insert(p.id).second)throw std::runtime_error("Engine profile IDs must be unique.");nextEngines.push_back(std::move(p));}
+   for(const auto& e:q.at("engines")){auto p=runEngineFromJson(e);if(p.id.empty()||!ids.insert(p.id).second)throw std::runtime_error("Engine profile IDs must be unique.");nextEngines.push_back(std::move(p));}
    auto nextRoot=q.at("gameRoot").get<std::string>(),nextBase=q.at("baseMod").get<std::string>();auto nextVariables=q.at("variables").get<std::map<std::string,std::string>>();
    auto old=runWorkspaceJson();auto previousMods=runCommonVariables().at("MODS");if(!previousMods.empty())previousMods.erase(previousMods.begin());
    runGameRoot=std::move(nextRoot);runBaseMod=std::move(nextBase);runEnabledMods=std::move(nextMods);runModsConfigured=true;runVariables=std::move(nextVariables);runEngines=std::move(nextEngines);
@@ -54,13 +59,13 @@ static nlohmann::json runUiExecute(const nlohmann::json& q){
    if(!runSaveImported(runImportPreview))throw std::runtime_error(runError);runImportReviewed=false;
   }else if(action=="engineProfiles"){
    std::vector<RunEngineProfile> next;std::set<std::string> ids;
-   for(const auto& e:q.at("engines")){RunEngineProfile p{e.at("id"),e.at("name"),e.at("path"),e.at("parameters")};if(p.id.empty()||!ids.insert(p.id).second)throw std::runtime_error("Engine profile IDs must be unique.");next.push_back(std::move(p));}
+   for(const auto& e:q.at("engines")){auto p=runEngineFromJson(e);if(p.id.empty()||!ids.insert(p.id).second)throw std::runtime_error("Engine profile IDs must be unique.");next.push_back(std::move(p));}
    auto old=runEngines;runEngines=std::move(next);if(!runSaveProfiles()){runEngines=std::move(old);throw std::runtime_error(runError);}
   }else if(action=="engineParameters"){
    for(const auto& e:q.at("engines"))for(auto& saved:runEngines)if(saved.id==e.at("id"))saved.parameters=e.at("parameters").get<std::string>();
    if(!runSaveProfiles())throw std::runtime_error(runError);
   }else if(action=="launchEngine"){
-   auto e=q.at("engine");RunEngineProfile engine{e.at("id"),e.at("name"),e.at("path"),e.at("parameters")};
+   auto e=q.at("engine");auto engine=runEngineFromJson(e);
    for(auto& saved:runEngines)if(saved.id==engine.id)saved.parameters=engine.parameters;runSaveProfiles();runLaunchConfiguredEngine(engine);
   }else throw std::runtime_error("Unknown Compile action: "+action);
   response["revision"]=runStoreRevision;return response;

@@ -14,6 +14,9 @@
 #include <windows.h>
 #endif
 int probeMain(const std::vector<std::string>& args){
+ if(args.size()>2&&args[1]=="record"){
+  std::ofstream(std::filesystem::u8path(args[2]))<<nlohmann::json{{"argv",args},{"cwd",std::filesystem::current_path().u8string()}}.dump(2);return 0;
+ }
  if(args.size()>1&&(args[1]=="crash"||args[1]=="breakpoint")){
 #ifdef _WIN32
   SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);RaiseException(args[1]=="breakpoint"?EXCEPTION_BREAKPOINT:EXCEPTION_ACCESS_VIOLATION,EXCEPTION_NONCONTINUABLE,0,nullptr);

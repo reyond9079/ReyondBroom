@@ -20,4 +20,16 @@ struct RunProfile {
   // Legacy bundled presets retain the preview/resource-preparation adapter.
   bool trenchBroom=false;
 };
-struct RunEngineProfile {std::string id,name,path,parameters;};
+struct RunEngineProfile {
+  std::string id,name,path,parameters;
+  // Empty values retain the original engine-directory / no-staging behavior.
+  std::string work,mapFile;
+};
+inline RunEngineProfile runEngineFromJson(const nlohmann::json& e) {
+  return {e.at("id"),e.at("name"),e.at("path"),e.at("parameters"),
+          e.value("workdir",std::string{}),e.value("mapFile",std::string{})};
+}
+inline nlohmann::json runEngineToJson(const RunEngineProfile& e) {
+  return {{"id",e.id},{"name",e.name},{"path",e.path},{"parameters",e.parameters},
+          {"workdir",e.work},{"mapFile",e.mapFile}};
+}

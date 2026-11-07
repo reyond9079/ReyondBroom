@@ -511,6 +511,7 @@ static void actionMenus()
         if(ImGui::BeginMenu("Visibility")){actionMenuGroup("View",true);ImGui::EndMenu();}
         if(ImGui::MenuItem("Viewport options..."))viewOptionsOpen=true;
         if(ImGui::MenuItem("Preferences...")){preferencesRequest=true;preferencesAppearanceRequest=true;}
+        runUiRecordGlobal("menu-preferences");
         bool outlines=cvars->GetFloat("ftebroom_show_edges")!=0;
         if(ImGui::MenuItem("Brush outlines",nullptr,outlines))cvars->SetFloat("ftebroom_show_edges",!outlines);
         if(ImGui::MenuItem("Resolution...")){uiResolutionRead();uiResolutionWindow=true;}

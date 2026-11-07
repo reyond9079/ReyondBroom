@@ -505,7 +505,7 @@ void fb_surfacegrid(int geometryOnly)
     float tx=tan(fov_x*M_PI/360),ty=tan(fov_y*M_PI/360);
     int gridVisible=cvar("ftebroom_grid_visible"),edges=cvar("ftebroom_show_edges");
     fb_incremental_draw_grid();
-    shaderforname("ftebroom/brushedges","{\ncull none\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
+    shaderforname("ftebroom/brushedges","{\ncull none\nprogram ftebroom_edges\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
     if(autocvar_ftebroom_native_overlays && checkbuiltin(ftebroom_draw_grid_compact) && (fb_static_preview_supported || (!fb_active && !fb_transform_preview && !fb_vertex_preview_valid && !fb_generator_count && cvar("ftebroom_tool")!=FB_TOOL_CLIP))){
         fb_render_allowed(0,FB_PICK_LOCKED);int *access=fb_static_preview_supported?fb_static_access:fb_render_access;int accessCount=fb_static_preview_supported?fb_static_access_count:fb_render_access_count;fb_grid_native_params_t params;params.stride=sizeof(fb_grid_face_t);params.flags=8|(gridVisible?1:0)|(edges?2:0)|(autocvar_ftebroom_sky_overlays?4:0);params.gridShader="ftebroom/surfacegrid";params.edgeShader="ftebroom/brushedges";params.visible=fb_grid_visible;params.revision=fb_grid_upload_epoch;
         int nativeCount;if(autocvar_ftebroom_cached_meshes && fb_grid_face_count>=30000 && checkbuiltin(ftebroom_draw_grid_cached))nativeCount=ftebroom_draw_grid_cached(fb_grid_faces,fb_grid_face_count,fb_grid_brush_bounds,access,accessCount,&params);else nativeCount=ftebroom_draw_grid_compact(fb_grid_faces,fb_grid_face_count,fb_grid_brush_bounds,access,accessCount,&params);

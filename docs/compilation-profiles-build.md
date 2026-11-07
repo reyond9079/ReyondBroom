@@ -18,7 +18,60 @@ Link `build/profile/libreyond-profile.a` into the host. The normal Linux/Windows
 
 SDL2 also requires rebuilding the engine with `bash scripts/build-sdl2-engine.sh /dedicated/fteqw`. Its SDL window-close event must pass through the same editor confirmation as native Linux and Windows. The native-update workflow supplies this rebuilt executable and corresponding patched engine sources to the packager; it rejects an SDL2 package without them.
 
-## Migration
+## VKQuake / Ironwail launch (REYON-8)
+
+For a Quake 1 map, open **Run > Launch Engine > Configure engines** (also
+available from a Launch Engine task in Compile). The **VKQuake** and **Ironwail**
+buttons add editable templates. Choose the installed executable, set the game
+root in Compilation settings, and use the map's Mods list for the active mod.
+The game root contains `id1` and the mod directory; it is independent of the
+engine executable directory. Quote paths containing spaces in Arguments.
+
+Each engine profile now saves **Working dir**, **Arguments** and optional
+**Compiled map**, alongside its name and executable. A blank working directory
+uses the executable directory; `${ENGINE_DIR_PATH}` makes that explicit. The
+Quake template uses `-basedir "${GAME_DIR_PATH}" -game "${MODS[-1]}" +map
+"${MAP_BASE_NAME}"` and `${WORK_DIR_PATH}/${MAP_BASE_NAME}.bsp`. WORK_DIR_PATH is
+the selected compilation profile's expanded working directory, including when
+using Launch Engine separately. Relative engine/work/map paths use the editor
+application directory. Existing profiles without these fields retain their
+commands and deployment workflow. TrenchBroom profile import is preserved.
+
+Add a **Launch Engine** task after your export/compiler/light tasks and select
+this engine profile. A nonempty Compiled map enables Quake 1 BSP (29/BSP2) header
+validation and copies the BSP plus available `.lit`, `.lux`, `.ent` sidecars to
+the `-basedir` / `-game` / `maps` destination named by `+map`. Missing sidecars
+remove stale overrides for that output map. Use a filename without spaces for
+the map itself, as required by Quake's console; parent directories may contain
+spaces/Unicode. Missing executables/workdirs/maps and incompatible or truncated
+BSPs stop the launch with a diagnostic. The game installation must supply its
+own licensed data. For special mission-pack switches or an existing Copy task,
+leave Compiled map blank and manage deployment explicitly.
+
+The log distinguishes compilation completion, successful process creation and
+the engine's eventual exit status. A nonzero game exit is reported even after
+the compiler has finished. Stop compilation does not kill a separately launched
+game. Test mode interpolates/tokenizes the command without copying/launching.
+
+`scripts/test-engine-viewport.py` performs an actual compiler -> BSP deployment
+-> OS process test using explicitly labelled argv probes, and optionally a real
+installed engine via `--engine`, `--game-root`, `--mod`. This distinction matters:
+an argv probe is not evidence that a game renderer loaded the map.
+
+## Viewport colors (REYON-8)
+
+Open **View > Preferences > Colors**. **Brush edges** controls ordinary brush
+wire outlines in XY/XZ/YZ and the 3D edge passes (including retained GPU meshes).
+Selected, hovered and locked geometry keep their own color controls. Hidden
+geometry stays hidden. Color changes apply immediately without a geometry
+rebuild. **2D viewport background** defaults to `#303238` in both Modern themes.
+The shared preferences file stores explicit custom choices; startup/default
+registration and theme changes do not reset them. Grid and axes remain visible.
+
+The native update packager includes the current GLSL programs as well as CSQC
+and the host module. Updating only the module would leave the old 3D colors.
+
+## Profile migration
 
 The canonical store is `ftebroom/compilation-profiles.json`, version 1, with independent records keyed by game. Writes use a temporary file and atomic replacement. Empty and duplicate profile names are valid; an empty list stays empty. Bundled presets are available through Compilation settings and are not inserted automatically.
 

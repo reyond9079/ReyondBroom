@@ -43,7 +43,7 @@ void(vector mousepos) editor_brushes_addentities =
         vector fov=getproperty(VF_FOV);
         // VF_FOV only returns horizontal/vertical extents; depth is set separately.
         fov_z=262144;
-        if(!fb_view_render_cache) {drawfill(vmn,vsz,'0 0 0',1,0);fb_view_background();}
+        if(!fb_view_render_cache) {drawfill(vmn,vsz,autocvar_ftebroom_color_2d_background,1,0);fb_view_background();}
 
 		if (curmousepos_x >= vmn_x && curmousepos_x <= vmn_x+vsz_x && curmousepos_y >= vmn_y && curmousepos_y <= vmn_y+vsz_y)
 		{

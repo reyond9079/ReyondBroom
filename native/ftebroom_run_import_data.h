@@ -70,7 +70,7 @@ static RunImport runReadTrenchBroom(const std::filesystem::path& path,const std:
  auto engineFile=path.parent_path()/"GameEngineProfiles.cfg";
  if(std::filesystem::exists(engineFile))try{
   auto engines=runImportRead(engineFile);size_t i=0;
-  for(const auto& e:engines.at("profiles"))out.engines.push_back({e.value("id","imported-engine-"+std::to_string(++i)),e.at("name"),e.at("path"),e.at("parameters")});
+  for(const auto& e:engines.at("profiles"))out.engines.push_back({e.value("id","imported-engine-"+std::to_string(++i)),e.at("name"),e.at("path"),e.at("parameters"),e.value("workdir",std::string{}),e.value("mapFile",std::string{})});
  }catch(const std::exception& e){out.notices.push_back("GameEngineProfiles.cfg: "+std::string(e.what()));}
  for(const auto& entry:config.at("profiles"))try{
   auto p=runProfileFromJson(entry);

@@ -9,6 +9,12 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string_view(mode)=="reyon8qa"){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;uiScaleChoice=0;uiTheme=0;uiStyle();
+    viewSetLayout(4);runLoad();runUiLive=true;runWindow=false;frame();frame();
+  }
+  if(std::string_view(mode)=="reyon8preferences"){preferencesRequest=true;frame();frame();}
+  if(std::string_view(mode)=="reyon8engines"){runEngineWindow=true;frame();frame();}
 #include "ftebroom_sound_tests.h"
   if(std::string_view(mode)=="inspect125map"||std::string_view(mode)=="inspect125face"){
     auto click=[&](const char* key){

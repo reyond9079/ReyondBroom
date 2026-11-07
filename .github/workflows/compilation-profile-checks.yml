@@ -160,6 +160,7 @@ jobs:
           make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz'
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Linux-x64/ftebroom/csaddon.dat
+          cp runtime/glsl/* bundle/ReyondBroom-Linux-x64/ftebroom/glsl/
           cp deps/profile-core/compilation-profile-probe bundle/ReyondBroom-Linux-x64/tools/
       - name: Rebuild SDL2 engine with the window-close guard
         if: matrix.platform == 'Linux-SDL2-x64'
@@ -181,6 +182,8 @@ jobs:
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-ui.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
           python scripts/test-plant-exports.py qa/plants/ui
           python scripts/test-plant-map.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
+      - name: Verify engine launch and viewport colors with real OS input
+        run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py bundle/ReyondBroom-Linux-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -225,6 +228,7 @@ jobs:
           make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
+          cp runtime/glsl/* bundle/ReyondBroom-Windows-x64/ftebroom/glsl/
           cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
           git rev-parse HEAD > bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
       # Test-machine renderer only. The editor distribution does not gain a Mesa dependency.
@@ -285,6 +289,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Independent UI model reimport failed' }
           python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
           if ($LASTEXITCODE) { throw 'Real plant BSP compilation failed' }
+      - name: Verify engine launch and viewport colors with real Windows input
+        run: python scripts/test-engine-viewport.py bundle/ReyondBroom-Windows-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4
         if: always()
         with:

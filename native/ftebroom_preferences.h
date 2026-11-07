@@ -10,7 +10,7 @@ static const char* preferenceVariables[] = {
   "ftebroom_look_speed","ftebroom_pan_speed","ftebroom_move_speed","ftebroom_fly_speed",
   "ftebroom_fov","ftebroom_invert_horizontal","ftebroom_invert_vertical",
   "ftebroom_move_to_cursor","ftebroom_alt_move","ftebroom_grid_alpha",
-  "ftebroom_grid_color","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
+  "ftebroom_grid_color","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
   "ftebroom_show_entity_names","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
   "ftebroom_texture_lock","ftebroom_uv_lock","ftebroom_auto_integer_snap","ftebroom_sky_overlays","ftebroom_bounds_visible","ftebroom_map_bounds",
@@ -66,6 +66,9 @@ static void preferencesApplyActions()
 }
 static bool shortcutOverlap(uint32_t a,uint32_t b)
 {
+  // Model Editor handles its shortcuts before map actions. Treat its focused
+  // document as a separate context, including global map/file shortcuts.
+  if(bool(a&CtxModelEditor)!=bool(b&CtxModelEditor))return false;
   for(uint32_t group : {uint32_t(CtxAnyView),uint32_t(CtxAnyOrNoSelection),uint32_t(CtxAnyOrNoTool)})
     if((a&group)&&(b&group)&&!(a&b&group))return false;
   return true;
@@ -144,6 +147,7 @@ static void testPreferences()
   if(!cvars->GetFloat("ftebroom_skip_setup"))return;
   initActions();auto expect=[](bool ok,const char* name){core->Print((std::string(ok?"FTEBROOM_PREFS_PASS ":"FTEBROOM_PREFS_FAIL ")+name+"\n").c_str());};
   expect(shortcutConflicts().empty(),"default_shortcuts_unambiguous");
+  expect(!shortcutOverlap(CtxModelEditor,CtxAny)&&shortcutOverlap(CtxModelEditor,CtxModelEditor),"model_document_shortcuts_have_separate_focus");
   for(auto& a:actions)if(std::string(a.id)=="Menu/Tools/Vertex")shortcutApply(a,"c");
   auto conflicts=shortcutConflicts();expect(conflicts.count("Menu/Tools/Vertex")&&conflicts.count("Menu/Tools/Clip"),"overlap_detected");
   for(auto& a:actions)if(std::string(a.id)=="Menu/Tools/Clip")shortcutApply(a,"Shift+c");

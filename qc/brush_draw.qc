@@ -7,7 +7,7 @@ vector fb_visual_current_wire;
 void(int mod, int id) DrawEngineBrushWireframe =
 {
 	vector col = '1 0 0';
-    if(cvar("ca_brush_view") && !brush_isselected(mod,id)) col='0.65 0.65 0.7';
+    if(cvar("ca_brush_view") && !brush_isselected(mod,id)) col=autocvar_ftebroom_color_brush_edges;
     string wire="chop";
     if(cvar("ca_brush_view")) {
         col=fb_visual_current_wire;

@@ -34,6 +34,18 @@ Mesa software renderer for working headless OpenGL; it is a test dependency and 
 not packaged with the editor. SDL2 rebuilds the pinned engine with the editor's
 window-close guard. Both event paths now ask before stopping an active compilation.
 
+Linux uses XTest input. Windows uses OS mouse input and synchronous Win32 key messages
+through FTE's actual window procedure, with the target keyboard state held until
+`ToUnicode` finishes. The driver waits for fixture startup and subsequent rendered
+snapshots, and retries reads during Windows file replacement. It never changes the
+profile model or invokes a button callback to make an interaction pass. Optional
+input traces are enabled only by the explicit QA command.
+
+The 26 interaction checks passed on Windows x64, native Linux and Linux SDL2.
+Windows additionally passed the focused reproduction after the driver synchronization
+fixes; native Linux repeated the final driver successfully. The built Windows host
+imports only system DLLs, and the Linux host dependency list contains no Qt library.
+
 The CI artifact contains real editor logs, test results, geometry JSON and screenshots
 for 800×600 / 1200×800 Compile at 100%, 150% and 200% editor scaling, light and dark.
 Actual framebuffer dimensions are preserved when the desktop constrains its size.

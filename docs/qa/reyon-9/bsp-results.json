@@ -1,0 +1,21 @@
+[
+  {
+    "profile": "fte-custom",
+    "plant_triangles_in_world": 0,
+    "bsp_entities": "{\n\"classname\" \"worldspawn\"\n\"wad\" \"/workspace/reyon8/ui-sdl-verified/Quake fixture with spaces/id1/test textures.wad\"\n\"_q3map2_cmdline\" \"-bsp -meta; -light -fast -samples 2\"\n\"_q3map2_version\" \"2.5.17n\"\n}\n{\n\"classname\" \"info_player_start\"\n\"origin\" \"0 -200 32\"\n\"angle\" \"90\"\n}\n{\n\"model\" \"models/reyond-plugins/plant-c096891926cf7ec6-fte.md3\"\n\"classname\" \"func_model\"\n\"_reyondbroom_source\" \"models/reyond-plugins/plant-c096891926cf7ec6-fte.plant.json\"\n\"origin\" \"0 0 0\"\n\"_reyondbroom_fte_q1\" \"1\"\n\"_reyondbroom_placement\" \"placement-1794069341649777643-1\"\n\"_reyondbroom_authoring\" \"1\"\n\"_reyondbroom_normalization\" \"1\"\n\"modelscale\" \"1\"\n}\n\u0000",
+    "bsp_bytes": 56436,
+    "shader_names": [
+      "textures/q1test"
+    ]
+  },
+  {
+    "profile": "q3",
+    "plant_triangles_in_world": 31994,
+    "bsp_entities": "{\n\"classname\" \"worldspawn\"\n\"wad\" \"/workspace/reyon8/ui-sdl-verified/Quake fixture with spaces/id1/test textures.wad\"\n\"_q3map2_cmdline\" \"-bsp -meta; -light -fast -samples 2\"\n\"_q3map2_version\" \"2.5.17n\"\n}\n{\n\"angle\" \"90\"\n\"classname\" \"info_player_start\"\n\"origin\" \"0 -200 32\"\n}\n\u0000",
+    "bsp_bytes": 1877980,
+    "shader_names": [
+      "textures/q1test",
+      "textures/reyond-plugins/plant-c096891926cf7ec6-fte"
+    ]
+  }
+]

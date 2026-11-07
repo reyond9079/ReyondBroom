@@ -209,6 +209,17 @@ static void plantPick() {
   }
   if(part>=0)for(size_t i=0;i<s.doc.nodes.size();i++)if(int(s.doc.nodes[i].kind)==part){s.selected=i;break;}
 }
+static void plantUploadMaps(bool auxiliary=false){
+  auto& s=plantState;if(!s.result)return;auto images=bbImageAPI();if(!images)return;
+  if(s.previewMaps!=s.result->maps){
+    auto& map=s.result->maps->albedo;images->upload("bbtex/plant-atlas.tga",map.rgba.data(),map.width,map.height);
+    s.previewMaps=s.result->maps;s.auxiliaryMapsUploaded=false;
+  }
+  if(auxiliary&&!s.auxiliaryMapsUploaded){
+    auto& maps=*s.result->maps;images->upload("bbtex/plant-normal.tga",maps.normal.rgba.data(),maps.normal.width,maps.normal.height);
+    images->upload("bbtex/plant-orm.tga",maps.orm.rgba.data(),maps.orm.width,maps.orm.height);s.auxiliaryMapsUploaded=true;
+  }
+}
 static void plantViewport() {
   auto& s=plantState;auto& io=ImGui::GetIO();
   if(s.owner&&(bbActive||modelViewerOpen)) {s.owner=false;cvars->SetFloat("ftebroom_plant_active",0);}
@@ -247,12 +258,9 @@ static void plantViewport() {
     double now=ImGui::GetTime();if(s.dirtyRender||(s.wind&&now-s.lastUpload>1./30)) {
       auto api=bbAPI();auto images=bbImageAPI();if(!api||!images){s.error="This engine lacks the existing dynamic-mesh preview interfaces";return;}
       if(s.dirtyRender) {
-        auto& maps=*s.result->maps;
-        images->upload("bbtex/plant-atlas.tga",maps.albedo.rgba.data(),maps.albedo.width,maps.albedo.height);
-        images->upload("bbtex/plant-normal.tga",maps.normal.rgba.data(),maps.normal.width,maps.normal.height);
-        images->upload("bbtex/plant-orm.tga",maps.orm.rgba.data(),maps.orm.width,maps.orm.height);
-        std::vector<unsigned char> checker(64*64*4,255);for(int y=0;y<64;y++)for(int x=0;x<64;x++)for(int a=0;a<3;a++)checker[(y*64+x)*4+a]=((x/4+y/4)%2)?80:210;
-        images->upload("bbtex/plant-uv.tga",checker.data(),64,64);
+        plantUploadMaps();
+        if(s.display==4&&!s.checkerUploaded){std::vector<unsigned char> checker(64*64*4,255);for(int y=0;y<64;y++)for(int x=0;x<64;x++)for(int a=0;a<3;a++)checker[(y*64+x)*4+a]=((x/4+y/4)%2)?80:210;
+          images->upload("bbtex/plant-uv.tga",checker.data(),64,64);s.checkerUploaded=true;}
       }
       auto buffer=plants::preview(mesh,s.doc,s.display==3?2:s.display==4?3:s.display==1||s.display==2?1:0,now,s.wind,s.sun);
       if(!api->upload(buffer.data(),buffer.size()))s.error="Engine rejected plant preview mesh";s.dirtyRender=false;s.lastUpload=now;
@@ -272,7 +280,7 @@ static void plantViewport() {
 static void plantAssets() {
   auto& s=plantState;
   if(ImGui::BeginTabBar("Plant assets")) {
-    if(ImGui::BeginTabItem("Variations")) {
+    bool variationsTab=ImGui::BeginTabItem("Variations");plantRect("assets/variations");if(variationsTab) {
       ImGui::SetNextItemWidth(120);ImGui::InputScalar("Seed",ImGuiDataType_U32,&s.doc.seed);plantRect("Seed");ImGui::SameLine();
       if(plantButton("Randomize","randomize"))s.doc.seed=uint32_t(plants::mix(s.doc.seed,s.revision+uint64_t(core->GetMilliseconds())));
       ImGui::SameLine();if(plantButton("Keep variation","keep-variation")&&s.doc.variations.size()<64)s.doc.variations.push_back(s.doc.seed);
@@ -286,10 +294,11 @@ static void plantAssets() {
         ImGui::Text("%u",seed);ImGui::EndGroup();ImGui::PopID();}
       ImGui::EndChild();ImGui::EndTabItem();
     }
-    if(ImGui::BeginTabItem("Textures / UV")) {
+    bool texturesTab=ImGui::BeginTabItem("Textures / UV");plantRect("assets/textures");if(texturesTab) {
       if(s.result) {
+        plantUploadMaps(true);
         for(int i=0;i<3;i++){if(i)ImGui::SameLine();auto name=i==0?"bbtex/plant-atlas.tga":i==1?"bbtex/plant-normal.tga":"bbtex/plant-orm.tga";
-          auto handle=draw->LoadImage(name);if(handle)ImGui::Image((ImTextureID)handle,{85*uiScale(),85*uiScale()});}
+          auto handle=draw->LoadImage(name);if(s.qa)s.widgets["texture-map/"+std::to_string(i)]={{"loaded",handle!=0}};if(handle)ImGui::Image((ImTextureID)handle,{85*uiScale(),85*uiScale()});}
         ImGui::SameLine();ImGui::BeginGroup();ImGui::TextUnformatted("Albedo / normal / AO-roughness-metallic");ImGui::Checkbox("UV inspector",&s.uv);ImGui::EndGroup();
       }ImGui::EndTabItem();
     }
@@ -326,12 +335,24 @@ static void plantConfirmSwitch() {
 static std::vector<double> plantQaFrameWindow;
 static uint64_t plantQaFrameCount=0,plantQaSlowFrames=0;
 static double plantQaFrameSum=0,plantQaFrameMax=0;
+static uint64_t plantQaMainCount=0,plantQaMainSlow=0;
+static double plantQaMainMax=0;
+static std::vector<double> plantQaMainWindow;
+static plants::Json plantQaMainEvents=plants::Json::array();
+struct PlantQaMainScope {
+ bool active=plantState.qa&&plantState.open;
+ std::chrono::steady_clock::time_point start=std::chrono::steady_clock::now();
+ ~PlantQaMainScope(){if(!active)return;double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+  ++plantQaMainCount;plantQaMainMax=std::max(plantQaMainMax,ms);plantQaMainWindow.push_back(ms);if(plantQaMainWindow.size()>240)plantQaMainWindow.erase(plantQaMainWindow.begin());
+  if(ms>100){++plantQaMainSlow;if(plantQaMainEvents.size()<20)plantQaMainEvents.push_back({{"preset",plantState.doc.preset},{"ms",ms}});}
+ }
+};
 static void plantQaFrame(){
  if(!plantState.qa||!plantState.open)return;double ms=ImGui::GetIO().DeltaTime*1000.;
  ++plantQaFrameCount;plantQaSlowFrames+=ms>100;plantQaFrameSum+=ms;plantQaFrameMax=std::max(plantQaFrameMax,ms);
  plantQaFrameWindow.push_back(ms);if(plantQaFrameWindow.size()>240)plantQaFrameWindow.erase(plantQaFrameWindow.begin());
 }
-static plants::Json plantQaPerf(){auto sorted=plantQaFrameWindow;std::sort(sorted.begin(),sorted.end());return plants::Json{{"frames",plantQaFrameCount},{"mean_ms",plantQaFrameCount?plantQaFrameSum/plantQaFrameCount:0},{"max_ms",plantQaFrameMax},{"over_100_ms",plantQaSlowFrames},{"recent_p95_ms",sorted.empty()?0:sorted[size_t((sorted.size()-1)*.95)]}};}
+static plants::Json plantQaPerf(){auto sorted=plantQaFrameWindow;std::sort(sorted.begin(),sorted.end());auto main=plantQaMainWindow;std::sort(main.begin(),main.end());return plants::Json{{"frames",plantQaFrameCount},{"mean_ms",plantQaFrameCount?plantQaFrameSum/plantQaFrameCount:0},{"max_ms",plantQaFrameMax},{"over_100_ms",plantQaSlowFrames},{"recent_p95_ms",sorted.empty()?0:sorted[size_t((sorted.size()-1)*.95)]},{"plant_main_thread",{{"frames",plantQaMainCount},{"max_ms",plantQaMainMax},{"over_100_ms",plantQaMainSlow},{"recent_p95_ms",main.empty()?0:main[size_t((main.size()-1)*.95)]},{"slow_events",plantQaMainEvents}}}};}
 static void plantWriteQa() {
   auto& s=plantState;if(!s.qa)return;static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
   plants::Json counts=plants::Json::array();if(s.result)for(auto& m:s.result->lods)counts.push_back({{"triangles",m.faces.size()},{"vertices",m.vertices.size()},{"low",m.low},{"high",m.high}});
@@ -345,6 +366,7 @@ static void plantWriteQa() {
   plantAction([&](){bb::atomicWrite(documentPath("plant-ui-live.json"),j.dump());});
 }
 static void plantPanel() {
+  PlantQaMainScope qaMainScope;
   auto& s=plantState;plantQaFrame();plantAction(plantTick);if(!s.open){plantWriteQa();return;}
   s.widgets=plants::Json::object();auto before=plants::serialize(s.doc);auto revision=s.revision;
   auto display=ImGui::GetIO().DisplaySize;float u=uiScale();

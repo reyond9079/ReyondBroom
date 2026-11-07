@@ -110,6 +110,7 @@ jobs:
             qa/viewport-create-dark-1920/plant-editor.png
             qa/viewport-create-dark-1920/model-editor.png
             qa/viewport-create-dark-1920/placed-models-scene.png
+            qa/viewport-create-dark-1920/create-model-menu.png
       - name: Upload validated packages to the draft release
         run: |
           test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true

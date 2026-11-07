@@ -38,7 +38,7 @@ inline std::string prepareStaticModels(const std::string& bytes,int profile,size
     if(v[0]!=v[1]||v[0]!=v[2])throw std::runtime_error("Quake 1/FTE static-model fallback supports uniform scale only. Apply the non-uniform scale to the source geometry or use a compatible custom mod before compiling.");
     scale*=v[0];
    }
-   std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<scale;e.fields["scale"]=out.str();
+   std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<scale;e.fields["scale"]=out.str();e.fields.erase("modelscale");e.fields.erase("modelscale_vec");
   }
   if((profile==0&&marked)||(profile==2&&(marked||legacy))){
    e.fields["classname"]="misc_model";changed++;

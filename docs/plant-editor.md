@@ -76,7 +76,7 @@ Shader lists keep existing entries. Build snapshots include their dependencies.
 | Target | Authoring document and runtime |
 | --- | --- |
 | Quake III | `func_model` in source; only the disposable q3map2 copy uses `misc_model` |
-| FTE Custom | `func_model`, using the existing model pipeline |
+| FTE Custom | `func_model`, rendered by the existing compiled-preview model pipeline; external game launch requires a custom mod that implements this class |
 | Quake 1 with FTE | Explicit **Use FTE static models for Quake 1** opt-in; the disposable copy uses FTE `misc_model` and effective uniform scale. Bake nonuniform scale into the source geometry or use a compatible custom mod; otherwise the build stops with a diagnostic. |
 | Vanilla Quake / Quake II / GoldSrc | Authoring is allowed; an explicit build diagnostic requires conversion / a compatible mod entity |
 
@@ -136,3 +136,5 @@ corpus was recorded from the unmodified REYON-8 baseline (9e5b30a); CI rebuilds 
 270 exact legacy meshes and 270 albedo/normal/ORM atlas hashes.
 `scripts/test-viewport-create.py` uses real OS input for both Create/Save routes
 and independently inspects saved map history, source links and runtime assets.
+
+REYON-9 evidence: [visual review](qa/reyon-9/quality.md), [performance and raw measurements](qa/reyon-9/performance.md).

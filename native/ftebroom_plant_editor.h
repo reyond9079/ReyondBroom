@@ -33,6 +33,8 @@ struct PlantState {
   std::future<PlantResult> job;
   std::shared_ptr<PlantWork> work;
   std::shared_ptr<PlantResult> result;
+  std::shared_ptr<plants::Textures> previewMaps;
+  bool auxiliaryMapsUploaded=false,checkerUploaded=false;
   uint64_t revision=0;
   bool pending=false;
   std::vector<plants::Json> undo,redo;
@@ -154,7 +156,7 @@ static int plantThumbnail(const plants::Project& d) {
   return 0;
 }
 static void plantVideoChanged() {
-  auto& s=plantState;s.dirtyRender=true;for(auto& item:s.thumbs)item.second.handle=0;
+  auto& s=plantState;s.dirtyRender=true;s.previewMaps.reset();s.auxiliaryMapsUploaded=false;s.checkerUploaded=false;for(auto& item:s.thumbs)item.second.handle=0;
 }
 static void plantResumePreview() {
   auto& s=plantState;

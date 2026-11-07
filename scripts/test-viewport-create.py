@@ -50,7 +50,9 @@ def close_plant():
  wait(lambda:not live()['plantOpen'])
 def context(kind,view=0):
  v=live()['views'][view];ui.click(v['x']+v['width']*.46,v['y']+v['height']*.52,button=3)
- hover('context/create');hover('context/model');click('context/new-'+kind)
+ hover('context/create');hover('context/model')
+ if not (out/'create-model-menu.png').exists():ui.settle();ImageGrab.grab().save(out/'create-model-menu.png')
+ click('context/new-'+kind)
 def snapshot(name):
  f=data/'maps'/('creation-qa-'+name+'.map');f.unlink(missing_ok=True);ui.console('mod_terrain_save "" creation-qa-'+name);wait(f.exists);text=f.read_text(errors='replace');(out/f.name).write_text(text);return text
 
@@ -90,6 +92,10 @@ try:
  context('model');wait(lambda:live()['newModel']);edit('model/new-name','creation-qa-guard-'+str(int(time.time())));click('model/new-template');click('model/template/Prop');click('model/new-create');wait(lambda:live()['model']['active']);click('model/file-menu');click('model/file/Open');edit('model/file-name',model_source);click('model/file-accept');wait(lambda:live()['guardModel']);click('model/guard-save');wait(lambda:live()['modelOpen'] and live()['modelPath']=='' and not live()['modelBusy']);check(len(entities(snapshot('model-guard-save')))==3,'guard Save completes placement before switching model documents');check(not live()['model']['active'],'ordinary model source open has no pending insertion')
  ui.key('s',('ctrl',));wait(lambda:'model/file-name' in live()['widgets']);edit('model/file-name','creation-qa-source-copy-'+str(int(time.time()))+'.bbmodel');click('model/file-accept');wait(lambda:live()['modelPath'] and not live()['modelBusy']);check(model_source.read_bytes()==model_original and len(entities(snapshot('model-source-copy')))==3,'model source Save As preserves immutable history and does not insert');click('model/file-menu');click('model/file/Close')
  context('plant');wait(lambda:live()['plantReady']);click('plant/open');wait(lambda:'plant/file-path' in live()['widgets']);edit('plant/file-path',plant_source);click('plant/file-choose');wait(lambda:live()['plantReady'] and not live()['plant']['active']);check(live()['plantPath']=='','versioned plant source opens as a copy');copy=project.parent/'creation-qa-source-copy.plant.json';copy.unlink(missing_ok=True);click('plant/save');wait(lambda:'plant/file-path' in live()['widgets']);edit('plant/file-path',copy);click('plant/file-choose');wait(lambda:copy.is_file());check(plant_source.read_bytes()==plant_original and len(entities(snapshot('plant-source-copy')))==3,'ordinary plant source Save preserves history and does not insert')
+ close_plant()
+ # Exercise more than the default tree through the same Save placement route.
+ for species,label in [('wild-shrub','Wild hawthorn'),('meadow-grass','Meadow grass')]:
+  context('plant');wait(lambda:live()['plantReady'] and live()['plant']['active']);edit('plant/search',label);click('plant/preset/'+species);wait(lambda:live()['plantReady']);target=project.parent/('creation-qa-'+species+'.plant.json');target.unlink(missing_ok=True);click('plant/save');wait(lambda:'plant/file-path' in live()['widgets']);edit('plant/file-path',target);click('plant/file-choose');wait(lambda:live()['plant']['created'] and not live()['plant']['awaiting']);check(len(entities(snapshot(species)))==(4 if species=='wild-shrub' else 5),species+' first Save creates its own single func_model');close_plant()
  print('PASS viewport creation',len(checks),flush=True)
 except Exception:
  ImageGrab.grab().save(out/'failure.png');(out/'failure-state.json').write_text(json.dumps(live(),indent=2));raise

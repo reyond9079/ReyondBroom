@@ -97,6 +97,7 @@ try:
   # Select representative species through the actual search and preset rows.
   for preset,search in [('oak','English oak'),('pine','Scots pine'),('wild-shrub','Wild hawthorn'),('meadow-grass','Meadow grass'),('amanita','Fly agaric'),('daisy','Oxeye daisy'),('bracken','Common bracken')]:
    edit('search',search);click('preset/'+preset);ready();expect(live()['project']['preset']==preset and live()['lods'][0]['triangles']>0,'native generation '+preset);screenshot(preset+'-dark')
+  click('assets/textures');wait(lambda:all(live()['widgets'].get('texture-map/'+str(i),{}).get('loaded') for i in range(3)));screenshot('plant-texture-maps');expect(True,'texture inspector loads albedo, normal and ORM after deferred upload');click('assets/variations')
   # Settings use the actual editor theme; geometry and project stay intact.
   console('ftebroom_plant qa light');wait(lambda:live()['theme']==3);screenshot('plant-editor-light');expect(live()['project']['preset']=='bracken','Modern Light changes the UI without replacing the plant')
   console('ftebroom_plant qa dark');wait(lambda:live()['theme']==0)

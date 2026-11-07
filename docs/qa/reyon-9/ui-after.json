@@ -1,0 +1,1209 @@
+{
+  "hardware": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "machine": "x86_64",
+    "processor": "",
+    "build_label": "REYON-9 final botanical code, g++14 -O1, no concurrent jobs",
+    "module_sha256": "4961105099b6e62fdbb0dfa37fa180a69a99a3f97e62b48e69b97b2dd05d3b89",
+    "build_info": "ReyondBroom 0.5.0-alpha.126\nPlatform: Linux-x64\nEditor revision: b1291df2957c3e6172097583b8c5d63ff0f3e61e\nEditor compiler: g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nModule SHA256: da8a400886bc698529ae687c6f7d0e77553b292719aaf076104c3c74a384c39d\nNative module update; engine, CSQC, plugins and game compilers retained from the verified base runtime.\nSystem FFmpeg is used through the bundled wrapper.\n",
+    "screen": [
+      1920.0,
+      1080.0
+    ],
+    "renderer_note": "Inspect editor.log for actual renderer; software-renderer frame rates are not hardware guarantees",
+    "cpu": "model name\t: AMD EPYC 9V74 80-Core Processor"
+  },
+  "presets": [
+    {
+      "id": "oak",
+      "project": {
+        "family": 0,
+        "format": "ReyondBroomPlant",
+        "generatorVersion": 2,
+        "hierarchy": [
+          {
+            "id": "roots",
+            "kind": 0,
+            "name": "Roots",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "trunk",
+            "kind": 1,
+            "name": "Trunk / stems",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "primary",
+            "kind": 2,
+            "name": "Primary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "secondary",
+            "kind": 3,
+            "name": "Secondary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "primary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "twigs",
+            "kind": 4,
+            "name": "Twigs / fronds",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "secondary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "leaves",
+            "kind": 5,
+            "name": "Leaves",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "flowers",
+            "kind": 6,
+            "name": "Flowers / fruit",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "surface",
+            "kind": 7,
+            "name": "Cap / surface",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          }
+        ],
+        "name": "English oak",
+        "parameters": {
+          "age": 0.85,
+          "ao": 0.35,
+          "bark": [
+            0.31,
+            0.2,
+            0.12
+          ],
+          "barkPattern": 0,
+          "bloom": 0.85,
+          "branchAngle": 62.0,
+          "branchLength": 0.65,
+          "branchTaper": 0.62,
+          "branches": 12,
+          "budget": 32000,
+          "capThickness": 0.2,
+          "clumps": 1,
+          "clusterLeaves": 5,
+          "controls": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.33
+            ],
+            [
+              0.0,
+              0.0,
+              0.67
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "crown": 0,
+          "crownAspect": 0.9,
+          "crownBase": 0.3,
+          "crownFill": 0.85,
+          "curvature": 0.22,
+          "dead": 0.06,
+          "density": 0.85,
+          "depth": 3,
+          "dryness": 0.0,
+          "evergreen": 0,
+          "flower": [
+            0.94,
+            0.72,
+            0.19
+          ],
+          "flowerLayers": 1,
+          "flowerSize": 12.0,
+          "flutter": 0.4,
+          "foliageMode": 1,
+          "gills": 0.6,
+          "gravity": 0.2,
+          "growth": [
+            0.1,
+            0.5,
+            0.8,
+            0.65,
+            0.2
+          ],
+          "height": 240.0,
+          "irregularity": 0.28,
+          "leaf": [
+            0.21,
+            0.43,
+            0.1
+          ],
+          "leafCurl": 0.2,
+          "leafProfile": [
+            0.0,
+            0.75,
+            1.0,
+            0.65,
+            0.0
+          ],
+          "leafShape": 3,
+          "leafSize": 14.0,
+          "leafTwist": 0.25,
+          "leafWidth": 0.55,
+          "leaflets": 7,
+          "leaves": 28,
+          "light": 0.25,
+          "lod1Ratio": 0.5,
+          "lod2Ratio": 0.2,
+          "needleForm": 0,
+          "organ": 0,
+          "petals": 12,
+          "petiole": 0.16,
+          "phyllotaxy": 0,
+          "quality": 0,
+          "radius": 9.0,
+          "ribs": 10.0,
+          "rootFlare": 1.8,
+          "roughness": 0.8,
+          "season": 1,
+          "segments": 8,
+          "serration": 0.18,
+          "sides": 9,
+          "spines": 0.3,
+          "spread": 0.75,
+          "stiffness": 0.65,
+          "taper": 0.8,
+          "variation": 0.18,
+          "windDirection": 30.0,
+          "windFrequency": 1.1,
+          "windStrength": 0.28
+        },
+        "preset": "oak",
+        "seed": 137,
+        "species": "oak",
+        "tags": [
+          "Quercus robur",
+          "tree",
+          "woodland",
+          "large",
+          "spreading",
+          "deciduous"
+        ],
+        "texture": "",
+        "variations": [],
+        "version": 1
+      },
+      "frame_stats": {
+        "frames": 80,
+        "max_ms": 197.9999989271164,
+        "mean_ms": 50.187500077299774,
+        "over_100_ms": 3,
+        "recent_p95_ms": 71.00000232458115
+      },
+      "process_memory_kib": {
+        "VmHWM": 333520,
+        "VmRSS": 333520
+      },
+      "mesh_cache_bytes": 17370176,
+      "texture_bytes": 12582912,
+      "generation_ms": 65.894915
+    },
+    {
+      "id": "spruce",
+      "project": {
+        "family": 1,
+        "format": "ReyondBroomPlant",
+        "generatorVersion": 2,
+        "hierarchy": [
+          {
+            "id": "roots",
+            "kind": 0,
+            "name": "Roots",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "trunk",
+            "kind": 1,
+            "name": "Trunk / stems",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "primary",
+            "kind": 2,
+            "name": "Primary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "secondary",
+            "kind": 3,
+            "name": "Secondary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "primary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "twigs",
+            "kind": 4,
+            "name": "Twigs / fronds",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "secondary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "leaves",
+            "kind": 5,
+            "name": "Leaves",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "flowers",
+            "kind": 6,
+            "name": "Flowers / fruit",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "surface",
+            "kind": 7,
+            "name": "Cap / surface",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          }
+        ],
+        "name": "Norway spruce",
+        "parameters": {
+          "age": 0.85,
+          "ao": 0.35,
+          "bark": [
+            0.31,
+            0.2,
+            0.12
+          ],
+          "barkPattern": 3,
+          "bloom": 0.85,
+          "branchAngle": 52.0,
+          "branchLength": 0.65,
+          "branchTaper": 0.62,
+          "branches": 17,
+          "budget": 32000,
+          "capThickness": 0.2,
+          "clumps": 1,
+          "clusterLeaves": 5,
+          "controls": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.33
+            ],
+            [
+              0.0,
+              0.0,
+              0.67
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "crown": 5,
+          "crownAspect": 0.9,
+          "crownBase": 0.08,
+          "crownFill": 1.15,
+          "curvature": 0.22,
+          "dead": 0.06,
+          "density": 0.85,
+          "depth": 3,
+          "dryness": 0.0,
+          "evergreen": 1,
+          "flower": [
+            0.94,
+            0.72,
+            0.19
+          ],
+          "flowerLayers": 1,
+          "flowerSize": 12.0,
+          "flutter": 0.4,
+          "foliageMode": 0,
+          "gills": 0.6,
+          "gravity": 0.7,
+          "growth": [
+            0.1,
+            0.5,
+            0.8,
+            0.65,
+            0.2
+          ],
+          "height": 290.0,
+          "irregularity": 0.28,
+          "leaf": [
+            0.13,
+            0.27,
+            0.18
+          ],
+          "leafCurl": 0.2,
+          "leafProfile": [
+            0.0,
+            0.75,
+            1.0,
+            0.65,
+            0.0
+          ],
+          "leafShape": 5,
+          "leafSize": 10.0,
+          "leafTwist": 0.25,
+          "leafWidth": 0.6,
+          "leaflets": 7,
+          "leaves": 18,
+          "light": 0.25,
+          "lod1Ratio": 0.5,
+          "lod2Ratio": 0.2,
+          "needleForm": 1,
+          "organ": 0,
+          "petals": 12,
+          "petiole": 0.16,
+          "phyllotaxy": 0,
+          "quality": 0,
+          "radius": 5.0,
+          "ribs": 10.0,
+          "rootFlare": 1.3,
+          "roughness": 0.8,
+          "season": 1,
+          "segments": 8,
+          "serration": 0.18,
+          "sides": 9,
+          "spines": 0.3,
+          "spread": 0.43,
+          "stiffness": 0.65,
+          "taper": 0.8,
+          "variation": 0.18,
+          "windDirection": 30.0,
+          "windFrequency": 1.1,
+          "windStrength": 0.28
+        },
+        "preset": "spruce",
+        "seed": 137,
+        "species": "spruce",
+        "tags": [
+          "Picea abies",
+          "conifer",
+          "woodland",
+          "large",
+          "pyramidal",
+          "needles",
+          "evergreen"
+        ],
+        "texture": "",
+        "variations": [],
+        "version": 1
+      },
+      "frame_stats": {
+        "frames": 402,
+        "max_ms": 197.9999989271164,
+        "mean_ms": 46.36567169846735,
+        "over_100_ms": 5,
+        "recent_p95_ms": 61.99999898672104
+      },
+      "process_memory_kib": {
+        "VmHWM": 367784,
+        "VmRSS": 364628
+      },
+      "mesh_cache_bytes": 15859712,
+      "texture_bytes": 12582912,
+      "generation_ms": 502.385
+    },
+    {
+      "id": "meadow-grass",
+      "project": {
+        "family": 3,
+        "format": "ReyondBroomPlant",
+        "generatorVersion": 2,
+        "hierarchy": [
+          {
+            "id": "roots",
+            "kind": 0,
+            "name": "Roots",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "trunk",
+            "kind": 1,
+            "name": "Trunk / stems",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "primary",
+            "kind": 2,
+            "name": "Primary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "secondary",
+            "kind": 3,
+            "name": "Secondary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "primary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "twigs",
+            "kind": 4,
+            "name": "Twigs / fronds",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "secondary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "leaves",
+            "kind": 5,
+            "name": "Leaves",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "flowers",
+            "kind": 6,
+            "name": "Flowers / fruit",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "surface",
+            "kind": 7,
+            "name": "Cap / surface",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          }
+        ],
+        "name": "Meadow grass clump",
+        "parameters": {
+          "age": 0.85,
+          "ao": 0.35,
+          "bark": [
+            0.31,
+            0.2,
+            0.12
+          ],
+          "barkPattern": 0,
+          "bloom": 0.85,
+          "branchAngle": 52.0,
+          "branchLength": 0.65,
+          "branchTaper": 0.62,
+          "branches": 30,
+          "budget": 32000,
+          "capThickness": 0.2,
+          "clumps": 4,
+          "clusterLeaves": 5,
+          "controls": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.33
+            ],
+            [
+              0.0,
+              0.0,
+              0.67
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "crown": 0,
+          "crownAspect": 0.9,
+          "crownBase": 0.28,
+          "crownFill": 0.85,
+          "curvature": 0.55,
+          "dead": 0.06,
+          "density": 0.85,
+          "depth": 3,
+          "dryness": 0.0,
+          "evergreen": 3,
+          "flower": [
+            0.94,
+            0.72,
+            0.19
+          ],
+          "flowerLayers": 1,
+          "flowerSize": 9.0,
+          "flutter": 0.4,
+          "foliageMode": 0,
+          "gills": 0.6,
+          "gravity": 0.2,
+          "growth": [
+            0.1,
+            0.5,
+            0.8,
+            0.65,
+            0.2
+          ],
+          "height": 38.0,
+          "irregularity": 0.28,
+          "leaf": [
+            0.21,
+            0.43,
+            0.1
+          ],
+          "leafCurl": 0.2,
+          "leafProfile": [
+            0.0,
+            0.75,
+            1.0,
+            0.65,
+            0.0
+          ],
+          "leafShape": 0,
+          "leafSize": 14.0,
+          "leafTwist": 0.25,
+          "leafWidth": 0.045,
+          "leaflets": 7,
+          "leaves": 18,
+          "light": 0.25,
+          "lod1Ratio": 0.5,
+          "lod2Ratio": 0.2,
+          "needleForm": 0,
+          "organ": 0,
+          "petals": 12,
+          "petiole": 0.16,
+          "phyllotaxy": 0,
+          "quality": 0,
+          "radius": 0.25,
+          "ribs": 10.0,
+          "rootFlare": 1.3,
+          "roughness": 0.8,
+          "season": 1,
+          "segments": 8,
+          "serration": 0.18,
+          "sides": 9,
+          "spines": 0.3,
+          "spread": 0.72,
+          "stiffness": 0.65,
+          "taper": 0.8,
+          "variation": 0.18,
+          "windDirection": 30.0,
+          "windFrequency": 1.1,
+          "windStrength": 0.28
+        },
+        "preset": "meadow-grass",
+        "seed": 137,
+        "species": "meadow-grass",
+        "tags": [
+          "Poa pratensis",
+          "grass",
+          "meadow",
+          "small",
+          "clumping"
+        ],
+        "texture": "",
+        "variations": [],
+        "version": 1
+      },
+      "frame_stats": {
+        "frames": 554,
+        "max_ms": 197.9999989271164,
+        "mean_ms": 46.72924197524355,
+        "over_100_ms": 7,
+        "recent_p95_ms": 63.00000101327896
+      },
+      "process_memory_kib": {
+        "VmHWM": 367784,
+        "VmRSS": 365756
+      },
+      "mesh_cache_bytes": 692224,
+      "texture_bytes": 12582912,
+      "generation_ms": 397.464154
+    },
+    {
+      "id": "date-palm",
+      "project": {
+        "family": 8,
+        "format": "ReyondBroomPlant",
+        "generatorVersion": 2,
+        "hierarchy": [
+          {
+            "id": "roots",
+            "kind": 0,
+            "name": "Roots",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "trunk",
+            "kind": 1,
+            "name": "Trunk / stems",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "primary",
+            "kind": 2,
+            "name": "Primary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "secondary",
+            "kind": 3,
+            "name": "Secondary branches",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "primary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "twigs",
+            "kind": 4,
+            "name": "Twigs / fronds",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "secondary",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "leaves",
+            "kind": 5,
+            "name": "Leaves",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "flowers",
+            "kind": 6,
+            "name": "Flowers / fruit",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "twigs",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          {
+            "id": "surface",
+            "kind": 7,
+            "name": "Cap / surface",
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "parent": "trunk",
+            "rotation": 0.0,
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          }
+        ],
+        "name": "Date palm",
+        "parameters": {
+          "age": 0.85,
+          "ao": 0.35,
+          "bark": [
+            0.31,
+            0.2,
+            0.12
+          ],
+          "barkPattern": 5,
+          "bloom": 0.85,
+          "branchAngle": 52.0,
+          "branchLength": 0.65,
+          "branchTaper": 0.62,
+          "branches": 15,
+          "budget": 32000,
+          "capThickness": 0.2,
+          "clumps": 1,
+          "clusterLeaves": 5,
+          "controls": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.33
+            ],
+            [
+              0.0,
+              0.0,
+              0.67
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "crown": 0,
+          "crownAspect": 0.9,
+          "crownBase": 0.28,
+          "crownFill": 0.85,
+          "curvature": 0.2,
+          "dead": 0.06,
+          "density": 0.85,
+          "depth": 3,
+          "dryness": 0.0,
+          "evergreen": 1,
+          "flower": [
+            0.94,
+            0.72,
+            0.19
+          ],
+          "flowerLayers": 1,
+          "flowerSize": 12.0,
+          "flutter": 0.4,
+          "foliageMode": 1,
+          "gills": 0.6,
+          "gravity": 0.2,
+          "growth": [
+            0.1,
+            0.5,
+            0.8,
+            0.65,
+            0.2
+          ],
+          "height": 280.0,
+          "irregularity": 0.28,
+          "leaf": [
+            0.21,
+            0.43,
+            0.1
+          ],
+          "leafCurl": 0.2,
+          "leafProfile": [
+            0.0,
+            0.75,
+            1.0,
+            0.65,
+            0.0
+          ],
+          "leafShape": 0,
+          "leafSize": 30.0,
+          "leafTwist": 0.25,
+          "leafWidth": 0.16,
+          "leaflets": 7,
+          "leaves": 26,
+          "light": 0.25,
+          "lod1Ratio": 0.5,
+          "lod2Ratio": 0.2,
+          "needleForm": 0,
+          "organ": 0,
+          "petals": 12,
+          "petiole": 0.16,
+          "phyllotaxy": 0,
+          "quality": 0,
+          "radius": 10.0,
+          "ribs": 10.0,
+          "rootFlare": 1.3,
+          "roughness": 0.8,
+          "season": 1,
+          "segments": 8,
+          "serration": 0.18,
+          "sides": 9,
+          "spines": 0.3,
+          "spread": 0.78,
+          "stiffness": 0.65,
+          "taper": 0.8,
+          "variation": 0.18,
+          "windDirection": 30.0,
+          "windFrequency": 1.1,
+          "windStrength": 0.28
+        },
+        "preset": "date-palm",
+        "seed": 137,
+        "species": "date-palm",
+        "tags": [
+          "Phoenix dactylifera",
+          "palm",
+          "tropical",
+          "large",
+          "evergreen"
+        ],
+        "texture": "",
+        "variations": [],
+        "version": 1
+      },
+      "frame_stats": {
+        "frames": 981,
+        "max_ms": 197.9999989271164,
+        "mean_ms": 44.55963311817546,
+        "over_100_ms": 7,
+        "recent_p95_ms": 54.999999701976776
+      },
+      "process_memory_kib": {
+        "VmHWM": 367784,
+        "VmRSS": 367148
+      },
+      "mesh_cache_bytes": 5472256,
+      "texture_bytes": 12582912,
+      "generation_ms": 387.914538
+    }
+  ]
+}

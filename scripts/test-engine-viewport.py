@@ -8,7 +8,7 @@ real Quake engine with licensed game data under --game-root (id1 + mod).
 import argparse, json, os, shutil, subprocess, sys, time
 from pathlib import Path
 from PIL import ImageGrab
-from editor_os_input import NativeInput
+from editor_os_input import NativeInput,read_ui_json
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime',type=Path);p.add_argument('output',type=Path)
@@ -52,7 +52,7 @@ for receipt in out.glob('receipt-*.json'):receipt.unlink()
 def expect(ok,name):
  assert ok,name
  checks.append(name);(out/'results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
-def live():return json.loads(statepath.read_text(encoding='utf-8'))
+def live():return read_ui_json(statepath)
 def start(label):
  global process,stream,ui
  statepath.unlink(missing_ok=True)
@@ -129,7 +129,7 @@ try:
    receipt=out/f'receipt-{i}.json';observed=wait(lambda:json.loads(receipt.read_text()))
    expect(observed['cwd'].replace('\\','/')==launchdir.as_posix() and observed['argv'][3:]==['-basedir',game.as_posix(),'-game',mod,'+map',mapname],name+'_actual_argv_and_working_directory')
   shot('compiled-engine-'+str(i))
- saved=json.loads(store.read_text())['games']['quake1']['engines']
+ saved=read_ui_json(store)['games']['quake1']['engines']
  expect(saved==engines,'engine_path_arguments_workdir_map_survive_restart')
  click('close');click('menu/Run',True);click('Menu/Run/Launch...',True);click('launch-configure');click('engine/0');shot('engine-configuration')
  if a.engine:

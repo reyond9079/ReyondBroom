@@ -5,6 +5,18 @@ import os
 import time
 
 
+def read_ui_json(path,timeout=2):
+ # The engine periodically replaces these read-only QA snapshots. Windows can
+ # briefly deny access during replacement; existence alone is not a read ack.
+ # Retry only the file read, never a user action or a failed UI assertion.
+ deadline=time.monotonic()+timeout
+ while True:
+  try:return json.loads(path.read_text(encoding='utf-8'))
+  except (FileNotFoundError,PermissionError,json.JSONDecodeError):
+   if time.monotonic()>=deadline:raise
+   time.sleep(.02)
+
+
 class NativeInput:
  def __init__(self,process,live_path,live,wait,output):
   self.process,self.path,self.live,self.wait,self.output=process,live_path,live,wait,output
@@ -29,7 +41,7 @@ class NativeInput:
  def settle(self):
   if self.in_console:return
   for _ in range(2):
-   stamp=self.path.stat().st_mtime_ns
+   stamp=self.wait(lambda:self.path.stat().st_mtime_ns)
    self.wait(lambda:self.path.stat().st_mtime_ns!=stamp)
 
  def position(self):

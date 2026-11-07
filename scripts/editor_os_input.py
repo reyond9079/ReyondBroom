@@ -113,6 +113,20 @@ class NativeInput:
 
  def key(self,name,mods=()):
   names={'enter':'Return','esc':'Escape','tab':'Tab','backspace':'BackSpace','grave':'grave'}
+  if os.name=='nt' and mods:
+   # Shortcut modifiers and the key must share the OS input queue. Sending
+   # synchronous WM_KEYDOWN while restoring a thread-local keyboard snapshot
+   # can race the engine's later input processing (notably clipboard paste).
+   mapped=self.user.VkKeyScanW(name) if len(name)==1 else -1
+   assert mapped!=-1,'Unsupported Windows shortcut: '+name
+   vk=mapped&255;scan=self.user.MapVirtualKeyW(vk,0);pressed=[]
+   try:
+    for mod in mods:self.mod(mod,True);pressed.append(mod)
+    self.user.keybd_event(vk,scan,0,0);time.sleep(.08);self.settle()
+   finally:
+    self.user.keybd_event(vk,scan,2,0)
+    for mod in reversed(pressed):self.mod(mod,False)
+   time.sleep(.1);self.settle();return
   if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
   for mod in mods:self.mod(mod,True)
   code=self.d.keysym_to_keycode(self.XK.string_to_keysym(names.get(name,name)));self.xtest.fake_input(self.d,self.X.KeyPress,code);self.xtest.fake_input(self.d,self.X.KeyRelease,code);self.d.sync()

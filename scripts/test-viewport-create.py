@@ -48,7 +48,11 @@ def edit(key,value,scalar=False):
   try:wait(lambda:live()['widgets'][key].get('active'),3);break
   except AssertionError:
    if attempt==2:raise
- ui.key('a',('ctrl',));ui.key('backspace');ui.text(str(value));ui.key('enter')
+ ui.key('a',('ctrl',));ui.key('backspace');ui.text(str(value))
+ # Observe that the actual clipboard/key input reached this field before
+ # leaving it; a missing paste must fail here, rather than saving an empty path.
+ if key=='plant/file-path':wait(lambda:live()['browsePath']==str(value),10)
+ ui.key('enter')
 def close_plant():
  w=live()['widgets']['plant/window'];ui.click(w['x']+w['width']-16,w['y']+14)
  if 'plant/confirm-discard' in live()['widgets']:click('plant/confirm-discard')

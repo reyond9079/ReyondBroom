@@ -67,6 +67,11 @@ int main(int argc,char** argv) try {
     {"triangle budget",[](auto& x){x.p.budget=7000;}},{"optimized geometry",[](auto& x){x.p.quality=1;}}
   };
   for(auto& edit:edits){auto x=d;edit.second(x);expect(fingerprint(generate(x))!=original,"wired parameter "+edit.first);}
+  for(auto id:{"bamboo","ivy"}){auto x=*std::find_if(catalog.begin(),catalog.end(),[&](auto& p){return p.preset==id;});auto before=fingerprint(generate(x));x.p.segments=4;expect(fingerprint(generate(x))!=before,std::string(id)+" spline tessellation control changes mesh");}
+  auto dense=d;dense.p.budget=100000;dense.p.branches=30;dense.p.depth=4;dense.p.leaves=40;dense.p.age=1;
+  auto denseStart=std::chrono::steady_clock::now();auto denseMesh=generate(dense);validate(denseMesh);
+  double denseMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-denseStart).count();
+  expect(denseMesh.faces.size()>50000&&denseMesh.faces.size()<=100000,"dense mature tree remains valid within 100k triangle budget");
   auto hidden=d;for(auto& n:hidden.nodes)n.visible=false;expect(generate(hidden).faces.empty(),"hide all components produces an empty preview");
   auto moved=d;moved.nodes[1].offset={10,0,0};expect(fingerprint(generate(moved))!=original,"hierarchy transform changes mesh");
   auto cache=generateBase(d);expect(fingerprint(hierarchy(cache,d))==original,"cached base mesh matches full generation");
@@ -78,6 +83,7 @@ int main(int argc,char** argv) try {
   auto maps=textureMaps(d,nullptr,nullptr,48);auto again=textureMaps(d,nullptr,nullptr,48);expect(maps.albedo.rgba==again.albedo.rgba&&maps.normal.rgba==again.normal.rgba&&maps.orm.rgba==again.orm.rgba,"procedural textures deterministic");
   auto material=d;material.p.leaf={.8,.1,.1};expect(textureMaps(material,nullptr,nullptr,48).albedo.rgba!=maps.albedo.rgba,"foliage color affects actual texture");
   material=d;material.p.roughness=.2;expect(textureMaps(material,nullptr,nullptr,48).orm.rgba!=maps.orm.rgba,"roughness changes exported PBR data");
+  material=d;material.p.quality=3;expect(textureMaps(material,nullptr,nullptr,48).albedo.rgba!=maps.albedo.rgba,"stylized quality changes actual material palette");
   size_t alpha=0,opaque=0;for(int y=0;y<48;y++)for(int x=48;x<96;x++){auto value=maps.albedo.rgba[(y*192+x)*4+3];if(value<128)alpha++;else opaque++;}
   expect(alpha>0&&opaque>0,"leaf atlas contains real alpha cutout");
   Image override{2,2,std::vector<unsigned char>(16,255)};auto replacement=textureMaps(d,&override,nullptr,48);expect(replacement.albedo.rgba!=maps.albedo.rgba,"imported leaf pixels replace generated material");
@@ -91,6 +97,6 @@ int main(int argc,char** argv) try {
   rejects([&](){auto x=d;x.nodes[1].parent=x.nodes[1].id;validate(x);},"reject cyclic hierarchy");
   rejects([&](){auto x=d;x.nodes[1].parent="missing";validate(x);},"reject missing hierarchy parent");
   rejects([&](){auto x=d;x.p.height=1800;md3(generate(x),"textures/plant");},"reject out-of-range MD3 coordinates");
-  write(output/"presets.json",report.dump(2));write(output/"results.json",Json{{"checks",checks},{"presets",catalog.size()},{"max_generation_ms",maxMilliseconds}}.dump(2));
+  write(output/"presets.json",report.dump(2));write(output/"results.json",Json{{"checks",checks},{"presets",catalog.size()},{"max_generation_ms",maxMilliseconds},{"dense_tree_ms",denseMs},{"dense_tree_triangles",denseMesh.faces.size()}}.dump(2));
   std::cout<<"Plant core: "<<checks<<" checks passed; maximum three-LOD generation "<<maxMilliseconds<<" ms\n";return 0;
 } catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}

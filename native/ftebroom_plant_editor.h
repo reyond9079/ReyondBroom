@@ -74,7 +74,7 @@ static void plantLibraryLoad() {
 }
 static std::string plantTextureKey(const plants::Project& d) {
   auto& p=d.p;return plants::Json{{"seed",d.seed},{"species",d.species},{"family",int(d.family)},{"bark",p.bark},{"leaf",p.leaf},{"flower",p.flower},
-    {"shape",p.leafShape},{"profile",p.leafProfile},{"season",p.season},{"dryness",p.dryness},{"roughness",p.roughness},{"ao",p.ao},{"variation",p.variation},{"ribs",p.ribs},{"gills",p.gills},{"override",d.texture}}.dump();
+    {"shape",p.leafShape},{"profile",p.leafProfile},{"season",p.season},{"quality",p.quality},{"dryness",p.dryness},{"roughness",p.roughness},{"ao",p.ao},{"variation",p.variation},{"ribs",p.ribs},{"gills",p.gills},{"override",d.texture}}.dump();
 }
 static std::string plantGeometryKey(const plants::Project& d) {
   auto p=plants::parameters(d.p);
@@ -246,7 +246,7 @@ static void QDECL plantCommand() {
   plantAction([&](){
     if(std::string(action)=="qa-assets") {
       if(!plantState.qa||!cvars->GetFloat("ftebroom_skip_setup"))throw std::runtime_error("Asset QA requires a disposable plant session");
-      auto source=q1Read(documentPath("maps/plant-reopened.map"));auto models=ftebroom::generatedIvyModels(source);
+      auto source=q1Read(documentPath("data/export-map.map"));auto models=ftebroom::generatedIvyModels(source);
       if(models.empty())throw std::runtime_error("No placed plant in the reopened map");
       auto folder=documentPath("plant-qa-build");stageGeneratedModels(source,folder);bb::atomicWrite(folder/"plant.map",source);
       auto entities=ftebroom::rawPreviewEntities(source);std::string classic;

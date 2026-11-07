@@ -67,7 +67,7 @@ float fb_context_command()
 
         for(int axis=0;axis<3;axis++)if(!fb_geom_finite(modelPosition[axis])||fabs(modelPosition[axis])>autocvar_ftebroom_world_bound){strunzone(model);return TRUE;}
         fb_tx_begin("Import model");fb_entity_create(modelClass,FALSE,modelPosition);
-        fb_entity_property("set","model",model);if(authoring)fb_entity_property("set","_reyondbroom_authoring","1");fb_tx_commit();strunzone(model);return TRUE;
+        fb_entity_property("set","model",model);if(authoring){fb_entity_property("set","_reyondbroom_authoring","1");fb_entity_property("set","origin",sprintf("%g %g %g",modelPosition_x,modelPosition_y,modelPosition_z));}fb_tx_commit();strunzone(model);return TRUE;
     }
     if(argv(0)=="ftebroom_entity_drop"){
         string name=strzone(argv(1));vector pixel=[stof(argv(2)),stof(argv(3)),0];vector position=fb_entity_drop_position(name,pixel);fb_entity_create(name,FALSE,position);strunzone(name);return TRUE;

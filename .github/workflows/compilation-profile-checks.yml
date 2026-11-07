@@ -160,6 +160,7 @@ jobs:
         run: |
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-ui.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
           python scripts/test-plant-exports.py qa/plants/ui
+          python scripts/test-plant-map.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -262,6 +263,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Plant UI acceptance failed' }
           python scripts/test-plant-exports.py qa/plants/ui
           if ($LASTEXITCODE) { throw 'Independent UI model reimport failed' }
+          python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+          if ($LASTEXITCODE) { throw 'Real plant BSP compilation failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

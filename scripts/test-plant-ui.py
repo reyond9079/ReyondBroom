@@ -98,6 +98,7 @@ try:
  console('ftebroom_undo');console('mod_terrain_save "" plant-undo');undone=data/'maps/plant-undo.map';wait(lambda:undone.exists());expect(relative not in undone.read_text(errors='replace'),'map Undo removes the inserted entity')
  console('ftebroom_redo');console('mod_terrain_save "" plant-redo');redone=data/'maps/plant-redo.map';wait(lambda:redone.exists());expect(relative in redone.read_text(errors='replace'),'map Redo restores the inserted entity')
  console('mapedit maps/plant-redo.map');time.sleep(2);console('mod_terrain_save "" plant-reopened');reopened=data/'maps/plant-reopened.map';wait(lambda:reopened.exists());expect(relative in reopened.read_text(errors='replace'),'map reopen preserves the installed model')
+ compile_map=data/'data/export-map.map';compile_map.unlink(missing_ok=True);console('ftebroom_export_map');wait(lambda:compile_map.exists())
  console('ftebroom_plant qa-assets');asset_report=data/'plant-asset-qa.json';wait(lambda:asset_report.exists());assets=json.loads(asset_report.read_text());staged=Path(assets['staged'])
  expect(assets['q1_migrated']==1,'Quake 1 build copy adapts the authoring entity to the FTE static-model fallback')
  expect((staged/relative).read_bytes()==model.read_bytes(),'build snapshot stages the exact MD3 bytes')
@@ -110,7 +111,7 @@ try:
  window=live()['widgets']['window'];ui.click(window['x']+window['width']-16,window['y']+14);click('confirm-discard');wait(lambda:not live()['open'])
  entities=re.findall(r'\{([^{}]*)\}',reopened.read_text(errors='replace'))
  entity=next(e for e in entities if relative in e);origin=re.search(r'"origin"\s+"([^"]+)"',entity)
- xyz=[float(x) for x in origin.group(1).split()] if origin else [0,0,0]
+ xyz=[float(x) for x in origin.group(1).strip("'").split()] if origin else [0,0,0]
  console('ftebroom_camera_restore '+' '.join(str(x+d) for x,d in zip(xyz,[320,-400,260]))+' 20 130 0 75');time.sleep(1)
  screenshot('plant-placed-map');expect(not live()['open'],'placed model remains in the map after closing Plant Editor')
  print('Plant UI:',len(checks),'checks passed',flush=True)

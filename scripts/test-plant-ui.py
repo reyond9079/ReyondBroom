@@ -142,11 +142,7 @@ try:
   console('ftebroom_show_models');console('r_drawentities');console('version_modelformats')
   console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
   if a.scene_only:
-   for expression in ['numents','editents[1].modelindex','editents[1].isbsp','editents[1].org','editents[1].modelaxes','fb_point_model_count','fb_point_render_count','fb_build_active']:
-    console('poke_csqc '+expression)
-   console('r_glsl_offsetmapping');console('set r_glsl_offsetmapping 0');time.sleep(1);screenshot('plant-offset-disabled');console('set r_glsl_offsetmapping 1')
-   console('set ftebroom_point_cache 0');screenshot('plant-uncached-points');console('set ftebroom_point_cache 1')
-   material='textures/reyond-plugins/'+model.stem;console('r_remapshader '+material+' $whiteimage 0');screenshot('plant-white-material')
+   console('coredump_csqc')
   console('condump plant-diagnostic')
  pixels=visible_foliage(out/'plant-placed-map.png');(out/'scene-render-result.json').write_text(json.dumps({'visible_foliage_pixels':pixels},indent=2));expect(pixels>250,'placed plant visibly renders in the map after reopen')
  print('Plant UI:',len(checks),'checks passed',flush=True)
@@ -159,4 +155,7 @@ finally:
   try:shutil.copy2(log,out/'engine-qconsole.log');break
   except OSError:pass
  for log in data.glob('plant-diagnostic*'):
+  if log.is_file():shutil.copy2(log,out/log.name)
+
+ for log in data.glob('csqccore.txt'):
   if log.is_file():shutil.copy2(log,out/log.name)

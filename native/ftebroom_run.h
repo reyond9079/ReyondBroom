@@ -646,6 +646,7 @@ static void testRunProfiles()
   }
   else if(stage==9)
   {
+    if(runActive||runHadError||runStep!=3)core->Print(("FTEBROOM_RUN_DIAGNOSTIC step="+std::to_string(runStep)+" active="+std::to_string(runActive)+" error="+runError+"\n"+runLog).c_str());
     expect(!runActive&&!runHadError&&runStep==3&&runLog.find("continuing as configured")!=std::string::npos&&
            std::filesystem::is_regular_file(root/"new maps/source.txt"),"trenchbroom_imported_pipeline_ran");
   }

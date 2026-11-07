@@ -17,6 +17,8 @@ static void plantColor(const char* name,plants::V& color) {
 static void plantProperties() {
   auto& s=plantState;auto& p=s.doc.p;auto f=s.doc.family;
   bool tree=f==plants::Family::Broadleaf||f==plants::Family::Bush||f==plants::Family::Custom;
+  bool flowering=f==plants::Family::Flower||(f==plants::Family::Cactus&&(s.doc.generator==1||p.organ==1))||s.doc.species=="flowering-shrub";
+  bool pads=f==plants::Family::Cactus&&s.doc.generator==2&&p.organ==2;
   bool leafy=f==plants::Family::Riparian||tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Bamboo||f==plants::Family::Vine||f==plants::Family::Flower;
   if(ImGui::CollapsingHeader("General",ImGuiTreeNodeFlags_DefaultOpen)) {
     plantText("Plant name",s.doc.name);
@@ -70,15 +72,15 @@ static void plantProperties() {
       if(f!=plants::Family::Conifer)plantCombo("Foliage geometry",p.foliageMode,"Detailed curved leaf\0Curved low-poly leaf\0Alpha-cutout card\0Crossed cards\0Distant foliage cards\0");
     }
   }
-  if(f==plants::Family::Flower||f==plants::Family::Cactus||s.doc.species=="flowering-shrub")if(ImGui::CollapsingHeader("Flowers",ImGuiTreeNodeFlags_DefaultOpen)) {
+  if(flowering)if(ImGui::CollapsingHeader("Flowers",ImGuiTreeNodeFlags_DefaultOpen)) {
     plantSlider("Flower diameter",p.flowerSize,1,70);plantSlider("Bloom stage",p.bloom,0,1);plantInt("Petals",p.petals,3,40);plantInt("Petal layers",p.flowerLayers,1,8);
   }
   if(f==plants::Family::Mushroom&&ImGui::CollapsingHeader("Mushroom surface",ImGuiTreeNodeFlags_DefaultOpen)){plantSlider("Cap thickness",p.capThickness,.03,.8);plantSlider("Gills / pores",p.gills,0,1);}
-  if(f==plants::Family::Cactus&&ImGui::CollapsingHeader("Cactus ribs / spines",ImGuiTreeNodeFlags_DefaultOpen)){plantSlider("Rib count",p.ribs,3,24,"%.0f");plantSlider("Spine length",p.spines,0,1);}
+  if(f==plants::Family::Cactus&&ImGui::CollapsingHeader(pads?"Cactus pads / spines":"Cactus ribs / spines",ImGuiTreeNodeFlags_DefaultOpen)){if(pads)plantInt("Pad count",p.leaves,4,40);else if(s.doc.generator==1||p.organ<4)plantSlider("Rib count",p.ribs,3,24,"%.0f");if(s.doc.generator==1||p.organ<4)plantSlider("Spine length",p.spines,0,1);}
   if(ImGui::CollapsingHeader("Materials / textures",ImGuiTreeNodeFlags_DefaultOpen)) {
     if(f!=plants::Family::Grass)plantColor(f==plants::Family::Mushroom?"Stem / gill color":f==plants::Family::Cactus?"Spine color":"Bark / stem color",p.bark);
     if(f!=plants::Family::Mushroom)plantColor("Foliage color",p.leaf);
-    if(f==plants::Family::Mushroom||f==plants::Family::Flower||f==plants::Family::Cactus||s.doc.species=="flowering-shrub")plantColor("Flower / cap color",p.flower);
+    if(f==plants::Family::Mushroom||flowering)plantColor("Flower / cap color",p.flower);
     if(s.advanced) {
       if(s.doc.generator==2)plantCombo("Bark pattern",p.barkPattern,"Fissured\0Smooth\0Papery\0Scaly\0Fibrous\0Rings\0Cork\0Mottled\0");
       plantSlider("Surface roughness",p.roughness,.05,1);plantSlider("Ambient occlusion",p.ao,0,1);plantSlider("Color variation",p.variation,0,.6);

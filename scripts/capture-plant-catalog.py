@@ -13,7 +13,7 @@ import time
 from PIL import Image,ImageGrab
 from editor_os_input import NativeInput
 
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--controls',action='store_true');p.add_argument('--extended',action='store_true');a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--controls',action='store_true');p.add_argument('--extended',action='store_true');p.add_argument('--ids',nargs='+');a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom'
 for file in out.glob('ui-plant*'):
  if file.is_file():file.unlink()
@@ -102,8 +102,11 @@ try:
  ready();ui.position()
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
  controls={'oak','birch','willow','pine','spruce','wild-shrub','meadow-grass','bracken','daisy','amanita','saguaro','date-palm'}
+ if a.ids:controls.update(a.ids)
  catalog=json.loads((Path(__file__).resolve().parents[1]/'runtime/plants/builtin/catalog.json').read_text())['presets']
  if a.controls:catalog=[d for d in catalog if d['id'] in controls]
+ if a.ids:
+  catalog=[d for d in catalog if d['id'] in a.ids];assert len(catalog)==len(set(a.ids)),'Unknown preset ID'
  for d in catalog:
   key=d['id'];edit('search',d['name']);click('preset/'+key);ready();orbit(135,18);record(key)
   if a.extended and key in controls:

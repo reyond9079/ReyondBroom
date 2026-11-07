@@ -17,6 +17,12 @@ int main(int argc,char** argv)try{
    for(int l=0;l<3;l++){auto mesh=generate(d,l);validate(mesh);check(!mesh.faces.empty(),"nonempty "+d.preset);check(mesh.faces.size()<previous,"strict LOD reduction "+d.preset);previous=mesh.faces.size();check(mesh.faces.size()<=size_t(d.p.budget*(l==0?1:l==1?d.p.lod1Ratio:d.p.lod2Ratio)),"budget "+d.preset);
     auto foliage=std::count_if(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves&&(f.material==Leaf||f.material==Needle||f.material==Grass||f.material>=LeafLight);});
     std::set<unsigned> trunkOrgans;for(auto& face:mesh.faces)if(face.part==Part::Trunk)trunkOrgans.insert(face.organ);
+    if(d.family==Family::Cactus&&d.p.organ==2){
+     std::map<unsigned,std::pair<V,V>> boxes;for(auto& f:mesh.faces)if(f.part==Part::Trunk){auto [it,inserted]=boxes.emplace(f.organ,std::make_pair(V{1e30,1e30,1e30},V{-1e30,-1e30,-1e30}));for(auto i:f.i)for(int a=0;a<3;a++){it->second.first[a]=std::min(it->second.first[a],mesh.vertices[i].p[a]);it->second.second[a]=std::max(it->second.second[a],mesh.vertices[i].p[a]);}}
+     check(boxes.size()==size_t(std::max(4,d.p.leaves)),"all Opuntia pads survive each LOD");std::set<unsigned> reached{boxes.begin()->first};bool progress=true;
+     while(progress){progress=false;for(auto& [id,box]:boxes)if(!reached.count(id))for(auto previous:reached){auto& other=boxes.at(previous);bool overlap=true;for(int a=0;a<3;a++)overlap&=box.first[a]<=other.second[a]+1e-4&&other.first[a]<=box.second[a]+1e-4;if(overlap){reached.insert(id);progress=true;break;}}}
+     check(reached.size()==boxes.size(),"Opuntia segments form one connected rooted plant");
+    }
     if(l==0){hasFoliage=foliage>0;stems=trunkOrgans.size();}else{check(!hasFoliage||foliage>0,"LOD retains foliage "+d.preset);if(d.family==Family::Bamboo||d.family==Family::Riparian)check(trunkOrgans.size()==stems,"LOD retains all culms "+d.preset);}
     auto key=fingerprint(mesh);check(fingerprint(generate(d,l))==key,"exact deterministic regeneration "+d.preset);for(auto& f:mesh.faces)check(f.material>=0&&f.material<Count,"valid material slot");row["triangles"].push_back(mesh.faces.size());row["fingerprints"].push_back(key);
    }entry["seeds"].push_back(row);

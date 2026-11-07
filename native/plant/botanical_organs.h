@@ -235,12 +235,30 @@ inline void Botanical::succulents() {
     }return;
   }
   if(p.organ==2){
-    int pads=std::max(4,p.leaves);
+    int pads=std::max(4,p.leaves),depth=0;for(int n=pads;n>1;n/=2)depth++;
+    struct Pad {V base,axis,right,normal;double radius,span;};std::vector<Pad> plan;
+    double span=height/(1+.74*depth*.92);
     for(int i=0;i<pads;i++){
-      Rng r(mix(doc.seed,i+39));double level=std::sqrt(double(i))*r.range(.94,1.06),az=i*2.399963+r.range(-.2,.2);V q{std::cos(az)*height*.16*level,std::sin(az)*height*.16*level,height*.15*level};
-      auto first=b.mesh.vertices.size();double radius=p.radius*(1+.3*std::sin(i));
-      b.lathe(q,{{.01,0},{radius*.7,radius*.4},{radius,radius*1.2},{radius*.8,radius*2},{.01,radius*2.3}},lod==0?12:lod==1?8:5,CactusSkin,Part::Trunk,.02);
-      for(size_t v=first;v<b.mesh.vertices.size();v++){auto& x=b.mesh.vertices[v];x.p[1]=q[1]+(x.p[1]-q[1])*.20;x.n=unit({x.n[0],x.n[1]/.2,x.n[2]});}
+      b.check();Rng r(mix(doc.seed,i+39));Pad pad;pad.radius=p.radius*r.range(.90,1.10);pad.span=span*r.range(.94,1.06);pad.axis={0,0,1};pad.base={0,0,0};
+      if(i){auto& parent=plan[(i-1)/2];double side=i%2?-1:1;
+        // A child starts inside its parent's shoulder, so growth forms one
+        // connected plant instead of a cloud of independent floating pads.
+        pad.base=add(parent.base,add(mul(parent.axis,parent.span*.74),mul(parent.right,side*parent.radius*.40)));
+        pad.axis=unit(add(mul(parent.axis,.82),add(mul(parent.right,side*(.42+r.range(-.08,.08)*p.irregularity)),mul(parent.normal,r.range(-.10,.10)*p.irregularity))));
+      }
+      double yaw=r.range(-.35,.35)*p.irregularity;V normal{-std::sin(yaw),std::cos(yaw),0};pad.right=unit(cross(normal,pad.axis));pad.normal=unit(cross(pad.axis,pad.right));plan.push_back(pad);
+      auto first=b.mesh.vertices.size();double radius=pad.radius;
+      b.lathe({},{{.01,0},{radius*.7,pad.span*.18},{radius,pad.span*.50},{radius*.8,pad.span*.86},{.01,pad.span}},lod==0?12:lod==1?8:5,CactusSkin,Part::Trunk,.01);
+      if(first==b.mesh.vertices.size())break;
+      for(size_t v=first;v<b.mesh.vertices.size();v++){auto& x=b.mesh.vertices[v];auto q=x.p,n=x.n;
+        x.p=add(pad.base,add(add(mul(pad.right,q[0]),mul(pad.normal,q[1]*.20)),mul(pad.axis,q[2])));
+        x.n=unit(add(add(mul(pad.right,n[0]),mul(pad.normal,n[1]/.20)),mul(pad.axis,n[2])));
+      }
+      int areoles=lod==0?12:lod==1?8:4;
+      for(int k=0;k<areoles;k++){double t=.22+.57*(k+.5)/areoles,side=k%3?1:-1;
+        V q=add(pad.base,add(mul(pad.axis,pad.span*t),add(mul(pad.right,(k%2?-.42:.42)*radius),mul(pad.normal,side*radius*.20))));
+        b.leaf(q,mul(pad.normal,side),pad.axis,radius*p.spines*.22,.035,5,2,Wood,Part::Surface,0,0,p.leafProfile);
+      }
     }return;
   }
   if(p.organ==1){

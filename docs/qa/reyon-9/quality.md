@@ -32,6 +32,13 @@ renderer or generated illustration.
 | saguaro | Continuous ribbed stem and rising arms replace flower-like terminal artifacts | Thicker rounded arms with taper | Irregular but coherent arm positions | Ribs, areoles/spines and species skin, without imported assets | More geometry is used (11,048 → 31,992), still bounded; low LOD retains the arms and full height |
 | date-palm | Pinnate fronds replace broad repeating fan-like strips | Separate rachis and tapered pinnae, scarred trunk | Fronds arranged around the crown, naturally falling outward | Original stem scars and leaf material; this preview does not add HDRI/translucent subsurface lighting | Fewer default triangles (10,260 → 8,112); reduced LOD retains crown/frond directions |
 
+The full-size catalogue review also found disconnected Opuntia pads. The final
+generator attaches each child inside its parent shoulder, flattens and orients
+the pads with corrected normals, and uses smooth areole skin rather than
+columnar ribs. A separate organ-bounds graph checks pad connectivity across
+all seeds and LODs. Its panel exposes pad count instead of unused rib/flower
+controls; the original gen1 cactus remains unchanged.
+
 ## Scope and limits of the evidence
 
 This is a substantial procedural geometry/library improvement, not a claim of

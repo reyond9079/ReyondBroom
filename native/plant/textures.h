@@ -126,6 +126,12 @@ inline Texel texel(const Project& d,int material,double u,double v) {
     sample.color=mul(sample.color,variant*(.96+.07*grain));
     double vein=std::exp(-std::abs(std::sin((v*12-std::abs(x)*2.9)*pi))*32),mid=std::exp(-std::abs(x)*85);
     sample.color=blend(sample.color,mul(p.leaf,1.28),mid*.18+vein*.10);sample.height=.28+.10*grain+mid*.17+vein*.08;
+  }else if(mat==CactusSkin&&d.family==Family::Cactus&&p.organ==2){
+    // Opuntia pads have a smooth epidermis with staggered areoles, not the
+    // longitudinal rib pattern used by columnar cacti.
+    double column=std::floor(u*11),x=u*11-column-.5,y=v*9+(int(column)%2)*.5;y-=std::floor(y);y-=.5;
+    double areole=std::exp(-(x*x+y*y)*110);
+    sample.color=blend(mul(p.leaf,.88+.16*grain),{.54,.48,.31},areole*.72);sample.height=.30+grain*.035+areole*.20;
   }else if(mat==Center&&d.family==Family::Flower){
     sample.color=mul(p.organ==12?V{.24,.14,.035}:V{.94,.60,.055},.75+.35*grain);
     sample.height=.22+.12*grain;

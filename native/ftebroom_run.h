@@ -590,6 +590,11 @@ static void testRunProfiles()
   }
   else if(stage==8)
   {
+#ifdef _WIN32
+    // cmd.exe parses /c itself, unlike the native argv contract exercised here.
+    // Use the real test executable so engine exit monitoring observes code 0.
+    shell=(documentPath("ftebroom.cfg").parent_path().parent_path()/"tools/compilation-profile-probe.exe").u8string();
+#endif
     const auto file=root/"CompilationProfiles.cfg";
     const auto engines=root/"GameEngineProfiles.cfg";
     std::ofstream(file)<<R"({
@@ -634,8 +639,8 @@ static void testRunProfiles()
       test.tasks={test.tasks[1],test.tasks[3],{2,"source.txt","new maps",true,RunCopyToDirectory}};
       test.tasks[0].destination=
 #ifdef _WIN32
-        "/d /c exit /b 7";
-      test.tasks[1].destination="/d /c exit /b 0";
+        "exit 7";
+      test.tasks[1].destination="exit 0";
 #else
         "-c \"exit 7\"";
       test.tasks[1].destination="-c \"exit 0\"";

@@ -38,13 +38,18 @@ def click(key):
 def hover(key):
  r=wait(lambda:live()['widgets'].get(key));ui.move(r['x']+r['width']*.45,r['y']+r['height']*.5);time.sleep(.5)
 def edit(key,value,scalar=False):
- r=wait(lambda:live()['widgets'].get(key));ui.click(r['x']+r['width']*.3,r['y']+r['height']*.5,mods=('ctrl',) if scalar else ());ui.key('a',('ctrl',));ui.key('backspace');ui.text(str(value));ui.key('enter')
+ for attempt in range(3):
+  r=wait(lambda:live()['widgets'].get(key));ui.click(r['x']+r['width']*.3,r['y']+r['height']*.5,mods=('ctrl',) if scalar else ())
+  try:wait(lambda:live()['widgets'][key].get('active'),3);break
+  except AssertionError:
+   if attempt==2:raise
+ ui.key('a',('ctrl',));ui.key('backspace');ui.text(str(value));ui.key('enter')
 def close_plant():
  w=live()['widgets']['plant/window'];ui.click(w['x']+w['width']-16,w['y']+14)
  if 'plant/confirm-discard' in live()['widgets']:click('plant/confirm-discard')
  wait(lambda:not live()['plantOpen'])
-def context(kind):
- v=live()['views'][0];ui.click(v['x']+v['width']*.46,v['y']+v['height']*.52,button=3)
+def context(kind,view=0):
+ v=live()['views'][view];ui.click(v['x']+v['width']*.46,v['y']+v['height']*.52,button=3)
  hover('context/create');hover('context/model');click('context/new-'+kind)
 def snapshot(name):
  f=data/'maps'/('creation-qa-'+name+'.map');f.unlink(missing_ok=True);ui.console('mod_terrain_save "" creation-qa-'+name);wait(f.exists);text=f.read_text(errors='replace');(out/f.name).write_text(text);return text
@@ -59,21 +64,28 @@ try:
  first=entities(snapshot('first'));check(len(first)==1 and first[0]['classname']=='func_model','first Save creates exactly one func_model');old=first[0]['model'];origin=first[0]['origin'];check(live()['plant']['point']==captured,'Save retains original world contact after camera movement');normal=live()['plant']['normal'];xyz=[float(x) for x in origin.strip("'").split()];tangent=[xyz[i]-captured[i] for i in range(3)];projection=sum(tangent[i]*normal[i] for i in range(3));check(sum((tangent[i]-normal[i]*projection)**2 for i in range(3))<256,'placement uses captured surface normal and grid basis');check((data/old).is_file(),'runtime asset exists before insertion')
  edit('plant/Height',170,True);wait(lambda:live()['plantReady']);click('plant/save');wait(lambda:not live()['plant']['awaiting']);second=entities(snapshot('second'));check(len(second)==1 and second[0]['model']!=old and second[0]['origin']==origin,'repeat Save updates same entity and preserves transform');check((data/old).is_file(),'previous immutable runtime asset survives for history')
  ui.console('ftebroom_undo');undone=entities(snapshot('undo'));check(len(undone)==1 and undone[0]['model']==old,'Undo restores previous visible asset path');ui.console('ftebroom_redo');check(entities(snapshot('redo'))[0]['model']==second[0]['model'],'Redo restores updated asset path')
+ # Cancellation and a refused overwrite leave both source and scene intact.
+ original_path=live()['plantPath'];click('plant/save-as');click('plant/file-cancel');check(live()['plantPath']==original_path and len(entities(snapshot('plant-save-as-cancel')))==1,'cancelled plant Save As preserves the existing binding')
+ sentinel=project.parent/'creation-qa-other.plant.json';sentinel.write_text('owned test sentinel');click('plant/save-as');edit('plant/file-path',sentinel);click('plant/file-choose');check(sentinel.read_text()=='owned test sentinel' and live()['plantPath']==original_path,'failed plant Save As never overwrites another project');click('plant/file-cancel');check(len(entities(snapshot('plant-refused-overwrite')))==1,'failed plant Save As leaves the single scene entity intact')
+ new_source=project.parent/'creation-qa-as.plant.json';new_source.unlink(missing_ok=True);click('plant/save-as');edit('plant/file-path',new_source);click('plant/file-choose');wait(lambda:live()['plantPath']==str(new_source) and not live()['plant']['awaiting']);check(len(entities(snapshot('plant-save-as')))==1,'successful plant Save As updates the same entity')
  ui.console('ftebroom_delete');edit('plant/Height',160,True);wait(lambda:live()['plantReady']);click('plant/save');wait(lambda:not live()['plant']['active']);check(not entities(snapshot('deleted-save')),'Save after deletion never resurrects an entity')
- close_plant();context('model');wait(lambda:live()['newModel']);edit('model/new-name','creation-qa-'+str(int(time.time())))
+ close_plant();context('model');wait(lambda:live()['newModel']);click('model/new-cancel');wait(lambda:not live()['newModel']);check(not entities(snapshot('new-model-cancel')),'cancelled New Model inserts no entity');context('model');wait(lambda:live()['newModel']);edit('model/new-name','creation-qa-'+str(int(time.time())))
  # Prop template is chosen through the real combo with keyboard navigation.
  click('model/new-template');click('model/template/Prop');click('model/new-create');wait(lambda:live()['modelOpen'] and live()['model']['active']);check(live()['modelElements']>0,'Prop template creates exportable geometry');ui.key('s',('ctrl',));wait(lambda:live()['model']['created'] and not live()['model']['awaiting']);created=entities(snapshot('model'));check(len(created)==1 and created[0]['classname']=='func_model','Model Editor first Save creates func_model');check(created[0]['_reyondbroom_source'].endswith('.bbmodel'),'model entity retains portable editable source link');check((data/created[0]['model']).is_file(),'model runtime MD3 saved automatically')
  ui.key('s',('ctrl',));time.sleep(.4);check(len(entities(snapshot('model-repeat')))==1,'unchanged model Save does not duplicate the entity')
  # A geometry change produces a new asset but retains the same scene entity.
  before_count=live()['modelElements'];click('model/transform-menu');click('model/transform/Add Cube');wait(lambda:live()['modelElements']>before_count);ui.key('s',('ctrl',));wait(lambda:not live()['modelBusy']);updated=entities(snapshot('model-updated'));check(len(updated)==1 and updated[0]['model']!=created[0]['model'],'model geometry Save updates the same linked entity');check((data/created[0]['model']).exists(),'model history keeps the old geometry asset')
  # Save As changes the authoring filename without inserting another entity.
- click('model/file-menu');click('model/file/Save as');edit('model/file-name','creation-qa-as-'+str(int(time.time()))+'.bbmodel');click('model/file-accept');wait(lambda:not live()['modelBusy']);check(len(entities(snapshot('model-save-as')))==1,'model Save As preserves the single placement binding');saved_path=live()['modelPath']
+ click('model/file-menu');click('model/file/Save as');edit('model/file-name','creation-qa-as-'+str(int(time.time()))+'.bbmodel');click('model/file-accept');wait(lambda:not live()['modelBusy']);ImageGrab.grab().save(out/'model-editor.png');check(len(entities(snapshot('model-save-as')))==1,'model Save As preserves the single placement binding');saved_path=live()['modelPath']
  click('model/file-menu');click('model/file/Close');context('model');wait(lambda:live()['newModel']);edit('model/new-name','creation-qa-empty-'+str(int(time.time())));click('model/new-template');click('model/template/Empty');click('model/new-create');wait(lambda:live()['modelOpen'] and live()['model']['active']);ui.key('s',('ctrl',));wait(lambda:not live()['modelBusy'] and 'failed' in live()['modelMessage']);check(len(entities(snapshot('empty-model-error')))==1,'failed model export leaves no broken scene entity')
  # Switching the source map invalidates this unsatisfied Create request.
  ui.console('mapedit maps/creation-qa-switch.map');wait(lambda:not live()['model']['active']);click('model/file-menu');click('model/file/Save');check(not entities(snapshot('stale-map-save')),'Save after a map switch cannot insert into the new map')
- ImageGrab.grab().save(out/'model-editor.png');(out/'final-state.json').write_text(json.dumps(live(),indent=2));print('PASS viewport creation',len(checks),flush=True)
+ # Both commands also work from an orthographic scene, with its own plane.
+ click('model/file-menu');click('model/file/Close');ui.console('set ca_brush_view 2');wait(lambda:live()['views'][0]['type']==2);context('plant');wait(lambda:live()['plantReady'] and live()['plant']['active']);check(abs(live()['plant']['normal'][1])>.99,'orthographic click captures the front workplane normal');ortho=project.parent/'creation-qa-ortho.plant.json';ortho.unlink(missing_ok=True);click('plant/save');wait(lambda:'plant/file-path' in live()['widgets']);edit('plant/file-path',ortho);click('plant/file-choose');wait(lambda:live()['plant']['created'] and not live()['plant']['awaiting']);check(len(entities(snapshot('orthographic-plant')))==1,'orthographic plant Save inserts one func_model');ImageGrab.grab().save(out/'plant-editor.png');close_plant()
+ context('model');wait(lambda:live()['newModel']);edit('model/new-name','creation-qa-ortho-'+str(int(time.time())));click('model/new-template');click('model/template/Prop');click('model/new-create');wait(lambda:live()['model']['active']);ui.key('s',('ctrl',));wait(lambda:live()['model']['created'] and not live()['modelBusy']);check(len(entities(snapshot('orthographic-model')))==2,'orthographic Model Editor Save inserts its own single func_model')
+ ImageGrab.grab().save(out/'empty-model-error.png');(out/'final-state.json').write_text(json.dumps(live(),indent=2));print('PASS viewport creation',len(checks),flush=True)
 except Exception:
- ImageGrab.grab().save(out/'failure.png');raise
+ ImageGrab.grab().save(out/'failure.png');(out/'failure-state.json').write_text(json.dumps(live(),indent=2));raise
 finally:
  if process.poll() is None:process.kill();process.wait(timeout=15)
  stream.close()

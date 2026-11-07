@@ -126,6 +126,9 @@ inline Texel texel(const Project& d,int material,double u,double v) {
     sample.color=mul(sample.color,variant*(.96+.07*grain));
     double vein=std::exp(-std::abs(std::sin((v*12-std::abs(x)*2.9)*pi))*32),mid=std::exp(-std::abs(x)*85);
     sample.color=blend(sample.color,mul(p.leaf,1.28),mid*.18+vein*.10);sample.height=.28+.10*grain+mid*.17+vein*.08;
+  }else if(mat==Center&&d.family==Family::Flower){
+    sample.color=mul(p.organ==12?V{.24,.14,.035}:V{.94,.60,.055},.75+.35*grain);
+    sample.height=.22+.12*grain;
   }else if(mat==Cap&&d.family==Family::Mushroom&&p.organ==7){
     // Morel pits have dark cell interiors and raised, irregular pale ridges.
     double a=std::sin((u*19+smoothNoise(u*4,v*5,seed)*.5)*pi),c=std::sin((v*11+u*.8)*pi);

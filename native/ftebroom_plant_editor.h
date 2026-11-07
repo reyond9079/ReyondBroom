@@ -184,14 +184,15 @@ static void plantSave(const std::filesystem::path& file) {
     if(!std::filesystem::exists(target))bb::atomicWrite(target,bytes);portable["texture"]=id.str();
   }
   bb::atomicWrite(file,portable.dump(2));s.file=file;s.saved=plants::serialize(s.doc).dump();s.message="Saved "+file.filename().u8string();
-  placementPlantSaved();
+  placementPlantSaved();if(plantReady())s.error.clear();
 }
 static void plantAction(const std::function<void()>& action){try{action();}catch(const std::exception& e){plantState.error=e.what();}}
-static void plantAskSave(std::function<void()> next={}) {
+static void plantAskSave(std::function<void()> next={},bool choose=false) {
   auto& s=plantState;
-  if(!s.file.empty()){plantSave(s.file);placementAfterPlantSave(std::move(next));return;}
+  if(!choose&&!s.file.empty()){plantSave(s.file);placementAfterPlantSave(std::move(next));return;}
   std::filesystem::create_directories(plantFolder()/"projects");
-  runUiChoose((plantFolder()/"projects"/(plants::assetId(s.doc,0)+".plant.json")).u8string(),[next](const std::string& p){plantSave(std::filesystem::u8path(p));placementAfterPlantSave(next);},true);
+  auto initial=s.file.empty()?plantFolder()/"projects"/(plants::assetId(s.doc,0)+".plant.json"):s.file;
+  runUiChoose(initial.u8string(),[next](const std::string& p){plantSave(std::filesystem::u8path(p));placementAfterPlantSave(next);},true);
 }
 static void plantRequest(std::function<void()> next) {
   auto& s=plantState;if(plants::serialize(s.doc).dump()!=s.saved){s.nextAction=std::move(next);s.closeRequest=true;}else next();

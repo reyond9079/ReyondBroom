@@ -12,13 +12,14 @@ vector fb_entity_drop_position(string classname,vector pixel)
     vector origin=fb_snap(point-normal*support);float penetration=point*normal-(origin*normal+support);if(penetration>0)origin+=normal*penetration;
     return origin;
 }
+string fb_context_vector(vector p){return sprintf("%.9g %.9g %.9g",p_x,p_y,p_z);}
 void fb_context_query(vector pixel)
 {
     fb_document_tick();cvar_set("ftebroom_context_group","0");cvar_set("ftebroom_context_entity","0");cvar_set("ftebroom_context_brush_entity","0");cvar_set("ftebroom_context_layer","0");cvar_set("ftebroom_context_material","");cvar_set("ftebroom_context_class","");
     vector point=fb_view_plane_point(pixel,cvar("ca_brush_view"),[0,0,cvar("ftebroom_plane")]),normal='0 0 1';
     if(cvar("ca_brush_view")){fb_view_axes(cvar("ca_brush_view"));normal=fb_view_normal;}
     if(fb_pick(pixel)>0) {
-        fb_hit_t hit=fb_hits[0];point=hit.point;normal=hit.normal;
+        fb_hit_t hit=fb_hits[0];point=hit.point;if(vlen(hit.normal)>.1)normal=normalize(hit.normal);
         if(hit.kind==FB_HIT_BRUSH && hit.face>0){static brushface_t faces[64];int count=brush_get(hit.model,hit.id,faces,64,__NULL__);if(hit.face<=count)cvar_set("ftebroom_context_material",faces[hit.face-1].shadername);}
         if(hit.node>=0)for(int n=hit.node,steps=0;n>=2 && steps++<fb_node_count;n=fb_nodes[n].parent) {
             if(fb_nodes[n].kind==FB_NODE_GROUP && !cvar("ftebroom_context_group"))cvar_set("ftebroom_context_group",itos(fb_nodes[n].id));
@@ -26,8 +27,8 @@ void fb_context_query(vector pixel)
             if(fb_nodes[n].kind==FB_NODE_ENTITY){cvar_set("ftebroom_context_class",fb_nodes[n].fields["classname"]);cvar_set("ftebroom_context_entity",itos(fb_nodes[n].id));if(!fb_selection_leaf(n))cvar_set("ftebroom_context_brush_entity","1");}
         }
     }
-    cvar_set("ftebroom_context_point",sprintf("%.9g %.9g %.9g",point_x,point_y,point_z));cvar_set("ftebroom_context_normal",vtos(normal));cvar_set("ftebroom_context_active_layer",itos(fb_active_layer));cvar_set("ftebroom_context_grid",ftos(cvar("ftebroom_grid_snap")?fb_grid():0));cvar_set("ftebroom_context_grid_origin",vtos(autocvar_ftebroom_grid_origin));
-    cvar_set("ftebroom_context_basis0",vtos(fb_grid_direction_world('1 0 0')));cvar_set("ftebroom_context_basis1",vtos(fb_grid_direction_world('0 1 0')));cvar_set("ftebroom_context_basis2",vtos(fb_grid_direction_world('0 0 1')));
+    cvar_set("ftebroom_context_point",sprintf("%.9g %.9g %.9g",point_x,point_y,point_z));cvar_set("ftebroom_context_normal",fb_context_vector(normal));cvar_set("ftebroom_context_active_layer",itos(fb_active_layer));cvar_set("ftebroom_context_grid",ftos(cvar("ftebroom_grid_snap")?fb_grid():0));cvar_set("ftebroom_context_grid_origin",fb_context_vector(autocvar_ftebroom_grid_origin));
+    cvar_set("ftebroom_context_basis0",fb_context_vector(fb_grid_direction_world('1 0 0')));cvar_set("ftebroom_context_basis1",fb_context_vector(fb_grid_direction_world('0 1 0')));cvar_set("ftebroom_context_basis2",fb_context_vector(fb_grid_direction_world('0 0 1')));
     cvar_set("ftebroom_context_serial",ftos(cvar("ftebroom_context_serial")+1));
 }
 void fb_entity_move_to(int id)

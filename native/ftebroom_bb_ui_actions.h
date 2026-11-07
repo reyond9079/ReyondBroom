@@ -1501,7 +1501,7 @@ static void bbDialogs() {
       }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
+    if (placementButton("Cancel","model/new-cancel")) {
       bbNewOpen = false;placementCancel(modelNewPlacement);
       ImGui::CloseCurrentPopup();
     }

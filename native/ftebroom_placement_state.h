@@ -10,7 +10,7 @@ struct AssetPlacement {
   double grid=1;
   std::array<double,3> gridOrigin{};
   std::array<std::array<double,3>,3> basis{{{1,0,0},{0,1,0},{0,0,1}}};
-  std::string id,request;
+  std::string id,request,sourceRoot,runtimeRoot,assetRoot;
 };
 static AssetPlacement contextPlacement,plantPlacement,modelPlacement,modelNewPlacement;
 static unsigned placementSerial=0;
@@ -24,7 +24,7 @@ static void placementAfterPlantSave(std::function<void()> next);
 static void placementCancel(AssetPlacement& p){p={};}
 static void placementCapture() {
   auto read=[](const char* name){char value[160]{};cvars->GetString(name,value,sizeof value);std::string text(value);text.erase(std::remove(text.begin(),text.end(),'\''),text.end());std::array<double,3> out{};std::istringstream in(text);for(auto& x:out)in>>x;return out;};
-  AssetPlacement p;p.active=true;p.epoch=organizationMapEpoch;p.profile=gameProfile;
+  AssetPlacement p;p.active=true;p.epoch=organizationMapEpoch;p.profile=gameProfile;p.sourceRoot=baseq3;p.runtimeRoot=gameRuntime();p.assetRoot=documentPath("ftebroom.cfg").parent_path().u8string();
   p.layer=int(cvars->GetFloat("ftebroom_context_active_layer"));p.grid=cvars->GetFloat("ftebroom_context_grid");
   p.point=read("ftebroom_context_point");p.normal=read("ftebroom_context_normal");
   if(ftebroom::plant::length(p.normal)<.1)p.normal={0,0,1};else p.normal=ftebroom::plant::unit(p.normal);

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <tuple>
 static uint64_t placementPlantRevision=0;
 static bool placementPlantPending=false;
 static std::function<void()> placementPlantNext;
 static std::string placementVector(plants::V v){std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(9)<<v[0]<<' '<<v[1]<<' '<<v[2];return out.str();}
 static void placementValid(AssetPlacement& p){
   if(!p.active)return;
-  if(p.epoch!=organizationMapEpoch||p.profile!=gameProfile){p={};throw std::runtime_error("Placement cancelled: the map or game profile changed. The source project is saved.");}
+  if(p.epoch!=organizationMapEpoch||p.profile!=gameProfile||p.sourceRoot!=std::string(baseq3)||p.runtimeRoot!=gameRuntime()||p.assetRoot!=documentPath("ftebroom.cfg").parent_path().u8string()){p={};throw std::runtime_error("Placement cancelled: the map or game profile changed. The source project is saved.");}
   if(p.awaiting)throw std::runtime_error("Wait for the map to finish the previous Save.");
 }
 static void placementPublish(const std::map<std::string,std::string>& bundle){
@@ -21,15 +22,16 @@ static void placementPublish(const std::map<std::string,std::string>& bundle){
   std::set<std::string> shaderNames;
   for(auto& [name,bytes]:bundle)if(name.rfind("scripts/",0)==0&&std::filesystem::u8path(name).extension()==".shader")shaderNames.insert(std::filesystem::u8path(name).stem().u8string());
   std::vector<std::filesystem::path> added;
+  std::vector<std::tuple<std::filesystem::path,bool,std::string>> lists;
   try{
     for(bool manifest:{false,true})for(auto& root:roots)for(auto& [name,bytes]:bundle){if((name.size()>12&&name.substr(name.size()-12)==".reyond.json")!=manifest)continue;auto path=root/std::filesystem::u8path(name);if(std::filesystem::exists(path))continue;plantWriteNew(path,bytes);added.push_back(path);}
     for(auto& root:roots)if(!shaderNames.empty()){
       auto list=root/"scripts/shaderlist.txt";std::string previous;
       if(std::filesystem::is_regular_file(list))previous=q1Read(list);
       else{size_t size=0;auto data=static_cast<char*>(files->LoadFile("scripts/shaderlist.txt",&size));if(data){previous.assign(data,size);core->Free(data);}}
-      auto next=ftebroom::appendShaderList(previous,shaderNames);if(next!=previous)bb::atomicWrite(list,next);
+      auto next=ftebroom::appendShaderList(previous,shaderNames);if(next!=previous){lists.emplace_back(list,std::filesystem::exists(list),previous);bb::atomicWrite(list,next);}
     }
-  }catch(...){for(auto& path:added){std::error_code ec;std::filesystem::remove(path,ec);}throw;}
+  }catch(...){for(auto i=lists.rbegin();i!=lists.rend();++i){try{if(std::get<1>(*i))bb::atomicWrite(std::get<0>(*i),std::get<2>(*i));else{std::error_code ec;std::filesystem::remove(std::get<0>(*i),ec);}}catch(...){}}for(auto& path:added){std::error_code ec;std::filesystem::remove(path,ec);}throw;}
 }
 static void placementSend(AssetPlacement& p,const std::string& model,const std::string& source,plants::V low,plants::V high,double scale,bool optin){
   placementValid(p);if(!p.active)return;
@@ -47,7 +49,7 @@ static void placementCreate(bool plant){
   // Guards run before installing the new binding, so Save in a guard always
   // belongs to the previous document and cannot use this click by mistake.
   plantRequest([captured,plant](){bbLeave([captured,plant](){
-    if(captured.epoch!=organizationMapEpoch||captured.profile!=gameProfile)return;
+    if(captured.epoch!=organizationMapEpoch||captured.profile!=gameProfile||captured.sourceRoot!=std::string(baseq3)||captured.runtimeRoot!=gameRuntime())return;
     bbSavedStamp=bbHistory.state();bbSaved=bb::serialize(bbProject,bbEmbed);
     if(plant){plantSelect(plants::presets().front());plantPlacement=captured;plantState.saved=plants::serialize(plantState.doc).dump();plantState.undo.clear();plantState.redo.clear();plantShow();}
     else{bbNew();modelNewPlacement=captured;}
@@ -95,7 +97,7 @@ static void placementModelSaved(){
   bbMessage="Project saved; preparing the linked model assets in the background.";
 }
 static void placementAfterModelSave(std::function<void()> next){
-  if(!next)return;if(placementModelPending||placementModelJob.valid()){placementModelNext=std::move(next);return;}next();
+  if(!next)return;if(placementModelPending||placementModelJob.valid()||modelPlacement.awaiting){placementModelNext=std::move(next);return;}next();
 }
 static void placementShutdown(){
   if(placementModelCancel)*placementModelCancel=true;
@@ -118,7 +120,7 @@ static void placementPlantSaved(){
   placementSend(p,model,source,low,high,scale,s.allowFteQ1);s.lastModel=documentPath(model);s.message="Project and runtime assets saved; updating linked func_model.";
 }
 static void placementAfterPlantSave(std::function<void()> next){
-  if(!next)return;if(placementPlantPending){placementPlantNext=std::move(next);return;}next();
+  if(!next)return;if(placementPlantPending||plantPlacement.awaiting){placementPlantNext=std::move(next);return;}next();
 }
 static void placementTick(){
   if(!modelPlacement.active){if(placementModelCancel)*placementModelCancel=true;placementModelPending={};placementModelNext={};}
@@ -130,7 +132,7 @@ static void placementTick(){
         placementPublish(result.bundle);
         for(auto& [id,shader]:result.shaders){plantState.pendingShaders[id]=shader;command(("ftebroom_plant shader "+id+"\n").c_str());}
         placementSend(modelPlacement,result.model,result.source,result.low,result.high,result.scale,result.optin);bbMessage="Saved model assets; updating linked func_model.";
-        if(placementModelNext){auto next=std::move(placementModelNext);placementModelNext={};next();}
+
       }catch(const std::exception& e){placementModelNext={};bbMessage=std::string("Project saved; model placement failed: ")+e.what();}
     }
   }
@@ -143,24 +145,26 @@ static void placementTick(){
   }
 
   for(auto* p:{&plantPlacement,&modelPlacement}){
-    if(p->active&&(p->epoch!=organizationMapEpoch||p->profile!=gameProfile))*p={};
+    if(p->active&&(p->epoch!=organizationMapEpoch||p->profile!=gameProfile||p->sourceRoot!=std::string(baseq3)||p->runtimeRoot!=gameRuntime()))*p={};
     if(!p->awaiting)continue;char ack[200]{},status[64]{};cvars->GetString("ftebroom_placement_ack",ack,sizeof ack);
     if(p->request!=ack)continue;cvars->GetString("ftebroom_placement_status",status,sizeof status);p->awaiting=false;
     auto& message=p==&plantPlacement?plantState.message:bbMessage;
     if(std::string(status)=="ok"){message="Saved linked func_model. Undo/Redo restores its previous model and assets.";if(!p->runtimeSupported)message+=" Authoring only: this runtime requires a compatible model/mod, or the explicit Quake 1 FTE extension. Compilation will report the unsupported entity.";}
     else{p->active=false;message=std::string(status)=="missing"?"Source saved. Linked entity was deleted or undone; placement cancelled.":"Source saved. Placement cancelled: map, layer or position is no longer valid.";}
+    auto& after=p==&plantPlacement?placementPlantNext:placementModelNext;
+    if(std::string(status)=="ok"&&after){auto next=std::move(after);after={};next();}else if(std::string(status)!="ok")after={};
   }
   if(placementPlantPending){
     if(!plantPlacement.active||placementPlantRevision!=plantState.revision||(!plantBusy()&&!plantState.error.empty())){placementPlantPending=false;placementPlantNext={};plantState.message="Source saved. Pending placement cancelled because the document changed or generation failed; Save again when ready.";}
-    else if(plantReady()){placementPlantPending=false;plantAction(placementPlantSaved);if(placementPlantNext){auto next=std::move(placementPlantNext);next();}}
+    else if(plantReady()){placementPlantPending=false;plantAction(placementPlantSaved);}
   }
 }
 
 static void placementWriteQa(){
  if(!placementQa())return;static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
- nlohmann::json views=nlohmann::json::array();for(auto& v:viewRects)views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h}});
+ nlohmann::json views=nlohmann::json::array();for(auto& v:viewRects)views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});
  auto binding=[](auto& p){return nlohmann::json{{"active",p.active},{"created",p.created},{"awaiting",p.awaiting},{"id",p.id},{"epoch",p.epoch},{"point",p.point},{"normal",p.normal},{"layer",p.layer}};};
  auto widgets=placementWidgets;if(plantState.qa)for(auto it=plantState.widgets.begin();it!=plantState.widgets.end();++it)widgets["plant/"+it.key()]=it.value();
- auto j=nlohmann::json{{"widgets",widgets},{"views",views},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"profile",gameProfile},{"epoch",organizationMapEpoch},{"context",binding(contextPlacement)},{"plant",binding(plantPlacement)},{"model",binding(modelPlacement)},{"modelBusy",bool(placementModelPending)||placementModelJob.valid()||modelPlacement.awaiting},{"modelOpen",bbActive},{"modelPath",bbProject.path},{"modelMessage",bbMessage},{"modelElements",bbProject.root["elements"].size()},{"newModel",bbNewOpen},{"guardModel",bbGuardOpen},{"plantOpen",plantState.open},{"plantReady",plantReady()},{"plantMessage",plantState.message},{"plantError",plantState.error},{"plantPath",plantState.file.u8string()},{"mapPath",documentFile.u8string()},{"generation_ms",plantState.result?plantState.result->milliseconds:0.}};
+ auto j=nlohmann::json{{"widgets",widgets},{"views",views},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"profile",gameProfile},{"epoch",organizationMapEpoch},{"context",binding(contextPlacement)},{"plant",binding(plantPlacement)},{"model",binding(modelPlacement)},{"browseError",runUiBrowseError},{"browsePath",runUiBrowsePath},{"modelBusy",bool(placementModelPending)||placementModelJob.valid()||modelPlacement.awaiting},{"modelOpen",bbActive},{"modelPath",bbProject.path},{"modelMessage",bbMessage},{"modelElements",bbProject.root["elements"].size()},{"newModel",bbNewOpen},{"guardModel",bbGuardOpen},{"plantOpen",plantState.open},{"plantReady",plantReady()},{"plantMessage",plantState.message},{"plantError",plantState.error},{"plantPath",plantState.file.u8string()},{"mapPath",documentFile.u8string()},{"generation_ms",plantState.result?plantState.result->milliseconds:0.}};
  try{bb::atomicWrite(documentPath("placement-ui-live.json"),j.dump());}catch(const std::exception& e){core->Print((std::string("Placement QA: ")+e.what()+"\n").c_str());}
 }

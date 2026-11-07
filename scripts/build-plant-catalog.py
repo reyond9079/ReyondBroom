@@ -36,7 +36,7 @@ species('plane','London plane','Platanus acerifolia','tree',320,crown=7,spread=.
 species('horse-chestnut','Horse chestnut','Aesculus hippocastanum','tree',250,crown=0,spread=.7,crownBase=.30,radius=9,phyllotaxy=1,leafShape=7,leaflets=7,leafSize=27,leafWidth=.42,organ=2,barkPattern=3,crownFill=1)
 species('walnut','Common walnut','Juglans regia','tree',240,crown=0,spread=.8,crownBase=.32,radius=10,leafShape=7,leaflets=9,leafSize=28,leafWidth=.48,organ=1,barkPattern=0,branches=9)
 species('alder','Black alder','Alnus glutinosa','tree',240,crown=5,spread=.45,crownBase=.18,radius=6,leafShape=1,leafSize=10,leafWidth=.85,barkPattern=3,serration=.6)
-species('rowan','Rowan','Sorbus aucuparia','tree',180,crown=1,spread=.48,crownBase=.32,radius=4,leafShape=7,leaflets=13,leafSize=21,leafWidth=.28,organ=1,barkPattern=1,clusterLeaves=4)
+species('rowan','Rowan','Sorbus aucuparia','tree',180,crown=1,spread=.48,crownBase=.32,radius=4,leafShape=7,leaflets=13,leafSize=21,leafWidth=.28,organ=1,barkPattern=1)
 species('apple','Orchard apple','Malus domestica','tree',120,crown=0,spread=.85,crownBase=.25,radius=6,leafShape=1,leafSize=10,leafWidth=.65,barkPattern=0,branches=8,curvature=.48,organ=4,flowerSize=5)
 species('cherry','Wild cherry','Prunus avium','tree',185,crown=6,spread=.55,crownBase=.42,radius=5,leafShape=1,leafSize=12,leafWidth=.5,barkPattern=1,serration=.7,organ=4,flowerSize=4)
 species('magnolia','Southern magnolia','Magnolia grandiflora','tree',195,crown=5,spread=.50,crownBase=.18,radius=6,leafShape=1,leafSize=24,leafWidth=.5,barkPattern=1,evergreen=1,leafCurl=.15,crownFill=1.05,organ=4,flowerSize=13)
@@ -100,7 +100,7 @@ for key,name,latin,h,form,leaves,width in [
 
 for key,name,latin,h,form,petals,layers,size,shape,clumps in [
  ('daisy','Oxeye daisy','Leucanthemum vulgare',42,0,18,1,13,2,3),
- ('sunflower','Wild sunflower','Helianthus annuus',90,0,26,2,22,6,1),
+ ('sunflower','Wild sunflower','Helianthus annuus',90,12,26,2,22,6,1),
  ('rose','Garden rose','Rosa gallica',60,1,9,5,13,7,2),
  ('poppy','Corn poppy','Papaver rhoeas',50,2,4,1,17,3,5),
  ('tulip','Garden tulip','Tulipa gesneriana',38,2,6,1,12,2,3),
@@ -176,7 +176,7 @@ def emit():
     assert len({r['id'] for r in ROWS})==len(ROWS)>=120
     for name,count in minimum.items():assert sum(r['category']==name for r in ROWS)>=count
     for row in ROWS:
-        if row['category'] in ('tree','shrub'):row['parameters'].setdefault('foliageMode',1)
+        if row['category'] in ('tree','shrub','fern','palm','bamboo','vine','riparian'):row['parameters'].setdefault('foliageMode',1)
         row['tags']=[row['scientificName'],row['category'],
                      'wetland' if row['category']=='riparian' else 'tropical' if row['category']=='palm' else 'dryland' if row['category']=='cactus' else 'woodland' if row['category'] in ('tree','conifer','fern') else 'garden']
     document={'format':'ReyondBroomBotanicalCatalog','version':2,'generatorVersion':2,

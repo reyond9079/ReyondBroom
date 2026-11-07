@@ -9,6 +9,11 @@ struct Botanical : Generator {
   std::vector<Span> skeleton;
   std::vector<Shoot> foliage;
   Botanical(const Project& d,int l,const std::atomic<bool>* c):Generator(d,l,c){}
+  double leafAngle(int i) const {
+    if(p.phyllotaxy==1)return (i%2)*pi+(i/2)*.27;
+    if(p.phyllotaxy==2)return (i%p.clusterLeaves)*2*pi/p.clusterLeaves+(i/p.clusterLeaves)*.19;
+    return i*2.399963;
+  }
   double phenology() const {
     if(p.evergreen==1)return 1;
     if(p.evergreen==2)return p.season==3?.55:1;
@@ -101,7 +106,7 @@ struct Botanical : Generator {
     return cost;
   }
   void planBranch(V origin,V end,double radius,int order,uint64_t id) {
-    b.check();Rng r(mix(id,doc.seed));
+    b.check();if(skeleton.size()>16384||foliage.size()>262144)throw std::runtime_error("Botanical plan exceeds the preview limit; reduce stems, branching depth or leaves per shoot");Rng r(mix(id,doc.seed));
     double droop=p.gravity*(p.crown==3?1.1:.50);
     auto path=arc(origin,end,droop,std::max(4,p.segments),id);
     skeleton.push_back({path,radius,std::max(.015,radius*(1-p.taper)*.45),order==0?Part::Primary:order==1?Part::Secondary:Part::Twigs,id});
@@ -120,12 +125,16 @@ struct Botanical : Generator {
         planBranch(anchor,target,radius*p.branchTaper*.72,order+1,mix(id,i+11));
       }
     }else if(r.real()>=p.dead){
-      int leaves=std::max(4,int(p.leaves*p.density*p.crownFill));
+      int leaves=std::max(4,int(p.leaves*p.density*p.crownFill*(p.crown==3?1.6:1.)));
+      std::vector<V> drape;
+      if(p.crown==3){auto anchor=path.back();auto tip=add(anchor,{r.range(-.04,.04)*height,r.range(-.04,.04)*height,-height*r.range(.18,.34)*std::max(.3,p.gravity)});drape=arc(anchor,tip,.12,std::max(4,p.segments),mix(id,907));skeleton.push_back({drape,std::max(.03,radius*.6),.012,Part::Twigs,mix(id,908)});}
       for(int i=0;i<leaves;i++){
-        double t=.24+.75*(i+.5)/leaves;auto at=std::min(path.size()-2,size_t(t*(path.size()-1)));
-        double f=t*(path.size()-1)-at;V anchor=add(path[at],mul(sub(path[at+1],path[at]),f));
-        V axis=unit(sub(path[at+1],path[at]));double az=p.phyllotaxy==1?(i%2)*pi+(i/2)*.21:p.phyllotaxy==2?i*2*pi/3:i*2.399963;
-        az+=r.range(-.25,.25)*p.irregularity;V radial=unit({std::cos(az),std::sin(az),r.range(-.35,1.0)});
+        auto& shoot=!drape.empty()&&i>=leaves/4?drape:path;
+        double t=!drape.empty()&&i>=leaves/4?double(i-leaves/4+.5)/(leaves-leaves/4):.24+.75*(i+.5)/leaves;
+        auto at=std::min(shoot.size()-2,size_t(t*(shoot.size()-1)));
+        double f=t*(shoot.size()-1)-at;V anchor=add(shoot[at],mul(sub(shoot[at+1],shoot[at]),f));
+        V axis=unit(sub(shoot[at+1],shoot[at]));double az=leafAngle(i);
+        az+=r.range(-.25,.25)*p.irregularity;V radial=unit({std::cos(az),std::sin(az),p.crown==3?r.range(-1.8,-.5):r.range(-.35,1.0)});
         foliage.push_back({anchor,unit(add(mul(radial,.75),mul(axis,.25))),mix(id,i+200),r.range(.75,1.2)});
       }
     }
@@ -207,8 +216,8 @@ struct Botanical : Generator {
         if(k%3==0)skeleton.push_back({{node,tip},std::max(.025,p.radius*.025),.01,Part::Twigs,mix(id,k+side+17)});
         for(int n=0;n<3;n++){
           double f=(n+.2)/3;auto at=add(node,mul(sub(tip,node),f));
-          double turn=n*2.399963+az;
-          V aim=p.needleForm==0?unit(add(dir,V{std::cos(turn)*.45,std::sin(turn)*.45,.45})):p.needleForm==3?unit({std::cos(turn),std::sin(turn),.4}):dir;
+          double turn=leafAngle(n)+az;
+          V aim=p.needleForm==0?unit(add(dir,V{std::cos(turn)*.45,std::sin(turn)*.45,.45})):p.needleForm==3?unit({std::cos(turn),std::sin(turn),.4}):unit(add(dir,V{std::cos(turn)*.14,std::sin(turn)*.14,0}));
           foliage.push_back({at,aim,mix(id,k*21+n+side+100),std::max(1.8,length(sub(tip,node))/p.leafSize*1.5)});
         }
       }

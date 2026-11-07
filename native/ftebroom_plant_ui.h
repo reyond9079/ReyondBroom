@@ -58,9 +58,9 @@ static void plantProperties() {
     plantSlider("Leaf / blade width",p.leafWidth,.015,1.5);
     if(s.advanced) {
       if(s.doc.generator==2){
-        plantCombo("Leaf arrangement",p.phyllotaxy,"Alternate spiral\0Opposite\0Whorled\0");
+        if(f!=plants::Family::Grass){plantCombo("Leaf arrangement",p.phyllotaxy,"Alternate spiral\0Opposite\0Whorled\0");if(p.phyllotaxy==2)plantInt("Leaves in whorl",p.clusterLeaves,1,12);}
         if(p.leafShape==7||p.leafShape==4)plantInt("Leaflets / lobes",p.leaflets,3,21);
-        plantSlider("Petiole ratio",p.petiole,0,.6);plantSlider("Edge serration",p.serration,0,1);
+        if(tree||f==plants::Family::Vine)plantSlider("Petiole ratio",p.petiole,0,.6);if(f!=plants::Family::Conifer)plantSlider("Edge serration",p.serration,0,1);
         if(f==plants::Family::Conifer)plantCombo("Needle architecture",p.needleForm,"Pine bundles\0Flat needles\0Scale sprays\0Rosettes\0Imbricate leaves\0");
       }
       plantSlider("Leaf curl",p.leafCurl,-.5,1);plantSlider("Leaf twist",p.leafTwist,-1,1);
@@ -212,8 +212,12 @@ static void plantViewport() {
   auto& s=plantState;auto& io=ImGui::GetIO();
   if(s.owner&&(bbActive||modelViewerOpen)) {s.owner=false;cvars->SetFloat("ftebroom_plant_active",0);}
   if(!s.owner){ImGui::TextWrapped("Model Editor is using the shared 3D preview.");if(plantButton("Resume plant preview"))plantResumePreview();return;}
-  ImGui::SetNextItemWidth(120);if(ImGui::Combo("##plant-lod",&s.lod,"LOD0 high\0LOD1 medium\0LOD2 low\0"))s.dirtyRender=true;plantRect("lod");ImGui::SameLine();
-  ImGui::SetNextItemWidth(140);if(ImGui::Combo("##plant-display",&s.display,"Textured\0Solid\0Wireframe\0Normals\0UV debug\0"))s.dirtyRender=true;plantRect("display");ImGui::SameLine();
+  const char* lodNames[]={"LOD0 high","LOD1 medium","LOD2 low"};
+  ImGui::SetNextItemWidth(120);bool lodOpen=ImGui::BeginCombo("##plant-lod",lodNames[s.lod]);plantRect("lod");
+  if(lodOpen){for(int i=0;i<3;i++){if(ImGui::Selectable(lodNames[i],s.lod==i)){s.lod=i;s.dirtyRender=true;}plantRect("lod/"+std::to_string(i));}ImGui::EndCombo();}ImGui::SameLine();
+  const char* displays[]={"Textured","Solid","Wireframe","Normals","UV debug"};
+  ImGui::SetNextItemWidth(140);bool displayOpen=ImGui::BeginCombo("##plant-display",displays[s.display]);plantRect("display");
+  if(displayOpen){for(int i=0;i<5;i++){if(ImGui::Selectable(displays[i],s.display==i)){s.display=i;s.dirtyRender=true;}plantRect("display/"+std::to_string(i));}ImGui::EndCombo();}ImGui::SameLine();
   if(plantButton("Frame","frame")){s.framePending=true;if(s.result){s.cameraLow=s.result->lods[s.lod].low;s.cameraHigh=s.result->lods[s.lod].high;s.zoom=1;s.framePending=false;}}
   ImGui::Checkbox("Ortho",&s.ortho);ImGui::SameLine();ImGui::Checkbox("Grid",&s.floor);ImGui::SameLine();ImGui::Checkbox("Axes",&s.axes);
   auto size=ImGui::GetContentRegionAvail();size.x=std::max(64.f,size.x);size.y=std::max(64.f,size.y-45*uiScale());
@@ -317,12 +321,22 @@ static void plantConfirmSwitch() {
     ImGui::EndPopup();
   }
 }
+// Read-only performance telemetry, enabled only in disposable UI QA sessions.
+static std::vector<double> plantQaFrameWindow;
+static uint64_t plantQaFrameCount=0,plantQaSlowFrames=0;
+static double plantQaFrameSum=0,plantQaFrameMax=0;
+static void plantQaFrame(){
+ if(!plantState.qa||!plantState.open)return;double ms=ImGui::GetIO().DeltaTime*1000.;
+ ++plantQaFrameCount;plantQaSlowFrames+=ms>100;plantQaFrameSum+=ms;plantQaFrameMax=std::max(plantQaFrameMax,ms);
+ plantQaFrameWindow.push_back(ms);if(plantQaFrameWindow.size()>240)plantQaFrameWindow.erase(plantQaFrameWindow.begin());
+}
+static plants::Json plantQaPerf(){auto sorted=plantQaFrameWindow;std::sort(sorted.begin(),sorted.end());return plants::Json{{"frames",plantQaFrameCount},{"mean_ms",plantQaFrameCount?plantQaFrameSum/plantQaFrameCount:0},{"max_ms",plantQaFrameMax},{"over_100_ms",plantQaSlowFrames},{"recent_p95_ms",sorted.empty()?0:sorted[size_t((sorted.size()-1)*.95)]}};}
 static void plantWriteQa() {
   auto& s=plantState;if(!s.qa)return;static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
   plants::Json counts=plants::Json::array();if(s.result)for(auto& m:s.result->lods)counts.push_back({{"triangles",m.faces.size()},{"vertices",m.vertices.size()},{"low",m.low},{"high",m.high}});
   if(runUiBrowseOpen)for(auto it=runUiBrowseRects.begin();it!=runUiBrowseRects.end();++it)s.widgets[it.key()]=it.value();
   size_t meshBytes=0,textureBytes=0;if(s.result){for(auto* lods:{&s.result->lods,&s.result->baseLods})for(auto& m:*lods)meshBytes+=m.vertices.capacity()*sizeof(plants::Vertex)+m.faces.capacity()*sizeof(plants::Face);for(auto* m:{&s.result->maps->albedo,&s.result->maps->normal,&s.result->maps->orm})textureBytes+=m->rgba.capacity();}
-  auto j=plants::Json{{"generation_ms",s.result?s.result->milliseconds:0.},{"frame_ms",ImGui::GetIO().DeltaTime*1000},{"mesh_cache_bytes",meshBytes},{"texture_bytes",textureBytes},{"open",s.open},{"busy",plantBusy()},{"ready",plantReady()},{"widgets",s.widgets},{"project",plants::serialize(s.doc)},
+  auto j=plants::Json{{"frame_stats",plantQaPerf()},{"generation_ms",s.result?s.result->milliseconds:0.},{"frame_ms",ImGui::GetIO().DeltaTime*1000},{"mesh_cache_bytes",meshBytes},{"texture_bytes",textureBytes},{"open",s.open},{"busy",plantBusy()},{"ready",plantReady()},{"widgets",s.widgets},{"project",plants::serialize(s.doc)},
     {"lods",counts},{"selected",s.selected},{"error",s.error},{"message",s.message},{"path",s.file.u8string()},{"model",s.lastModel.u8string()},
     {"camera",{s.yaw,s.pitch,s.zoom}},{"cameraLow",s.cameraLow},{"cameraHigh",s.cameraHigh},{"undo",s.undo.size()},{"redo",s.redo.size()},
     {"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"theme",uiTheme},{"profile",gameProfile},{"settingsDir",settingsPath().parent_path().u8string()},
@@ -330,7 +344,7 @@ static void plantWriteQa() {
   plantAction([&](){bb::atomicWrite(documentPath("plant-ui-live.json"),j.dump());});
 }
 static void plantPanel() {
-  auto& s=plantState;plantAction(plantTick);if(!s.open){plantWriteQa();return;}
+  auto& s=plantState;plantQaFrame();plantAction(plantTick);if(!s.open){plantWriteQa();return;}
   s.widgets=plants::Json::object();auto before=plants::serialize(s.doc);auto revision=s.revision;
   auto display=ImGui::GetIO().DisplaySize;float u=uiScale();
   ImGui::SetNextWindowSize({std::min(1640*u,display.x-28),std::min(980*u,display.y-54)},ImGuiCond_FirstUseEver);
@@ -343,6 +357,7 @@ static void plantPanel() {
     if(plantButton("New","new"))plantRequest([](){placementCancel(plantPlacement);auto d=plants::presets().front();d.name="Untitled oak";d.seed=uint32_t(plants::mix(d.seed,plantState.revision+1));plantSelect(d);});ImGui::SameLine();
     if(plantButton("Open...","open"))plantRequest([](){runUiChoose(plantFolder().u8string(),[](const std::string& path){plantOpenFile(std::filesystem::u8path(path));});});ImGui::SameLine();
     if(plantButton("Save","save"))plantAction([](){plantAskSave();});ImGui::SameLine();
+    if(plantButton("Save as...","save-as"))plantAction([](){plantAskSave({},true);});ImGui::SameLine();
     ImGui::BeginDisabled(!plantReady());
     if(plantButton("Export...","export"))runUiChoose((plantFolder()/(plants::assetId(s.doc,s.lod)+".glb")).u8string(),[](const std::string& path){plantExport(std::filesystem::u8path(path));},true);ImGui::SameLine();
     if(plantButton("Add to Map","add-map"))plantAction(plantAddToMap);

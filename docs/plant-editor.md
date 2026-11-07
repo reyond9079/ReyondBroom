@@ -132,7 +132,7 @@ Windows, native Linux and Linux SDL2. Screenshots come from the running app.
 
 `tests/plant-botanical.cpp` checks all 121 presets × 3 seeds × 3 LODs,
 architectural descriptor uniqueness and category minima. The generator-1 golden
-corpus was recorded from the unmodified REYON-8 baseline (9e5b30a); it verifies
+corpus was recorded from the unmodified REYON-8 baseline (9e5b30a); CI rebuilds that frozen baseline on each OS so different libm implementations do not cause false cross-platform bit comparisons. It verifies
 270 exact legacy meshes and 270 albedo/normal/ORM atlas hashes.
 `scripts/test-viewport-create.py` uses real OS input for both Create/Save routes
 and independently inspects saved map history, source links and runtime assets.

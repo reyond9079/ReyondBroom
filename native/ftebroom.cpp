@@ -96,6 +96,7 @@ static void initialize()
     return;
   IMGUI_CHECKVERSION();
   cvars->SetFloat("ftebroom_mod_preview",0);
+  cvars->GetNVFDG("ftebroom_text_input","0",0,"Native GUI UTF-8 composition request","ReyondBroom");
   ImGui::CreateContext();
   auto& io = ImGui::GetIO();
   io.IniFilename = nullptr;
@@ -1143,6 +1144,7 @@ static void panel(float w, float h)
 #endif
   uiCursorUpdate(sceneLook||modelEditCameraCaptured||modCaptured,uiCursorPercent/100.f);
   uiReachableWindows();
+  cvars->SetFloat("ftebroom_text_input",io.WantTextInput&&input->HasMenuFocus()&&!sceneLook&&!modelEditCameraCaptured&&!modCaptured);
   placementWriteQa();
   runUiWriteLive(); // Include widgets drawn after Compile, such as Preferences.
   render();
@@ -1254,7 +1256,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     }
     if(inScene)return qtrue;
   }
-  if (inScene && !sceneDrag && !sceneLook && !io.WantTextInput)
+  if (inScene && !sceneDrag && !sceneLook && (!io.WantTextInput||(type==1&&key==mouseKeys[1])))
   {
     if (type == 1 && (key == mouseKeys[0] || key == mouseKeys[1] || key == mouseKeys[2]))
       viewFocusArmed = true;
@@ -1380,7 +1382,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     }
     if (key == mouseKeys[1] || key == mouseKeys[2])
     {
-      if (down && inScene && !io.WantTextInput && !sceneLook)
+      if (down && inScene && (!io.WantTextInput||key==mouseKeys[1]) && !sceneLook)
       {
         cancelGesture();
         sceneLook = true;
@@ -1936,6 +1938,7 @@ static void testModControls()
 }
 static void shutdownEditor()
 {
+  cvars->SetFloat("ftebroom_text_input",0);
   plantShutdown();
   pluginsShutdown();
   settleCancel=true;if(settleJob.valid())settleJob.wait();

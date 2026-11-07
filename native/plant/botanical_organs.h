@@ -69,13 +69,17 @@ inline void Botanical::ferns() {
   bool tree=p.organ==7;V crown{0,0,tree?height*.65:0};
   if(tree){std::vector<V> stem;for(int i=0;i<=p.segments;i++)stem.push_back({0,0,crown[2]*i/p.segments});b.tube(stem,p.radius,p.radius*.72,sides(),Bark,Part::Trunk);}
   for(int i=0;i<p.branches;i++){
-    b.check();Rng r(mix(doc.seed,i+42));double a=i*2.399963,length=height*(tree?.60:.94)*r.range(.78,1.1);
+    b.check();Rng r(mix(doc.seed,i+42));double a=leafAngle(i),length=height*(tree?.60:.94)*r.range(.78,1.1);
     V base=add(crown,{std::cos(a)*height*.025,std::sin(a)*height*.025,0});
-    auto tip=add(base,{std::cos(a)*length*(p.organ==1?.4:.75),std::sin(a)*length*(p.organ==1?.4:.75),length*(p.organ==1?.8:.28)});
+    auto tip=add(base,{std::cos(a)*length*(p.organ==1?.4:.75),std::sin(a)*length*(p.organ==1?.4:.75),length*(p.organ==1?.95:p.organ==5?1.1:.65)});
     auto path=arc(base,tip,p.gravity,std::max(5,count(p.segments+4,4)),mix(doc.seed,i));
     b.tube(path,tree?.6:p.radius*.3,.025,std::max(3,sides()-2),Bark,Part::Twigs);
     if(p.organ==5){lamina(base,unit(sub(tip,base)),{0,0,1},length,.26,mix(doc.seed,i),2,foliageMaterial(i));continue;}
-    int pinnae=std::max(6,int(p.leaves*(lod==2?.55:1)));
+    int pinnae=std::max(3,int(p.leaves*(lod==2?.55:1)));
+    if((p.organ==0||p.organ==2||p.organ==3||tree)&&lod<2){
+      size_t cost=4*(p.organ==3?9:6)*leafCost()+24;
+      int quota=int(b.budget*.72/std::max(1,p.branches)/std::max<size_t>(1,cost));pinnae=std::min(pinnae,std::max(lod?3:5,quota));
+    }
     for(int j=0;j<pinnae;j++)for(int side:{-1,1}){
       double t=.11+.85*(j+.5)/pinnae;auto q=path[std::min(path.size()-2,size_t(t*(path.size()-1)))];
       V dir=unit({std::cos(a+side*1.05),std::sin(a+side*1.05),-.10});
@@ -104,7 +108,7 @@ inline void Botanical::palms() {
     }
     auto top=path.back();
     for(int i=0;i<p.branches;i++){
-      double a=i*2.399963,span=height*p.spread*(p.organ==1?.5:.75);
+      double a=leafAngle(i),span=height*p.spread*(p.organ==1?.5:.75);
       V end=add(top,{std::cos(a)*span,std::sin(a)*span,span*(.1-.12*(i%3))});
       auto rachis=arc(top,end,p.gravity,std::max(5,count(p.segments+4,4)),mix(doc.seed,i+stem*53));
       b.tube(rachis,p.radius*.065,.02,3,Bark,Part::Twigs);
@@ -140,10 +144,11 @@ inline void botanicalCorolla(Botanical& g,V center,double radius,uint64_t id,int
     double a=(i+.47*layer)*2*pi/petals,tilt=form==1?.5+layer*.12:form==2?1.1:form==4?(i%2?-.55:1.4):form==5?.65:.12;
     auto dir=unit({std::cos(a),std::sin(a),tilt});
     double curl=form==1?.65:form==2?.55:form==4?-.25:form==5?.35:.08;
-    b.leaf(add(center,{0,0,layer*radius*.045}),dir,{0,0,1},radius*(1-layer*.10),form==1?.9:form==2?.95:form==5?.55:.33,0,g.lod?1:0,Petal,Part::Flowers,curl,r.range(-.1,.1),p.leafProfile);
+    auto profile=form==0?std::array<double,5>{.025,.55,.9,1.,.32}:p.leafProfile;
+    b.leaf(add(center,{0,0,layer*radius*.045}),dir,{0,0,1},radius*(1-layer*.10)*r.range(.94,1.06),form==1?.9:form==2?.95:form==5?.55:.38,form==0?6:0,g.lod?1:0,Petal,Part::Flowers,curl,r.range(-.1,.1),profile);
   }
   if(form==3)b.lathe(center,{{radius*.18,0},{radius*.22,radius*.5},{radius*.38,radius*.7},{radius*.34,radius*.75},{radius*.18,radius*.3}},g.lod?8:15,Center,Part::Flowers,.1);
-  else b.lathe(center,{{.01,-radius*.05},{radius*(form==0?.26:.12),0},{radius*.10,radius*.12},{.01,radius*.15}},g.lod?8:16,Center,Part::Flowers,.03);
+  else b.lathe(center,{{.01,-radius*.05},{radius*(form==12?.40:form==0?.26:.12),0},{radius*.10,radius*.12},{.01,radius*.15}},g.lod?8:16,Center,Part::Flowers,.03);
   if(form==5||form==4)for(int i=0;i<6;i++){
     double a=i*2*pi/6;auto tip=add(center,{std::cos(a)*radius*.2,std::sin(a)*radius*.2,radius*.42});b.tube({center,tip},.055,.025,3,Gills,Part::Flowers);
     b.lathe(tip,{{.01,0},{radius*.045,radius*.035},{.01,radius*.08}},5,Center,Part::Flowers);
@@ -156,7 +161,7 @@ inline void Botanical::blossoms() {
     V tip=add(base,{r.range(-1,1)*height*p.curvature*.18,r.range(-1,1)*height*p.curvature*.18,height*r.range(.82,1)});
     auto stem=arc(base,tip,0,std::max(4,count(p.segments)),mix(doc.seed,i));b.tube(stem,p.radius,p.radius*.35,std::max(3,sides()-2),Bark,Part::Trunk);
     for(int j=1;j<=5;j++){
-      auto q=stem[std::min(stem.size()-1,size_t(j*(stem.size()-1)/6))];double turn=j*2.399963;
+      auto q=stem[std::min(stem.size()-1,size_t(j*(stem.size()-1)/6))];double turn=leafAngle(j);
       blade(q,{std::cos(turn),std::sin(turn),.2},p.leafSize,mix(i,j));
     }
     if(p.organ==6||p.organ==10||p.organ==11){
@@ -271,7 +276,7 @@ inline void Botanical::reedsAndBamboo() {
       auto path=arc(last,tip,0,std::max(2,count(p.segments,2)),mix(stem,j));
       b.tube(path,p.radius*(1-t*.30),p.radius*(1-t*.34),bamboo?sides():p.organ==2?3:std::max(3,sides()-3),Bark,Part::Trunk);
       b.lathe(tip,{{p.radius*.9,-p.radius*.2},{p.radius*1.12,0},{p.radius*.86,p.radius*.25}},std::max(4,sides()),Wood,Part::Primary);
-      double az=j*2.399963+a;
+      double az=leafAngle(j)+a;
       if(!bamboo&&p.organ==3){
         for(int k=0;k<7;k++){
           double turn=k*2*pi/7;auto end=add(tip,{std::cos(turn)*height*.17,std::sin(turn)*height*.17,height*.08});
@@ -279,9 +284,13 @@ inline void Botanical::reedsAndBamboo() {
         }
       }else if(j>nodes/4&&(bamboo||p.organ==0)){
         for(int side:{-1,1}){
-          V aim{std::cos(az+side*.6),std::sin(az+side*.6),.12};auto end=add(tip,mul(aim,p.leafSize*.5));
-          b.tube({tip,end},p.radius*.18,.012,3,Bark,Part::Twigs);
-          for(int k=0;k<(bamboo?3:1);k++)lamina(add(tip,mul(sub(end,tip),(k+.5)/3)),{std::cos(az+side*.6+k*.3),std::sin(az+side*.6+k*.3),-.15},{0,0,1},p.leafSize,p.leafWidth,mix(stem*71+j,k+side+5),2);
+          for(int shoot=0;shoot<(bamboo?3:1);shoot++){
+            double turn=az+side*(.35+shoot*.36);V aim{std::cos(turn),std::sin(turn),.12+shoot*.10};auto end=add(tip,mul(aim,p.leafSize*(bamboo?1.7:.5)));
+            b.tube({tip,end},p.radius*.18,.012,3,Bark,Part::Twigs);
+            int blades=bamboo?(lod==2?3:lod==1?4:6):1;
+            for(int k=0;k<blades;k++){double t=(k+.5)/blades,spread=(k%2?1:-1)*.62;
+              lamina(add(tip,mul(sub(end,tip),t)),{std::cos(turn+spread),std::sin(turn+spread),-.18-.22*t},{0,0,1},p.leafSize*(1-.25*t),p.leafWidth,mix(stem*71+j,shoot*31+k+side+5),2);}
+          }
         }
       }last=tip;
     }
@@ -301,8 +310,8 @@ inline void Botanical::climbers() {
   b.tube(stem,p.radius,p.radius*.3,sides(),Bark,Part::Trunk);
   int nodes=std::max(6,p.leaves/(lod==2?2:1));
   for(int i=1;i<nodes;i++){
-    double a=p.phyllotaxy==1?(i%2)*pi+i*.17:i*2.399963;V dir{std::cos(a),std::sin(a),-.08};
-    auto base=stem[size_t(double(i)*steps/nodes)],tip=add(base,mul(dir,p.leafSize*.25));
+    double a=leafAngle(i);V dir{std::cos(a),std::sin(a),-.08};
+    auto base=stem[size_t(double(i)*steps/nodes)],tip=add(base,mul(dir,p.leafSize*p.petiole));
     b.tube({base,tip},p.radius*.25,.025,3,Bark,Part::Twigs);blade(tip,dir,p.leafSize,mix(doc.seed,i));
     if(i%4)continue;
     if(p.organ==2){

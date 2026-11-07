@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -12,6 +13,20 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime',type=Path);p.add_argument('artifacts',type=Path);a=p.parse_args()
 root=a.runtime.resolve();out=a.artifacts.resolve();source=out/'build-snapshot'
 base=out/'q3-compile';game=base/'baseq3';shutil.copytree(source,game,dirs_exist_ok=True)
+# The compilation regression can leave the FTE profile selected. Its func_model
+# must remain a runtime entity in that profile. Validate that class, then make
+# an explicit Quake III compilation copy using the same installed MD3 assets.
+state=json.loads((out/'final-state.json').read_text());profile=state['profile'];assert profile in (0,1)
+text=(game/'plant.map').read_text();converted=0
+def target_entity(match):
+ global converted
+ entity=match.group(0);expected='misc_model' if profile==0 else 'func_model'
+ assert re.search(r'"classname"\s+"'+expected+r'"',entity),'Placement class does not match the active profile'
+ if profile==1:
+  entity=re.sub(r'("classname"\s+)"func_model"',r'\1"misc_model"',entity);converted+=1
+ return entity
+text=re.sub(r'\{[^{}]*"_reyondbroom_authoring"\s+"1"[^{}]*\}',target_entity,text)
+(game/'plant.map').write_text(text)
 compiler=root/'tools/q3map2'/('q3map2.exe' if os.name=='nt' else 'q3map2')
 command=[str(compiler),'-game','quake3','-fs_basepath',str(base),'-fs_homepath',str(base),'-meta',str(game/'plant.map')]
 result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=120)
@@ -31,6 +46,6 @@ for at in range(0,len(surfaces),104):
 assert triangles>1000,'Compiled BSP omitted the generated plant geometry'
 text=result.stdout.decode(errors='replace')
 assert any('entering scripts/'+name+'.shader' in text for name in (game/'scripts/shaderlist.txt').read_text().split() if name.startswith('plant-')),'Compiler did not read the plant cutout shader'
-report={'compiler':str(compiler),'bsp_version':46,'plant_triangles':triangles,'plant_shaders':[names[i] for i in plants]}
+report={'compiler':str(compiler),'source_profile':profile,'q3_copy_class_adaptations':converted,'bsp_version':46,'plant_triangles':triangles,'plant_shaders':[names[i] for i in plants]}
 (out/'q3-compile-results.json').write_text(json.dumps(report,indent=2))
 print('PASS real q3map2 BSP compilation:',triangles,'plant triangles; cutout shader loaded',flush=True)

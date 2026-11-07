@@ -73,6 +73,8 @@ inline Texel texel(const Project& d,int mat,double u,double v) {
     double rib=.5+.5*std::cos(u*pi*2*p.ribs);h=rib*.5+n*.15;c=mul(c,.60+.45*rib+n*.13);
     double dots=std::pow(std::max(0.,std::cos(u*pi*2*p.ribs)),24)*std::pow(std::max(0.,std::cos(v*pi*26)),16);
     c=blend(c,{.72,.64,.39},dots*.8);h+=dots*.15;
+    c=blend(c,{.52,.43,.25},std::clamp(p.dryness+(p.season==3?.20:p.season==2?.10:0),0.,1.)*.7);
+    if(p.season==0)c=blend(c,{.37,.51,.22},.10);
   }else {c=mul(c,.70+n*.5);h=n*.3;}
   c=mul(c,1+p.variation*(fine-.5));for(double& x:c){x=std::clamp(x,0.,1.);if(p.quality==3)x=std::min(1.,std::round(x*5)/5.+.04);}
   return {c,h,alpha};

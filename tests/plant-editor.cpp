@@ -68,6 +68,8 @@ int main(int argc,char** argv) try {
   };
   for(auto& edit:edits){auto x=d;edit.second(x);expect(fingerprint(generate(x))!=original,"wired parameter "+edit.first);}
   for(auto id:{"bamboo","ivy"}){auto x=*std::find_if(catalog.begin(),catalog.end(),[&](auto& p){return p.preset==id;});auto before=fingerprint(generate(x));x.p.segments=4;expect(fingerprint(generate(x))!=before,std::string(id)+" spline tessellation control changes mesh");}
+  {auto x=*std::find_if(catalog.begin(),catalog.end(),[](auto& p){return p.preset=="bracken";});auto before=fingerprint(generate(x));x.p.sides=4;expect(fingerprint(generate(x))!=before,"fern radial sides change actual frond stems");}
+  {auto x=*std::find_if(catalog.begin(),catalog.end(),[](auto& p){return p.preset=="saguaro";});auto before=fingerprint(generate(x));x.p.irregularity=.8;expect(fingerprint(generate(x))!=before,"saguaro irregularity changes arm placement");auto skin=textureMaps(x,nullptr,nullptr,48);x.p.dryness=.8;expect(textureMaps(x,nullptr,nullptr,48).albedo.rgba!=skin.albedo.rgba,"cactus dryness changes its skin material");x.p.branches=0;validate(generate(x));expect(true,"saguaro permits a valid unbranched plant");}
   auto dense=d;dense.p.budget=100000;dense.p.branches=30;dense.p.depth=4;dense.p.leaves=40;dense.p.age=1;
   auto denseStart=std::chrono::steady_clock::now();auto denseMesh=generate(dense);validate(denseMesh);
   double denseMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-denseStart).count();
@@ -79,6 +81,7 @@ int main(int argc,char** argv) try {
   auto duplicated=d;auto copied=duplicateComponent(duplicated,1);validate(duplicated);
   expect(duplicated.nodes.size()==15&&duplicated.nodes[copied].parent.empty(),"duplicate copies the complete trunk subtree");
   expect(std::any_of(duplicated.nodes.begin(),duplicated.nodes.end(),[&](auto& n){return n.parent==duplicated.nodes[copied].id;}),"duplicate children use copied parent IDs");
+  expect(generate(duplicated,2).faces.size()<=size_t(duplicated.p.budget*duplicated.p.lod2Ratio),"duplicated components retain the selected LOD budget");
   rejects([&](){while(true)duplicateComponent(duplicated,copied);},"duplicate enforces the component limit");
   auto maps=textureMaps(d,nullptr,nullptr,48);auto again=textureMaps(d,nullptr,nullptr,48);expect(maps.albedo.rgba==again.albedo.rgba&&maps.normal.rgba==again.normal.rgba&&maps.orm.rgba==again.orm.rgba,"procedural textures deterministic");
   auto material=d;material.p.leaf={.8,.1,.1};expect(textureMaps(material,nullptr,nullptr,48).albedo.rgba!=maps.albedo.rgba,"foliage color affects actual texture");

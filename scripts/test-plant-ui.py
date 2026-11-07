@@ -25,7 +25,7 @@ shutil.rmtree(data/'plant-qa-build',ignore_errors=True)
 (data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\nin 12 ftebroom_plant qa dark\n')
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
-stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
+stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
 checks=[]
 def live():return json.loads(path.read_text(encoding='utf-8'))
 def wait(fn,timeout=25):
@@ -97,6 +97,8 @@ try:
  expect(relative in map_text and '"_reyondbroom_authoring" "1"' in map_text,'map save retains the generated model reference and authoring marker')
  console('ftebroom_undo');console('mod_terrain_save "" plant-undo');undone=data/'maps/plant-undo.map';wait(lambda:undone.exists());expect(relative not in undone.read_text(errors='replace'),'map Undo removes the inserted entity')
  console('ftebroom_redo');console('mod_terrain_save "" plant-redo');redone=data/'maps/plant-redo.map';wait(lambda:redone.exists());expect(relative in redone.read_text(errors='replace'),'map Redo restores the inserted entity')
+ console('ftebroom_entity_property set origin "64 -180 0"');console('ftebroom_entity_property set angles "0 25 0"');console('ftebroom_entity_property set modelscale "0.85"');console('mod_terrain_save "" plant-redo')
+ transformed=redone.read_text(errors='replace');expect(all(re.search(r'"'+key+r'"\s+"'+re.escape(value)+r'"',transformed) for key,value in [('origin','64 -180 0'),('angles','0 25 0'),('modelscale','0.85')]),'existing entity tools persist plant position, rotation and scale')
  console('mapedit maps/plant-redo.map');time.sleep(2);console('mod_terrain_save "" plant-reopened');reopened=data/'maps/plant-reopened.map';wait(lambda:reopened.exists());expect(relative in reopened.read_text(errors='replace'),'map reopen preserves the installed model')
  compile_map=data/'data/export-map.map';compile_map.unlink(missing_ok=True);console('ftebroom_export_map');wait(lambda:compile_map.exists())
  console('ftebroom_plant qa-assets');asset_report=data/'plant-asset-qa.json';wait(lambda:asset_report.exists());assets=json.loads(asset_report.read_text());staged=Path(assets['staged'])

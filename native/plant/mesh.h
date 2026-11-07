@@ -132,8 +132,9 @@ struct Builder {
     }
   }
 };
-inline Mesh hierarchy(const Mesh& source,const Project& d) {
+inline Mesh hierarchy(const Mesh& source,const Project& d,int lod=0) {
   Mesh out;out.budgetLimited=source.budgetLimited;
+  const auto budget=size_t(d.p.budget*(lod==0?1:lod==1?d.p.lod1Ratio:d.p.lod2Ratio));
   for(auto& node:d.nodes) {
     std::vector<const Component*> chain{&node};auto parent=node.parent;bool visible=node.visible;
     while(!parent.empty()) {auto it=std::find_if(d.nodes.begin(),d.nodes.end(),[&](auto& n){return n.id==parent;});visible&=it->visible;chain.push_back(&*it);parent=it->parent;}
@@ -148,7 +149,7 @@ inline Mesh hierarchy(const Mesh& source,const Project& d) {
       }return v;
     };
     for(auto& f:source.faces)if(f.part==node.kind) {
-      if(out.faces.size()>=size_t(d.p.budget)) {out.budgetLimited=true;break;}
+      if(out.faces.size()>=budget) {out.budgetLimited=true;break;}
       auto copy=f;
       for(int a=0;a<3;a++){unsigned i=f.i[a];if(!indices.count(i)){indices[i]=out.vertices.size();out.vertices.push_back(transform(source.vertices[i]));}copy.i[a]=indices[i];}
       out.faces.push_back(copy);

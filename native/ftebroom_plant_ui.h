@@ -22,7 +22,7 @@ static void plantProperties() {
     plantText("Plant name",s.doc.name);ImGui::TextDisabled("%s",plants::familyName(f));
     plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
-    plantCombo("Season",p.season,"Spring\0Summer\0Autumn\0Winter\0");
+    if(f!=plants::Family::Mushroom)plantCombo("Season",p.season,"Spring\0Summer\0Autumn\0Winter\0");
     if(tree||f==plants::Family::Conifer||f==plants::Family::Grass)plantSlider("Foliage density",p.density,.1,1.8);
     if(f!=plants::Family::Grass)plantSlider("Stem radius",p.radius,.1,std::min(100.,p.height*.40),"%.2f units");
   }

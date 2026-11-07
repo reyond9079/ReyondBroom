@@ -124,6 +124,6 @@ class NativeInput:
 
  def console(self,command):
   self.in_console=True
-  try:self.key('esc',('shift',));self.text(command);self.key('enter');self.key('esc');time.sleep(.25)
+  try:self.key('esc',('shift',));self.text('/'+command);self.key('enter');self.key('esc');time.sleep(.25)
   finally:self.in_console=False
   self.settle()

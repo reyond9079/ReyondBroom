@@ -123,7 +123,7 @@ static void plantTick() {
         for(int i=0;i<3;i++){
           work->stage=i;if(work->cancel.load())throw std::runtime_error("Plant generation cancelled");
           out.baseLods[i]=cached&&cached->geometryKey==geometryKey?cached->baseLods[i]:plants::generateBase(doc,i,&work->cancel);
-          out.lods[i]=plants::hierarchy(out.baseLods[i],doc);
+          out.lods[i]=plants::hierarchy(out.baseLods[i],doc,i);
           if(out.lods[i].faces.empty())out.lods[i].low=out.lods[i].high={0,0,0};else plants::validate(out.lods[i]);
         }
         work->stage=3;

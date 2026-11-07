@@ -162,7 +162,7 @@ struct Generator {
   void frond(V base,double az,double size,uint64_t seed,bool palm) {
     V end=add(base,{std::cos(az)*size*.87,std::sin(az)*size*.87,size*(palm?-.18:.2+p.curvature*.6)});
     auto path=arc(base,end,p.gravity,count(p.segments+6,5),seed);
-    b.tube(path,std::max(.12,p.radius*(palm?.055:.18)),.02,3,Bark,Part::Twigs);
+    b.tube(path,std::max(.12,p.radius*(palm?.055:.18)),.02,palm?3:sides(),Bark,Part::Twigs);
     int n=count(p.leaves,5);
     for(int j=1;j<=n;j++)for(int side:{-1,1}) {
       double t=double(j)/(n+1);auto q=path[std::min(path.size()-1,size_t(t*(path.size()-1)))];
@@ -257,7 +257,7 @@ struct Generator {
     }else {
       std::vector<V> path;for(int i=0;i<=p.segments;i++)path.push_back(trunk(double(i)/p.segments));stalk(path,p.radius,doc.seed);
       for(int i=0;i<std::min(6,p.branches);i++) {
-        double t=.35+.40*(i+.5)/p.branches,a=i*2.399963;V base=trunk(t),out=add(base,{std::cos(a)*height*.20*p.spread,std::sin(a)*height*.20*p.spread,height*.07});
+        Rng r(mix(doc.seed,i+100));double t=.35+.40*(i+.5)/p.branches+r.range(-.04,.04)*p.irregularity,a=i*2.399963+r.range(-.4,.4)*p.irregularity;V base=trunk(t),out=add(base,{std::cos(a)*height*.20*p.spread,std::sin(a)*height*.20*p.spread,height*.07});
         auto end=add(out,{0,0,height*.27});std::vector<V> arm;
         auto c1=add(base,{std::cos(a)*height*.25,std::sin(a)*height*.25,0});
         auto c2=sub(end,{0,0,height*.25});int n=count(12,6);
@@ -310,7 +310,7 @@ inline Mesh generateBase(const Project& d,int lod=0,const std::atomic<bool>* can
   validate(d);if(lod<0||lod>2)throw std::runtime_error("Invalid plant LOD");return Generator(d,lod,cancel).runBase();
 }
 inline Mesh generate(const Project& d,int lod=0,const std::atomic<bool>* cancel=nullptr) {
-  auto result=hierarchy(generateBase(d,lod,cancel),d);
+  auto result=hierarchy(generateBase(d,lod,cancel),d,lod);
   if(result.faces.empty()){result.low=result.high={0,0,0};return result;}
   validate(result);return result;
 }

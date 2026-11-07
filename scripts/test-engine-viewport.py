@@ -39,7 +39,7 @@ for i,name in enumerate(names):
  engines.append(e)
  profiles.append({'name':'Compile + '+name,'workdir':work.as_posix(),'trenchBroom':True,'tasks':[
   {'type':'export','target':'${WORK_DIR_PATH}/${MAP_BASE_NAME}.map','stripTbProperties':True},
-  {'type':'tool','tool':(root/('tools/ericw/qbsp.exe' if os.name=='nt' else 'tools/ericw/qbsp')).as_posix(),'parameters':'-bsp29 "${WORK_DIR_PATH}/${MAP_BASE_NAME}.map"','treatNonZeroResultCodeAsError':True},
+  {'type':'tool','tool':(root/('tools/ericw/qbsp.exe' if os.name=='nt' else 'tools/ericw/qbsp')).as_posix(),'parameters':'"${WORK_DIR_PATH}/${MAP_BASE_NAME}.map"','treatNonZeroResultCodeAsError':True},
   {'type':'launchEngine','engineProfileId':str(i),'treatLaunchFailureAsError':True}]})
 workspace={'profiles':profiles,'engines':engines,'variables':{},'gameRoot':game.as_posix(),'baseMod':'id1','enabledMods':[mod],'modsConfigured':True}
 store=data/'compilation-profiles.json';store.write_text(json.dumps({'version':1,'games':{'quake1':workspace}}))

@@ -113,9 +113,8 @@ string fb_view_cache_signature(int type,vector mn,vector sz)
 void fb_view_cache_draw(int index,vector mn,vector sz)
 {
     string image=sprintf("ftebroom/viewcache%i",index);
-    shaderforname(image,sprintf("{\n{\nmap $rt:ftebroom_viewcache%i\nblendfunc add\nrgbgen vertex\nalphagen vertex\n}\n}",index));
+    shaderforname(image,sprintf("{\n{\nmap $rt:ftebroom_viewcache%i\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}",index));
     drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
-    drawfill(mn,sz,autocvar_ftebroom_color_2d_background,1,0);fb_view_background();
     drawpic('0 0 0',image,vidsize,'1 1 1',1,0);
     fb_pick_draw_entities(TRUE);fb_visual_labels();
     drawresetcliparea();
@@ -309,7 +308,10 @@ void() wrap_renderscene =
                 fb_view_cache_draw(index,mn,sz);fb_visual_face_hover();continue;
             }
             setproperty(VF_RT_DESTCOLOUR,sprintf("ftebroom_viewcache%i",index),-IMGFMT_R8G8B8A8,vidsize);
-            drawfill('0 0 0',vidsize,'0 0 0',1,0);
+            // Cache the complete opaque canvas. Additive compositing over a
+            // gray background would tint bright edges and erase black edges.
+            drawfill('0 0 0',vidsize,autocvar_ftebroom_color_2d_background,1,0);
+            fb_view_background();
         }
         drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
         mousenear=unproject(curmousepos);mousefar=unproject(curmousepos+'0 0 1');

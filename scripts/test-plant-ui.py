@@ -22,7 +22,7 @@ path=data/'plant-ui-live.json';path.unlink(missing_ok=True)
 for name in ['plant-placed','plant-undo','plant-redo','plant-reopened']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'plant-asset-qa.json').unlink(missing_ok=True)
 shutil.rmtree(data/'plant-qa-build',ignore_errors=True)
-(data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\n'+('set developer 1\n' if a.scene_only else '')+'in 12 ftebroom_plant qa dark\n')
+(data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\n'+('set developer 1\nset sv_cheats 1\n' if a.scene_only else '')+'in 12 ftebroom_plant qa dark\n')
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
@@ -142,6 +142,8 @@ try:
   console('ftebroom_show_models');console('r_drawentities');console('version_modelformats')
   console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
   if a.scene_only:
+   for expression in ['numents','editents[1].modelindex','editents[1].isbsp','editents[1].org','editents[1].modelaxes','fb_point_model_count','fb_point_render_count','fb_build_active']:
+    console('poke_csqc '+expression)
    console('r_glsl_offsetmapping');console('set r_glsl_offsetmapping 0');time.sleep(1);screenshot('plant-offset-disabled');console('set r_glsl_offsetmapping 1')
    console('set ftebroom_point_cache 0');screenshot('plant-uncached-points');console('set ftebroom_point_cache 1')
    material='textures/reyond-plugins/'+model.stem;console('r_remapshader '+material+' $whiteimage 0');screenshot('plant-white-material')

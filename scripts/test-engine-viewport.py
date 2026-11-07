@@ -124,7 +124,9 @@ try:
   expect(not live()['error'],name+'_pipeline_no_error: '+live()['error'])
   expect((game/mod/'maps'/(mapname+'.bsp')).is_file(),name+'_map_deployed')
   if not a.engine:
-   receipt=out/f'receipt-{i}.json';wait(lambda:receipt.exists());observed=json.loads(receipt.read_text())
+   # Engine launch is asynchronous: creating a receipt precedes its JSON write.
+   # Poll a complete parsed record, just as we poll the live editor state.
+   receipt=out/f'receipt-{i}.json';observed=wait(lambda:json.loads(receipt.read_text()))
    expect(observed['cwd'].replace('\\','/')==launchdir.as_posix() and observed['argv'][3:]==['-basedir',game.as_posix(),'-game',mod,'+map',mapname],name+'_actual_argv_and_working_directory')
   shot('compiled-engine-'+str(i))
  saved=json.loads(store.read_text())['games']['quake1']['engines']

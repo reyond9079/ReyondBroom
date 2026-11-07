@@ -34,7 +34,12 @@ def check(ok,name):
  assert ok,name
  checks.append(name);(out/'results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
 def click(key):
- r=wait(lambda:live()['widgets'].get(key));ui.click(r['x']+r['width']*.45,r['y']+r['height']*.5)
+ wait(lambda:live()['widgets'].get(key));ui.settle()
+ # A just-opened auto-sized modal can move after its first recorded frame.
+ # Read its rectangle again after two fresh UI publications before pressing.
+ r=wait(lambda:live()['widgets'].get(key));assert r.get('visible',True),key+' is clipped'
+ with (out/'os-clicks.jsonl').open('a') as f:f.write(json.dumps({'key':key,'rect':r,'time':time.monotonic()})+'\n')
+ ui.click(r['x']+r['width']*.45,r['y']+r['height']*.5)
 def hover(key):
  r=wait(lambda:live()['widgets'].get(key));ui.move(r['x']+r['width']*.45,r['y']+r['height']*.5);time.sleep(.5)
 def edit(key,value,scalar=False):

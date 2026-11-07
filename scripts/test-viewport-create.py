@@ -13,6 +13,7 @@ p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Pat
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';path=data/'placement-ui-live.json';path.unlink(missing_ok=True)
 (data/'placement-interaction.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_plant qa '+a.theme+'\n')
 for f in (data/'maps').glob('creation-qa-*.map'):f.unlink()
+(data/'maps/creation-qa-switch.map').write_bytes((data/'maps/qa_clip.map').read_bytes())
 project=data/'plants/projects/creation-qa.plant.json';project.unlink(missing_ok=True)
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width',str(a.width),'-height',str(a.height),'-basedir',str(root),'+exec','placement-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
@@ -69,7 +70,7 @@ try:
  click('model/file-menu');click('model/file/Save as');edit('model/file-name','creation-qa-as-'+str(int(time.time()))+'.bbmodel');click('model/file-accept');wait(lambda:not live()['modelBusy']);check(len(entities(snapshot('model-save-as')))==1,'model Save As preserves the single placement binding');saved_path=live()['modelPath']
  click('model/file-menu');click('model/file/Close');context('model');wait(lambda:live()['newModel']);edit('model/new-name','creation-qa-empty-'+str(int(time.time())));click('model/new-template');click('model/template/Empty');click('model/new-create');wait(lambda:live()['modelOpen'] and live()['model']['active']);ui.key('s',('ctrl',));wait(lambda:not live()['modelBusy'] and 'failed' in live()['modelMessage']);check(len(entities(snapshot('empty-model-error')))==1,'failed model export leaves no broken scene entity')
  # Switching the source map invalidates this unsatisfied Create request.
- ui.console('mapedit maps/qa_clip.map');wait(lambda:not live()['model']['active']);ui.key('s',('ctrl',));check(not entities(snapshot('stale-map-save')),'Save after a map switch cannot insert into the new map')
+ ui.console('mapedit maps/creation-qa-switch.map');wait(lambda:not live()['model']['active']);click('model/file-menu');click('model/file/Save');check(not entities(snapshot('stale-map-save')),'Save after a map switch cannot insert into the new map')
  ImageGrab.grab().save(out/'model-editor.png');(out/'final-state.json').write_text(json.dumps(live(),indent=2));print('PASS viewport creation',len(checks),flush=True)
 except Exception:
  ImageGrab.grab().save(out/'failure.png');raise

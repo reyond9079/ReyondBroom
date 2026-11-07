@@ -89,10 +89,10 @@ def rgb(setting,values):
 def shot(name):ui.settle();ImageGrab.grab().save(out/(name+'.png'))
 def channels(name):return [float(x) for x in live()['viewportColors'][name].split()]
 def pixel_count(predicate,kind):
- image=ImageGrab.grab();total=0
+ ox,oy=ui.position();sx,sy=getattr(ui,'scale',(1,1));image=ImageGrab.grab();total=0
  for v in live()['views']:
   if (kind=='2d')!=(v['type']!=0):continue
-  area=image.crop((int(v['x'])+6,int(v['y'])+35,int(v['x']+v['width'])-6,int(v['y']+v['height'])-6))
+  area=image.crop((int(ox+(v['x']+6)*sx),int(oy+(v['y']+35)*sy),int(ox+(v['x']+v['width']-6)*sx),int(oy+(v['y']+v['height']-6)*sy)))
   total+=sum(predicate(rgb[:3]) for rgb in area.getdata())
  return total
 try:

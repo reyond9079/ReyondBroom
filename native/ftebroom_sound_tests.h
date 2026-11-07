@@ -40,7 +40,7 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     frame();
     ImGui::SetWindowFocus("Mod file manager");
     frame();
-    auto point = modFilesTestItems.at((folder / "sounds.pk3/sound/short.wav").u8string());
+    auto point = modFilesTestItems.at((folder / "sounds.pk3/sound/short.wav").generic_u8string());
     for (int click = 0; click < 2; ++click) {
       event(0, 0, 0, point.x, point.y, testW, testH);
       event(1, mouseKeys[0], 0, point.x, point.y, testW, testH);

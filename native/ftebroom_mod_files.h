@@ -5,6 +5,8 @@
 #endif
  #include "ftebroom_wad_browser.h"
 static bool modFilesOpen=false,modFilesVisible=false;
+static bool modFilesRequestFocus=false;
+static std::map<std::string,ImVec2> modFilesTestItems;
 static ImVec2 modFilesMin,modFilesMax;
 static std::filesystem::path modFilesFolder,modFilesRoot;
 static bool modFilesSources=false;
@@ -287,8 +289,9 @@ static void modFilesPanel() {
   imageViewerPanel();
   modelConverterPanel();
   modFilesTextPanel();
-  modFilesVisible=false;if(!modFilesOpen)return;
+  modFilesVisible=false;if(cvars->GetFloat("ftebroom_skip_setup"))modFilesTestItems.clear();if(!modFilesOpen)return;
   ImGui::SetNextWindowSize({650*uiScale(),450*uiScale()},ImGuiCond_FirstUseEver);
+  if(modFilesRequestFocus){ImGui::SetNextWindowFocus();modFilesRequestFocus=false;}
   if(uiSoftPanelBegin("Mod file manager",&modFilesOpen)) {
     modFilesVisible=true;modFilesMin=ImGui::GetWindowPos();auto sz=ImGui::GetWindowSize();modFilesMax={modFilesMin.x+sz.x,modFilesMin.y+sz.y};
     try {
@@ -349,6 +352,7 @@ static void modFilesPanel() {
         auto& entry=modFilesEntries[i];auto path=entry.second;bool directory=entry.first;auto label=path.filename().u8string();
         if(col)ImGui::SameLine();ImGui::PushID(i);auto p=ImGui::GetCursorScreenPos();
         if(ImGui::Selectable("##file",false,ImGuiSelectableFlags_AllowDoubleClick,{modFilesGrid?tileSize+8:ImGui::GetContentRegionAvail().x,rowHeight-ImGui::GetStyle().ItemSpacing.y})&&directory)navigate=path;
+        if(cvars->GetFloat("ftebroom_skip_setup")&&soundFile(path)) {auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();modFilesTestItems[path.generic_u8string()]={(a.x+b.x)*.5f,(a.y+b.y)*.5f};}
         if(ImGui::IsItemHovered()&&ImGui::IsMouseDoubleClicked(0)&&!directory) {
           if(entityLower(path.extension().u8string())==".lmp")lmpShow(path);else if(modelViewableFile(path))modelEditorShow(modFileModelPath(path));else if(soundFile(path))soundOpen(path);else if(imageFile(path))imageViewerShow(path);else if(entityLower(path.extension().u8string())==".map")modFileOpenMap(path);else if(modFileText(path))modFilesEdit(path);
         }

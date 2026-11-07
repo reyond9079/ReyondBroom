@@ -1,13 +1,18 @@
 # Sound Editor
 
 Open mono/stereo WAV, OGG, MP3 or FLAC from the Mod file manager, including PAK/PK3 members.
-The editor opens a full-window audio workspace with Media on the left, the master
+The editor opens a movable, resizable window inside ReyondBroom with Media on the left, the master
 monitor in the middle, the clip inspector on the right and tracks below.
 The layout and audio shortcut preset follow the approved REYON-4 mockup v1.
 This is an audio-only adaptation of the public CapCut Desktop references recorded
 in the mockup; it does not depend on CapCut or claim an exact unknown CapCut build.
 
 ## Editing
+
+Opening audio from the Mod file manager imports and selects it in Media, clears
+the media search and scrolls to the new source. Imports wait in order while
+another file is decoding or effects are preparing. PK3 members support long
+archive paths; importing does not modify the archive.
 
 Import adds a source and a clip at the playhead. Double-click a library source or
 drag it onto a track to add another clip. Dropping below the tracks creates a

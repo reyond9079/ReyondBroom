@@ -3,6 +3,7 @@
 #include "ftebroom_audio_process.h"
 #include <future>
 #include <mutex>
+#include <deque>
 namespace rbAudio = ftebroom::audio;
 static bool soundFile(const std::filesystem::path &p) {
   auto e = entityLower(p.extension().u8string());
@@ -44,9 +45,16 @@ struct SoundWorkResult {
   uint64_t revision = 0;
   rbAudio::Id sourceId = 0, track = 0;
   rbAudio::Frame at = 0;
+  bool addTrack = false;
   std::string error;
   bool loaded = false;
   std::filesystem::path path;
+};
+struct SoundImportRequest {
+  std::filesystem::path path;
+  rbAudio::Id track = 0;
+  rbAudio::Frame at = 0;
+  bool addTrack = false;
 };
 struct SoundState {
   rbAudio::Project project;
@@ -55,6 +63,7 @@ struct SoundState {
   std::set<rbAudio::Id> selected;
   std::vector<rbAudio::Clip> clipboard;
   rbAudio::Id track = 0, source = 0, nextGroup = 1;
+  rbAudio::Id revealSource = 0;
   rbAudio::Frame cursor = 0, queuedCursor = 0, viewStart = 0;
   double playStarted = 0;
   rbAudio::Frame playOrigin = 0;
@@ -67,6 +76,9 @@ struct SoundState {
        autoplay = false;
   bool importAddTrack = false, exportRange = false, shortcutsLoaded = false,
        closing = false;
+  bool requestFocus = false;
+  std::deque<SoundImportRequest> imports;
+  SoundWorkResult::Kind jobKind = SoundWorkResult::Prepare;
   float zoom = 1, peak = 0;
   int tab = 0, recordDevice = 0;
   float recordGain = 1;
@@ -127,7 +139,9 @@ static void soundValidate(const std::filesystem::path &uri,
   std::filesystem::path physical, archive;
   std::string member;
   if (ftebroom::pak::split(uri, archive, member)) {
-    if (member.empty() || !ftebroom::pak::validName(member))
+    if (member.empty() || !(ftebroom::pak::zipFile(archive)
+                               ? ftebroom::pak::zipName(member)
+                               : ftebroom::pak::validName(member)))
       throw std::runtime_error("Choose a valid archive audio member");
     physical = archive;
   } else
@@ -309,6 +323,7 @@ static void soundJobStart(
   if (soundBusy())
     throw std::runtime_error("Wait for or cancel the current audio operation");
   soundState.control = std::make_shared<rbAudio::JobControl>();
+  soundState.jobKind = kind;
   auto control = soundState.control;
   auto revision = soundState.revision;
   soundState.job = std::async(std::launch::async, [=] {
@@ -358,29 +373,41 @@ static void soundSeek(double seconds, bool play) {
     soundMessage =
         "No audio output device/API is available; offline export still works.";
 }
-static void soundOpen(const std::filesystem::path &path) {
-  if (soundBusy()) {
-    soundMessage = "Wait for or cancel the current audio operation";
+static void soundImportNext() {
+  auto &s = soundState;
+  if (soundBusy() || s.imports.empty())
     return;
-  }
+  auto request = s.imports.front();
+  s.imports.pop_front();
+  auto roots = soundRoots();
+  auto exe = soundFFmpeg();
+  int rate = s.project.rate;
+  soundMessage = "Decoding audio...";
+  soundJobStart(SoundWorkResult::Import, [=](auto &r, auto control) {
+    r.source = rbAudio::decode(exe, request.path.u8string(),
+                               soundReadResource(request.path, roots), rate,
+                               control);
+    r.track = request.track;
+    r.at = request.at;
+    r.addTrack = request.addTrack;
+  });
+}
+static void soundOpen(const std::filesystem::path &path) {
   try {
     modFileValidate(path);
     if (!soundFile(path))
       throw std::runtime_error("Choose WAV, OGG, MP3 or FLAC");
+    auto &s = soundState;
+    if (soundBusy() && s.jobKind != SoundWorkResult::Import &&
+        s.jobKind != SoundWorkResult::Prepare)
+      throw std::runtime_error("Wait for or cancel the current audio operation");
+    if (s.imports.size() >= 64)
+      throw std::runtime_error("Wait for the queued audio imports to finish");
     soundEditorOpen = true;
-    auto roots = soundRoots();
-    auto exe = soundFFmpeg();
-    int rate = soundState.project.rate;
-    auto track = soundState.track;
-    auto source = soundState.source;
-    auto at = soundState.cursor;
-    soundMessage = "Decoding audio...";
-    soundJobStart(SoundWorkResult::Import, [=](auto &r, auto control) {
-      r.source = rbAudio::decode(exe, path.u8string(),
-                                 soundReadResource(path, roots), rate, control);
-      r.track = track;
-      r.at = at;
-    });
+    s.requestFocus = true;
+    s.imports.push_back({path, s.track, s.cursor, s.importAddTrack});
+    s.importAddTrack = false;
+    soundImportNext();
   } catch (const std::exception &e) {
     soundMessage = e.what();
   }
@@ -629,18 +656,19 @@ static void soundFinish() {
       auto sid = s.project.addSource(std::move(result.source));
       auto tid = result.track;
       auto t = s.project.track(tid);
-      if (!t || t->locked || s.importAddTrack)
+      if (!t || t->locked || result.addTrack)
         tid = s.project.addTrack("Audio " +
                                  std::to_string(s.project.tracks.size() + 1));
       auto id = s.project.addClip(sid, tid, result.at);
       s.project.validate();
       s.track = tid;
       s.source = sid;
+      s.revealSource = sid;
+      s.filter[0] = 0;
       s.selected = {id};
       soundLegacySource(*s.project.source(sid));
       soundMessage = "Audio imported. Sources remain unchanged.";
     });
-    s.importAddTrack = false;
   } else if (result.kind == SoundWorkResult::Prepare) {
     if (result.revision == s.revision) {
       s.mixer = std::move(result.mixer);

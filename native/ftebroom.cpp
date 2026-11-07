@@ -488,7 +488,7 @@ static void panel(float w, float h)
         uiReset = true;
       ImGui::EndMenu();
     }
-    ImGui::TextDisabled("   ReyondBroom 0.5 alpha 126");
+    ImGui::TextDisabled("   ReyondBroom %s",editorVersion().c_str());
     ImGui::EndMainMenuBar();
   }
   const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
@@ -1101,7 +1101,7 @@ static void panel(float w, float h)
     if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
-      ImGui::TextUnformatted("ReyondBroom 0.5 alpha 126");
+      ImGui::Text("ReyondBroom %s",editorVersion().c_str());
       ImGui::TextLinkOpenURL("Check published releases","https://github.com/reyond9079/ReyondBroom/releases");
       updatePanel();
       ImGui::EndTabItem();

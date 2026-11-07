@@ -41,6 +41,7 @@ static void soundRequest(const std::string &action) {
     s.history.clear();
     s.selected.clear();
     s.clipboard.clear();
+    s.imports.clear();
     s.source = s.track = 0;
     s.cursor = 0;
     s.projectPath.clear();
@@ -48,6 +49,7 @@ static void soundRequest(const std::string &action) {
     soundRefreshMixer();
   } else if (action == "close") {
     soundStop();
+    s.imports.clear();
     soundEditorOpen = false;
   } else
     soundPathDialog("open");
@@ -1861,6 +1863,7 @@ static void soundLibrary() {
   ImGui::SameLine();
   if (ImGui::Button("Game sounds")) {
     modFilesOpen = true;
+    modFilesRequestFocus = true;
     modFilesVisible = true;
     soundMessage = "Browse Mod file manager or drop an audio file from it into "
                    "the timeline.";
@@ -1928,6 +1931,10 @@ static void soundLibrary() {
     if (!source.pcm)
       ImGui::TextColored({1, .5f, .4f, 1}, "Source unavailable");
     ImGui::EndGroup();
+    if (s.revealSource == source.id) {
+      ImGui::SetScrollHereY(.5f);
+      s.revealSource = 0;
+    }
     ImGui::PopID();
     count++;
   }
@@ -2050,26 +2057,33 @@ static void soundPanel() {
       s.focused = false;
       return;
     }
+    soundImportNext();
     if (!soundAPI)
       soundAPI = (plugaudiofuncs_t *)core->GetEngineInterface(
           plugaudiofuncs_name, sizeof(plugaudiofuncs_t));
     soundBindings();
     SoundStyle audioStyle;
     auto display = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
-    ImGui::SetNextWindowSize(display, ImGuiCond_Always);
+    const float scale = uiScale();
+    ImVec2 maximum{std::max(1.f, display.x - 32 * scale),
+                   std::max(1.f, display.y - 70 * scale)};
+    ImGui::SetNextWindowPos({16 * scale, 45 * scale}, ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(
+        {std::min(1280 * scale, maximum.x),
+         std::min(820 * scale, maximum.y)}, ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSizeConstraints(
-        {std::min(display.x, 900.f * uiScale()),
-         std::min(display.y, 650.f * uiScale())},
-        display);
+        {std::min(maximum.x, 900 * scale),
+         std::min(maximum.y, 560 * scale)}, maximum);
+    if (s.requestFocus) {
+      ImGui::SetNextWindowFocus();
+      s.requestFocus = false;
+    }
     bool open = true;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
                         {8 * uiScale(), 6 * uiScale()});
     if (ImGui::Begin("Sound editor", &open,
                      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
-                         ImGuiWindowFlags_NoSavedSettings |
-                         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-                         ImGuiWindowFlags_NoResize)) {
+                         ImGuiWindowFlags_NoSavedSettings)) {
       s.focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
       ImGui::TextUnformatted("ReyondBroom");
       ImGui::SameLine();
@@ -2134,8 +2148,10 @@ static void soundPanel() {
             {ImGui::GetContentRegionAvail().x - 90 * uiScale(), 0},
             soundMessage.c_str());
         ImGui::SameLine();
-        if (ImGui::Button("Cancel job") && s.control)
+        if (ImGui::Button("Cancel job") && s.control) {
+          s.imports.clear();
           s.control->cancel = true;
+        }
       }
       auto area = ImGui::GetContentRegionAvail();
       float status = ImGui::GetTextLineHeightWithSpacing() * 2,

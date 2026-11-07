@@ -7,6 +7,7 @@ import random
 import subprocess
 import sys
 import wave
+import zipfile
 
 root = Path(sys.argv[1]).resolve()
 converter = sys.argv[2] if len(sys.argv) > 2 else 'ffmpeg'
@@ -33,4 +34,8 @@ for name, duration, channels in [('voice', 6, 1), ('music', 18, 2), ('impact', 1
     if name != 'voice':
         ext = '.ogg' if name == 'music' else '.flac'
         subprocess.run([converter, '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(wav), str(root / (name + ext))], check=True)
+with zipfile.ZipFile(root / 'sounds.pk3', 'w', zipfile.ZIP_DEFLATED) as archive:
+    archive.writestr('sound/short.wav', (root / 'voice.wav').read_bytes())
+    archive.writestr('sound/' + 'long-nested-resource-name-' * 3 + 'звук.wav', (root / 'voice.wav').read_bytes())
+    archive.writestr('sound/music.ogg', (root / 'music.ogg').read_bytes())
 print(f'Audio fixtures: {root}')

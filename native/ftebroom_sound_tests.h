@@ -13,7 +13,96 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     expect(!soundBusy(), "audio4_worker_completed");
   };
   std::string test = mode;
-  if (test == "audio4preview") {
+  if (test.rfind("audio4archive", 0) == 0) {
+    testW = ImGui::GetIO().DisplaySize.x;
+    testH = ImGui::GetIO().DisplaySize.y;
+  }
+  if (test == "audio4archivebegin") {
+    gameProfile = 0;
+    std::snprintf(baseq3, sizeof baseq3, "%s", root);
+    uiTheme = 0;
+    uiScaleChoice = 0;
+    uiStyle();
+    soundStop();
+    p = {};
+    s.imports.clear();
+    s.history.clear();
+    s.selected.clear();
+    s.track = s.source = 0;
+    s.cursor = 0;
+    soundEditorOpen = false;
+    modFilesOpen = true;
+    modFilesRoot = folder;
+    modFilesFolder = folder / "sounds.pk3/sound";
+    modFilesRefresh = true;
+    modFilesGrid = true;
+    original = rbAudio::readBytes(folder / "sounds.pk3");
+    frame();
+    ImGui::SetWindowFocus("Mod file manager");
+    frame();
+    auto point = modFilesTestItems.at((folder / "sounds.pk3/sound/short.wav").u8string());
+    for (int click = 0; click < 2; ++click) {
+      event(0, 0, 0, point.x, point.y, testW, testH);
+      event(1, mouseKeys[0], 0, point.x, point.y, testW, testH);
+      event(0, 0, 0, point.x, point.y, testW, testH);
+      event(2, mouseKeys[0], 0, point.x, point.y, testW, testH);
+    }
+    frame();
+    expect(soundEditorOpen && (soundBusy() || p.sources.size() == 1),
+           "audio4_pk3_file_manager_double_click");
+  } else if (test == "audio4archiveopened") {
+    finish();
+    expect(p.sources.size() == 1 && p.clips.size() == 1 && p.sources[0].pcm &&
+               p.sources[0].name == "short.wav",
+           "audio4_pk3_sound_in_media_and_timeline");
+    auto window = ImGui::FindWindowByName("Sound editor");
+    expect(window && window->Pos.x > 0 && window->Pos.y > 0 &&
+               window->Size.x < testW && window->Size.y < testH,
+           "audio4_sound_is_inner_window");
+  } else if (test == "audio4archivequeue") {
+    finish();
+    std::snprintf(s.filter, sizeof s.filter, "%s", "no matching sounds");
+    s.importAddTrack = true;
+    auto name = std::string("sound/") + "long-nested-resource-name-" +
+                "long-nested-resource-name-long-nested-resource-name-" +
+                u8"звук.wav";
+    soundOpen(folder / "sounds.pk3" / std::filesystem::u8path(name));
+    s.importAddTrack = true;
+    soundOpen(folder / "sounds.pk3/sound/music.ogg");
+    expect(soundBusy() && s.imports.size() == 1,
+           "audio4_import_queued_while_decoding");
+  } else if (test == "audio4archivequeued") {
+    finish();
+    expect(s.imports.empty() && p.sources.size() == 3 && p.tracks.size() == 3 &&
+               p.clips.size() == 3 && p.sources[1].pcm &&
+               p.sources[1].uri.size() > 56 && p.sources[2].name == "music.ogg",
+           "audio4_long_pk3_and_compressed_audio_imported");
+    expect(!*s.filter && s.source == p.sources.back().id &&
+               s.selected.count(p.clips.back().id),
+           "audio4_import_reveals_selected_media");
+    expect(rbAudio::readBytes(folder / "sounds.pk3") == original,
+           "audio4_pk3_import_preserves_archive");
+  } else if (test == "audio4archivewindow") {
+    auto window = ImGui::FindWindowByName("Sound editor");
+    auto drag = [&](ImVec2 from, ImVec2 to) {
+      event(0, 0, 0, from.x, from.y, testW, testH);
+      event(1, mouseKeys[0], 0, from.x, from.y, testW, testH);
+      event(0, 0, 0, from.x, from.y, testW, testH);
+      event(0, 0, 0, to.x, to.y, testW, testH);
+      event(0, 0, 0, to.x, to.y, testW, testH);
+      event(2, mouseKeys[0], 0, to.x, to.y, testW, testH);
+      frame();frame();
+    };
+    auto size = window->Size;
+    auto corner = ImVec2{window->Pos.x + size.x - 3, window->Pos.y + size.y - 3};
+    drag(corner, {corner.x - 120, corner.y - 80});
+    expect(window->Size.x < size.x - 60 && window->Size.y < size.y - 40,
+           "audio4_inner_window_can_resize");
+    auto before = window->Pos;
+    drag({before.x + 160, before.y + 10}, {before.x + 220, before.y + 40});
+    expect(window->Pos.x > before.x + 30 && window->Pos.y > before.y + 10,
+           "audio4_inner_window_can_move");
+  } else if (test == "audio4preview") {
     gameProfile = 0;
     std::snprintf(baseq3, sizeof baseq3, "%s", root);
     soundEditorOpen = true;

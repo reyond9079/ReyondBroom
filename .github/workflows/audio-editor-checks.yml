@@ -4,7 +4,7 @@ on:
   push:
     branches: [feat/REYON-4-audio-editor]
   pull_request:
-    paths: ['native/ftebroom*audio*', 'native/ftebroom_sound*', 'tests/audio*', 'scripts/*audio*', '.github/workflows/audio-editor-checks.yml']
+    paths: ['native/ftebroom*audio*', 'native/ftebroom_sound*', 'native/ftebroom_mod_files.h', 'tests/audio*', 'scripts/*audio*', '.github/workflows/audio-editor-checks.yml']
 permissions:
   contents: read
 jobs:

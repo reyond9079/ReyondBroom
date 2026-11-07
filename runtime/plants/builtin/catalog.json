@@ -1,0 +1,3407 @@
+{
+  "format": "ReyondBroomBotanicalCatalog",
+  "generatorVersion": 2,
+  "license": "Original procedural descriptors; GPL-3.0-or-later",
+  "minimumByCategory": {
+    "bamboo": 4,
+    "cactus": 8,
+    "conifer": 12,
+    "fern": 8,
+    "flower": 14,
+    "grass": 12,
+    "mushroom": 8,
+    "palm": 6,
+    "riparian": 4,
+    "shrub": 14,
+    "tree": 24,
+    "vine": 6
+  },
+  "presets": [
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "oak",
+      "name": "English oak",
+      "parameters": {
+        "barkPattern": 0,
+        "branchAngle": 62,
+        "branches": 12,
+        "crown": 0,
+        "crownBase": 0.3,
+        "foliageMode": 1,
+        "height": 240,
+        "leafShape": 3,
+        "leafSize": 14,
+        "leafWidth": 0.55,
+        "leaves": 28,
+        "radius": 9,
+        "rootFlare": 1.8,
+        "spread": 0.75
+      },
+      "scientificName": "Quercus robur",
+      "tags": [
+        "Quercus robur",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "cork-oak",
+      "name": "Cork oak",
+      "parameters": {
+        "barkPattern": 6,
+        "branchAngle": 70,
+        "clumps": 2,
+        "crown": 7,
+        "crownBase": 0.25,
+        "evergreen": 1,
+        "foliageMode": 1,
+        "height": 190,
+        "leafShape": 1,
+        "leafSize": 8,
+        "leafWidth": 0.55,
+        "radius": 11,
+        "spread": 0.8,
+        "taper": 0.65
+      },
+      "scientificName": "Quercus suber",
+      "tags": [
+        "Quercus suber",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "birch",
+      "name": "Silver birch",
+      "parameters": {
+        "bark": [
+          0.78,
+          0.77,
+          0.7
+        ],
+        "barkPattern": 2,
+        "branchTaper": 0.45,
+        "branches": 14,
+        "crown": 1,
+        "crownBase": 0.3,
+        "foliageMode": 1,
+        "gravity": 0.65,
+        "height": 280,
+        "leafShape": 1,
+        "leafSize": 8,
+        "leafWidth": 0.75,
+        "radius": 3.8,
+        "spread": 0.38
+      },
+      "scientificName": "Betula pendula",
+      "tags": [
+        "Betula pendula",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "paper-birch",
+      "name": "Paper birch",
+      "parameters": {
+        "bark": [
+          0.84,
+          0.82,
+          0.74
+        ],
+        "barkPattern": 2,
+        "clumps": 3,
+        "crown": 7,
+        "crownBase": 0.4,
+        "foliageMode": 1,
+        "gravity": 0.18,
+        "height": 255,
+        "leafShape": 1,
+        "leafSize": 11,
+        "leafWidth": 0.68,
+        "phyllotaxy": 0,
+        "radius": 3.5,
+        "spread": 0.42
+      },
+      "scientificName": "Betula papyrifera",
+      "tags": [
+        "Betula papyrifera",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "maple",
+      "name": "Field maple",
+      "parameters": {
+        "barkPattern": 0,
+        "branchAngle": 60,
+        "crown": 0,
+        "crownBase": 0.32,
+        "foliageMode": 1,
+        "height": 210,
+        "leafShape": 4,
+        "leafSize": 14,
+        "leafWidth": 0.9,
+        "leaflets": 5,
+        "phyllotaxy": 1,
+        "spread": 0.65
+      },
+      "scientificName": "Acer campestre",
+      "tags": [
+        "Acer campestre",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "japanese-maple",
+      "name": "Japanese maple",
+      "parameters": {
+        "barkPattern": 1,
+        "branches": 10,
+        "clumps": 2,
+        "crown": 4,
+        "crownBase": 0.35,
+        "foliageMode": 1,
+        "height": 130,
+        "leafShape": 4,
+        "leafSize": 12,
+        "leafWidth": 1,
+        "leaflets": 7,
+        "phyllotaxy": 1,
+        "radius": 3.2,
+        "spread": 0.85
+      },
+      "scientificName": "Acer palmatum",
+      "tags": [
+        "Acer palmatum",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "willow",
+      "name": "Weeping willow",
+      "parameters": {
+        "barkPattern": 0,
+        "branchLength": 0.9,
+        "branches": 16,
+        "crown": 3,
+        "crownBase": 0.42,
+        "foliageMode": 1,
+        "gravity": 1.3,
+        "height": 245,
+        "leafShape": 2,
+        "leafSize": 15,
+        "leafWidth": 0.14,
+        "leaves": 34,
+        "radius": 8,
+        "spread": 0.8
+      },
+      "scientificName": "Salix babylonica",
+      "tags": [
+        "Salix babylonica",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "white-willow",
+      "name": "White willow",
+      "parameters": {
+        "barkPattern": 0,
+        "branches": 14,
+        "clumps": 2,
+        "crown": 6,
+        "crownBase": 0.24,
+        "foliageMode": 1,
+        "gravity": 0.5,
+        "height": 265,
+        "leafShape": 2,
+        "leafSize": 12,
+        "leafWidth": 0.2,
+        "radius": 7,
+        "spread": 0.6
+      },
+      "scientificName": "Salix alba",
+      "tags": [
+        "Salix alba",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "lombardy-poplar",
+      "name": "Lombardy poplar",
+      "parameters": {
+        "barkPattern": 0,
+        "branchAngle": 23,
+        "branches": 22,
+        "crown": 2,
+        "crownBase": 0.12,
+        "depth": 3,
+        "foliageMode": 1,
+        "height": 350,
+        "leafShape": 1,
+        "leafSize": 11,
+        "leafWidth": 0.8,
+        "radius": 6,
+        "spread": 0.19
+      },
+      "scientificName": "Populus nigra italica",
+      "tags": [
+        "Populus nigra italica",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "aspen",
+      "name": "European aspen",
+      "parameters": {
+        "barkPattern": 1,
+        "crown": 1,
+        "crownBase": 0.45,
+        "foliageMode": 1,
+        "height": 260,
+        "leafShape": 1,
+        "leafSize": 9,
+        "leafWidth": 1.05,
+        "petiole": 0.3,
+        "radius": 4.2,
+        "serration": 0.5,
+        "spread": 0.35
+      },
+      "scientificName": "Populus tremula",
+      "tags": [
+        "Populus tremula",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "beech",
+      "name": "European beech",
+      "parameters": {
+        "barkPattern": 1,
+        "branchAngle": 57,
+        "crown": 1,
+        "crownBase": 0.28,
+        "crownFill": 1.05,
+        "foliageMode": 1,
+        "height": 285,
+        "leafShape": 1,
+        "leafSize": 12,
+        "leafWidth": 0.55,
+        "radius": 10,
+        "spread": 0.56
+      },
+      "scientificName": "Fagus sylvatica",
+      "tags": [
+        "Fagus sylvatica",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "linden",
+      "name": "Small-leaved lime",
+      "parameters": {
+        "barkPattern": 0,
+        "crown": 1,
+        "crownBase": 0.25,
+        "foliageMode": 1,
+        "height": 270,
+        "leafProfile": [
+          0.12,
+          1.2,
+          0.9,
+          0.5,
+          0
+        ],
+        "leafShape": 6,
+        "leafSize": 13,
+        "leafWidth": 0.9,
+        "radius": 8,
+        "serration": 0.65,
+        "spread": 0.5
+      },
+      "scientificName": "Tilia cordata",
+      "tags": [
+        "Tilia cordata",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "ash",
+      "name": "European ash",
+      "parameters": {
+        "barkPattern": 0,
+        "crown": 6,
+        "crownBase": 0.4,
+        "crownFill": 0.7,
+        "foliageMode": 1,
+        "height": 300,
+        "leafShape": 7,
+        "leafSize": 24,
+        "leafWidth": 0.32,
+        "leaflets": 11,
+        "organ": 1,
+        "phyllotaxy": 1,
+        "radius": 7,
+        "spread": 0.55
+      },
+      "scientificName": "Fraxinus excelsior",
+      "tags": [
+        "Fraxinus excelsior",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "elm",
+      "name": "English elm",
+      "parameters": {
+        "barkPattern": 0,
+        "branchAngle": 48,
+        "crown": 6,
+        "crownBase": 0.35,
+        "foliageMode": 1,
+        "height": 300,
+        "leafShape": 1,
+        "leafSize": 11,
+        "leafWidth": 0.65,
+        "radius": 10,
+        "serration": 0.8,
+        "spread": 0.7
+      },
+      "scientificName": "Ulmus procera",
+      "tags": [
+        "Ulmus procera",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "plane",
+      "name": "London plane",
+      "parameters": {
+        "barkPattern": 7,
+        "branches": 10,
+        "crown": 7,
+        "crownBase": 0.28,
+        "foliageMode": 1,
+        "height": 320,
+        "leafShape": 4,
+        "leafSize": 23,
+        "leafWidth": 0.95,
+        "leaflets": 5,
+        "radius": 12,
+        "spread": 0.68
+      },
+      "scientificName": "Platanus acerifolia",
+      "tags": [
+        "Platanus acerifolia",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "horse-chestnut",
+      "name": "Horse chestnut",
+      "parameters": {
+        "barkPattern": 3,
+        "crown": 0,
+        "crownBase": 0.3,
+        "crownFill": 1,
+        "foliageMode": 1,
+        "height": 250,
+        "leafShape": 7,
+        "leafSize": 27,
+        "leafWidth": 0.42,
+        "leaflets": 7,
+        "organ": 2,
+        "phyllotaxy": 1,
+        "radius": 9,
+        "spread": 0.7
+      },
+      "scientificName": "Aesculus hippocastanum",
+      "tags": [
+        "Aesculus hippocastanum",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "walnut",
+      "name": "Common walnut",
+      "parameters": {
+        "barkPattern": 0,
+        "branches": 9,
+        "crown": 0,
+        "crownBase": 0.32,
+        "foliageMode": 1,
+        "height": 240,
+        "leafShape": 7,
+        "leafSize": 28,
+        "leafWidth": 0.48,
+        "leaflets": 9,
+        "organ": 1,
+        "radius": 10,
+        "spread": 0.8
+      },
+      "scientificName": "Juglans regia",
+      "tags": [
+        "Juglans regia",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "alder",
+      "name": "Black alder",
+      "parameters": {
+        "barkPattern": 3,
+        "crown": 5,
+        "crownBase": 0.18,
+        "foliageMode": 1,
+        "height": 240,
+        "leafShape": 1,
+        "leafSize": 10,
+        "leafWidth": 0.85,
+        "radius": 6,
+        "serration": 0.6,
+        "spread": 0.45
+      },
+      "scientificName": "Alnus glutinosa",
+      "tags": [
+        "Alnus glutinosa",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "rowan",
+      "name": "Rowan",
+      "parameters": {
+        "barkPattern": 1,
+        "clusterLeaves": 4,
+        "crown": 1,
+        "crownBase": 0.32,
+        "foliageMode": 1,
+        "height": 180,
+        "leafShape": 7,
+        "leafSize": 21,
+        "leafWidth": 0.28,
+        "leaflets": 13,
+        "organ": 1,
+        "radius": 4,
+        "spread": 0.48
+      },
+      "scientificName": "Sorbus aucuparia",
+      "tags": [
+        "Sorbus aucuparia",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "apple",
+      "name": "Orchard apple",
+      "parameters": {
+        "barkPattern": 0,
+        "branches": 8,
+        "crown": 0,
+        "crownBase": 0.25,
+        "curvature": 0.48,
+        "flowerSize": 5,
+        "foliageMode": 1,
+        "height": 120,
+        "leafShape": 1,
+        "leafSize": 10,
+        "leafWidth": 0.65,
+        "organ": 4,
+        "radius": 6,
+        "spread": 0.85
+      },
+      "scientificName": "Malus domestica",
+      "tags": [
+        "Malus domestica",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "cherry",
+      "name": "Wild cherry",
+      "parameters": {
+        "barkPattern": 1,
+        "crown": 6,
+        "crownBase": 0.42,
+        "flowerSize": 4,
+        "foliageMode": 1,
+        "height": 185,
+        "leafShape": 1,
+        "leafSize": 12,
+        "leafWidth": 0.5,
+        "organ": 4,
+        "radius": 5,
+        "serration": 0.7,
+        "spread": 0.55
+      },
+      "scientificName": "Prunus avium",
+      "tags": [
+        "Prunus avium",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "magnolia",
+      "name": "Southern magnolia",
+      "parameters": {
+        "barkPattern": 1,
+        "crown": 5,
+        "crownBase": 0.18,
+        "crownFill": 1.05,
+        "evergreen": 1,
+        "flowerSize": 13,
+        "foliageMode": 1,
+        "height": 195,
+        "leafCurl": 0.15,
+        "leafShape": 1,
+        "leafSize": 24,
+        "leafWidth": 0.5,
+        "organ": 4,
+        "radius": 6,
+        "spread": 0.5
+      },
+      "scientificName": "Magnolia grandiflora",
+      "tags": [
+        "Magnolia grandiflora",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "baobab",
+      "name": "African baobab",
+      "parameters": {
+        "barkPattern": 1,
+        "branches": 7,
+        "crown": 4,
+        "crownBase": 0.7,
+        "depth": 3,
+        "foliageMode": 1,
+        "height": 240,
+        "leafShape": 7,
+        "leafSize": 20,
+        "leafWidth": 0.4,
+        "leaflets": 5,
+        "organ": 2,
+        "radius": 32,
+        "rootFlare": 0.6,
+        "spread": 0.75,
+        "taper": 0.3
+      },
+      "scientificName": "Adansonia digitata",
+      "tags": [
+        "Adansonia digitata",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "tree",
+      "family": 0,
+      "id": "umbrella-acacia",
+      "name": "Umbrella thorn acacia",
+      "parameters": {
+        "barkPattern": 0,
+        "branchAngle": 75,
+        "crown": 4,
+        "crownAspect": 0.38,
+        "crownBase": 0.6,
+        "crownFill": 0.75,
+        "foliageMode": 1,
+        "height": 180,
+        "leafShape": 7,
+        "leafSize": 22,
+        "leafWidth": 0.16,
+        "leaflets": 17,
+        "organ": 3,
+        "radius": 7,
+        "spread": 1
+      },
+      "scientificName": "Vachellia tortilis",
+      "tags": [
+        "Vachellia tortilis",
+        "tree",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "pine",
+      "name": "Scots pine",
+      "parameters": {
+        "barkPattern": 3,
+        "branches": 11,
+        "crown": 4,
+        "crownBase": 0.42,
+        "evergreen": 1,
+        "height": 300,
+        "leaf": [
+          0.15,
+          0.3,
+          0.18
+        ],
+        "leafShape": 5,
+        "leafSize": 11,
+        "leafWidth": 0.8,
+        "needleForm": 0,
+        "radius": 5,
+        "spread": 0.48
+      },
+      "scientificName": "Pinus sylvestris",
+      "tags": [
+        "Pinus sylvestris",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "maritime-pine",
+      "name": "Maritime pine",
+      "parameters": {
+        "barkPattern": 3,
+        "branches": 10,
+        "crown": 6,
+        "crownBase": 0.48,
+        "evergreen": 1,
+        "height": 275,
+        "leafShape": 5,
+        "leafSize": 18,
+        "leafWidth": 0.9,
+        "needleForm": 0,
+        "radius": 7,
+        "spread": 0.6
+      },
+      "scientificName": "Pinus pinaster",
+      "tags": [
+        "Pinus pinaster",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "stone-pine",
+      "name": "Siberian stone pine",
+      "parameters": {
+        "barkPattern": 3,
+        "branches": 15,
+        "crown": 1,
+        "crownBase": 0.2,
+        "evergreen": 1,
+        "height": 290,
+        "leafShape": 5,
+        "leafSize": 14,
+        "leaflets": 5,
+        "needleForm": 0,
+        "radius": 6,
+        "spread": 0.38
+      },
+      "scientificName": "Pinus sibirica",
+      "tags": [
+        "Pinus sibirica",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "spruce",
+      "name": "Norway spruce",
+      "parameters": {
+        "barkPattern": 3,
+        "branches": 17,
+        "crown": 5,
+        "crownBase": 0.08,
+        "crownFill": 1.15,
+        "evergreen": 1,
+        "gravity": 0.7,
+        "height": 290,
+        "leaf": [
+          0.13,
+          0.27,
+          0.18
+        ],
+        "leafShape": 5,
+        "leafSize": 10,
+        "needleForm": 1,
+        "radius": 5,
+        "spread": 0.43
+      },
+      "scientificName": "Picea abies",
+      "tags": [
+        "Picea abies",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "blue-spruce",
+      "name": "Blue spruce",
+      "parameters": {
+        "barkPattern": 3,
+        "branchAngle": 81,
+        "branches": 15,
+        "crown": 5,
+        "crownBase": 0.05,
+        "evergreen": 1,
+        "gravity": 0.12,
+        "height": 245,
+        "leaf": [
+          0.26,
+          0.39,
+          0.37
+        ],
+        "leafShape": 5,
+        "leafSize": 8,
+        "needleForm": 1,
+        "radius": 6,
+        "spread": 0.44
+      },
+      "scientificName": "Picea pungens",
+      "tags": [
+        "Picea pungens",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "fir",
+      "name": "Silver fir",
+      "parameters": {
+        "barkPattern": 1,
+        "branches": 16,
+        "crown": 5,
+        "crownBase": 0.13,
+        "evergreen": 1,
+        "gravity": -0.05,
+        "height": 320,
+        "leafShape": 5,
+        "leafSize": 9,
+        "needleForm": 1,
+        "phyllotaxy": 1,
+        "radius": 6,
+        "spread": 0.36
+      },
+      "scientificName": "Abies alba",
+      "tags": [
+        "Abies alba",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "larch",
+      "name": "European larch",
+      "parameters": {
+        "barkPattern": 0,
+        "branches": 14,
+        "crown": 5,
+        "crownBase": 0.16,
+        "crownFill": 0.7,
+        "evergreen": 0,
+        "gravity": 0.48,
+        "height": 295,
+        "leafShape": 5,
+        "leafSize": 9,
+        "needleForm": 3,
+        "radius": 5,
+        "spread": 0.4
+      },
+      "scientificName": "Larix decidua",
+      "tags": [
+        "Larix decidua",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "cedar",
+      "name": "Cedar of Lebanon",
+      "parameters": {
+        "barkPattern": 0,
+        "branches": 9,
+        "crown": 8,
+        "crownAspect": 0.55,
+        "crownBase": 0.22,
+        "evergreen": 1,
+        "gravity": 0.05,
+        "height": 265,
+        "leafShape": 5,
+        "leafSize": 10,
+        "needleForm": 3,
+        "radius": 9,
+        "spread": 0.78
+      },
+      "scientificName": "Cedrus libani",
+      "tags": [
+        "Cedrus libani",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "cypress",
+      "name": "Mediterranean cypress",
+      "parameters": {
+        "barkPattern": 0,
+        "branches": 21,
+        "crown": 2,
+        "crownBase": 0.08,
+        "crownFill": 1.2,
+        "evergreen": 1,
+        "height": 290,
+        "leafShape": 5,
+        "leafSize": 12,
+        "needleForm": 2,
+        "radius": 5,
+        "spread": 0.16
+      },
+      "scientificName": "Cupressus sempervirens",
+      "tags": [
+        "Cupressus sempervirens",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "tree-juniper",
+      "name": "Tree juniper",
+      "parameters": {
+        "barkPattern": 4,
+        "branches": 11,
+        "clumps": 2,
+        "crown": 7,
+        "crownBase": 0.12,
+        "curvature": 0.6,
+        "evergreen": 1,
+        "height": 180,
+        "leafShape": 5,
+        "leafSize": 10,
+        "needleForm": 2,
+        "radius": 6,
+        "spread": 0.5
+      },
+      "scientificName": "Juniperus excelsa",
+      "tags": [
+        "Juniperus excelsa",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "redwood",
+      "name": "Coast redwood",
+      "parameters": {
+        "barkPattern": 4,
+        "branches": 23,
+        "crown": 5,
+        "crownBase": 0.27,
+        "evergreen": 1,
+        "height": 460,
+        "leafShape": 5,
+        "leafSize": 10,
+        "needleForm": 1,
+        "radius": 15,
+        "spread": 0.3,
+        "taper": 0.9
+      },
+      "scientificName": "Sequoia sempervirens",
+      "tags": [
+        "Sequoia sempervirens",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "conifer",
+      "family": 1,
+      "id": "araucaria",
+      "name": "Monkey puzzle tree",
+      "parameters": {
+        "barkPattern": 3,
+        "branches": 10,
+        "crown": 5,
+        "crownBase": 0.18,
+        "evergreen": 1,
+        "height": 260,
+        "leafShape": 2,
+        "leafSize": 12,
+        "leafWidth": 0.45,
+        "needleForm": 4,
+        "phyllotaxy": 2,
+        "radius": 8,
+        "spread": 0.55
+      },
+      "scientificName": "Araucaria araucana",
+      "tags": [
+        "Araucaria araucana",
+        "conifer",
+        "woodland"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "boxwood",
+      "name": "Round boxwood",
+      "parameters": {
+        "branches": 6,
+        "clumps": 5,
+        "crown": 0,
+        "crownFill": 1.25,
+        "depth": 2,
+        "evergreen": 1,
+        "foliageMode": 1,
+        "height": 64,
+        "leafShape": 1,
+        "leafSize": 5,
+        "leafWidth": 0.65,
+        "phyllotaxy": 1,
+        "radius": 1.2,
+        "spread": 0.65
+      },
+      "scientificName": "Buxus sempervirens",
+      "tags": [
+        "Buxus sempervirens",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "hedge",
+      "name": "Clipped hornbeam hedge",
+      "parameters": {
+        "branches": 5,
+        "clumps": 7,
+        "crown": 2,
+        "crownFill": 1.15,
+        "depth": 2,
+        "evergreen": 2,
+        "foliageMode": 1,
+        "height": 104,
+        "leafShape": 1,
+        "leafSize": 8,
+        "leafWidth": 0.58,
+        "organ": 5,
+        "radius": 1.8,
+        "serration": 0.8,
+        "spread": 0.5
+      },
+      "scientificName": "Carpinus betulus",
+      "tags": [
+        "Carpinus betulus",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "wild-shrub",
+      "name": "Wild hawthorn shrub",
+      "parameters": {
+        "branches": 7,
+        "clumps": 5,
+        "crown": 7,
+        "depth": 2,
+        "flowerSize": 3,
+        "foliageMode": 1,
+        "height": 82,
+        "leafShape": 3,
+        "leafSize": 7,
+        "leafWidth": 0.6,
+        "organ": 6,
+        "radius": 1.8,
+        "spread": 0.72
+      },
+      "scientificName": "Crataegus monogyna",
+      "tags": [
+        "Crataegus monogyna",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "flowering-shrub",
+      "name": "Flowering dog rose",
+      "parameters": {
+        "branches": 6,
+        "clumps": 4,
+        "crown": 6,
+        "depth": 2,
+        "flower": [
+          0.88,
+          0.37,
+          0.51
+        ],
+        "flowerSize": 7,
+        "foliageMode": 1,
+        "height": 96,
+        "leafShape": 7,
+        "leafSize": 15,
+        "leafWidth": 0.4,
+        "leaflets": 7,
+        "organ": 4,
+        "petals": 5,
+        "radius": 1.2,
+        "spread": 0.8
+      },
+      "scientificName": "Rosa canina",
+      "tags": [
+        "Rosa canina",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "lilac",
+      "name": "Common lilac",
+      "parameters": {
+        "branches": 6,
+        "clumps": 5,
+        "crown": 6,
+        "depth": 2,
+        "flower": [
+          0.63,
+          0.41,
+          0.75
+        ],
+        "flowerSize": 11,
+        "foliageMode": 1,
+        "height": 120,
+        "leafProfile": [
+          0.15,
+          1.15,
+          0.85,
+          0.5,
+          0
+        ],
+        "leafShape": 6,
+        "leafSize": 12,
+        "leafWidth": 0.8,
+        "organ": 7,
+        "phyllotaxy": 1,
+        "radius": 2,
+        "spread": 0.6
+      },
+      "scientificName": "Syringa vulgaris",
+      "tags": [
+        "Syringa vulgaris",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "hydrangea",
+      "name": "Bigleaf hydrangea",
+      "parameters": {
+        "branches": 5,
+        "clumps": 7,
+        "crown": 0,
+        "depth": 2,
+        "flower": [
+          0.57,
+          0.62,
+          0.88
+        ],
+        "flowerSize": 12,
+        "foliageMode": 1,
+        "height": 82,
+        "leafShape": 1,
+        "leafSize": 16,
+        "leafWidth": 0.8,
+        "organ": 8,
+        "phyllotaxy": 1,
+        "radius": 0.9,
+        "spread": 0.7
+      },
+      "scientificName": "Hydrangea macrophylla",
+      "tags": [
+        "Hydrangea macrophylla",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "rhododendron",
+      "name": "Rhododendron",
+      "parameters": {
+        "branches": 7,
+        "clumps": 4,
+        "crown": 0,
+        "depth": 2,
+        "evergreen": 1,
+        "flower": [
+          0.75,
+          0.31,
+          0.57
+        ],
+        "flowerSize": 9,
+        "foliageMode": 1,
+        "height": 110,
+        "leafShape": 2,
+        "leafSize": 17,
+        "leafWidth": 0.35,
+        "organ": 9,
+        "phyllotaxy": 2,
+        "radius": 2,
+        "spread": 0.8
+      },
+      "scientificName": "Rhododendron ponticum",
+      "tags": [
+        "Rhododendron ponticum",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "heather",
+      "name": "Common heather",
+      "parameters": {
+        "branches": 5,
+        "clumps": 12,
+        "crown": 5,
+        "depth": 2,
+        "evergreen": 1,
+        "flower": [
+          0.7,
+          0.4,
+          0.59
+        ],
+        "flowerSize": 3,
+        "foliageMode": 1,
+        "height": 35,
+        "leafShape": 2,
+        "leafSize": 2,
+        "leafWidth": 0.2,
+        "organ": 7,
+        "phyllotaxy": 1,
+        "radius": 0.2,
+        "spread": 0.45
+      },
+      "scientificName": "Calluna vulgaris",
+      "tags": [
+        "Calluna vulgaris",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "viburnum",
+      "name": "Guelder rose",
+      "parameters": {
+        "branches": 7,
+        "clumps": 4,
+        "crown": 6,
+        "depth": 2,
+        "flowerSize": 8,
+        "foliageMode": 1,
+        "height": 130,
+        "leafShape": 4,
+        "leafSize": 11,
+        "leafWidth": 0.9,
+        "leaflets": 3,
+        "organ": 8,
+        "phyllotaxy": 1,
+        "radius": 2,
+        "spread": 0.75
+      },
+      "scientificName": "Viburnum opulus",
+      "tags": [
+        "Viburnum opulus",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "currant",
+      "name": "Blackcurrant",
+      "parameters": {
+        "branches": 4,
+        "clumps": 8,
+        "crown": 7,
+        "depth": 2,
+        "flowerSize": 3,
+        "foliageMode": 1,
+        "height": 70,
+        "leafShape": 4,
+        "leafSize": 9,
+        "leafWidth": 1,
+        "leaflets": 5,
+        "organ": 10,
+        "radius": 0.6,
+        "spread": 0.65
+      },
+      "scientificName": "Ribes nigrum",
+      "tags": [
+        "Ribes nigrum",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "gooseberry",
+      "name": "Gooseberry",
+      "parameters": {
+        "branchAngle": 84,
+        "branches": 5,
+        "clumps": 6,
+        "crown": 7,
+        "depth": 2,
+        "foliageMode": 1,
+        "height": 65,
+        "leafShape": 4,
+        "leafSize": 6,
+        "leafWidth": 0.85,
+        "leaflets": 3,
+        "organ": 6,
+        "radius": 0.75,
+        "spread": 0.8
+      },
+      "scientificName": "Ribes uva-crispa",
+      "tags": [
+        "Ribes uva-crispa",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "blackberry",
+      "name": "Bramble blackberry",
+      "parameters": {
+        "branches": 5,
+        "clumps": 5,
+        "crown": 3,
+        "depth": 2,
+        "foliageMode": 1,
+        "gravity": 0.75,
+        "height": 95,
+        "leafShape": 7,
+        "leafSize": 22,
+        "leafWidth": 0.45,
+        "leaflets": 5,
+        "organ": 10,
+        "radius": 0.65,
+        "spread": 1
+      },
+      "scientificName": "Rubus fruticosus",
+      "tags": [
+        "Rubus fruticosus",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "creeping-juniper",
+      "name": "Creeping juniper",
+      "parameters": {
+        "branches": 6,
+        "clumps": 6,
+        "crown": 4,
+        "crownAspect": 0.3,
+        "depth": 2,
+        "evergreen": 1,
+        "foliageMode": 1,
+        "height": 28,
+        "leafShape": 5,
+        "leafSize": 4,
+        "leafWidth": 0.25,
+        "needleForm": 2,
+        "radius": 0.6,
+        "spread": 1.3
+      },
+      "scientificName": "Juniperus horizontalis",
+      "tags": [
+        "Juniperus horizontalis",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "shrub",
+      "family": 2,
+      "id": "barberry",
+      "name": "Common barberry",
+      "parameters": {
+        "branches": 5,
+        "clumps": 7,
+        "crown": 6,
+        "depth": 2,
+        "foliageMode": 1,
+        "height": 88,
+        "leafShape": 1,
+        "leafSize": 5,
+        "leafWidth": 0.7,
+        "organ": 6,
+        "phyllotaxy": 2,
+        "radius": 0.65,
+        "serration": 0.6,
+        "spread": 0.6
+      },
+      "scientificName": "Berberis vulgaris",
+      "tags": [
+        "Berberis vulgaris",
+        "shrub",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "meadow-grass",
+      "name": "Meadow grass clump",
+      "parameters": {
+        "branches": 30,
+        "clumps": 4,
+        "curvature": 0.55,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 38,
+        "leafWidth": 0.045,
+        "organ": 0,
+        "radius": 0.25
+      },
+      "scientificName": "Poa pratensis",
+      "tags": [
+        "Poa pratensis",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "lawn-grass",
+      "name": "Low lawn grass",
+      "parameters": {
+        "branches": 36,
+        "clumps": 8,
+        "curvature": 0.22,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 12,
+        "leafWidth": 0.055,
+        "organ": 1,
+        "radius": 0.25
+      },
+      "scientificName": "Festuca rubra",
+      "tags": [
+        "Festuca rubra",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "blue-fescue",
+      "name": "Blue fescue",
+      "parameters": {
+        "branches": 36,
+        "clumps": 5,
+        "curvature": 0.6,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 30,
+        "leafWidth": 0.025,
+        "organ": 2,
+        "radius": 0.25
+      },
+      "scientificName": "Festuca glauca",
+      "tags": [
+        "Festuca glauca",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "feather-grass",
+      "name": "Feather grass",
+      "parameters": {
+        "branches": 24,
+        "clumps": 5,
+        "curvature": 0.7,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 68,
+        "leafWidth": 0.018,
+        "organ": 3,
+        "radius": 0.25
+      },
+      "scientificName": "Stipa pennata",
+      "tags": [
+        "Stipa pennata",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "miscanthus",
+      "name": "Chinese silver grass",
+      "parameters": {
+        "branches": 24,
+        "clumps": 4,
+        "curvature": 0.75,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 125,
+        "leafWidth": 0.065,
+        "organ": 4,
+        "radius": 0.25
+      },
+      "scientificName": "Miscanthus sinensis",
+      "tags": [
+        "Miscanthus sinensis",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "pampas-grass",
+      "name": "Pampas grass",
+      "parameters": {
+        "branches": 32,
+        "clumps": 4,
+        "curvature": 0.9,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 165,
+        "leafWidth": 0.055,
+        "organ": 5,
+        "radius": 0.25
+      },
+      "scientificName": "Cortaderia selloana",
+      "tags": [
+        "Cortaderia selloana",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "sedge",
+      "name": "Tufted sedge",
+      "parameters": {
+        "branches": 28,
+        "clumps": 5,
+        "curvature": 0.48,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 48,
+        "leafWidth": 0.055,
+        "organ": 6,
+        "radius": 0.25
+      },
+      "scientificName": "Carex cespitosa",
+      "tags": [
+        "Carex cespitosa",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "hair-grass",
+      "name": "Tufted hairgrass",
+      "parameters": {
+        "branches": 24,
+        "clumps": 4,
+        "curvature": 0.4,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 75,
+        "leafWidth": 0.023,
+        "organ": 7,
+        "radius": 0.25
+      },
+      "scientificName": "Deschampsia cespitosa",
+      "tags": [
+        "Deschampsia cespitosa",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "foxtail-grass",
+      "name": "Meadow foxtail",
+      "parameters": {
+        "branches": 24,
+        "clumps": 4,
+        "curvature": 0.3,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 65,
+        "leafWidth": 0.036,
+        "organ": 8,
+        "radius": 0.25
+      },
+      "scientificName": "Alopecurus pratensis",
+      "tags": [
+        "Alopecurus pratensis",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "couch-grass",
+      "name": "Couch grass",
+      "parameters": {
+        "branches": 22,
+        "clumps": 7,
+        "curvature": 0.3,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 62,
+        "leafWidth": 0.045,
+        "organ": 9,
+        "radius": 0.25
+      },
+      "scientificName": "Elymus repens",
+      "tags": [
+        "Elymus repens",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "rye",
+      "name": "Rye",
+      "parameters": {
+        "branches": 18,
+        "clumps": 5,
+        "curvature": 0.22,
+        "dryness": 0,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 110,
+        "leafWidth": 0.035,
+        "organ": 10,
+        "radius": 0.25
+      },
+      "scientificName": "Secale cereale",
+      "tags": [
+        "Secale cereale",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "grass",
+      "family": 3,
+      "id": "dry-grass",
+      "name": "Dry steppe tussock",
+      "parameters": {
+        "branches": 32,
+        "clumps": 5,
+        "curvature": 0.85,
+        "dryness": 0.75,
+        "evergreen": 3,
+        "flowerSize": 9,
+        "height": 56,
+        "leafWidth": 0.025,
+        "organ": 11,
+        "radius": 0.25
+      },
+      "scientificName": "Stipa capillata",
+      "tags": [
+        "Stipa capillata",
+        "grass",
+        "garden"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "bracken",
+      "name": "Common bracken fern",
+      "parameters": {
+        "branches": 9,
+        "evergreen": 0,
+        "gravity": 0.55,
+        "height": 65,
+        "leafSize": 12,
+        "leafWidth": 0.24,
+        "leaves": 16,
+        "organ": 0,
+        "radius": 0.55
+      },
+      "scientificName": "Pteridium aquilinum",
+      "tags": [
+        "Pteridium aquilinum",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "ostrich-fern",
+      "name": "Ostrich fern",
+      "parameters": {
+        "branches": 9,
+        "evergreen": 0,
+        "gravity": 0.55,
+        "height": 100,
+        "leafSize": 12,
+        "leafWidth": 0.28,
+        "leaves": 22,
+        "organ": 1,
+        "radius": 0.55
+      },
+      "scientificName": "Matteuccia struthiopteris",
+      "tags": [
+        "Matteuccia struthiopteris",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "wood-fern",
+      "name": "Male wood fern",
+      "parameters": {
+        "branches": 9,
+        "evergreen": 0,
+        "gravity": 0.55,
+        "height": 75,
+        "leafSize": 12,
+        "leafWidth": 0.32,
+        "leaves": 20,
+        "organ": 2,
+        "radius": 0.55
+      },
+      "scientificName": "Dryopteris filix-mas",
+      "tags": [
+        "Dryopteris filix-mas",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "lady-fern",
+      "name": "Lady fern",
+      "parameters": {
+        "branches": 9,
+        "evergreen": 0,
+        "gravity": 0.55,
+        "height": 70,
+        "leafSize": 12,
+        "leafWidth": 0.16,
+        "leaves": 26,
+        "organ": 3,
+        "radius": 0.55
+      },
+      "scientificName": "Athyrium filix-femina",
+      "tags": [
+        "Athyrium filix-femina",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "maidenhair",
+      "name": "Maidenhair fern",
+      "parameters": {
+        "branches": 9,
+        "evergreen": 0,
+        "gravity": 0.55,
+        "height": 38,
+        "leafSize": 12,
+        "leafWidth": 0.75,
+        "leaves": 15,
+        "organ": 4,
+        "radius": 0.55
+      },
+      "scientificName": "Adiantum capillus-veneris",
+      "tags": [
+        "Adiantum capillus-veneris",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "birds-nest-fern",
+      "name": "Birds nest fern",
+      "parameters": {
+        "branches": 14,
+        "evergreen": 1,
+        "gravity": 0.55,
+        "height": 90,
+        "leafSize": 12,
+        "leafWidth": 0.24,
+        "leaves": 10,
+        "organ": 5,
+        "radius": 0.55
+      },
+      "scientificName": "Asplenium nidus",
+      "tags": [
+        "Asplenium nidus",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "polypody",
+      "name": "Common polypody",
+      "parameters": {
+        "branches": 9,
+        "evergreen": 1,
+        "gravity": 0.55,
+        "height": 35,
+        "leafSize": 12,
+        "leafWidth": 0.35,
+        "leaves": 18,
+        "organ": 6,
+        "radius": 0.55
+      },
+      "scientificName": "Polypodium vulgare",
+      "tags": [
+        "Polypodium vulgare",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "fern",
+      "family": 4,
+      "id": "tree-fern",
+      "name": "Soft tree fern",
+      "parameters": {
+        "branches": 9,
+        "evergreen": 1,
+        "gravity": 0.55,
+        "height": 230,
+        "leafSize": 23,
+        "leafWidth": 0.2,
+        "leaves": 25,
+        "organ": 7,
+        "radius": 9
+      },
+      "scientificName": "Dicksonia antarctica",
+      "tags": [
+        "Dicksonia antarctica",
+        "fern",
+        "woodland"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "daisy",
+      "name": "Oxeye daisy",
+      "parameters": {
+        "clumps": 3,
+        "flower": [
+          0.95,
+          0.92,
+          0.81
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 13,
+        "height": 42,
+        "leafShape": 2,
+        "leafSize": 11,
+        "leafWidth": 0.2,
+        "leaflets": 7,
+        "organ": 0,
+        "petals": 18,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Leucanthemum vulgare",
+      "tags": [
+        "Leucanthemum vulgare",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "sunflower",
+      "name": "Wild sunflower",
+      "parameters": {
+        "clumps": 1,
+        "flower": [
+          0.96,
+          0.7,
+          0.1
+        ],
+        "flowerLayers": 2,
+        "flowerSize": 22,
+        "height": 90,
+        "leafShape": 6,
+        "leafSize": 17,
+        "leafWidth": 0.5,
+        "leaflets": 7,
+        "organ": 0,
+        "petals": 26,
+        "phyllotaxy": 0,
+        "radius": 0.8
+      },
+      "scientificName": "Helianthus annuus",
+      "tags": [
+        "Helianthus annuus",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "rose",
+      "name": "Garden rose",
+      "parameters": {
+        "clumps": 2,
+        "flower": [
+          0.66,
+          0.12,
+          0.22
+        ],
+        "flowerLayers": 5,
+        "flowerSize": 13,
+        "height": 60,
+        "leafShape": 7,
+        "leafSize": 11,
+        "leafWidth": 0.5,
+        "leaflets": 7,
+        "organ": 1,
+        "petals": 9,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Rosa gallica",
+      "tags": [
+        "Rosa gallica",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "poppy",
+      "name": "Corn poppy",
+      "parameters": {
+        "clumps": 5,
+        "flower": [
+          0.85,
+          0.15,
+          0.1
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 17,
+        "height": 50,
+        "leafShape": 3,
+        "leafSize": 11,
+        "leafWidth": 0.5,
+        "leaflets": 7,
+        "organ": 2,
+        "petals": 4,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Papaver rhoeas",
+      "tags": [
+        "Papaver rhoeas",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "tulip",
+      "name": "Garden tulip",
+      "parameters": {
+        "clumps": 3,
+        "flower": [
+          0.78,
+          0.18,
+          0.32
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 12,
+        "height": 38,
+        "leafShape": 2,
+        "leafSize": 11,
+        "leafWidth": 0.2,
+        "leaflets": 7,
+        "organ": 2,
+        "petals": 6,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Tulipa gesneriana",
+      "tags": [
+        "Tulipa gesneriana",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "daffodil",
+      "name": "Wild daffodil",
+      "parameters": {
+        "clumps": 4,
+        "flower": [
+          0.96,
+          0.7,
+          0.1
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 12,
+        "height": 35,
+        "leafShape": 2,
+        "leafSize": 11,
+        "leafWidth": 0.2,
+        "leaflets": 7,
+        "organ": 3,
+        "petals": 6,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Narcissus pseudonarcissus",
+      "tags": [
+        "Narcissus pseudonarcissus",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "iris",
+      "name": "Bearded iris",
+      "parameters": {
+        "clumps": 3,
+        "flower": [
+          0.4,
+          0.26,
+          0.69
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 17,
+        "height": 60,
+        "leafShape": 2,
+        "leafSize": 11,
+        "leafWidth": 0.2,
+        "leaflets": 7,
+        "organ": 4,
+        "petals": 6,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Iris germanica",
+      "tags": [
+        "Iris germanica",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "lily",
+      "name": "White lily",
+      "parameters": {
+        "clumps": 2,
+        "flower": [
+          0.95,
+          0.92,
+          0.81
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 18,
+        "height": 80,
+        "leafShape": 2,
+        "leafSize": 17,
+        "leafWidth": 0.2,
+        "leaflets": 7,
+        "organ": 5,
+        "petals": 6,
+        "phyllotaxy": 0,
+        "radius": 0.8
+      },
+      "scientificName": "Lilium candidum",
+      "tags": [
+        "Lilium candidum",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "lavender",
+      "name": "Lavender",
+      "parameters": {
+        "clumps": 9,
+        "flower": [
+          0.52,
+          0.38,
+          0.7
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 5,
+        "height": 45,
+        "leafShape": 2,
+        "leafSize": 11,
+        "leafWidth": 0.2,
+        "leaflets": 7,
+        "organ": 6,
+        "petals": 5,
+        "phyllotaxy": 1,
+        "radius": 0.4
+      },
+      "scientificName": "Lavandula angustifolia",
+      "tags": [
+        "Lavandula angustifolia",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "lupin",
+      "name": "Garden lupin",
+      "parameters": {
+        "clumps": 3,
+        "flower": [
+          0.4,
+          0.3,
+          0.7
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 7,
+        "height": 90,
+        "leafShape": 7,
+        "leafSize": 17,
+        "leafWidth": 0.5,
+        "leaflets": 7,
+        "organ": 11,
+        "petals": 5,
+        "phyllotaxy": 0,
+        "radius": 0.8
+      },
+      "scientificName": "Lupinus polyphyllus",
+      "tags": [
+        "Lupinus polyphyllus",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "foxglove",
+      "name": "Common foxglove",
+      "parameters": {
+        "clumps": 2,
+        "flower": [
+          0.69,
+          0.3,
+          0.55
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 10,
+        "height": 115,
+        "leafShape": 1,
+        "leafSize": 17,
+        "leafWidth": 0.5,
+        "leaflets": 7,
+        "organ": 10,
+        "petals": 5,
+        "phyllotaxy": 0,
+        "radius": 0.8
+      },
+      "scientificName": "Digitalis purpurea",
+      "tags": [
+        "Digitalis purpurea",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "bellflower",
+      "name": "Peach-leaved bellflower",
+      "parameters": {
+        "clumps": 4,
+        "flower": [
+          0.43,
+          0.39,
+          0.75
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 12,
+        "height": 65,
+        "leafShape": 2,
+        "leafSize": 17,
+        "leafWidth": 0.2,
+        "leaflets": 7,
+        "organ": 7,
+        "petals": 5,
+        "phyllotaxy": 0,
+        "radius": 0.8
+      },
+      "scientificName": "Campanula persicifolia",
+      "tags": [
+        "Campanula persicifolia",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "clover",
+      "name": "Red clover",
+      "parameters": {
+        "clumps": 6,
+        "flower": [
+          0.73,
+          0.39,
+          0.57
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 7,
+        "height": 25,
+        "leafShape": 7,
+        "leafSize": 11,
+        "leafWidth": 0.5,
+        "leaflets": 3,
+        "organ": 8,
+        "petals": 5,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Trifolium pratense",
+      "tags": [
+        "Trifolium pratense",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "flower",
+      "family": 5,
+      "id": "dandelion",
+      "name": "Dandelion seed head",
+      "parameters": {
+        "clumps": 3,
+        "flower": [
+          0.95,
+          0.92,
+          0.81
+        ],
+        "flowerLayers": 1,
+        "flowerSize": 11,
+        "height": 28,
+        "leafShape": 3,
+        "leafSize": 11,
+        "leafWidth": 0.5,
+        "leaflets": 7,
+        "organ": 9,
+        "petals": 20,
+        "phyllotaxy": 0,
+        "radius": 0.4
+      },
+      "scientificName": "Taraxacum officinale",
+      "tags": [
+        "Taraxacum officinale",
+        "flower",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "amanita",
+      "name": "Fly agaric",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 3,
+        "flower": [
+          0.7,
+          0.1,
+          0.055
+        ],
+        "gills": 0.8,
+        "height": 32,
+        "organ": 0,
+        "radius": 2.5,
+        "spread": 0.72
+      },
+      "scientificName": "Amanita muscaria",
+      "tags": [
+        "Amanita muscaria",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "boletus",
+      "name": "Porcini bolete",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.4,
+        "clumps": 2,
+        "flower": [
+          0.36,
+          0.25,
+          0.14
+        ],
+        "gills": 0.15,
+        "height": 29,
+        "organ": 1,
+        "radius": 4.5,
+        "spread": 0.8
+      },
+      "scientificName": "Boletus edulis",
+      "tags": [
+        "Boletus edulis",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "oyster",
+      "name": "Oyster mushroom cluster",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 5,
+        "flower": [
+          0.36,
+          0.25,
+          0.14
+        ],
+        "gills": 0.8,
+        "height": 25,
+        "organ": 2,
+        "radius": 1.8,
+        "spread": 1.15
+      },
+      "scientificName": "Pleurotus ostreatus",
+      "tags": [
+        "Pleurotus ostreatus",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "chanterelle",
+      "name": "Golden chanterelle",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 4,
+        "flower": [
+          0.91,
+          0.55,
+          0.1
+        ],
+        "gills": 0.8,
+        "height": 28,
+        "organ": 3,
+        "radius": 2.3,
+        "spread": 0.65
+      },
+      "scientificName": "Cantharellus cibarius",
+      "tags": [
+        "Cantharellus cibarius",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "woodland",
+      "name": "Shaggy inkcap",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 6,
+        "flower": [
+          0.36,
+          0.25,
+          0.14
+        ],
+        "gills": 0.8,
+        "height": 24,
+        "organ": 4,
+        "radius": 0.8,
+        "spread": 0.4
+      },
+      "scientificName": "Coprinus comatus",
+      "tags": [
+        "Coprinus comatus",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "honey-fungus",
+      "name": "Honey fungus cluster",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 9,
+        "flower": [
+          0.36,
+          0.25,
+          0.14
+        ],
+        "gills": 0.8,
+        "height": 22,
+        "organ": 5,
+        "radius": 1,
+        "spread": 0.5
+      },
+      "scientificName": "Armillaria mellea",
+      "tags": [
+        "Armillaria mellea",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "bracket-fungus",
+      "name": "Bracket fungus",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 3,
+        "flower": [
+          0.36,
+          0.25,
+          0.14
+        ],
+        "gills": 0.8,
+        "height": 20,
+        "organ": 6,
+        "radius": 2,
+        "spread": 1.1
+      },
+      "scientificName": "Fomes fomentarius",
+      "tags": [
+        "Fomes fomentarius",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "morel",
+      "name": "Common morel",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 3,
+        "flower": [
+          0.36,
+          0.25,
+          0.14
+        ],
+        "gills": 0.8,
+        "height": 26,
+        "organ": 7,
+        "radius": 1.7,
+        "spread": 0.45
+      },
+      "scientificName": "Morchella esculenta",
+      "tags": [
+        "Morchella esculenta",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "mushroom",
+      "family": 6,
+      "id": "fantasy",
+      "name": "Giant violet parasol",
+      "parameters": {
+        "bark": [
+          0.82,
+          0.77,
+          0.65
+        ],
+        "capThickness": 0.2,
+        "clumps": 1,
+        "flower": [
+          0.42,
+          0.23,
+          0.61
+        ],
+        "gills": 0.8,
+        "height": 150,
+        "organ": 0,
+        "radius": 9,
+        "spread": 0.95
+      },
+      "scientificName": "Legacy fantasy variety",
+      "tags": [
+        "Legacy fantasy variety",
+        "mushroom",
+        "garden"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "saguaro",
+      "name": "Saguaro cactus",
+      "parameters": {
+        "branches": 4,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 180,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.3,
+        "leaves": 18,
+        "organ": 0,
+        "radius": 13,
+        "ribs": 10,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Carnegiea gigantea",
+      "tags": [
+        "Carnegiea gigantea",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "barrel-cactus",
+      "name": "Golden barrel cactus",
+      "parameters": {
+        "branches": 1,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 48,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.3,
+        "leaves": 18,
+        "organ": 1,
+        "radius": 24,
+        "ribs": 18,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Echinocactus grusonii",
+      "tags": [
+        "Echinocactus grusonii",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "prickly-pear",
+      "name": "Prickly pear",
+      "parameters": {
+        "branches": 1,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 95,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.8,
+        "leaves": 14,
+        "organ": 2,
+        "radius": 8,
+        "ribs": 10,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Opuntia ficus-indica",
+      "tags": [
+        "Opuntia ficus-indica",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "cereus",
+      "name": "Columnar cereus",
+      "parameters": {
+        "branches": 1,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 220,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.3,
+        "leaves": 14,
+        "organ": 3,
+        "radius": 12,
+        "ribs": 10,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Cereus repandus",
+      "tags": [
+        "Cereus repandus",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "agave",
+      "name": "Blue agave",
+      "parameters": {
+        "branches": 1,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 70,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.17,
+        "leaves": 24,
+        "organ": 4,
+        "radius": 2,
+        "ribs": 10,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Agave tequilana",
+      "tags": [
+        "Agave tequilana",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "aloe",
+      "name": "Aloe vera",
+      "parameters": {
+        "branches": 1,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 46,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.25,
+        "leaves": 17,
+        "organ": 5,
+        "radius": 2,
+        "ribs": 10,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Aloe barbadensis",
+      "tags": [
+        "Aloe barbadensis",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "echeveria",
+      "name": "Echeveria rosette",
+      "parameters": {
+        "branches": 1,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 18,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.55,
+        "leaves": 32,
+        "organ": 6,
+        "radius": 1,
+        "ribs": 10,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Echeveria elegans",
+      "tags": [
+        "Echeveria elegans",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "cactus",
+      "family": 7,
+      "id": "yucca",
+      "name": "Adams needle yucca",
+      "parameters": {
+        "branches": 1,
+        "evergreen": 1,
+        "flowerSize": 9,
+        "height": 95,
+        "leaf": [
+          0.28,
+          0.42,
+          0.23
+        ],
+        "leafWidth": 0.075,
+        "leaves": 38,
+        "organ": 7,
+        "radius": 2,
+        "ribs": 10,
+        "spines": 0.6,
+        "spread": 0.72
+      },
+      "scientificName": "Yucca filamentosa",
+      "tags": [
+        "Yucca filamentosa",
+        "cactus",
+        "dryland"
+      ]
+    },
+    {
+      "category": "palm",
+      "family": 8,
+      "id": "date-palm",
+      "name": "Date palm",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 15,
+        "clumps": 1,
+        "curvature": 0.2,
+        "evergreen": 1,
+        "height": 280,
+        "leafSize": 30,
+        "leafWidth": 0.16,
+        "leaves": 26,
+        "organ": 0,
+        "radius": 10,
+        "spread": 0.78
+      },
+      "scientificName": "Phoenix dactylifera",
+      "tags": [
+        "Phoenix dactylifera",
+        "palm",
+        "tropical"
+      ]
+    },
+    {
+      "category": "palm",
+      "family": 8,
+      "id": "coconut-palm",
+      "name": "Coconut palm",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 11,
+        "clumps": 1,
+        "curvature": 0.65,
+        "evergreen": 1,
+        "height": 340,
+        "leafSize": 38,
+        "leafWidth": 0.16,
+        "leaves": 26,
+        "organ": 0,
+        "radius": 7,
+        "spread": 0.95
+      },
+      "scientificName": "Cocos nucifera",
+      "tags": [
+        "Cocos nucifera",
+        "palm",
+        "tropical"
+      ]
+    },
+    {
+      "category": "palm",
+      "family": 8,
+      "id": "washingtonia",
+      "name": "Mexican fan palm",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 19,
+        "clumps": 1,
+        "curvature": 0.2,
+        "evergreen": 1,
+        "height": 330,
+        "leafSize": 35,
+        "leafWidth": 0.16,
+        "leaves": 26,
+        "organ": 1,
+        "radius": 9,
+        "spread": 0.55
+      },
+      "scientificName": "Washingtonia robusta",
+      "tags": [
+        "Washingtonia robusta",
+        "palm",
+        "tropical"
+      ]
+    },
+    {
+      "category": "palm",
+      "family": 8,
+      "id": "chamaerops",
+      "name": "European fan palm",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 15,
+        "clumps": 3,
+        "curvature": 0.2,
+        "evergreen": 1,
+        "height": 130,
+        "leafSize": 27,
+        "leafWidth": 0.16,
+        "leaves": 26,
+        "organ": 1,
+        "radius": 6,
+        "spread": 0.7
+      },
+      "scientificName": "Chamaerops humilis",
+      "tags": [
+        "Chamaerops humilis",
+        "palm",
+        "tropical"
+      ]
+    },
+    {
+      "category": "palm",
+      "family": 8,
+      "id": "royal-palm",
+      "name": "Royal palm",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 12,
+        "clumps": 1,
+        "curvature": 0.2,
+        "evergreen": 1,
+        "height": 380,
+        "leafSize": 37,
+        "leafWidth": 0.16,
+        "leaves": 26,
+        "organ": 0,
+        "radius": 11,
+        "spread": 0.75
+      },
+      "scientificName": "Roystonea regia",
+      "tags": [
+        "Roystonea regia",
+        "palm",
+        "tropical"
+      ]
+    },
+    {
+      "category": "palm",
+      "family": 8,
+      "id": "rhapis",
+      "name": "Lady palm",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 10,
+        "clumps": 3,
+        "curvature": 0.2,
+        "evergreen": 1,
+        "height": 160,
+        "leafSize": 25,
+        "leafWidth": 0.16,
+        "leaves": 26,
+        "organ": 1,
+        "radius": 3,
+        "spread": 0.6
+      },
+      "scientificName": "Rhapis excelsa",
+      "tags": [
+        "Rhapis excelsa",
+        "palm",
+        "tropical"
+      ]
+    },
+    {
+      "category": "vine",
+      "family": 10,
+      "id": "ivy",
+      "name": "English ivy vine",
+      "parameters": {
+        "curvature": 0.7,
+        "evergreen": 1,
+        "height": 155,
+        "leafShape": 4,
+        "leafSize": 17,
+        "leafWidth": 0.9,
+        "leaflets": 3,
+        "leaves": 25,
+        "organ": 0,
+        "phyllotaxy": 1,
+        "radius": 0.7,
+        "spread": 0.5
+      },
+      "scientificName": "Hedera helix",
+      "tags": [
+        "Hedera helix",
+        "vine",
+        "garden"
+      ]
+    },
+    {
+      "category": "vine",
+      "family": 10,
+      "id": "virginia-creeper",
+      "name": "Virginia creeper",
+      "parameters": {
+        "curvature": 0.7,
+        "evergreen": 0,
+        "height": 190,
+        "leafShape": 7,
+        "leafSize": 17,
+        "leafWidth": 0.45,
+        "leaflets": 5,
+        "leaves": 24,
+        "organ": 1,
+        "phyllotaxy": 0,
+        "radius": 0.7,
+        "spread": 0.5
+      },
+      "scientificName": "Parthenocissus quinquefolia",
+      "tags": [
+        "Parthenocissus quinquefolia",
+        "vine",
+        "garden"
+      ]
+    },
+    {
+      "category": "vine",
+      "family": 10,
+      "id": "climbing-vine",
+      "name": "Wild grapevine",
+      "parameters": {
+        "curvature": 0.7,
+        "evergreen": 0,
+        "height": 210,
+        "leafShape": 4,
+        "leafSize": 17,
+        "leafWidth": 0.95,
+        "leaflets": 3,
+        "leaves": 22,
+        "organ": 2,
+        "phyllotaxy": 0,
+        "radius": 0.7,
+        "spread": 0.5
+      },
+      "scientificName": "Vitis vinifera",
+      "tags": [
+        "Vitis vinifera",
+        "vine",
+        "garden"
+      ]
+    },
+    {
+      "category": "vine",
+      "family": 10,
+      "id": "wisteria",
+      "name": "Chinese wisteria",
+      "parameters": {
+        "curvature": 0.7,
+        "evergreen": 0,
+        "height": 200,
+        "leafShape": 7,
+        "leafSize": 17,
+        "leafWidth": 0.35,
+        "leaflets": 11,
+        "leaves": 26,
+        "organ": 3,
+        "phyllotaxy": 0,
+        "radius": 0.7,
+        "spread": 0.5
+      },
+      "scientificName": "Wisteria sinensis",
+      "tags": [
+        "Wisteria sinensis",
+        "vine",
+        "garden"
+      ]
+    },
+    {
+      "category": "vine",
+      "family": 10,
+      "id": "hops",
+      "name": "Common hop",
+      "parameters": {
+        "curvature": 0.7,
+        "evergreen": 0,
+        "height": 210,
+        "leafShape": 4,
+        "leafSize": 17,
+        "leafWidth": 0.85,
+        "leaflets": 3,
+        "leaves": 26,
+        "organ": 4,
+        "phyllotaxy": 1,
+        "radius": 0.7,
+        "spread": 0.5
+      },
+      "scientificName": "Humulus lupulus",
+      "tags": [
+        "Humulus lupulus",
+        "vine",
+        "garden"
+      ]
+    },
+    {
+      "category": "vine",
+      "family": 10,
+      "id": "clematis",
+      "name": "Old mans beard",
+      "parameters": {
+        "curvature": 0.7,
+        "evergreen": 0,
+        "height": 170,
+        "leafShape": 7,
+        "leafSize": 17,
+        "leafWidth": 0.4,
+        "leaflets": 3,
+        "leaves": 24,
+        "organ": 5,
+        "phyllotaxy": 1,
+        "radius": 0.7,
+        "spread": 0.5
+      },
+      "scientificName": "Clematis vitalba",
+      "tags": [
+        "Clematis vitalba",
+        "vine",
+        "garden"
+      ]
+    },
+    {
+      "category": "bamboo",
+      "family": 9,
+      "id": "bamboo",
+      "name": "Golden bamboo grove",
+      "parameters": {
+        "bark": [
+          0.4,
+          0.48,
+          0.22
+        ],
+        "barkPattern": 5,
+        "branches": 10,
+        "clumps": 5,
+        "evergreen": 1,
+        "height": 210,
+        "leafShape": 2,
+        "leafSize": 20,
+        "leafWidth": 0.16,
+        "phyllotaxy": 1,
+        "radius": 2
+      },
+      "scientificName": "Phyllostachys aurea",
+      "tags": [
+        "Phyllostachys aurea",
+        "bamboo",
+        "garden"
+      ]
+    },
+    {
+      "category": "bamboo",
+      "family": 9,
+      "id": "black-bamboo",
+      "name": "Black bamboo",
+      "parameters": {
+        "bark": [
+          0.12,
+          0.13,
+          0.1
+        ],
+        "barkPattern": 5,
+        "branches": 12,
+        "clumps": 4,
+        "evergreen": 1,
+        "height": 250,
+        "leafShape": 2,
+        "leafSize": 18,
+        "leafWidth": 0.16,
+        "phyllotaxy": 1,
+        "radius": 2.4
+      },
+      "scientificName": "Phyllostachys nigra",
+      "tags": [
+        "Phyllostachys nigra",
+        "bamboo",
+        "garden"
+      ]
+    },
+    {
+      "category": "bamboo",
+      "family": 9,
+      "id": "dwarf-bamboo",
+      "name": "Dwarf bamboo",
+      "parameters": {
+        "bark": [
+          0.4,
+          0.48,
+          0.22
+        ],
+        "barkPattern": 5,
+        "branches": 7,
+        "clumps": 12,
+        "evergreen": 1,
+        "height": 55,
+        "leafShape": 2,
+        "leafSize": 14,
+        "leafWidth": 0.16,
+        "phyllotaxy": 1,
+        "radius": 0.55
+      },
+      "scientificName": "Pleioblastus pygmaeus",
+      "tags": [
+        "Pleioblastus pygmaeus",
+        "bamboo",
+        "garden"
+      ]
+    },
+    {
+      "category": "bamboo",
+      "family": 9,
+      "id": "giant-bamboo",
+      "name": "Giant bamboo",
+      "parameters": {
+        "bark": [
+          0.4,
+          0.48,
+          0.22
+        ],
+        "barkPattern": 5,
+        "branches": 17,
+        "clumps": 3,
+        "evergreen": 1,
+        "height": 460,
+        "leafShape": 2,
+        "leafSize": 28,
+        "leafWidth": 0.16,
+        "phyllotaxy": 1,
+        "radius": 6
+      },
+      "scientificName": "Dendrocalamus giganteus",
+      "tags": [
+        "Dendrocalamus giganteus",
+        "bamboo",
+        "garden"
+      ]
+    },
+    {
+      "category": "riparian",
+      "family": 12,
+      "id": "reeds",
+      "name": "Common reed stand",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 8,
+        "clumps": 11,
+        "evergreen": 3,
+        "flowerSize": 13,
+        "height": 130,
+        "leafShape": 2,
+        "leafSize": 30,
+        "leafWidth": 0.09,
+        "organ": 0,
+        "radius": 0.55
+      },
+      "scientificName": "Phragmites australis",
+      "tags": [
+        "Phragmites australis",
+        "riparian",
+        "wetland"
+      ]
+    },
+    {
+      "category": "riparian",
+      "family": 12,
+      "id": "cattail",
+      "name": "Broadleaf cattail",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 8,
+        "clumps": 7,
+        "evergreen": 3,
+        "flowerSize": 13,
+        "height": 140,
+        "leafShape": 2,
+        "leafSize": 30,
+        "leafWidth": 0.045,
+        "organ": 1,
+        "radius": 0.65
+      },
+      "scientificName": "Typha latifolia",
+      "tags": [
+        "Typha latifolia",
+        "riparian",
+        "wetland"
+      ]
+    },
+    {
+      "category": "riparian",
+      "family": 12,
+      "id": "bulrush",
+      "name": "Lakeshore bulrush",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 8,
+        "clumps": 13,
+        "evergreen": 3,
+        "flowerSize": 13,
+        "height": 120,
+        "leafShape": 2,
+        "leafSize": 30,
+        "leafWidth": 0.025,
+        "organ": 2,
+        "radius": 0.8
+      },
+      "scientificName": "Schoenoplectus lacustris",
+      "tags": [
+        "Schoenoplectus lacustris",
+        "riparian",
+        "wetland"
+      ]
+    },
+    {
+      "category": "riparian",
+      "family": 12,
+      "id": "horsetail",
+      "name": "Field horsetail",
+      "parameters": {
+        "barkPattern": 5,
+        "branches": 8,
+        "clumps": 9,
+        "evergreen": 3,
+        "flowerSize": 13,
+        "height": 55,
+        "leafShape": 2,
+        "leafSize": 30,
+        "leafWidth": 0.015,
+        "organ": 3,
+        "radius": 0.7
+      },
+      "scientificName": "Equisetum arvense",
+      "tags": [
+        "Equisetum arvense",
+        "riparian",
+        "wetland"
+      ]
+    }
+  ],
+  "version": 2
+}

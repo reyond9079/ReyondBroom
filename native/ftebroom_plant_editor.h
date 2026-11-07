@@ -29,6 +29,7 @@ struct PlantState {
   std::map<std::string,PlantThumb> thumbs;
   std::map<std::string,std::pair<std::string,std::string>> pendingShaders;
   std::future<std::pair<std::string,plants::Image>> thumbJob;
+  std::shared_ptr<std::atomic<bool>> thumbCancel;
   std::future<PlantResult> job;
   std::shared_ptr<PlantWork> work;
   std::shared_ptr<PlantResult> result;
@@ -73,17 +74,17 @@ static void plantLibraryLoad() {
   }catch(const std::exception& e){s.error=e.what();}
 }
 static std::string plantTextureKey(const plants::Project& d) {
-  auto& p=d.p;return plants::Json{{"seed",d.seed},{"species",d.species},{"family",int(d.family)},{"bark",p.bark},{"leaf",p.leaf},{"flower",p.flower},
+  auto& p=d.p;return plants::Json{{"generator",d.generator},{"barkPattern",p.barkPattern},{"serration",p.serration},{"needleForm",p.needleForm},{"evergreen",p.evergreen},{"leaflets",p.leaflets},{"organ",p.organ},{"seed",d.seed},{"species",d.species},{"family",int(d.family)},{"bark",p.bark},{"leaf",p.leaf},{"flower",p.flower},
     {"shape",p.leafShape},{"profile",p.leafProfile},{"season",p.season},{"quality",p.quality},{"dryness",p.dryness},{"roughness",p.roughness},{"ao",p.ao},{"variation",p.variation},{"ribs",p.ribs},{"gills",p.gills},{"override",d.texture}}.dump();
 }
 static std::string plantGeometryKey(const plants::Project& d) {
   auto p=plants::parameters(d.p);
-  for(auto key:{"bark","leaf","flower","roughness","ao","variation","dryness","windStrength","windDirection","windFrequency","stiffness","flutter"})p.erase(key);
-  return plants::Json{{"parameters",p},{"family",int(d.family)},{"species",d.species},{"seed",d.seed}}.dump();
+  for(auto key:{"bark","leaf","flower","roughness","ao","variation","dryness","windStrength","windDirection","windFrequency","stiffness","flutter","barkPattern","serration"})p.erase(key);
+  return plants::Json{{"generator",d.generator},{"parameters",p},{"family",int(d.family)},{"species",d.species},{"seed",d.seed}}.dump();
 }
 static void plantSchedule(bool immediate=false) {
   auto& s=plantState;s.revision++;s.pending=true;s.nextGenerate=ImGui::GetTime()+(immediate?0:.20);
-  if(s.work)s.work->cancel=true;s.error.clear();
+  if(s.work)s.work->cancel=true;if(s.thumbCancel)*s.thumbCancel=true;s.error.clear();
 }
 static void plantChanged(const plants::Json& before) {
   auto& s=plantState;auto active=ImGui::GetActiveID();
@@ -134,19 +135,22 @@ static void plantTick() {
     });
   }
   if(s.thumbJob.valid()&&s.thumbJob.wait_for(std::chrono::seconds(0))==std::future_status::ready) {
-    try {auto result=s.thumbJob.get();int slot=s.thumbSlot++%64;
+    try {auto result=s.thumbJob.get();if(result.first.empty())return;int slot=s.thumbSlot++%160;
       for(auto it=s.thumbs.begin();it!=s.thumbs.end();)if(it->second.slot==slot)it=s.thumbs.erase(it);else ++it;
       s.thumbs[result.first]={std::move(result.second),0,slot};
     }catch(const std::exception& e){s.error=e.what();}
   }
 }
 static int plantThumbnail(const plants::Project& d) {
-  auto& s=plantState;auto it=s.thumbs.find(d.preset);
+  auto& s=plantState;auto it=s.thumbs.find(std::to_string(plants::hash(plants::serialize(d).dump())));
   if(it!=s.thumbs.end()) {
     if(!it->second.handle)if(auto api=bbImageAPI()){auto& t=it->second;auto name="bbtex/plant-thumb-"+std::to_string(t.slot)+".tga";t.handle=api->upload(name.c_str(),t.image.rgba.data(),t.image.width,t.image.height);}
     return it->second.handle;
   }
-  if(!s.thumbJob.valid()&&!s.job.valid())s.thumbJob=std::async(std::launch::async,[d](){auto mesh=plants::generate(d,2);auto maps=plants::textureMaps(d,nullptr,nullptr,48);return std::make_pair(d.preset,plants::thumbnail(mesh,maps));});
+  if(!s.thumbJob.valid()&&!s.job.valid()){
+    s.thumbCancel=std::make_shared<std::atomic<bool>>(false);auto cancel=s.thumbCancel;
+    s.thumbJob=std::async(std::launch::async,[d,cancel](){try{auto mesh=plants::generate(d,2,cancel.get());auto maps=plants::textureMaps(d,nullptr,cancel.get(),48);return std::make_pair(std::to_string(plants::hash(plants::serialize(d).dump())),plants::thumbnail(mesh,maps));}catch(...){if(cancel->load())return std::make_pair(std::string{},plants::Image{});throw;}});
+  }
   return 0;
 }
 static void plantVideoChanged() {
@@ -164,29 +168,39 @@ static void plantShow() {
   plantResumePreview();input->SetMenuFocus(qtrue,"",0,0,1);
 }
 static void plantClose() {
-  auto& s=plantState;s.open=false;s.closeRequest=false;if(s.work)s.work->cancel=true;s.pending=false;
+  auto& s=plantState;s.open=false;s.closeRequest=false;placementCancel(plantPlacement);if(s.thumbCancel)*s.thumbCancel=true;if(s.work)s.work->cancel=true;s.pending=false;
   if(s.owner){cvars->SetFloat("ftebroom_plant_active",0);cvars->SetFloat("ftebroom_bb_active",0);cvars->SetFloat("ftebroom_modelviewer_open",0);cvars->SetFloat("ftebroom_modeleditor_active",0);if(auto api=bbAPI())api->clear();}s.owner=false;
 }
-static void plantShutdown(){if(plantState.work)plantState.work->cancel=true;if(plantState.job.valid())plantState.job.wait();if(plantState.thumbJob.valid())plantState.thumbJob.wait();}
+static void plantShutdown(){placementShutdown();if(plantState.work)plantState.work->cancel=true;if(plantState.thumbCancel)*plantState.thumbCancel=true;if(plantState.job.valid())plantState.job.wait();if(plantState.thumbJob.valid())plantState.thumbJob.wait();}
 static bool plantBusy(){return plantState.pending||plantState.job.valid();}
 static bool plantReady(){return plantState.result&&plantState.result->revision==plantState.revision&&!plantBusy();}
 static void plantSave(const std::filesystem::path& file) {
   auto& s=plantState;plants::validate(s.doc);if(std::filesystem::exists(file)&&file!=s.file)throw std::runtime_error("Choose a new project filename; open an existing plant to edit it.");
-  std::filesystem::create_directories(file.parent_path());bb::atomicWrite(file,plants::serialize(s.doc).dump(2));s.file=file;s.saved=plants::serialize(s.doc).dump();s.message="Saved "+file.filename().u8string();
+  std::filesystem::create_directories(file.parent_path());auto portable=plants::serialize(s.doc);
+  if(!s.doc.texture.empty()){
+    auto texture=std::filesystem::u8path(s.doc.texture);auto bytes=q1Read(texture);std::ostringstream id;id<<"leaf-"<<std::hex<<plants::hash(bytes)<<texture.extension().u8string();
+    auto target=file.parent_path()/std::filesystem::u8path(id.str());
+    if(std::filesystem::exists(target)&&q1Read(target)!=bytes)throw std::runtime_error("Imported texture asset already exists with different contents");
+    if(!std::filesystem::exists(target))bb::atomicWrite(target,bytes);portable["texture"]=id.str();
+  }
+  bb::atomicWrite(file,portable.dump(2));s.file=file;s.saved=plants::serialize(s.doc).dump();s.message="Saved "+file.filename().u8string();
+  placementPlantSaved();
 }
 static void plantAction(const std::function<void()>& action){try{action();}catch(const std::exception& e){plantState.error=e.what();}}
 static void plantAskSave(std::function<void()> next={}) {
   auto& s=plantState;
-  if(!s.file.empty()){plantSave(s.file);if(next)next();return;}
+  if(!s.file.empty()){plantSave(s.file);placementAfterPlantSave(std::move(next));return;}
   std::filesystem::create_directories(plantFolder()/"projects");
-  runUiChoose((plantFolder()/"projects"/(plants::assetId(s.doc,0)+".plant.json")).u8string(),[next](const std::string& p){plantSave(std::filesystem::u8path(p));if(next)next();},true);
+  runUiChoose((plantFolder()/"projects"/(plants::assetId(s.doc,0)+".plant.json")).u8string(),[next](const std::string& p){plantSave(std::filesystem::u8path(p));placementAfterPlantSave(next);},true);
 }
 static void plantRequest(std::function<void()> next) {
   auto& s=plantState;if(plants::serialize(s.doc).dump()!=s.saved){s.nextAction=std::move(next);s.closeRequest=true;}else next();
 }
 static void plantOpenFile(const std::filesystem::path& file) {
   if(std::filesystem::file_size(file)>4*1024*1024)throw std::runtime_error("Plant project exceeds 4 MiB");
-  auto d=plants::deserialize(plants::Json::parse(q1Read(file)));plantSelect(d);plantState.file=file;plantState.saved=plants::serialize(d).dump();plantState.undo.clear();plantState.redo.clear();
+  auto d=plants::deserialize(plants::Json::parse(q1Read(file)));
+  if(!d.texture.empty()&&std::filesystem::u8path(d.texture).is_relative())d.texture=(file.parent_path()/std::filesystem::u8path(d.texture)).u8string();
+  placementCancel(plantPlacement);plantSelect(d);plantState.file=file;plantState.saved=plants::serialize(d).dump();plantState.undo.clear();plantState.redo.clear();
 }
 static void plantWriteNew(const std::filesystem::path& file,const std::string& bytes) {
   if(std::filesystem::exists(file)){if(q1Read(file)==bytes)return;throw std::runtime_error("Existing asset differs; choose a new export name: "+file.filename().u8string());}
@@ -208,6 +222,7 @@ static void plantExport(const std::filesystem::path& target) {
   s.message="Exported "+target.filename().u8string()+" (static wind fallback)";
 }
 static void plantAddToMap() {
+  if(plantPlacement.active){placementPlantSaved();return;}
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
   if(gameProfile==3||gameProfile==4)throw std::runtime_error("This profile requires MD2 or studio MDL. Export OBJ, convert with Model Editor, then place its compatible model.");
   if(gameProfile==2&&!s.allowFteQ1)throw std::runtime_error("Enable the explicit FTE static-model extension for Quake 1, or export and convert to MDL for a compatible mod.");
@@ -233,7 +248,7 @@ static void plantAddToMap() {
   s.pendingShaders[id]={material,shader};
   auto path=source/std::filesystem::u8path(model);auto view=viewRects[viewFocus];
   auto vector=[](plants::V v){std::ostringstream out;out.imbue(std::locale::classic());out<<v[0]<<' '<<v[1]<<' '<<v[2];return out.str();};
-  auto action="ftebroom_model_drop "+organizationQuote(model)+" "+std::to_string(view.x+view.w*.5f)+" "+std::to_string(view.y+view.h*.5f)+" "+organizationQuote(gameProfile==0?"misc_model":"func_model")+" authoring "+organizationQuote(vector(mesh.low))+" "+organizationQuote(vector(mesh.high))+"\n";
+  auto action="ftebroom_model_drop "+organizationQuote(model)+" "+std::to_string(view.x+view.w*.5f)+" "+std::to_string(view.y+view.h*.5f)+" "+organizationQuote("func_model")+" authoring "+organizationQuote(vector(mesh.low))+" "+organizationQuote(vector(mesh.high))+(s.allowFteQ1?" fte-q1":"")+"\n";
   command(("fs_flush\nftebroom_plant shader "+id+"\n"+action).c_str());s.lastModel=path;s.message="Placed model in map — Undo removes the entity; assets remain reusable.";
 }
 static void plantPresetSave() {
@@ -251,9 +266,9 @@ static void QDECL plantCommand() {
       if(!plantState.qa||!cvars->GetFloat("ftebroom_skip_setup"))throw std::runtime_error("Asset QA requires a disposable plant session");
       auto source=q1Read(documentPath("data/export-map.map"));auto models=ftebroom::generatedIvyModels(source);
       if(models.empty())throw std::runtime_error("No placed plant in the reopened map");
-      auto folder=documentPath("plant-qa-build");stageGeneratedModels(source,folder);bb::atomicWrite(folder/"plant.map",source);
+      auto folder=documentPath("plant-qa-build");stageGeneratedModels(source,folder);size_t buildAdapted=0;bb::atomicWrite(folder/"plant.map",ftebroom::prepareStaticModels(source,gameProfile,buildAdapted));
       auto entities=ftebroom::rawPreviewEntities(source);std::string classic;
-      for(auto& e:entities){if(e.get("_reyondbroom_authoring")=="1")e.fields["classname"]="func_model";classic+="{\n";for(auto& f:e.fields)classic+=ftebroom::prefab::quote(f.first)+" "+ftebroom::prefab::quote(f.second)+"\n";classic+=e.geometry+"}\n";}
+      for(auto& e:entities){if(e.get("_reyondbroom_authoring")=="1"){e.fields["classname"]="func_model";e.fields["_reyondbroom_fte_q1"]="1";}classic+="{\n";for(auto& f:e.fields)classic+=ftebroom::prefab::quote(f.first)+" "+ftebroom::prefab::quote(f.second)+"\n";classic+=e.geometry+"}\n";}
       size_t migrated=0;auto adapted=ftebroom::prepareStaticModels(classic,2,migrated);
       if(migrated!=models.size()||adapted.find("misc_model")==adapted.npos)throw std::runtime_error("Quake 1 static-model adaptation failed");
       bb::atomicWrite(folder/"q1-fte-static.map",adapted);

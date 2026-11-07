@@ -19,12 +19,19 @@ inline bool generatedAuthoringPath(const std::string& name){
  for(auto& part:std::filesystem::u8path(name))if(part==".."||part==".")return false;
  return true;
 }
-// FTE supplies a native misc_model fallback for classic Quake progs. The
-// ordinary LibreQuake progs has no func_model spawn function. Migrate only the
-// known static ivy class in disposable build/preview copies, never the MAP.
+// Authoring entities stay func_model in the document. Only disposable build
+// copies use q3map2's misc_model or the explicitly requested FTE Q1 fallback.
 inline std::string prepareStaticModels(const std::string& bytes,int profile,size_t& changed){
- changed=0;if(profile!=2)return bytes;auto entities=rawPreviewEntities(bytes);
- for(auto& e:entities)if(e.geometry.empty()&&e.get("classname")=="func_model"&&(generatedIvyPath(e.get("model"))||(e.get("_reyondbroom_authoring")=="1"&&generatedAuthoringPath(e.get("model"))))){e.fields["classname"]="misc_model";changed++;}
+ changed=0;auto entities=rawPreviewEntities(bytes);
+ for(auto& e:entities){
+  if(!e.geometry.empty()||e.get("classname")!="func_model")continue;
+  bool marked=e.get("_reyondbroom_authoring")=="1"&&generatedAuthoringPath(e.get("model"));
+  bool legacy=generatedIvyPath(e.get("model"));
+  if(!marked&&!legacy)continue;
+  if(marked&&(profile==3||profile==4))throw std::runtime_error("This map contains ReyondBroom authoring func_model entities. Quake II / GoldSrc runtime export is unsupported; convert the source model and use a compatible mod entity before compiling.");
+  if(marked&&profile==2&&e.get("_reyondbroom_fte_q1")!="1")throw std::runtime_error("Authoring func_model requires the explicit FTE static-model extension for Quake 1. Enable it in Plant Editor and Save, or convert the model for a compatible mod; vanilla Quake cannot spawn this entity.");
+  if((profile==0&&marked)||(profile==2&&(marked||legacy))){e.fields["classname"]="misc_model";changed++;}
+ }
  if(!changed)return bytes;std::string result;
  for(auto& e:entities){result+="{\n";for(auto& f:e.fields)result+=prefab::quote(f.first)+" "+prefab::quote(f.second)+"\n";result+=e.geometry+"}\n";}
  return result;

@@ -13,10 +13,10 @@ using V = bb::Vec3;
 using bb::add; using bb::sub; using bb::mul; using bb::dot; using bb::cross;
 using bb::unit; using bb::length;
 constexpr double pi = bb::pi;
-enum class Family { Broadleaf, Conifer, Bush, Grass, Fern, Flower, Mushroom, Cactus, Palm, Bamboo, Vine, Custom };
+enum class Family { Broadleaf, Conifer, Bush, Grass, Fern, Flower, Mushroom, Cactus, Palm, Bamboo, Vine, Custom, Riparian };
 enum class Part { Roots, Trunk, Primary, Secondary, Twigs, Leaves, Flowers, Surface };
 inline const char* familyName(Family f) {
-  static const char* names[] = {"Trees","Conifers","Bushes","Grass","Ferns","Flowers","Mushrooms","Cacti","Palms","Reeds / Bamboo","Vines / Ivy","Custom"};
+  static const char* names[] = {"Trees","Conifers","Bushes","Grass","Ferns","Flowers","Mushrooms","Cacti","Palms","Bamboo","Vines / Ivy","Custom","Waterside plants"};
   return names[int(f)];
 }
 inline const char* partName(Part p) {
@@ -39,6 +39,11 @@ struct Component {
   double rotation=0;
 };
 struct Params {
+  // Generator 2: botanical architecture, independent of preset names/colours.
+  // Existing generator-1 files retain the original algorithm and materials.
+  int crown=0, phyllotaxy=0, organ=0, barkPattern=0, needleForm=0, evergreen=0;
+  int leaflets=7, clusterLeaves=5;
+  double crownBase=.28, crownAspect=.9, crownFill=.85, petiole=.16, serration=.18;
   double height=240, radius=8, taper=.8, curvature=.22, spread=.72;
   double age=.85, density=.85, irregularity=.28, gravity=.2, light=.25;
   int branches=14, depth=3, segments=8, sides=9;
@@ -58,7 +63,7 @@ struct Params {
   std::array<V,4> controls{{{0,0,0},{0,0,.33},{0,0,.67},{0,0,1}}};
 };
 struct Project {
-  int version=1, generator=1;
+  int version=1, generator=2;
   std::string name="English oak", preset="oak", species="oak";
   Family family=Family::Broadleaf;
   uint32_t seed=137;
@@ -66,6 +71,7 @@ struct Project {
   std::vector<Component> nodes;
   std::vector<uint32_t> variations;
   std::string texture;
+  std::vector<std::string> tags;
 };
 inline std::vector<Component> defaultNodes() {
   std::vector<Component> out;
@@ -93,6 +99,8 @@ inline double curve(const std::array<double,5>& c,double t) {
 inline Json parameters(const Params& p) {
   Json j;
 #define RB_PLANT_FIELD(n) j[#n]=p.n
+  RB_PLANT_FIELD(crown);RB_PLANT_FIELD(phyllotaxy);RB_PLANT_FIELD(organ);RB_PLANT_FIELD(barkPattern);RB_PLANT_FIELD(needleForm);RB_PLANT_FIELD(evergreen);
+  RB_PLANT_FIELD(leaflets);RB_PLANT_FIELD(clusterLeaves);RB_PLANT_FIELD(crownBase);RB_PLANT_FIELD(crownAspect);RB_PLANT_FIELD(crownFill);RB_PLANT_FIELD(petiole);RB_PLANT_FIELD(serration);
   RB_PLANT_FIELD(height);RB_PLANT_FIELD(radius);RB_PLANT_FIELD(taper);RB_PLANT_FIELD(curvature);RB_PLANT_FIELD(spread);
   RB_PLANT_FIELD(age);RB_PLANT_FIELD(density);RB_PLANT_FIELD(irregularity);RB_PLANT_FIELD(gravity);RB_PLANT_FIELD(light);
   RB_PLANT_FIELD(branches);RB_PLANT_FIELD(depth);RB_PLANT_FIELD(segments);RB_PLANT_FIELD(sides);
@@ -113,13 +121,18 @@ inline Json serialize(const Project& d) {
   Json nodes=Json::array();
   for(auto& n:d.nodes)nodes.push_back({{"id",n.id},{"name",n.name},{"parent",n.parent},{"kind",int(n.kind)},
     {"visible",n.visible},{"offset",n.offset},{"scale",n.scale},{"rotation",n.rotation}});
-  return {{"format","ReyondBroomPlant"},{"version",d.version},{"generatorVersion",d.generator},{"name",d.name},
-    {"preset",d.preset},{"species",d.species},{"family",int(d.family)},{"seed",d.seed},{"parameters",parameters(d.p)},
+  auto params=parameters(d.p);
+  if(d.generator==1)for(auto key:{"crown","phyllotaxy","organ","barkPattern","needleForm","evergreen","leaflets","clusterLeaves","crownBase","crownAspect","crownFill","petiole","serration"})params.erase(key);
+  Json out={{"format","ReyondBroomPlant"},{"version",d.version},{"generatorVersion",d.generator},{"name",d.name},
+    {"preset",d.preset},{"species",d.species},{"family",int(d.family)},{"seed",d.seed},{"parameters",params},
     {"hierarchy",nodes},{"variations",d.variations},{"texture",d.texture}};
+  if(d.generator>=2)out["tags"]=d.tags;
+  return out;
 }
 inline void validate(const Project& d) {
-  if(d.version!=1||d.generator!=1)throw std::runtime_error("Unsupported plant project / generator version");
-  if(int(d.family)<0||int(d.family)>11||d.name.size()>256||d.species.size()>80)throw std::runtime_error("Invalid plant identity");
+  if(d.version!=1||(d.generator!=1&&d.generator!=2))throw std::runtime_error("Unsupported plant project / generator version");
+  if(int(d.family)<0||int(d.family)>(d.generator==1?11:12)||d.name.size()>256||d.species.size()>80||d.tags.size()>16)throw std::runtime_error("Invalid plant identity");
+  for(auto& tag:d.tags)if(tag.size()>80)throw std::runtime_error("Plant tag exceeds 80 bytes");
   const auto values=parameters(d.p);
   for(auto& item:values.items()) {
     std::function<void(const Json&)> finite=[&](const Json& x){if(x.is_array())for(auto& v:x)finite(v);else if(!x.is_number()||!std::isfinite(x.get<double>()))throw std::runtime_error("Non-finite plant parameter: "+item.key());};
@@ -127,6 +140,8 @@ inline void validate(const Project& d) {
   }
   const auto& p=d.p;
   auto bounded=[](double x,double low,double high){if(x<low||x>high)throw std::runtime_error("Plant parameter outside its supported range");};
+  bounded(p.crown,0,8);bounded(p.phyllotaxy,0,2);bounded(p.organ,0,15);bounded(p.barkPattern,0,7);bounded(p.needleForm,0,4);bounded(p.evergreen,0,3);
+  bounded(p.leaflets,3,25);bounded(p.clusterLeaves,2,16);bounded(p.crownBase,.05,.85);bounded(p.crownAspect,.2,2);bounded(p.crownFill,.1,1.5);bounded(p.petiole,0,.6);bounded(p.serration,0,1);
   for(double x:{p.taper,p.age,p.irregularity,p.dead,p.bloom,p.dryness,p.capThickness,p.gills,p.spines,p.roughness,p.ao,p.variation,p.stiffness,p.flutter})bounded(x,0,1);
   bounded(p.curvature,0,2);bounded(p.spread,.05,3);bounded(p.density,0,2);bounded(p.gravity,-2,2);bounded(p.light,-1,1);
   bounded(p.branchAngle,5,140);bounded(p.branchLength,.05,2);bounded(p.branchTaper,.05,1);bounded(p.leafWidth,.01,2);
@@ -163,6 +178,8 @@ inline Project deserialize(const Json& j) {
   Project d;d.version=j.at("version");d.generator=j.at("generatorVersion");d.name=j.at("name");d.preset=j.at("preset");
   d.species=j.at("species");d.family=Family(j.at("family").get<int>());d.seed=j.at("seed");auto& p=d.p;auto& a=j.at("parameters");
 #define RB_PLANT_FIELD(n) if(a.contains(#n))a.at(#n).get_to(p.n)
+  RB_PLANT_FIELD(crown);RB_PLANT_FIELD(phyllotaxy);RB_PLANT_FIELD(organ);RB_PLANT_FIELD(barkPattern);RB_PLANT_FIELD(needleForm);RB_PLANT_FIELD(evergreen);
+  RB_PLANT_FIELD(leaflets);RB_PLANT_FIELD(clusterLeaves);RB_PLANT_FIELD(crownBase);RB_PLANT_FIELD(crownAspect);RB_PLANT_FIELD(crownFill);RB_PLANT_FIELD(petiole);RB_PLANT_FIELD(serration);
   RB_PLANT_FIELD(height);RB_PLANT_FIELD(radius);RB_PLANT_FIELD(taper);RB_PLANT_FIELD(curvature);RB_PLANT_FIELD(spread);
   RB_PLANT_FIELD(age);RB_PLANT_FIELD(density);RB_PLANT_FIELD(irregularity);RB_PLANT_FIELD(gravity);RB_PLANT_FIELD(light);
   RB_PLANT_FIELD(branches);RB_PLANT_FIELD(depth);RB_PLANT_FIELD(segments);RB_PLANT_FIELD(sides);RB_PLANT_FIELD(branchAngle);RB_PLANT_FIELD(branchLength);RB_PLANT_FIELD(branchTaper);RB_PLANT_FIELD(dead);
@@ -173,6 +190,6 @@ inline Project deserialize(const Json& j) {
   RB_PLANT_FIELD(bark);RB_PLANT_FIELD(leaf);RB_PLANT_FIELD(flower);RB_PLANT_FIELD(roughness);RB_PLANT_FIELD(ao);RB_PLANT_FIELD(variation);RB_PLANT_FIELD(growth);RB_PLANT_FIELD(leafProfile);RB_PLANT_FIELD(controls);
 #undef RB_PLANT_FIELD
   for(auto& n:j.at("hierarchy"))d.nodes.push_back({n.at("id"),n.at("name"),n.at("parent"),Part(n.at("kind").get<int>()),n.at("visible"),n.at("offset").get<V>(),n.at("scale").get<V>(),n.at("rotation")});
-  d.variations=j.value("variations",std::vector<uint32_t>{});d.texture=j.value("texture",std::string{});validate(d);return d;
+  d.variations=j.value("variations",std::vector<uint32_t>{});d.texture=j.value("texture",std::string{});d.tags=j.value("tags",std::vector<std::string>{});validate(d);return d;
 }
 }

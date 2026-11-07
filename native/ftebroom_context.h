@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 static void bspModelShow();
 static bool sceneContextPending = false, sceneContextCandidate = false;
-static int sceneContextSerial = 0;
+static int sceneContextSerial = 0,sceneContextEpoch=0;
 static quintptr_t sceneContextTime;
 static float sceneContextDX = 0, sceneContextDY = 0, sceneContextX = 0, sceneContextY = 0;
 static bool organizationNameRequest = false, organizationRename = false;
 static void sceneContextBegin(float x, float y)
 {
-  sceneContextCandidate = !altHeld && !ctrlHeld && !shiftHeld
-    && double(core->GetMilliseconds())/1000.0-cvars->GetFloat("ftebroom_focus_time")>.35;
+  sceneContextCandidate = !altHeld && !ctrlHeld && !shiftHeld;
   sceneContextTime = core->GetMilliseconds();
   sceneContextDX = sceneContextDY = 0;
   sceneContextX = x;
-  sceneContextY = y;
+  sceneContextY = y;sceneContextEpoch=organizationMapEpoch;
+  sceneContextSerial=int(cvars->GetFloat("ftebroom_context_serial"));
+  command(("ftebroom_context "+std::to_string(x)+" "+std::to_string(y)+"\n").c_str());
 }
 static void sceneContextRelease()
 {
@@ -22,12 +23,8 @@ static void sceneContextRelease()
     return;
   if (sceneContextDX * sceneContextDX + sceneContextDY * sceneContextDY >= 16)
     return;
-  sceneContextSerial = (int)cvars->GetFloat("ftebroom_context_serial");
+  if(sceneContextEpoch!=organizationMapEpoch)return;
   sceneContextPending = true;
-  char query[128];
-  std::snprintf(
-    query, sizeof query, "ftebroom_context %g %g\n", sceneContextX, sceneContextY);
-  command(query);
 }
 static void sceneContextPanel()
 {
@@ -36,12 +33,17 @@ static void sceneContextPanel()
     && sceneContextSerial != (int)cvars->GetFloat("ftebroom_context_serial"))
   {
     sceneContextPending = false;
+    placementCapture();
     ImGui::OpenPopup("Scene context");
     ImGui::SetNextWindowPos({sceneContextX, sceneContextY});
   }
   if (ImGui::BeginPopup("Scene context"))
   {
     if(gameProfile==1 && ImGui::MenuItem("Create FTE Engine terrain here...")){terrainCreateWindow=true;command(("ftebroom_terrain_position "+std::to_string(sceneContextX)+" "+std::to_string(sceneContextY)+"\n").c_str());}
+    bool create=ImGui::BeginMenu("Create");placementRect("context/create");if(create){bool model=ImGui::BeginMenu("Model");placementRect("context/model");if(model){
+      if(ImGui::MenuItem("3d model"))placementCreate(false);placementRect("context/new-model");
+      if(ImGui::MenuItem("plants/trees/grass"))placementCreate(true);placementRect("context/new-plant");
+      ImGui::EndMenu();}ImGui::EndMenu();}
     bool selected = cvars->GetFloat("ftebroom_selection_count")
                     || cvars->GetFloat("ftebroom_entity_selection_count");
     int group = (int)cvars->GetFloat("ftebroom_context_group"),

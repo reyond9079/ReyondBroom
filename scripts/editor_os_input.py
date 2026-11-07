@@ -97,7 +97,7 @@ class NativeInput:
 
  def key(self,name,mods=()):
   names={'enter':'Return','esc':'Escape','tab':'Tab','backspace':'BackSpace','grave':'grave'}
-  if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`'}.get(name,name));return
+  if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
   for mod in mods:self.mod(mod,True)
   code=self.d.keysym_to_keycode(self.XK.string_to_keysym(names.get(name,name)));self.xtest.fake_input(self.d,self.X.KeyPress,code);self.xtest.fake_input(self.d,self.X.KeyRelease,code);self.d.sync()
   for mod in reversed(mods):self.mod(mod,False)

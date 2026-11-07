@@ -17,9 +17,11 @@ static void plantColor(const char* name,plants::V& color) {
 static void plantProperties() {
   auto& s=plantState;auto& p=s.doc.p;auto f=s.doc.family;
   bool tree=f==plants::Family::Broadleaf||f==plants::Family::Bush||f==plants::Family::Custom;
-  bool leafy=tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Bamboo||f==plants::Family::Vine||f==plants::Family::Flower;
+  bool leafy=f==plants::Family::Riparian||tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Bamboo||f==plants::Family::Vine||f==plants::Family::Flower;
   if(ImGui::CollapsingHeader("General",ImGuiTreeNodeFlags_DefaultOpen)) {
-    plantText("Plant name",s.doc.name);ImGui::TextDisabled("%s",plants::familyName(f));
+    plantText("Plant name",s.doc.name);
+    if(s.doc.generator==1){ImGui::TextWrapped("Legacy generator 1: original geometry is preserved.");if(plantButton("Upgrade to botanical generator 2","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
+    else ImGui::TextDisabled("Botanical generator 2");ImGui::TextDisabled("%s",plants::familyName(f));
     plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
     if(f!=plants::Family::Mushroom)plantCombo("Season",p.season,"Spring\0Summer\0Autumn\0Winter\0");
@@ -29,6 +31,10 @@ static void plantProperties() {
   if(s.advanced&&ImGui::CollapsingHeader("Shape / growth")) {
     if(tree||f==plants::Family::Conifer||f==plants::Family::Cactus||f==plants::Family::Mushroom)plantSlider("Crown / cap spread",p.spread,.1,1.5);
     if(f!=plants::Family::Mushroom&&s.doc.species!="barrel-cactus")plantSlider("Curvature",p.curvature,0,1.5);
+    if(s.doc.generator==2&&(tree||f==plants::Family::Conifer)){
+      plantCombo("Crown architecture",p.crown,"Spreading\0Oval\0Columnar\0Weeping\0Umbrella\0Pyramidal\0Vase\0Multiple leaders\0Layered\0");
+      plantSlider("Crown start",p.crownBase,.05,.85);plantSlider("Crown aspect",p.crownAspect,.2,1.5);plantSlider("Crown fill",p.crownFill,.1,1.8);
+    }
     if(tree) {plantSlider("Apical taper",p.taper,.1,.98);plantSlider("Root flare",p.rootFlare,0,3);}
     if(tree||f==plants::Family::Conifer||f==plants::Family::Fern||f==plants::Family::Palm)plantSlider("Gravity / droop",p.gravity,-.2,1.7);
     if(tree)plantSlider("Light tropism",p.light,-.5,1);
@@ -51,6 +57,12 @@ static void plantProperties() {
     if(f!=plants::Family::Grass)plantSlider("Leaf / leaflet size",p.leafSize,.5,60,"%.1f units");
     plantSlider("Leaf / blade width",p.leafWidth,.015,1.5);
     if(s.advanced) {
+      if(s.doc.generator==2){
+        plantCombo("Leaf arrangement",p.phyllotaxy,"Alternate spiral\0Opposite\0Whorled\0");
+        if(p.leafShape==7||p.leafShape==4)plantInt("Leaflets / lobes",p.leaflets,3,21);
+        plantSlider("Petiole ratio",p.petiole,0,.6);plantSlider("Edge serration",p.serration,0,1);
+        if(f==plants::Family::Conifer)plantCombo("Needle architecture",p.needleForm,"Pine bundles\0Flat needles\0Scale sprays\0Rosettes\0Imbricate leaves\0");
+      }
       plantSlider("Leaf curl",p.leafCurl,-.5,1);plantSlider("Leaf twist",p.leafTwist,-1,1);
       if(tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Conifer||f==plants::Family::Vine)plantInt("Leaves / shoot",p.leaves,3,40);
       if(f!=plants::Family::Conifer&&f!=plants::Family::Grass)plantCombo("Leaf shape",p.leafShape,"Oval\0Elliptical\0Lanceolate\0Lobed\0Palmate\0Needle\0Custom profile\0Compound\0");
@@ -68,6 +80,7 @@ static void plantProperties() {
     if(f!=plants::Family::Mushroom)plantColor("Foliage color",p.leaf);
     if(f==plants::Family::Mushroom||f==plants::Family::Flower||f==plants::Family::Cactus||s.doc.species=="flowering-shrub")plantColor("Flower / cap color",p.flower);
     if(s.advanced) {
+      if(s.doc.generator==2)plantCombo("Bark pattern",p.barkPattern,"Fissured\0Smooth\0Papery\0Scaly\0Fibrous\0Rings\0Cork\0Mottled\0");
       plantSlider("Surface roughness",p.roughness,.05,1);plantSlider("Ambient occlusion",p.ao,0,1);plantSlider("Color variation",p.variation,0,.6);
       if(f!=plants::Family::Mushroom)plantSlider("Dryness",p.dryness,0,1);
       if(leafy||f==plants::Family::Conifer||f==plants::Family::Grass)if(plantButton("Import leaf albedo...","import-texture"))runUiChoose(s.doc.texture,[](const std::string& path){auto before=plants::serialize(plantState.doc);plantState.doc.texture=path;plantChanged(before);});
@@ -134,7 +147,7 @@ static void plantLibrary() {
   ImGui::InputTextWithHint("##plant-search","Search species...",s.search.data(),s.search.size());plantRect("search");
   if(ImGui::BeginCombo("Category",s.category<0?"All plants":plants::familyName(plants::Family(s.category)))) {
     if(ImGui::Selectable("All plants",s.category<0))s.category=-1;
-    for(int i=0;i<12;i++)if(ImGui::Selectable(plants::familyName(plants::Family(i)),s.category==i))s.category=i;ImGui::EndCombo();
+    for(int i=0;i<13;i++)if(ImGui::Selectable(plants::familyName(plants::Family(i)),s.category==i))s.category=i;ImGui::EndCombo();
   }
   ImGui::Combo("Show",&s.filter,"All presets\0Favorites\0Recent\0User presets\0");
   float listHeight=std::max(110.f,ImGui::GetContentRegionAvail().y*(s.advanced?.46f:.82f));
@@ -142,7 +155,8 @@ static void plantLibrary() {
   std::string search=entityLower(s.search.data());
   for(auto& d:s.library) {
     if(s.category>=0&&int(d.family)!=s.category&&!(s.category==int(plants::Family::Custom)&&s.userFiles.count(d.preset)))continue;
-    if(!search.empty()&&entityLower(d.name).find(search)==std::string::npos)continue;
+    std::string searchable=d.name+" "+d.species;for(auto& tag:d.tags)searchable+=" "+tag;
+    if(!search.empty()&&entityLower(searchable).find(search)==std::string::npos)continue;
     if(s.filter==1&&std::find(s.favorites.begin(),s.favorites.end(),d.preset)==s.favorites.end())continue;
     if(s.filter==2&&std::find(s.recent.begin(),s.recent.end(),d.preset)==s.recent.end())continue;
     if(s.filter==3&&!s.userFiles.count(d.preset))continue;
@@ -307,7 +321,8 @@ static void plantWriteQa() {
   auto& s=plantState;if(!s.qa)return;static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
   plants::Json counts=plants::Json::array();if(s.result)for(auto& m:s.result->lods)counts.push_back({{"triangles",m.faces.size()},{"vertices",m.vertices.size()},{"low",m.low},{"high",m.high}});
   if(runUiBrowseOpen)for(auto it=runUiBrowseRects.begin();it!=runUiBrowseRects.end();++it)s.widgets[it.key()]=it.value();
-  auto j=plants::Json{{"open",s.open},{"busy",plantBusy()},{"ready",plantReady()},{"widgets",s.widgets},{"project",plants::serialize(s.doc)},
+  size_t meshBytes=0,textureBytes=0;if(s.result){for(auto* lods:{&s.result->lods,&s.result->baseLods})for(auto& m:*lods)meshBytes+=m.vertices.capacity()*sizeof(plants::Vertex)+m.faces.capacity()*sizeof(plants::Face);for(auto* m:{&s.result->maps->albedo,&s.result->maps->normal,&s.result->maps->orm})textureBytes+=m->rgba.capacity();}
+  auto j=plants::Json{{"generation_ms",s.result?s.result->milliseconds:0.},{"frame_ms",ImGui::GetIO().DeltaTime*1000},{"mesh_cache_bytes",meshBytes},{"texture_bytes",textureBytes},{"open",s.open},{"busy",plantBusy()},{"ready",plantReady()},{"widgets",s.widgets},{"project",plants::serialize(s.doc)},
     {"lods",counts},{"selected",s.selected},{"error",s.error},{"message",s.message},{"path",s.file.u8string()},{"model",s.lastModel.u8string()},
     {"camera",{s.yaw,s.pitch,s.zoom}},{"cameraLow",s.cameraLow},{"cameraHigh",s.cameraHigh},{"undo",s.undo.size()},{"redo",s.redo.size()},
     {"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"theme",uiTheme},{"profile",gameProfile},{"settingsDir",settingsPath().parent_path().u8string()},
@@ -325,7 +340,7 @@ static void plantPanel() {
   if(ImGui::Begin(dirty?"Plant Editor *###Plant Editor":"Plant Editor###Plant Editor",&open,ImGuiWindowFlags_NoDocking)) {
     if(s.qa){auto p=ImGui::GetWindowPos(),size=ImGui::GetWindowSize();s.widgets["window"]={{"x",p.x},{"y",p.y},{"width",size.x},{"height",size.y}};}
     ImGui::PushItemWidth(-1);
-    if(plantButton("New","new"))plantRequest([](){auto d=plants::presets().front();d.name="Untitled oak";d.seed=uint32_t(plants::mix(d.seed,plantState.revision+1));plantSelect(d);});ImGui::SameLine();
+    if(plantButton("New","new"))plantRequest([](){placementCancel(plantPlacement);auto d=plants::presets().front();d.name="Untitled oak";d.seed=uint32_t(plants::mix(d.seed,plantState.revision+1));plantSelect(d);});ImGui::SameLine();
     if(plantButton("Open...","open"))plantRequest([](){runUiChoose(plantFolder().u8string(),[](const std::string& path){plantOpenFile(std::filesystem::u8path(path));});});ImGui::SameLine();
     if(plantButton("Save","save"))plantAction([](){plantAskSave();});ImGui::SameLine();
     ImGui::BeginDisabled(!plantReady());

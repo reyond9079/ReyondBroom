@@ -175,6 +175,8 @@ jobs:
         run: |
           g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests
           deps/plant-editor-tests qa/plants/core
+          g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests
+          deps/plant-botanical-tests tests/fixtures/plant-generator1.json qa/plants/botanical-results.json
           python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
           python scripts/test-plant-exports.py qa/plants/core
       - name: Exercise native Plant Editor and map placement with OS input
@@ -182,6 +184,10 @@ jobs:
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-ui.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
           python scripts/test-plant-exports.py qa/plants/ui
           python scripts/test-plant-map.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
+      - name: Verify viewport creation through both authoring editors
+        run: |
+          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Linux-x64
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-create.py bundle/ReyondBroom-Linux-x64 qa/viewport-create
       - name: Verify engine launch and viewport colors with real OS input
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py bundle/ReyondBroom-Linux-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4
@@ -278,6 +284,8 @@ jobs:
         run: |
           g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests.exe
           deps/plant-editor-tests.exe qa/plants/core
+          g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests.exe
+          deps/plant-botanical-tests.exe tests/fixtures/plant-generator1.json qa/plants/botanical-results.json
       - name: Exercise actual Windows Plant Editor and independent model import
         shell: pwsh
         run: |
@@ -291,6 +299,12 @@ jobs:
           if ($LASTEXITCODE) { throw 'Independent UI model reimport failed' }
           python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
           if ($LASTEXITCODE) { throw 'Real plant BSP compilation failed' }
+      - name: Verify viewport creation through both authoring editors on Windows
+        shell: pwsh
+        run: |
+          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
+          python scripts/test-viewport-create.py bundle/ReyondBroom-Windows-x64 qa/viewport-create
+          if ($LASTEXITCODE) { throw 'Viewport Create / Save acceptance failed' }
       - name: Verify engine launch and viewport colors with real Windows input
         run: python scripts/test-engine-viewport.py bundle/ReyondBroom-Windows-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4

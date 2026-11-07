@@ -247,6 +247,7 @@ static bool bbBeforeDocument(const std::string& next);
 #include "ftebroom_view_options.h"
 static bool terrainCreateWindow;
 // Context menus share entity and organization panels.
+#include "ftebroom_placement_state.h"
 #include "ftebroom_context.h"
 #include "ftebroom_issues.h"
 #include "ftebroom_run.h"
@@ -269,6 +270,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_unity.h"
 #include "ftebroom_plugins.h"
 #include "ftebroom_plant_editor.h"
+#include "ftebroom_placement.h"
 #include "ftebroom_texture_folders.h"
 #include "ftebroom_prefabs.h"
 #include "ftebroom_entity_list.h"
@@ -1014,6 +1016,8 @@ static void panel(float w, float h)
   buildLeakDialog();
   modControlsPanel();
   ImGui::BeginDisabled(modEmbedded);
+  placementWidgets=nlohmann::json::object();
+  placementTick();
   sceneContextPanel();
   documentFileBrowser();
   documentDialogs();
@@ -1139,6 +1143,7 @@ static void panel(float w, float h)
 #endif
   uiCursorUpdate(sceneLook||modelEditCameraCaptured||modCaptured,uiCursorPercent/100.f);
   uiReachableWindows();
+  placementWriteQa();
   runUiWriteLive(); // Include widgets drawn after Compile, such as Preferences.
   render();
   modEmbedTick(w,h);
@@ -1487,6 +1492,8 @@ static void mapReady()
   static std::string loadedAlias;
   entitySelectionEpoch = organizationReadEpoch = -1;
   ++organizationMapEpoch;
+  cvars->SetFloat("ftebroom_map_instance",organizationMapEpoch);sceneContextPending=false;
+  placementCancel(contextPlacement);placementCancel(plantPlacement);placementCancel(modelPlacement);placementCancel(modelNewPlacement);
   cameraEnd();
   cameraMapReady();
   char loadedName[256];

@@ -22,7 +22,7 @@ path=data/'plant-ui-live.json';path.unlink(missing_ok=True)
 for name in ['plant-placed','plant-undo','plant-redo','plant-reopened']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'plant-asset-qa.json').unlink(missing_ok=True)
 shutil.rmtree(data/'plant-qa-build',ignore_errors=True)
-(data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\n'+('set developer 1\nset sv_cheats 1\n' if a.scene_only else '')+'in 12 ftebroom_plant qa dark\n')
+(data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\n'+'in 12 ftebroom_plant qa dark\n')
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
@@ -138,17 +138,6 @@ try:
  xyz=[float(x) for x in origin.group(1).strip("'").split()] if origin else [0,0,0]
  console('ftebroom_camera_restore '+' '.join(str(x+d) for x,d in zip(xyz,[320,-400,260]))+' 20 130 0 75');time.sleep(1)
  screenshot('plant-placed-map');expect(not live()['open'],'placed model remains in the map after closing Plant Editor')
- if os.name=='nt':
-  console('ftebroom_show_models');console('r_drawentities');console('version_modelformats')
-  console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
-  if a.scene_only:
-   shader_paths=[data/dep for dep in manifest['dependencies'] if dep.endswith('.shader')]
-   if live()['profile']==1:shader_paths += [Path(live()['assetSource'])/dep for dep in manifest['dependencies'] if dep.endswith('.shader')]
-   original=shader_paths[0].read_text()
-   for variant,text in [('reload-control',original),('alpha-identity',original.replace('rgbGen vertex','rgbGen vertex\n  alphaGen identity')),('diffuse',original.replace('rgbGen vertex','rgbGen lightingDiffuse'))]:
-    for path in shader_paths:path.write_text(text)
-    console('fs_restart');time.sleep(1);screenshot('plant-'+variant+'-diagnostic')
-  console('condump plant-diagnostic')
  pixels=visible_foliage(out/'plant-placed-map.png');(out/'scene-render-result.json').write_text(json.dumps({'visible_foliage_pixels':pixels},indent=2));expect(pixels>250,'placed plant visibly renders in the map after reopen')
  print('Plant UI:',len(checks),'checks passed',flush=True)
 finally:
@@ -162,5 +151,3 @@ finally:
  for log in data.glob('plant-diagnostic*'):
   if log.is_file():shutil.copy2(log,out/log.name)
 
- for log in data.glob('csqccore.txt'):
-  if log.is_file():shutil.copy2(log,out/log.name)

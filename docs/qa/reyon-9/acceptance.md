@@ -64,11 +64,13 @@ and [same-machine performance data](performance.md).
 - `scripts/test-plant-ui.py`, `test-plant-exports.py`, `test-plant-map.py`:
   OS controls, project/variation/preset operations, independent import, real
   q3map2 compilation, dependency staging and visible map reopen/Undo/Redo.
-- `scripts/test-viewport-create.py`: 38 OS-input assertions for both commands,
+- `scripts/test-viewport-create.py`: 39 OS-input assertions for both commands,
   3D/orthographic views, frozen click after camera movement, Save/update/Save As,
   Unicode paths, overwrite refusal, failed empty export, dirty-guard Save,
   history-source copies, stale maps, deleted entities, tree/shrub/grass routes
-  and real scene pixels. Screenshots retain menu, both editors and placed model.
+  and real scene pixels. Clicking visible crown pixels verifies full transformed
+  model bounds rather than only the origin marker. Screenshots retain menu,
+  both editors and placed model.
 - CI retains compilation-profile, model/sound/file-manager and engine viewport
   regression suites on Windows, native Linux and SDL2. Release packaging runs
   the actual produced binaries in Modern Dark/Light at 1920×1080 and 1024×768.

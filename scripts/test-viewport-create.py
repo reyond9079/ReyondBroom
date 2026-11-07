@@ -105,7 +105,15 @@ try:
   context('plant');wait(lambda:live()['plantReady'] and live()['plant']['active']);edit('plant/search',label);click('plant/preset/'+species);wait(lambda:live()['plantReady']);target=project.parent/('creation-qa-'+species+'.plant.json');target.unlink(missing_ok=True);click('plant/save');wait(lambda:'plant/file-path' in live()['widgets']);edit('plant/file-path',target);click('plant/file-choose');wait(lambda:live()['plant']['created'] and not live()['plant']['awaiting']);check(len(entities(snapshot(species)))==(4 if species=='wild-shrub' else 5),species+' first Save creates its own single func_model');close_plant()
  print('PASS viewport creation',len(checks),flush=True)
 except Exception:
- ImageGrab.grab().save(out/'failure.png');(out/'failure-state.json').write_text(json.dumps(live(),indent=2));raise
+ ImageGrab.grab().save(out/'failure.png')
+ try:(out/'failure-state.json').write_text(json.dumps(wait(live),indent=2))
+ except Exception:pass
+ raise
 finally:
  if process.poll() is None:process.kill();process.wait(timeout=15)
  stream.close()
+ for log in root.rglob('qconsole.log'):
+  try:
+   import shutil
+   shutil.copy2(log,out/'engine-qconsole.log');break
+  except OSError:pass

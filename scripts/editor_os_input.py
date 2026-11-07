@@ -147,6 +147,15 @@ class NativeInput:
 
  def console(self,command):
   self.in_console=True
-  try:self.key('esc',('shift',));self.text('/'+command);self.key('enter');self.key('esc');time.sleep(.25)
+  try:
+   self.key('esc',('shift',))
+   # Console transitions are processed by the engine between frames. UI live
+   # state pauses while the console is open, so settle() cannot acknowledge
+   # them. In particular a Windows clipboard paste must not race its opening,
+   # Enter or closing Escape when SendMessage returns before the next frame.
+   time.sleep(.25)
+   self.text('/'+command);time.sleep(.25)
+   self.key('enter');time.sleep(.25)
+   self.key('esc');time.sleep(.25)
   finally:self.in_console=False
   self.settle()

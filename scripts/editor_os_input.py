@@ -65,6 +65,7 @@ class NativeInput:
   u=self.user;target=u.GetWindowThreadProcessId(self.hwnd,None);current=ctypes.windll.kernel32.GetCurrentThreadId()
   assert u.AttachThreadInput(current,target,True)
   state=(ctypes.c_ubyte*256)();assert u.GetKeyboardState(state);initial=bytes(state);stack=[]
+  paced=bool(text) and text[0] in "^+%"
   try:
    for action in self.keyboard.parse_keys(text,with_spaces=True,with_tabs=True,with_newlines=True):
     vk,scan,flags=action.get_key_info();modifiers=0
@@ -81,6 +82,9 @@ class NativeInput:
      if stack:state=(ctypes.c_ubyte*256).from_buffer_copy(stack.pop())
      else:state[vk]&=127
      assert u.SetKeyboardState(state)
+    # A shortcut spans multiple ImGui key transitions. Keep the target-thread
+    # modifier state until each transition has reached fresh UI frames.
+    if paced:time.sleep(.03);self.settle()
   finally:u.SetKeyboardState((ctypes.c_ubyte*256).from_buffer_copy(initial));u.AttachThreadInput(current,target,False)
   self.settle()
 
@@ -113,24 +117,6 @@ class NativeInput:
 
  def key(self,name,mods=()):
   names={'enter':'Return','esc':'Escape','tab':'Tab','backspace':'BackSpace','grave':'grave'}
-  if os.name=='nt' and mods:
-   # Shortcut modifiers and the key must share the OS input queue. Sending
-   # synchronous WM_KEYDOWN while restoring a thread-local keyboard snapshot
-   # can race the engine's later input processing (notably clipboard paste).
-   special={'enter':13,'esc':27,'tab':9,'backspace':8,'grave':192,'Home':36,'End':35,'Down':40,'Up':38,'Left':37,'Right':39,'Delete':46,'Insert':45}
-   vk=special.get(name)
-   if vk is None:
-    mapped=self.user.VkKeyScanW(name) if len(name)==1 else -1
-    assert mapped!=-1,'Unsupported Windows shortcut: '+name
-    vk=mapped&255
-   scan=self.user.MapVirtualKeyW(vk,0);extended=int(vk in (33,34,35,36,37,38,39,40,45,46));pressed=[]
-   try:
-    for mod in mods:pressed.append(mod);self.mod(mod,True)
-    self.user.keybd_event(vk,scan,extended,0);time.sleep(.08);self.settle()
-   finally:
-    self.user.keybd_event(vk,scan,extended|2,0)
-    for mod in reversed(pressed):self.mod(mod,False)
-   time.sleep(.1);self.settle();return
   if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
   for mod in mods:self.mod(mod,True)
   code=self.d.keysym_to_keycode(self.XK.string_to_keysym(names.get(name,name)));self.xtest.fake_input(self.d,self.X.KeyPress,code);self.xtest.fake_input(self.d,self.X.KeyRelease,code);self.d.sync()

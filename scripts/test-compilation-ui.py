@@ -182,6 +182,12 @@ def click(name,right=False):
   r=state['globalWidgets'][name];mouse(r['x']+r['width']*.5,r['y']+r['height']*.5,right)
  else:
   r=state['widgets'][name];w=state['widgets']['window'];mouse(w['x']+r['x']+r['width']*.5,w['y']+r['y']+(10 if right and name.startswith('card/') else r['height']*.5),right)
+ if name=='Menu/File/Exit':return  # The expected next observation is process exit.
+ # Static sleeps can return while mouse-up is still queued on a busy runner.
+ # Observe two fresh end-of-panel snapshots before reading persisted effects.
+ for _ in range(2):
+  stamp=(data/'compilation-ui-live.json').stat().st_mtime_ns
+  wait_for(lambda:(data/'compilation-ui-live.json').stat().st_mtime_ns!=stamp)
 
 def edit(name,text):
  click(name)

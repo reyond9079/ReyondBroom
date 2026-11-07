@@ -70,7 +70,11 @@ jobs:
         shell: pwsh
         run: |
           $plantArgs = @()
-          if ('${{ inputs.plant_scene_only }}' -eq 'true') { $plantArgs += '--scene-only' }
+          if ('${{ inputs.plant_scene_only }}' -eq 'true') {
+            python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
+            if ($LASTEXITCODE) { throw 'FTE source-directory fixture failed' }
+            $plantArgs += '--scene-only'
+          }
           python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui @plantArgs
           if ($LASTEXITCODE) { throw 'Prepared Plant UI acceptance failed' }
           python scripts/test-plant-exports.py qa/plants/ui

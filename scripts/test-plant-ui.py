@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
-from PIL import ImageGrab
+from PIL import Image,ImageGrab
 from editor_os_input import NativeInput
 
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--scene-only',action='store_true',help='Focus OS input on installed model visibility and map lifecycle');a=p.parse_args()
@@ -67,6 +67,12 @@ def choose(target):
  wait(lambda:'file-path' in live()['widgets']);edit('file-path',str(target).replace('\\','/'));click('file-choose');wait(lambda:'file-path' not in live()['widgets'])
 def screenshot(name):
  ui.settle();ImageGrab.grab().save(out/(name+'.png'))
+def visible_foliage(path):
+ image=Image.open(path).convert('RGB');w,h=image.size
+ # The fixture has blue brushes/sky and teal UI. Its oak must contribute a
+ # substantial green silhouette inside the scene, not just an entity marker.
+ region=image.crop((int(w*.13),int(h*.16),int(w*.70),int(h*.88)))
+ return sum(g>r*1.25 and g>b*1.8 and g>25 and r<160 and b<100 for r,g,b in region.getdata())
 def console(command):ui.console(command);time.sleep(.25)
 try:
  ready();ui.position();expect(live()['open'] and len(live()['lods'])==3,'native Plant Editor opens with three real LODs')
@@ -104,6 +110,9 @@ try:
  # This profile is Quake III or FTE in the disposable fixture.
  click('add-map');wait(lambda:live()['model']);model=Path(live()['model']);expect(model.is_file() and model.read_bytes()[:4]==b'IDP3','Add to Map writes a native MD3 asset')
  manifest=json.loads(Path(str(model)+'.reyond.json').read_text());expect(any(s.endswith('.shader') for s in manifest['dependencies']),'placed asset retains its alpha-cutout shader dependency')
+ if live()['profile']==1:
+  asset_source=Path(live()['assetSource']);expect((asset_source/model.relative_to(data)).read_bytes()==model.read_bytes(),'FTE authoring source directory receives the exact generated model')
+  for dep in manifest['dependencies']:expect((asset_source/dep).read_bytes()==(data/dep).read_bytes(),'FTE authoring source dependency '+dep)
  placed=data/'maps/plant-placed.map';placed.unlink(missing_ok=True)
  console('mod_terrain_save "" plant-placed');wait(lambda:placed.exists());map_text=placed.read_text(errors='replace');relative=model.relative_to(data).as_posix()
  expect(relative in map_text and '"_reyondbroom_authoring" "1"' in map_text,'map save retains the generated model reference and authoring marker')
@@ -130,10 +139,10 @@ try:
  console('ftebroom_camera_restore '+' '.join(str(x+d) for x,d in zip(xyz,[320,-400,260]))+' 20 130 0 75');time.sleep(1)
  screenshot('plant-placed-map');expect(not live()['open'],'placed model remains in the map after closing Plant Editor')
  if os.name=='nt':
-  console('ftebroom_show_models');console('r_drawentities');console('cvarlist ftebroom_*');console('version_modelformats');console('modellist')
+  console('ftebroom_show_models');console('r_drawentities');console('version_modelformats')
   console('set ftebroom_show_models 1');console('set r_drawentities 1');screenshot('plant-visibility-enabled')
-  console('fs_flush');console('r_reloadshaders');time.sleep(2);screenshot('plant-shaders-reloaded')
-  console('modellist');console('condump plant-diagnostic')
+  console('condump plant-diagnostic')
+ pixels=visible_foliage(out/'plant-placed-map.png');(out/'scene-render-result.json').write_text(json.dumps({'visible_foliage_pixels':pixels},indent=2));expect(pixels>250,'placed plant visibly renders in the map after reopen')
  print('Plant UI:',len(checks),'checks passed',flush=True)
 finally:
  try:(out/'last-state.json').write_text(json.dumps(live(),indent=2));ImageGrab.grab().save(out/'last-desktop.png')

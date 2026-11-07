@@ -214,7 +214,10 @@ static void plantAddToMap() {
   auto id=plants::assetId(s.doc,s.lod),material="textures/reyond-plugins/"+id,model="models/reyond-plugins/"+id+".md3",script="scripts/"+id+".shader";
   auto& mesh=s.result->lods[s.lod];auto bytes=plants::md3(mesh,material); // Validate before writing anything.
   auto source=documentPath("ftebroom.cfg").parent_path();std::vector<std::filesystem::path> destinations{source};
-  auto mod=modFileRoot();if(!mod.empty()&&std::filesystem::is_directory(mod)&&std::filesystem::weakly_canonical(mod)!=std::filesystem::weakly_canonical(source))destinations.push_back(mod);
+  // FTE may have an authoring asset directory without a separate runtime mod.
+  // Match plugin asset installation: both configured roots must see new models.
+  auto addRoot=[&](const std::filesystem::path& root){if(root.empty()||!std::filesystem::is_directory(root))return;auto canonical=std::filesystem::weakly_canonical(root);if(std::none_of(destinations.begin(),destinations.end(),[&](auto& path){return std::filesystem::weakly_canonical(path)==canonical;}))destinations.push_back(root);};
+  addRoot(modFileRoot());if(gameProfile==1)addRoot(std::filesystem::u8path(baseq3));
   plants::Json metadata={{"kind","reyondbroom-authoring-model"},{"low",mesh.low},{"high",mesh.high},{"dependencies",{material+".tga",script}},{"plantProject",plants::serialize(s.doc)}};
   for(auto& root:destinations) {
     plantWriteNew(root/std::filesystem::u8path(material+".tga"),plants::tga(s.result->maps->albedo));

@@ -2,13 +2,15 @@
 static void bspModelShow();
 static bool sceneContextPending = false, sceneContextCandidate = false;
 static int sceneContextSerial = 0,sceneContextEpoch=0;
-static quintptr_t sceneContextTime;
+static quintptr_t sceneContextTime, sceneContextDuration;
 static float sceneContextDX = 0, sceneContextDY = 0, sceneContextX = 0, sceneContextY = 0;
 static bool organizationNameRequest = false, organizationRename = false;
 static void sceneContextBegin(float x, float y)
 {
   sceneContextCandidate = !altHeld && !ctrlHeld && !shiftHeld;
+  for(bool moving:moveHeld)if(moving)sceneContextCandidate=false;
   sceneContextTime = core->GetMilliseconds();
+  sceneContextDuration = 0;
   sceneContextDX = sceneContextDY = 0;
   sceneContextX = x;
   sceneContextY = y;sceneContextEpoch=organizationMapEpoch;
@@ -17,10 +19,12 @@ static void sceneContextBegin(float x, float y)
 }
 static void sceneContextRelease()
 {
+  if(cameraButton==1)sceneContextDuration=core->GetMilliseconds()-sceneContextTime;
   if (
-    !sceneLook || cameraButton != 1 || !sceneContextCandidate
-    || core->GetMilliseconds() - sceneContextTime >= 300)
+    !sceneLook || cameraButton != 1 || !sceneContextCandidate)
     return;
+  // A stationary release is a context click even after a slow rendered frame.
+  // Actual mouse/keyboard/wheel navigation invalidates the candidate instead.
   if (sceneContextDX * sceneContextDX + sceneContextDY * sceneContextDY >= 16)
     return;
   if(sceneContextEpoch!=organizationMapEpoch)return;

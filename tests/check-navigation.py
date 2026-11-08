@@ -15,7 +15,7 @@ checks=[
     "look_inversion","no_3d_motion_in_2d",
 ]
 for name in checks: assert f"FTEBROOM_CAMERA_PASS {name}" in log,name
-native=["text_guard","shift_flight","alt_vertical_flight","ctrl_guard","right_capture","right_release","middle_capture","escape_release","focus_loss","focus_return","right_click_context_menu","out_and_back_drag_not_context_menu"]
+native=["text_guard","shift_flight","alt_vertical_flight","ctrl_guard","right_capture","right_release","relative_drag_does_not_open_context","flight_tap_does_not_open_context","middle_capture","escape_release","focus_loss","focus_return","right_click_context_menu","out_and_back_drag_not_context_menu"]
 for name in native: assert f"FTEBROOM_NATIVE_CAMERA_PASS {name}" in log,name
 for name in ("saved_position","saved_angles_zoom"):
     assert reopened.count(f"FTEBROOM_CAMERA_PASS {name}")==2,name

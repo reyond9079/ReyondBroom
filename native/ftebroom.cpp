@@ -1409,6 +1409,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     }
     if (down && (key == wheelUp || key == wheelDown))
     {
+      if(sceneLook&&cameraButton==1)sceneContextCandidate=false;
       if ((inScene || sceneLook) && !sceneDrag && !io.WantTextInput && !popupOpen)
       {
         if (ctrlHeld && !altHeld && !shiftHeld && !sceneLook)
@@ -1824,11 +1825,15 @@ static void testNavigationInput()
   expect(!moveHeld[5], "ctrl_guard");
   key("x", false);
   key("ctrl", false);
+  sceneContextPending = false;
   key("mouse2", true);
   expect(sceneLook && cameraButton == 1, "right_capture");
   event(3, 0, 0, 4000, -2000, 1280, 800);
   key("mouse2", false);
   expect(!sceneLook, "right_release");
+  expect(!sceneContextPending,"relative_drag_does_not_open_context");
+  key("mouse2",true);key("w",true);key("w",false);key("mouse2",false);
+  expect(!sceneContextPending,"flight_tap_does_not_open_context");
   key("mouse3", true);
   expect(sceneLook && cameraButton == 2, "middle_capture");
   event(3, 0, 0, 100, 20, 1280, 800);

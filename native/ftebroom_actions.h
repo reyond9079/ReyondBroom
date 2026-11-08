@@ -197,8 +197,10 @@ static void executeAction(const Action& a, bool down = true)
   {
     const char* keys = "wsadqx";
     const char* found = std::strchr(keys, cmd.back());
-    if (found)
+    if (found){
       moveHeld[found - keys] = down;
+      if(down)sceneContextCandidate=false;
+    }
     return;
   }
   if (!down)
@@ -370,6 +372,7 @@ static bool dispatchAction(int key, bool down, bool inScene)
       if (key == input->GetKeyCode(name, nullptr))
       {
         moveHeld[i] = true;
+        sceneContextCandidate = false;
         return true;
       }
     }

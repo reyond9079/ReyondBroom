@@ -17,7 +17,7 @@ repo = Path(__file__).resolve().parents[1]
 root, out = a.runtime.resolve(), a.output.resolve()
 out.mkdir(parents=True, exist_ok=True)
 data = root/'ftebroom'
-for name in ['run.cfg', 'trenchbroom-native.cfg', 'trenchbroom-restore.cfg', 'compilation-parity-native.cfg']:
+for name in ['run.cfg', 'trenchbroom-native.cfg', 'trenchbroom-restore.cfg', 'compilation-parity-native.cfg', 'context-navigation-native.cfg']:
     shutil.copy2(repo/'tests'/name, data/name)
 shutil.copy2(repo/'tests/fixtures/CompilationProfiles-original.cfg', data/'CompilationProfiles-regression.cfg')
 # QA owns this runtime; no personal profile store is used.
@@ -26,7 +26,7 @@ for name in ['compilation-profiles.json', 'ftebroom-run-profiles.txt', 'ftebroom
 engine = root/('bin/fteqw64.exe' if os.name == 'nt' else 'fteqw-gl64')
 renderer_args=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 results = {}
-for case in ['run', 'trenchbroom-native', 'trenchbroom-restore', 'compilation-parity-native']:
+for case in ['run', 'trenchbroom-native', 'trenchbroom-restore', 'compilation-parity-native', 'context-navigation-native']:
     console = data/'qconsole.log'
     console.unlink(missing_ok=True)
     log = out/(case+'.log')
@@ -44,14 +44,14 @@ for case in ['run', 'trenchbroom-native', 'trenchbroom-restore', 'compilation-pa
     if console.is_file():
         text += '\n'+console.read_text(errors='replace')
         log.write_text(text)
-    fails = re.findall(r'FTEBROOM_(?:RUN|PARITY)_FAIL [^\r\n]*|CSQC_Abort|Assertion .*failed', text)
-    passes = sorted(set(re.findall(r'FTEBROOM_(?:RUN|PARITY)_PASS ([^\r\n]*)', text)))
+    fails = re.findall(r'FTEBROOM_(?:RUN|PARITY|NATIVE_CAMERA)_FAIL [^\r\n]*|CSQC_Abort|Assertion .*failed', text)
+    passes = sorted(set(re.findall(r'FTEBROOM_(?:RUN|PARITY|NATIVE_CAMERA)_PASS ([^\r\n]*)', text)))
     results[case] = {'exit': code, 'passed': passes, 'failed': fails}
     (out/'results.json').write_text(json.dumps(results, indent=2))
     print(case, 'exit', code, 'passed', len(passes), 'failed', fails, flush=True)
     if code or fails:
         raise RuntimeError(case+' failed; see '+str(log))
-    expected = {'run': 15, 'trenchbroom-native': 3, 'trenchbroom-restore': 3, 'compilation-parity-native': 32}[case]
+    expected = {'run': 15, 'trenchbroom-native': 3, 'trenchbroom-restore': 3, 'compilation-parity-native': 32, 'context-navigation-native': 14}[case]
     if len(passes) < expected:
         raise RuntimeError(f'{case}: missing checks ({len(passes)} < {expected})')
 # Exercise migration and its second-start idempotence with actual saved legacy records.

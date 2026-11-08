@@ -92,6 +92,20 @@ logs are attached to the Jira task, alongside before/after evidence.
 
 ## Publication
 
+Stationary RMB release opens Create regardless of hold duration. A 300 ms wall-clock
+cutoff previously discarded slow stationary clicks; mouse movement, held flight
+keys and wheel navigation now decide whether the gesture was navigation. Every
+40-check Create case starts with a real 550 ms stationary hold and records the
+requested hold and processed gesture in initial-context-gesture.json. Actual
+relative drag, out-and-back drag and a flight-key tap are checked by the native
+input regression (context-navigation-native.cfg); the existing text-entry guard
+continues to block camera navigation while typing.
+
+The local Xvfb/XTest device does not deliver XI2 raw relative movement to the
+plugin, so its synthetic drag probe is not counted as a successful drag check.
+Native relative-event regressions cover that branch; actual OS stationary,
+keyboard and wheel cases are recorded separately.
+
 The PR stays draft through platform CI. Its ready transition reserves the next
 alpha.129 draft and dispatches packaging against the exact PR head. Publication
 runs only after merge into main, verifies identical reviewed/merged source trees,

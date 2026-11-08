@@ -57,8 +57,9 @@ def close_plant():
  w=live()['widgets']['plant/window'];ui.click(w['x']+w['width']-16,w['y']+14)
  if 'plant/confirm-discard' in live()['widgets']:click('plant/confirm-discard')
  wait(lambda:not live()['plantOpen'])
-def context(kind,view=0):
- v=live()['views'][view];ui.click(v['x']+v['width']*.46,v['y']+v['height']*.52,button=3)
+def context(kind,view=0,hold=None):
+ v=live()['views'][view];x=v['x']+v['width']*.46;y=v['y']+v['height']*.52
+ ui.move(x,y);ui.settle();ui.click(x,y,button=3,hold=hold)
  hover('context/create');hover('context/model')
  if not (out/'create-model-menu.png').exists():ui.settle();ImageGrab.grab().save(out/'create-model-menu.png')
  click('context/new-'+kind)
@@ -69,7 +70,8 @@ def entities(text):return [dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"',x)) for 
 try:
  wait(lambda:live()['plantReady']);ui.position()
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
- close_plant();context('plant');wait(lambda:live()['plantReady'] and live()['plant']['active']);captured=live()['plant']['point'];check(live()['plant']['id']==live()['context']['id'],'plant route binds the initial click')
+ close_plant();context('plant',hold=.55);wait(lambda:live()['plantReady'] and live()['plant']['active']);captured=live()['plant']['point'];check(live()['plant']['id']==live()['context']['id'],'plant route binds the initial click')
+ (out/'initial-context-gesture.json').write_text(json.dumps({'requested_hold_seconds':.55,'observed':live()['contextGesture']},indent=2))
  # Moving the camera after opening the authoring window must not change the hit.
  ui.console('setpos 800 -900 600 20 110 0');edit('plant/search','oak');wait(lambda:'plant/preset/oak' in live()['widgets'] and 'plant/preset/birch' not in live()['widgets']);check(True,'short ASCII keyboard input works after closing the console');edit('plant/search','');click('plant/save');wait(lambda:'plant/file-path' in live()['widgets']);edit('plant/file-path',project);click('plant/file-choose');wait(lambda:live()['plant']['created'] and not live()['plant']['awaiting']);check(not live()['plantError'],live()['plantError'] or 'first Save succeeds')
  first=entities(snapshot('first'));check(len(first)==1 and first[0]['classname']=='func_model','first Save creates exactly one func_model');old=first[0]['model'];origin=first[0]['origin'];check(live()['plant']['point']==captured,'Save retains original world contact after camera movement');normal=live()['plant']['normal'];xyz=[float(x) for x in origin.strip("'").split()];tangent=[xyz[i]-captured[i] for i in range(3)];projection=sum(tangent[i]*normal[i] for i in range(3));check(sum((tangent[i]-normal[i]*projection)**2 for i in range(3))<256,'placement uses captured surface normal and grid basis');check((data/old).is_file(),'runtime asset exists before insertion')

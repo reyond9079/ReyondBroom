@@ -102,14 +102,14 @@ class NativeInput:
   if os.name=='nt':self.user.SetCursorPos(int(ox+x*self.scale[0]),int(oy+y*self.scale[1]));self.settle()
   else:self.xtest.fake_input(self.d,self.X.MotionNotify,x=int(ox+x),y=int(oy+y));self.d.sync();time.sleep(.08)
 
- def click(self,x,y,button=1,mods=()):
+ def click(self,x,y,button=1,mods=(),hold=None):
   self.move(x,y)
   for mod in mods:self.mod(mod,True)
   try:
    if os.name=='nt':
-    self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0);time.sleep(.10);self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
+    self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0);time.sleep(.10 if hold is None else hold);self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
    else:
-    self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync();time.sleep(.08);self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
+    self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync();time.sleep(.08 if hold is None else hold);self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
   finally:
    for mod in reversed(mods):self.mod(mod,False)
   time.sleep(.25)

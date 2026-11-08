@@ -28,14 +28,14 @@ static void tourMapReady(){
 static void tourBegin(){
   tourActive=true;tourOfferPending=false;recentWindow=false;setupNeeded=false;
   tourSavedLayout=viewLayout;tourSavedGrid=cvars->GetFloat("ca_grid");tourSavedWheel=cvars->GetFloat("ftebroom_wheel_grid");
-  viewLoaded=true;viewLayout=1;viewFocus=0;viewMax=-1;viewTypes[0]=0;cvars->SetFloat("ftebroom_view_layout",1);cvars->SetFloat("ca_brush_view",0);
+  viewLoaded=true;viewLayout=1;viewFocus=0;viewMax=-1;viewTypes[0]=0;cvars->SetFloat("ftebroom_view_layout",1);viewActivate(0);
   cvars->SetFloat("ftebroom_tour_active",1);cvars->SetFloat("ca_grid",16);cvars->SetFloat("ftebroom_wheel_grid",1);tourRecord("started");tourPrepare(0);
 }
 static void tourFinish(bool skipped){
   cancelGesture();cameraEnd();tourActive=false;tourDemo=false;tourWaitingForMap=false;tourOfferPending=false;
   cvars->SetFloat("ftebroom_tour_active",0);cvars->SetFloat("ftebroom_tour_demo",0);cvars->SetFloat("ftebroom_shift",0);cvars->SetFloat("ftebroom_alt",0);
   cvars->SetFloat("ca_grid",tourSavedGrid);cvars->SetFloat("ftebroom_wheel_grid",tourSavedWheel);cvars->SetFloat("ftebroom_tool",0);
-  viewLayout=tourSavedLayout;cvars->SetFloat("ftebroom_view_layout",viewLayout);viewTypes[0]=0;viewFocus=0;
+  viewLayout=tourSavedLayout;cvars->SetFloat("ftebroom_view_layout",viewLayout);viewTypes[0]=0;viewActivate(0);
   documentFile.clear();pendingDocumentFile.clear();pendingDocumentAlias.clear();documentUntitled=true;documentName="untitled";
   command(gameClassic()?"mapedit maps/start-quake1.map\n":"mapedit maps/start.map\n");tourRecord(skipped?"skipped":"complete");
 }

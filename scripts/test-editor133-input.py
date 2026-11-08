@@ -24,6 +24,7 @@ def wait(fn,timeout=90):
  end=time.monotonic()+timeout
  while time.monotonic()<end:
   assert process.poll() is None,'Editor exited'
+  if any(marker in logs() for marker in ['FTEBROOM_LAYOUT_FAIL','FTEBROOM_TUTORIAL_FAIL']):raise AssertionError('Native input/onboarding check failed; see combined.log')
   try:
    if value:=fn():return value
   except (FileNotFoundError,PermissionError,KeyError,json.JSONDecodeError):pass
@@ -62,6 +63,7 @@ try:
   ui.console('ftebroom_test_desktop rb10tourstage '+str(step))
   wait(lambda:logs().count(marker)>previous)
   check('FTEBROOM_TUTORIAL_FAIL' not in logs(),f'onboarding stage {step} loads only its target fixture'+(' on replay' if previous else ''))
+  time.sleep(.3);ui.settle()
   ImageGrab.grab().save(out/f'onboarding-stage-{step}.png')
  (out/'combined.log').write_text(logs())
  assert not any(x in logs() for x in ['_FAIL ','CSQC_Abort','Host_Error','runaway loop'])

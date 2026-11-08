@@ -12,8 +12,8 @@ void fb_tutorial_stage_check()
 {
     int step=cvar("ftebroom_tour_step"),expected=(step==1 || step==6)?0:1;
     int actual=fb_tutorial_brushes(),selected=selectedbrushcount;
-    print(sprintf("FTEBROOM_TUTORIAL_STATE step=%i brushes=%i selected=%i expected=%i\n",step,actual,selected,expected));
-    fb_tutorial_expect(cvar("ftebroom_tour_fixture_ready")==step+1 && fb_tutorial_brushes()==expected,strcat("native_stage_fixture_",itos(step)));
+    print(sprintf("FTEBROOM_TUTORIAL_STATE step=%i brushes=%i selected=%i expected=%i view=%g\n",step,actual,selected,expected,cvar("ca_brush_view")));
+    fb_tutorial_expect(cvar("ftebroom_tour_fixture_ready")==step+1 && fb_tutorial_brushes()==expected && cvar("ca_brush_view")==0,strcat("native_stage_fixture_",itos(step)));
 }
 float fb_tutorial_testcommand()
 {

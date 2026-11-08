@@ -1,6 +1,6 @@
 # Keep the existing workflow filename so it can be dispatched from a fix branch.
-name: Release native editor update
-run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
+name: RB-133 Windows verification
+run-name: Windows ${{ inputs.version }} source c77680c @ ${{ github.sha }}
 on:
   workflow_dispatch:
     inputs:
@@ -31,161 +31,6 @@ on:
 permissions:
   contents: write
 jobs:
-  linux:
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [Linux-x64, Linux-SDL2-x64]
-    env:
-      GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ inputs.version }}
-      PLATFORM: ${{ matrix.platform }}
-      BASE_TAG: ${{ matrix.platform == 'Linux-x64' && inputs.linux_base_tag || inputs.base_tag }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install build and validation tools
-        run: |
-          if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! command -v xclip || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h; then
-            if test -f /etc/apt/apt-mirrors.txt; then
-              printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
-            fi
-            sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
-            sudo timeout 180s apt-get install -y build-essential cmake libgl-dev libx11-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip ffmpeg libsdl2-dev ripgrep
-          fi
-      - name: Fetch and verify compatible runtime and complete sources
-        run: |
-          mkdir base deps
-          gh release download "$BASE_TAG" --repo "$GITHUB_REPOSITORY" --dir base --pattern "*-$PLATFORM.tar.gz" --pattern "*-$PLATFORM.tar.gz.sha256" --pattern "*-$PLATFORM-Sources.zip" --pattern "*-$PLATFORM-Sources.zip.sha256"
-          (cd base && sha256sum -c ./*.sha256)
-          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
-          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
-      - name: Build compatibility core and CSQC
-        run: |
-          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests
-          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz'
-          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
-      - name: Rebuild the SDL2 engine with the editor close guard
-        if: matrix.platform == 'Linux-SDL2-x64'
-        run: bash scripts/build-sdl2-engine.sh deps/sdl-engine
-      - name: Build and test the native module and profile importer
-        run: |
-          cmake -S deps/bullet -B deps/bullet-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
-          cmake --build deps/bullet-build -j2 --target BulletDynamics BulletCollision LinearMath
-          g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
-          scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
-      - name: Validate RB-10 native formats, browser cache and default shortcuts
-        if: inputs.rb10_checks
-        run: |
-          mkdir -p qa/rb10/units
-          g++ -std=c++17 -O2 tests/plant-runtime-targets.cpp -lz -o deps/plant-runtime-targets
-          deps/plant-runtime-targets qa/rb10/units/plant-targets
-          g++ -std=c++17 -O2 tests/browser132-unit.cpp -o deps/browser132-unit
-          deps/browser132-unit > qa/rb10/units/browser.log
-          g++ -std=c++17 -O2 -pthread -Ideps/imgui tests/entity-preview132-ui.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/entity-preview132-ui
-          deps/entity-preview132-ui > qa/rb10/units/preview.log
-          g++ -std=c++17 -O2 -Ideps/imgui tests/tools-layout.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/tools-layout
-          deps/tools-layout > qa/rb10/units/tools-layout.log
-          python tests/check-default-shortcuts.py deps/fteqw > qa/rb10/units/shortcuts.log
-          python tests/check-run-workspace-selection.py > qa/rb10/units/workspace-selection.log
-          g++ -std=c++17 -O2 tests/pak-resource-names.cpp -lz -o deps/pak-resource-names
-          deps/pak-resource-names > qa/rb10/units/q2-pak.log
-          g++ -std=c++17 -O2 tests/quake2-roots.cpp -o deps/quake2-roots
-          deps/quake2-roots > qa/rb10/units/q2-roots.log
-      - name: Package native runtime and corresponding sources
-        run: |
-          engine_args=()
-          if test "$PLATFORM" = Linux-SDL2-x64; then engine_args=(--engine deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 --engine-source deps/sdl-engine); fi
-          python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --csprogs csaddon.dat "${engine_args[@]}" --version "$VERSION" --output out/release
-          (cd out/release && sha256sum -c ./*.sha256)
-      - name: Validate the packaged editor
-        run: |
-          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
-          xvfb-run -a -s '-screen 0 1920x1080x24' scripts/test-trenchbroom-linux.sh "$bundle" "$PWD/qa/profiles"
-          xvfb-run -a -s '-screen 0 1920x1080x24' scripts/test-audio-editor-linux.sh "$bundle" "$PWD/qa/audio"
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-audio-archive.py "$bundle" "$PWD/qa/audio-archive"
-          python -m pip install python-xlib Pillow
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py "$bundle" "$PWD/qa/engine-viewport" --probe "$PWD/deps/profile-core/compilation-profile-probe"
-      - name: Validate packaged Create / Save in both themes and window sizes
-        run: |
-          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
-          python tests/make-linux-build-fixture.py "$bundle"
-          for theme in dark light; do
-            for dimensions in '1920 1080' '1024 768'; do
-              read -r width height <<< "$dimensions"
-              xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-create.py "$bundle" "$PWD/qa/viewport-create-$theme-$width" --theme "$theme" --width "$width" --height "$height"
-            done
-          done
-      - name: Validate packaged viewport fixes in both themes and sizes
-        if: inputs.viewport_checks
-        run: |
-          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
-          python tests/make-linux-build-fixture.py "$bundle"
-          for theme in dark light; do
-            for dimensions in '1920 1080' '1024 768'; do
-              read -r width height <<< "$dimensions"
-              xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-appearance.py "$bundle" "$PWD/qa/appearance-$theme-$width" --theme "$theme" --width "$width" --height "$height"
-            done
-          done
-      - name: Validate packaged RB-10 workflows with actual OS input
-        if: inputs.rb10_checks
-        run: |
-          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
-          python tests/make-linux-build-fixture.py "$bundle"
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-editor133-input.py "$bundle" qa/rb10/editor133-input
-          python tests/test-welcome-updater.py --platform "$PLATFORM" --output qa/rb10/updater --runtime "$bundle"
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-runtime.py "$bundle" qa/rb10/runtime
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-browsers.py "$bundle" qa/rb10/browsers
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-welcome.py "$bundle" qa/rb10/welcome
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-quake2-resources.py "$bundle" qa/rb10/quake2
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-cleanup.py "$bundle" qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-paths.py "$bundle" qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-target-ui.py "$bundle" qa/rb10/plant-target-ui
-          for theme in dark light; do
-            for dimensions in '1920 1080' '1024 768'; do
-              read -r width height <<< "$dimensions"
-              xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-views.py "$bundle" "qa/rb10/views-$theme-$width" --theme "$theme" --width "$width" --height "$height"
-            done
-          done
-      - name: Capture the complete native botanical catalogue and reference views
-        if: matrix.platform == 'Linux-x64' && inputs.capture_catalog
-        run: |
-          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
-          RB_QA_BUILD="packaged-$VERSION" xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/capture-plant-catalog.py "$bundle" "$PWD/qa/catalog-originals" --extended
-          python scripts/plant-contact-sheets.py qa/catalog-originals qa/catalog-sheets
-      - uses: actions/upload-artifact@v4
-        if: matrix.platform == 'Linux-x64' && inputs.capture_catalog && always()
-        with:
-          name: REYON-9-contact-sheets
-          path: |
-            qa/catalog-sheets/**
-            qa/catalog-originals/*.json
-            qa/catalog-originals/editor.log
-            qa/catalog-originals/oak.png
-            qa/catalog-originals/spruce.png
-            qa/catalog-originals/bracken.png
-            qa/viewport-create-*/results.json
-            qa/viewport-create-dark-1920/plant-editor.png
-            qa/viewport-create-dark-1920/model-editor.png
-            qa/viewport-create-dark-1920/placed-models-scene.png
-            qa/viewport-create-dark-1920/create-model-menu.png
-      - name: Upload validated packages to the draft release
-        run: |
-          test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
-          gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 --clobber
-      - name: Collect compact release evidence
-        if: always()
-        run: python scripts/collect-release-qa.py --qa qa --release out/release --output qa-artifact
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: qa-${{ matrix.platform }}
-          path: qa-artifact/
-          if-no-files-found: error
-
   windows:
     runs-on: windows-2022
     env:
@@ -194,6 +39,8 @@ jobs:
       BASE_TAG: ${{ inputs.base_tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: c77680c7f0d78118c6aa69cc9edd63bfcab40e68
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -263,6 +110,24 @@ jobs:
         run: |
           python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --audio-dir tools/audio --version "$VERSION" --output out/release
           (cd out/release && sha256sum -c ./*.sha256)
+      - name: Use reviewed OS-queue paste harness after packaging immutable product source
+        shell: pwsh
+        run: |
+          git fetch --no-tags --depth=1 origin $env:GITHUB_SHA
+          if ($LASTEXITCODE) { throw 'Fetching exact QA harness failed' }
+          $source = git show "$($env:GITHUB_SHA):scripts/editor_os_input.py"
+          if ($LASTEXITCODE) { throw 'Reading exact QA harness failed' }
+          $text = ($source -join "`n") + "`n"
+          [System.IO.File]::WriteAllText("$PWD/scripts/editor_os_input.py", $text, [System.Text.UTF8Encoding]::new($false))
+          New-Item -ItemType Directory -Force qa/harness | Out-Null
+          Copy-Item scripts/editor_os_input.py qa/harness/editor-os-input.txt
+          @{ source = 'c77680c7f0d78118c6aa69cc9edd63bfcab40e68'; workflow = $env:GITHUB_SHA; harness_sha256 = (Get-FileHash scripts/editor_os_input.py -Algorithm SHA256).Hash.ToLower(); method = 'Only QA input transport changes after runtime and corresponding Sources are packaged; assertions are unchanged.' } | ConvertTo-Json | Set-Content -Encoding utf8 qa/harness/provenance.json
+      - name: Stage immutable Windows packages in the owned draft for independent validation
+        shell: pwsh
+        run: |
+          if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft' }
+          gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
+          if ($LASTEXITCODE) { throw 'Staging draft packages failed' }
       - name: Validate PK3 import and the inner audio window in the packaged editor
         shell: pwsh
         run: |
@@ -270,6 +135,22 @@ jobs:
           python -m pip install Pillow pywinauto
           python scripts/test-engine-viewport.py out/release/ReyondBroom-Windows-x64 qa/engine-viewport --probe deps/profile-core/compilation-profile-probe.exe
           if ($LASTEXITCODE) { throw 'Windows engine/viewport acceptance failed' }
+      - name: Validate packaged viewport fixes on Windows
+        if: inputs.viewport_checks
+        shell: pwsh
+        env:
+          RB_QA_RENDERER: gl rb_qa_opengl.dll
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
+          if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
+          foreach ($theme in @('light','dark')) {
+            foreach ($width in @(1024,1920)) {
+              $height = if ($width -eq 1920) { 1080 } else { 768 }
+              python scripts/test-viewport-appearance.py out/release/ReyondBroom-Windows-x64 "qa/appearance-$theme-$width" --theme $theme --width $width --height $height
+              if ($LASTEXITCODE) { throw "Appearance acceptance failed: $theme / $width" }
+            }
+          }
       - name: Validate packaged Create / Save in both themes and window sizes
         shell: pwsh
         run: |
@@ -280,22 +161,6 @@ jobs:
               $height = if ($width -eq 1920) { 1080 } else { 768 }
               python scripts/test-viewport-create.py out/release/ReyondBroom-Windows-x64 "qa/viewport-create-$theme-$width" --theme $theme --width $width --height $height
               if ($LASTEXITCODE) { throw "Packaged viewport acceptance failed: $theme $width" }
-            }
-          }
-      - name: Validate packaged viewport fixes on Windows
-        if: inputs.viewport_checks
-        shell: pwsh
-        env:
-          RB_QA_RENDERER: gl rb_qa_opengl.dll
-          GALLIUM_DRIVER: llvmpipe
-        run: |
-          python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
-          if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
-          foreach ($theme in @('dark','light')) {
-            foreach ($width in @(1920,1024)) {
-              $height = if ($width -eq 1920) { 1080 } else { 768 }
-              python scripts/test-viewport-appearance.py out/release/ReyondBroom-Windows-x64 "qa/appearance-$theme-$width" --theme $theme --width $width --height $height
-              if ($LASTEXITCODE) { throw "Appearance acceptance failed: $theme / $width" }
             }
           }
       - name: Validate packaged RB-10 workflows on Windows and PowerShell 5.1

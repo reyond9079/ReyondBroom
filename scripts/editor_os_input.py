@@ -171,7 +171,21 @@ class NativeInput:
     import shutil,subprocess
     executable=os.environ.get('RB_QA_XCLIP') or shutil.which('xclip');assert executable,'Unicode OS-input QA requires xclip'
     subprocess.run([executable,'-selection','clipboard'],input=text.encode('utf-8'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True,timeout=10)
-   self.key('v',('ctrl',));return
+   if os.name=='nt':
+    # Clipboard paste enters the real OS queue, like mouse-wheel modifiers.
+    # Temporary SetKeyboardState around SendMessage is not the keyboard state
+    # observed when the engine later consumes its queued paste key event.
+    self.position();self.mod('ctrl',True)
+    try:
+     self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),0,0)
+     try:time.sleep(.05);self.settle()
+     finally:self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),2,0);self.settle()
+    finally:self.mod('ctrl',False)
+    with (self.output/'clipboard-paste.jsonl').open('a',encoding='utf-8') as log:
+     import hashlib
+     log.write(json.dumps({'length':len(text),'sha256':hashlib.sha256(text.encode('utf-8')).hexdigest(),'method':'OS keybd_event Ctrl+V held over observed engine ticks','focus':self.read_focus()})+'\n')
+   else:self.key('v',('ctrl',))
+   return
   if os.name=='nt':self.strokes(''.join('{'+c+'}' if c in '+^%~(){}' else c for c in text));return
   shift=self.d.keysym_to_keycode(self.XK.string_to_keysym('Shift_L'))
   for char in text:

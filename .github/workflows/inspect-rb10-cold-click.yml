@@ -1,9 +1,11 @@
-name: Inspect existing RB-10 Windows cold-click evidence
+name: Diagnose RB-10 Windows cold-click readiness
 on:
   pull_request:
     types: [opened, synchronize]
     branches: [feat/rb-10-editor-polish]
-    paths: [.github/workflows/inspect-rb10-cold-click.yml]
+    paths:
+      - .github/workflows/inspect-rb10-cold-click.yml
+      - scripts/test-plant-target-cold-diagnostic.py
 permissions:
   contents: read
   actions: read
@@ -11,67 +13,130 @@ concurrency:
   group: inspect-rb10-cold-click
   cancel-in-progress: false
 jobs:
-  inspect:
+  windows-cold-click-diagnostic:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'diag/rb10-cold-click'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    runs-on: windows-2022
+    timeout-minutes: 25
     env:
       GH_TOKEN: ${{ github.token }}
+      RB_QA_RENDERER: gl rb_qa_opengl.dll
+      GALLIUM_DRIVER: llvmpipe
     steps:
-      - name: Download and verify the exact existing artifact without running the editor
+      - uses: actions/checkout@v4
+        with:
+          ref: 6bd6e2cedcade6e7e4d09cfe8f81901c91655a50
+          path: product
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 3cfb070149d4233e2d1262e8b6e8e17072f39056
+          path: qa-tools
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: diagnostic
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore the verified original 653-file Windows product
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p inspection
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/13628075652" > inspection/original-metadata.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          m=json.loads(Path('inspection/original-metadata.json').read_text())
-          assert m['id']==13628075652 and m['name']=='qa-Windows-x64' and m['expired'] is False
-          assert m['size_in_bytes']==2559132655
-          assert m['workflow_run']['id']==42505903900
-          assert m['workflow_run']['head_sha']=='3cfb070149d4233e2d1262e8b6e8e17072f39056'
-          assert m['workflow_run']['head_repository_id']==1425178769
-          assert m['digest']=='sha256:e9fb7df6a3eb1d995326d39acde40e836a5d683a422654db258f1bbd5b0b25d0'
-          PY
-          curl --fail --location --silent --show-error --retry 0 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/13628075652/zip" -o "$RUNNER_TEMP/rb10-cold-click-original.zip"
-          python - <<'PY'
-          import hashlib,json,os,stat,zipfile
-          from pathlib import Path,PurePosixPath
-          archive=Path(os.environ['RUNNER_TEMP'])/'rb10-cold-click-original.zip'
-          assert archive.stat().st_size==2559132655
-          with archive.open('rb') as stream:digest=hashlib.file_digest(stream,'sha256').hexdigest()
-          assert digest=='e9fb7df6a3eb1d995326d39acde40e836a5d683a422654db258f1bbd5b0b25d0'
-          report={'artifact_id':13628075652,'run':42505903900,'workflow_head':'3cfb070149d4233e2d1262e8b6e8e17072f39056','product_head':'6bd6e2cedcade6e7e4d09cfe8f81901c91655a50','archive_bytes':archive.stat().st_size,'archive_sha256':digest,'method':'Read existing artifact only; no editor/test execution or source modification','selected':[]}
-          with zipfile.ZipFile(archive) as z:
-              names=set();selected=[]
-              for f in z.infolist():
-                  p=PurePosixPath(f.filename)
-                  assert not p.is_absolute() and '..' not in p.parts and '\\' not in f.filename and ':' not in f.filename and f.filename not in names
-                  assert not stat.S_ISLNK(f.external_attr>>16)
-                  names.add(f.filename)
-                  namespace=any(p.parts[i:i+2]==('rb10','plant-target-ui') for i in range(len(p.parts)-1))
-                  if namespace and not f.is_dir():selected.append(f)
-              assert selected and len(selected)<1000
-              total=sum(f.file_size for f in selected)
-              assert total<=19*1024*1024,('Selected namespace exceeds bounded artifact size',total)
-              for f in selected:
-                  data=z.read(f)
-                  path=Path('inspection/members')/f.filename
-                  path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
-                  report['selected'].append({'path':f.filename,'bytes':len(data),'zip_crc32':f'{f.CRC:08x}','sha256':hashlib.sha256(data).hexdigest()})
-          report['selected_bytes']=sum(f['bytes'] for f in report['selected'])
-          Path('inspection/extraction-proof.json').write_text(json.dumps(report,indent=2)+'\n')
-          assert sum(p.stat().st_size for p in Path('inspection').rglob('*') if p.is_file())<20*1024*1024
-          print('Verified original artifact and extracted',len(report['selected']),'cold-click evidence files; no tests executed.')
-          PY
-      - name: Retain only bounded cold-click evidence and original provenance
+          mkdir -p proof
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/13626282101" > proof/original-metadata.json
+          curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/13626282101/zip" -o "$RUNNER_TEMP/rb10-original.zip"
+          python qa-tools/.github/rb10-qa/restore-windows-payload.py --metadata proof/original-metadata.json --archive "$RUNNER_TEMP/rb10-original.zip" --output restored --head 6bd6e2cedcade6e7e4d09cfe8f81901c91655a50 --run 42498112722 --artifact-id 13626282101 --sha256 c30cfa600a7f9223bca901bd9b084526dc4fe686d86cc57a67053504e8441313
+      - name: Prepare independent fresh runtimes and the verified software renderer
+        shell: pwsh
+        run: |
+          python -m pip install Pillow pywinauto
+          if ($LASTEXITCODE) { throw 'Diagnostic dependencies failed' }
+          Copy-Item diagnostic/scripts/test-plant-target-cold-diagnostic.py product/scripts/test-plant-target-cold-diagnostic.py
+          New-Item -ItemType Directory -Force variants, out, proof | Out-Null
+          Copy-Item restored/runtime variants/A -Recurse
+          Copy-Item restored/runtime variants/B -Recurse
+          $mesa = Join-Path $env:RUNNER_TEMP 'rb10-cold-click-mesa'
+          New-Item -ItemType Directory -Force $mesa | Out-Null
+          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir $mesa --pattern mesa3d-25.3.3-release-msvc.7z
+          if ($LASTEXITCODE) { throw 'Mesa download failed' }
+          $archive = Join-Path $mesa 'mesa3d-25.3.3-release-msvc.7z'
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Mesa checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x $archive "-o$mesa/extracted" -y | Out-Null
+          if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
+          $gl = Get-ChildItem "$mesa/extracted" -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
+          if (!$gl) { throw '64-bit Mesa missing' }
+          foreach ($variant in @('A','B')) {
+            python product/tests/make-linux-build-fixture.py "variants/$variant"
+            if ($LASTEXITCODE) { throw "Fresh diagnostic fixture setup failed: $variant" }
+            Copy-Item (Join-Path $gl.DirectoryName '*.dll') "variants/$variant/bin" -Force
+            Copy-Item $gl.FullName "variants/$variant/bin/rb_qa_opengl.dll"
+          }
+          if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) { Set-DisplayResolution -Width 1920 -Height 1080 -Force }
+          $provenance = [ordered]@{
+            diagnostic_only = $true
+            product_qa_completed = $false
+            product_head = '6bd6e2cedcade6e7e4d09cfe8f81901c91655a50'
+            qa_tools_head = '3cfb070149d4233e2d1262e8b6e8e17072f39056'
+            diagnostic_head = '${{ github.event.pull_request.head.sha }}'
+            original_artifact_id = 13626282101
+            original_artifact_sha256 = 'c30cfa600a7f9223bca901bd9b084526dc4fe686d86cc57a67053504e8441313'
+            module_sha256 = (Get-FileHash restored/runtime/fteplug_ftebroom_x64.dll -Algorithm SHA256).Hash.ToLower()
+            qc_sha256 = (Get-FileHash restored/runtime/ftebroom/csaddon.dat -Algorithm SHA256).Hash.ToLower()
+            runtime_manifest_sha256 = (Get-FileHash restored/runtime/distribution-manifest.json -Algorithm SHA256).Hash.ToLower()
+            driver_sha256 = (Get-FileHash product/scripts/test-plant-target-cold-diagnostic.py -Algorithm SHA256).Hash.ToLower()
+            renderer_sha256 = (Get-FileHash variants/A/bin/rb_qa_opengl.dll -Algorithm SHA256).Hash.ToLower()
+            variants = @('A: original map/epoch readiness','B: same readiness plus in 11 fixture completion marker')
+            method = 'Fresh independent runtime clones; real OS input; unchanged ten assertions; no product rebuild or prior-suite warming'
+          }
+          $provenance | ConvertTo-Json -Depth 6 | Set-Content proof/provenance.json -Encoding utf8
+      - name: Run both real OS-input diagnostics and preserve each actual exit code
+        shell: pwsh
+        working-directory: product
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $statuses = @()
+          foreach ($variant in @('A','B')) {
+            $runtime = (Resolve-Path "../variants/$variant").Path
+            $output = Join-Path (Resolve-Path ../out).Path $variant
+            New-Item -ItemType Directory -Force $output | Out-Null
+            python scripts/test-plant-target-cold-diagnostic.py $runtime $output --variant $variant 2>&1 | Tee-Object -FilePath "$output/driver-output.log"
+            $code = $LASTEXITCODE
+            $statuses += [ordered]@{ variant = $variant; actual_exit_code = $code; diagnostic_only = $true; product_qa_completed = $false }
+            [ordered]@{ diagnostic_only = $true; product_qa_completed = $false; variants = $statuses } | ConvertTo-Json -Depth 6 | Set-Content ../proof/variant-exit-codes.json -Encoding utf8
+          }
+          if ($statuses | Where-Object { $_.actual_exit_code -ne 0 }) { throw 'One or more diagnostic variants failed. Inspect actual exit codes and snapshots; this job does not certify the product.' }
+      - name: Collect only bounded screenshots, logs, state and provenance
         if: always()
-        uses: actions/upload-artifact@v4
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,shutil
+          target=Path('diagnostic-evidence');target.mkdir()
+          allowed={'.png','.json','.jsonl','.log','.map','.cfg','.txt'}
+          selected=[]
+          for base in (Path('out'),Path('proof')):
+              if not base.exists():continue
+              for path in base.rglob('*'):
+                  assert not path.is_symlink()
+                  if path.is_file() and path.suffix.lower() in allowed:selected.append(path)
+          restoration=Path('restored/restoration.json')
+          if restoration.is_file():selected.append(restoration)
+          assert sum(p.stat().st_size for p in selected)<=19*1024*1024
+          members=[]
+          for path in selected:
+              dst=target/path;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,dst)
+              members.append({'path':path.as_posix(),'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+          (target/'collection.json').write_text(json.dumps({'diagnostic_only':True,'product_qa_completed':False,'files':members},indent=2)+'\n')
+          assert sum(p.stat().st_size for p in target.rglob('*') if p.is_file())<20*1024*1024
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: rb10-cold-click-existing-evidence
+          name: rb10-cold-click-two-variant-diagnostic
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
-          path: inspection/
+          path: diagnostic-evidence/

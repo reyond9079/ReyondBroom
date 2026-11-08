@@ -126,7 +126,8 @@ jobs:
         shell: pwsh
         run: |
           if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft' }
-          gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
+          $files = (Get-ChildItem out/release/*.zip,out/release/*.sha256).FullName
+          gh release upload "v$env:VERSION" @files --clobber
           if ($LASTEXITCODE) { throw 'Staging draft packages failed' }
       - name: Validate PK3 import and the inner audio window in the packaged editor
         shell: pwsh
@@ -202,7 +203,8 @@ jobs:
         shell: pwsh
         run: |
           if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
-          gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
+          $files = (Get-ChildItem out/release/*.zip,out/release/*.sha256).FullName
+          gh release upload "v$env:VERSION" @files --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
       - name: Collect compact release evidence
         if: always()

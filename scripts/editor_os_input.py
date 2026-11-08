@@ -181,7 +181,7 @@ class NativeInput:
      try:time.sleep(.05);self.settle()
      finally:self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),2,0);self.settle()
     finally:self.mod('ctrl',False)
-    with (self.output/'clipboard-paste.jsonl').open('a',encoding='utf-8') as log:
+    with (self.output/'clipboard-paste.log').open('a',encoding='utf-8') as log:
      import hashlib
      log.write(json.dumps({'length':len(text),'sha256':hashlib.sha256(text.encode('utf-8')).hexdigest(),'method':'OS keybd_event Ctrl+V held over observed engine ticks','focus':self.read_focus()})+'\n')
    else:self.key('v',('ctrl',))

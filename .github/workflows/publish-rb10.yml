@@ -94,6 +94,7 @@ jobs:
               'Подробности приёмки и ограничения игровых профилей: docs/qa/rb-10/acceptance.md'
             ].join('\n');
             const {data: published} = await github.rest.repos.updateRelease({...repo, release_id: release.id,
+              tag_name: tag, name: 'ReyondBroom ' + version,
               target_commitish: context.sha, body, draft: false, prerelease: false, make_latest: 'true'});
             core.info(`Published ${published.html_url}`);
         env:

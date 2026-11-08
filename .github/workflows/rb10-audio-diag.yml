@@ -1,0 +1,125 @@
+name: RB-10 isolated Windows audio diagnostic
+on:
+  pull_request:
+    branches: [feat/rb-10-editor-polish]
+    paths: [.github/workflows/rb10-audio-diag.yml]
+permissions:
+  contents: read
+concurrency:
+  group: rb10-audio-diag-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  windows-audio-diagnostic:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BASE_TAG: v0.5.0-alpha.131
+    steps:
+      # The separate diagnostic branch starts at the current RB-10 source and
+      # contains only private clock/trace instrumentation beyond that revision.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-pkgconf git curl diffutils tar make unzip
+      - name: Verify alpha.131 runtime and native SDK
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p base deps bundle qa/build
+          gh release download "$BASE_TAG" --repo "$GITHUB_REPOSITORY" --dir base \
+            --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' \
+            --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+          (cd base && sha256sum -c ./*.sha256) 2>&1 | tee qa/build/base-checksums.log
+          unzip -q base/*-Windows-x64.zip -d bundle
+          unzip -q base/*-Linux-x64-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
+          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+      - name: Build current native editor and QC only
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          {
+            python scripts/build-profile-support.py core --build-dir deps/profile-core --generator 'MinGW Makefiles'
+            cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
+            cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
+            g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
+            make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
+            deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
+            cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
+            cp runtime/ftebroom.cfg bundle/ReyondBroom-Windows-x64/ftebroom/ftebroom.cfg
+            cp runtime/glsl/* bundle/ReyondBroom-Windows-x64/ftebroom/glsl/
+          } 2>&1 | tee qa/build/native-qc.log
+      - name: Prepare two independent clean runtime clones
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force diag-runtime, qa | Out-Null
+          Copy-Item bundle/ReyondBroom-Windows-x64 diag-runtime/baseline -Recurse
+          Copy-Item bundle/ReyondBroom-Windows-x64 diag-runtime/controlled-clock -Recurse
+          $revision = (git rev-parse HEAD).Trim()
+          $info = [ordered]@{
+            diagnostic_source_revision = $revision
+            workflow_revision = $env:GITHUB_SHA
+            base_tag = $env:BASE_TAG
+            module_sha256 = (Get-FileHash bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll -Algorithm SHA256).Hash.ToLower()
+            qc_sha256 = (Get-FileHash bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat -Algorithm SHA256).Hash.ToLower()
+            scope = 'Diagnostic branch only; no release packaging, upload or publication'
+            variants = @('baseline: original input clock', 'controlled: synthetic input clock')
+          }
+          $info | ConvertTo-Json -Depth 4 | Set-Content qa/provenance.json -Encoding utf8
+      - name: Baseline original input clock, native Windows archive regression
+        id: baseline
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./scripts/test-audio-archive-windows.ps1 -Runtime diag-runtime/baseline -Output qa/baseline
+      - name: Controlled input clock, same nine strict assertions
+        shell: pwsh
+        run: |
+          # The wrapper installs verified Mesa into BASELINE. Copy only its DLLs,
+          # never baseline settings, screenshots, traces or imported sound state.
+          if (!(Test-Path diag-runtime/baseline/bin/rb_qa_opengl.dll)) { throw 'Baseline Mesa setup failed; controlled run cannot start' }
+          Copy-Item diag-runtime/baseline/bin/*.dll diag-runtime/controlled-clock/bin -Force
+          $env:RB_QA_RENDERER = 'gl rb_qa_opengl.dll'
+          python scripts/test-audio-archive.py diag-runtime/controlled-clock qa/controlled-clock --synthetic-input-clock
+          if ($LASTEXITCODE) { throw 'Controlled-clock archive diagnostic failed its unchanged assertions' }
+      - name: Collect native logs and screenshots even on failure
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force qa/retained | Out-Null
+          foreach ($variant in @('baseline', 'controlled-clock')) {
+            $target = Join-Path qa/retained $variant
+            New-Item -ItemType Directory -Force $target | Out-Null
+            foreach ($relative in @('qconsole.log', 'ftebroom/qconsole.log')) {
+              $path = Join-Path "diag-runtime/$variant" $relative
+              if (Test-Path $path) { Copy-Item $path (Join-Path $target ($relative.Replace('/', '-'))) -Force }
+            }
+            if (Test-Path "diag-runtime/$variant/ftebroom") {
+              Get-ChildItem "diag-runtime/$variant/ftebroom" -File | Where-Object { $_.Name -like 'audio-archive-*' -and $_.Extension -in @('.png','.json','.jsonl','.cfg') } | Copy-Item -Destination $target -Force
+            }
+          }
+          if (Test-Path tests/audio-archive.cfg) { Copy-Item tests/audio-archive.cfg qa/retained/diagnostic-timing.cfg -Force }
+          if (Test-Path tests/audio-archive-clock.cfg) { Copy-Item tests/audio-archive-clock.cfg qa/retained/controlled-timing.cfg -Force }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rb10-audio-windows-diagnostic-${{ github.run_id }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            qa/**
+            diag-runtime/**/audio-archive-*.png
+            diag-runtime/**/audio-archive-*.json
+            diag-runtime/**/qconsole.log

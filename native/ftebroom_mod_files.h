@@ -8,6 +8,7 @@
 static bool modFilesOpen=false,modFilesVisible=false;
 static bool modFilesRequestFocus=false;
 static std::map<std::string,ImVec2> modFilesTestItems;
+static nlohmann::json modFilesTestGeometry=nlohmann::json::object();
 static ImVec2 modFilesMin,modFilesMax;
 static std::filesystem::path modFilesFolder,modFilesRoot;
 static bool modFilesSources=false;
@@ -263,7 +264,7 @@ static void modFilesPanel() {
   imageViewerPanel();
   modelConverterPanel();
   modFilesTextPanel();
-  modFilesVisible=false;if(cvars->GetFloat("ftebroom_skip_setup"))modFilesTestItems.clear();if(!modFilesOpen)return;
+  modFilesVisible=false;if(cvars->GetFloat("ftebroom_skip_setup")){modFilesTestItems.clear();modFilesTestGeometry=nlohmann::json::object();}if(!modFilesOpen)return;
   ImGui::SetNextWindowSize({650*uiScale(),450*uiScale()},ImGuiCond_FirstUseEver);
   if(modFilesRequestFocus){ImGui::SetNextWindowFocus();modFilesRequestFocus=false;}
   if(uiSoftPanelBegin("Mod file manager",&modFilesOpen)) {
@@ -312,7 +313,12 @@ static void modFilesPanel() {
         if(col)ImGui::SameLine();ImGui::PushID(i);auto p=ImGui::GetCursorScreenPos();
         if(ImGui::Selectable("##file",false,ImGuiSelectableFlags_AllowDoubleClick,{modFilesGrid?tileSize+8:ImGui::GetContentRegionAvail().x,rowHeight-ImGui::GetStyle().ItemSpacing.y})&&directory)navigate=path;
         browserQaItem("files/item/"+label);
-        if(cvars->GetFloat("ftebroom_skip_setup")&&soundFile(path)) {auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();modFilesTestItems[path.generic_u8string()]={(a.x+b.x)*.5f,(a.y+b.y)*.5f};}
+        if(cvars->GetFloat("ftebroom_skip_setup")&&soundFile(path)) {auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();modFilesTestItems[path.generic_u8string()]={(a.x+b.x)*.5f,(a.y+b.y)*.5f};
+          if(cvars->GetFloat("ftebroom_test_audio_diag")){
+            const auto* window=ImGui::GetCurrentWindow();const auto& g=*ImGui::GetCurrentContext();const auto& io=ImGui::GetIO();ImRect visible(a,b);visible.ClipWith(window->ClipRect);
+            modFilesTestGeometry[path.generic_u8string()]={{"frame",g.FrameCount},{"time",g.Time},{"delta_time",io.DeltaTime},{"item_id",g.LastItemData.ID},{"item_rect",{a.x,a.y,b.x,b.y}},{"clip_rect",{window->ClipRect.Min.x,window->ClipRect.Min.y,window->ClipRect.Max.x,window->ClipRect.Max.y}},{"inner_clip_rect",{window->InnerClipRect.Min.x,window->InnerClipRect.Min.y,window->InnerClipRect.Max.x,window->InnerClipRect.Max.y}},{"visible_rect",{visible.Min.x,visible.Min.y,visible.Max.x,visible.Max.y}},{"item_visible",ImGui::IsItemVisible()},{"item_hovered",ImGui::IsItemHovered()},{"item_hovered_allow_blocked",ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup|ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)},{"window",window->Name},{"pointer",{io.MousePos.x,io.MousePos.y}},{"mouse_down",io.MouseDown[0]},{"mouse_clicked",io.MouseClicked[0]},{"mouse_double_clicked",io.MouseDoubleClicked[0]},{"mouse_clicked_count",io.MouseClickedCount[0]},{"mouse_clicked_time",io.MouseClickedTime[0]}};
+          }
+        }
         if(ImGui::IsItemHovered()&&ImGui::IsMouseDoubleClicked(0)&&!directory) {
           if(entityLower(path.extension().u8string())==".lmp")lmpShow(path);else if(modelViewableFile(path))modelEditorShow(modFileModelPath(path));else if(soundFile(path))soundOpen(path);else if(imageFile(path))imageViewerShow(path);else if(entityLower(path.extension().u8string())==".map")modFileOpenMap(path);else if(modFileText(path))modFilesEdit(path);
         }

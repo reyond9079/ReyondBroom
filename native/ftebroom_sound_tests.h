@@ -40,14 +40,61 @@ if (std::string_view(mode).substr(0, 6) == "audio4") {
     frame();
     ImGui::SetWindowFocus("Mod file manager");
     frame();
-    auto point = modFilesTestItems.at((folder / "sounds.pk3/sound/short.wav").generic_u8string());
+    const auto target = (folder / "sounds.pk3/sound/short.wav").generic_u8string();
+    auto point = modFilesTestItems.at(target);
+    const bool syntheticClock = cvars->GetFloat("ftebroom_test_audio_input_clock") != 0;
+    nlohmann::json clickTrace = nlohmann::json::array();
+    auto trace = [&](const char* phase, int click) {
+      const auto& g = *ImGui::GetCurrentContext();
+      const auto& io = ImGui::GetIO();
+      const auto* manager = ImGui::FindWindowByName("Mod file manager");
+      auto fresh = modFilesTestItems.find(target);
+      nlohmann::json record = {{"phase",phase},{"click",click},{"synthetic_input_clock",syntheticClock},
+        {"engine_milliseconds",uint64_t(core->GetMilliseconds())},{"last_panel_milliseconds",uint64_t(lastTime)},
+        {"frame",g.FrameCount},{"time",g.Time},{"delta_time",io.DeltaTime},
+        {"mouse_clicked_time",io.MouseClickedTime[0]},{"mouse_clicked_count",io.MouseClickedCount[0]},
+        {"mouse_clicked_last_count",io.MouseClickedLastCount[0]},{"mouse_clicked",io.MouseClicked[0]},
+        {"mouse_double_clicked",io.MouseDoubleClicked[0]},{"mouse_down",io.MouseDown[0]},
+        {"double_click_limit",io.MouseDoubleClickTime},{"double_click_max_distance",io.MouseDoubleClickMaxDist},
+        {"pointer",{io.MousePos.x,io.MousePos.y}},{"injected_pointer",{point.x,point.y}},
+        {"input_queue",g.InputEventsQueue.Size},{"hovered_id",g.HoveredId},{"active_id",g.ActiveId},
+        {"hovered_window",g.HoveredWindow?g.HoveredWindow->Name:""},
+        {"hovered_window_before_clear",g.HoveredWindowBeforeClear?g.HoveredWindowBeforeClear->Name:""},
+        {"has_menu_focus",bool(input->HasMenuFocus())},{"mod_files_visible",modFilesVisible},
+        {"sound_editor_open",soundEditorOpen},{"sources",p.sources.size()},{"theme",uiTheme},{"scale",uiScale()},
+        {"recent_window",recentWindow},{"first_setup_step",firstSetupStep},{"setup_needed",setupNeeded},
+        {"target",target},{"display",{testW,testH}}};
+      if (fresh != modFilesTestItems.end()) record["fresh_target_center"] = {fresh->second.x,fresh->second.y};
+      if (manager) record["manager"] = {{"position",{manager->Pos.x,manager->Pos.y}},
+        {"size",{manager->Size.x,manager->Size.y}},{"clip_rect",{manager->ClipRect.Min.x,manager->ClipRect.Min.y,manager->ClipRect.Max.x,manager->ClipRect.Max.y}},
+        {"active",manager->Active},{"hidden",manager->Hidden},{"collapsed",manager->Collapsed},{"dock_node",manager->DockNode!=nullptr}};
+      auto geometry = modFilesTestGeometry.find(target);
+      if (geometry != modFilesTestGeometry.end()) record["target_geometry"] = *geometry;
+      clickTrace.push_back(std::move(record));
+    };
+    auto inject = [&](const char* phase, int click, int type, int key) {
+      trace((std::string("before_")+phase).c_str(),click);
+      // Controlled diagnostic only. Default 0 retains the original real clock.
+      if (syntheticClock && type == 0) lastTime = core->GetMilliseconds();
+      event(type,key,0,point.x,point.y,testW,testH);
+      trace((std::string("after_")+phase).c_str(),click);
+    };
+    trace("target_captured",-1);
     for (int click = 0; click < 2; ++click) {
-      event(0, 0, 0, point.x, point.y, testW, testH);
-      event(1, mouseKeys[0], 0, point.x, point.y, testW, testH);
-      event(0, 0, 0, point.x, point.y, testW, testH);
-      event(2, mouseKeys[0], 0, point.x, point.y, testW, testH);
+      inject("move",click,0,0);
+      inject("down",click,1,mouseKeys[0]);
+      inject("flush_down",click,0,0);
+      inject("up",click,2,mouseKeys[0]);
     }
+    trace("before_final_frame",2);
+    if (syntheticClock) lastTime = core->GetMilliseconds();
     frame();
+    trace("after_final_frame",2);
+    // Write after the gesture so disk/log I/O cannot alter its measured timing.
+    std::ofstream traceFile(documentPath("audio-archive-click-trace.jsonl"));
+    for (const auto& record : clickTrace) traceFile << record.dump() << '\n';
+    traceFile.close();
+    for (const auto& record : clickTrace) core->Print(("FTEBROOM_AUDIO_DIAG "+record.dump()+"\n").c_str());
     expect(soundEditorOpen && (soundBusy() || p.sources.size() == 1),
            "audio4_pk3_file_manager_double_click");
   } else if (test == "audio4archiveopened") {

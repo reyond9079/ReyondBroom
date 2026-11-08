@@ -589,8 +589,21 @@ float fb_frame_profile[4];
 void fb_generator_draw();
 void fb_symmetry_draw();
 void fb_array_draw();
+string fb_caption_alias, fb_caption_name;
+void fb_caption_update()
+{
+    string alias=cvar_string("mapname");
+    string name=cvar_string("ftebroom_document_title");
+    if (name=="" || (alias==fb_caption_alias && name==fb_caption_name)) return;
+    setwindowcaption(strcat("ReyondBroom: ",name,".map"));
+    if (fb_caption_alias!="") strunzone(fb_caption_alias);
+    if (fb_caption_name!="") strunzone(fb_caption_name);
+    fb_caption_alias=strzone(alias);
+    fb_caption_name=strzone(name);
+}
 void ftebroom_frame()
 {
+    fb_caption_update();
     float profileTime=gettime(1);
     fb_trace_draw();
     fb_issues_tick();

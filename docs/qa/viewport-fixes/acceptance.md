@@ -21,6 +21,14 @@ comparison after the fix measured68400 white grid pixels and2048 magenta edge
 pixels with the grid both on and off. These are fixture measurements, not a
 universal performance/quality threshold or an OS/GPU hardware guarantee.
 
+Windows acceptance also exposed a second source of coverage changes: its default
+8× MSAA window backbuffer smooths thin lines, while the cache texture has one
+sample. Orthographic views now always rasterize into the same opaque canvas.
+Idle multi-view panes reuse it; dragging, tools, disabled caching and maximized
+2D panes redraw it each frame. This keeps line coverage consistent without
+disabling 3D MSAA or removing cache reuse. The unchanged cached/uncached strength
+assertion detects this difference; screenshots and metrics retain the evidence.
+
 The existing editor sky shader now emits a configurable flat gray when sky
 background is disabled. Preferences persist this independent RGB value.
 Keyboard actions reuse the real entity/group/history/texture operations;

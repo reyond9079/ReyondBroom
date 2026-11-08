@@ -89,7 +89,8 @@ try:
  if not a.capture_only:expect(count(red,'2d',lambda c:c[0]>235 and c[1]<20 and c[2]<20)>1000,'red_grid_preserves_rgb')
  ui.console('set ftebroom_grid_color "1 1 1"');ui.console('set ftebroom_view_cache_disable 1');direct=shot('grid-direct')
  if not a.capture_only:expect(count(direct,'2d',lambda c:min(c)>235)>1000,'uncached_grid_uses_same_color')
- if not a.capture_only:expect(count(direct,'2d',magenta)>=metrics['edges_grid_on']*.95,'cached_and_uncached_edges_keep_strength')
+ metrics['edges_uncached']=count(direct,'2d',magenta)
+ if not a.capture_only:expect(metrics['edges_uncached']>=metrics['edges_grid_on']*.95,'cached_and_uncached_edges_keep_strength')
  ui.console('set ftebroom_view_cache_disable 0')
  if not a.capture_only:
   metrics['edge_refresh_samples']=[]

@@ -126,9 +126,18 @@ class NativeInput:
   for mod in mods:self.mod(mod,True)
   try:
    if os.name=='nt':
-    self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0);time.sleep(.10 if hold is None else hold);self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
+    self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0)
+    # Observe fresh UI frames with the button down before releasing it. A
+    # fixed hold can otherwise fit entirely between slow software-rendered
+    # frames, losing the click. This never retries the action.
+    try:time.sleep(.10 if hold is None else hold);self.settle()
+    finally:self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
    else:
-    self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync();time.sleep(.08 if hold is None else hold);self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
+    self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync()
+    try:time.sleep(.08 if hold is None else hold);self.settle()
+    finally:self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
+   # Keep modifiers held until the release has reached the editor as well.
+   self.settle()
   finally:
    for mod in reversed(mods):self.mod(mod,False)
   time.sleep(.25)

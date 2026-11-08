@@ -288,6 +288,16 @@ jobs:
             # Match the supported desktop used by packaged-release acceptance.
             Set-DisplayResolution -Width 1920 -Height 1080 -Force
           }
+      - name: Verify viewport appearance, keyboard actions and profile ordering on Windows
+        shell: pwsh
+        run: |
+          # Isolate preferences/profiles and run the changed behavior first,
+          # before the longer existing authoring scenarios.
+          Copy-Item -Recurse bundle/ReyondBroom-Windows-x64 appearance-runtime
+          python tests/make-linux-build-fixture.py appearance-runtime
+          if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
+          python scripts/test-viewport-appearance.py appearance-runtime qa/appearance
+          if ($LASTEXITCODE) { throw 'Appearance / shortcuts / order acceptance failed' }
       - name: Run real Windows editor checks and UI atlas
         shell: pwsh
         run: python scripts/test-compilation-runtime.py bundle/ReyondBroom-Windows-x64 qa
@@ -325,13 +335,6 @@ jobs:
           python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
           python scripts/test-viewport-create.py bundle/ReyondBroom-Windows-x64 qa/viewport-create
           if ($LASTEXITCODE) { throw 'Viewport Create / Save acceptance failed' }
-      - name: Verify viewport appearance, keyboard actions and profile ordering on Windows
-        shell: pwsh
-        run: |
-          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
-          if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
-          python scripts/test-viewport-appearance.py bundle/ReyondBroom-Windows-x64 qa/appearance
-          if ($LASTEXITCODE) { throw 'Appearance / shortcuts / order acceptance failed' }
       - name: Verify engine launch and viewport colors with real Windows input
         run: python scripts/test-engine-viewport.py bundle/ReyondBroom-Windows-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4

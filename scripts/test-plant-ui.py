@@ -25,7 +25,7 @@ shutil.rmtree(data/'plant-qa-build',ignore_errors=True)
 (data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\n'+'in 12 ftebroom_plant qa dark\n')
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
-stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
+stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
 checks=[]
 def live():
  deadline=time.monotonic()+2
@@ -48,7 +48,7 @@ def ready():return wait(lambda:live()['ready'],90)
 def expect(value,name):
  assert value,name
  checks.append(name);(out/'ui-results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
-ui=NativeInput(process,path,live,wait,out)
+ui=NativeInput(process,path,live,wait,out,focus_required=True)
 def click(name,mods=()):
  for _ in range(12):
   r=wait(lambda:live()['widgets'].get(name));x,y=r['x']+r['width']*.5,r['y']+r['height']*.5

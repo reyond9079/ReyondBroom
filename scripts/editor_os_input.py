@@ -18,8 +18,10 @@ def read_ui_json(path,timeout=2):
 
 
 class NativeInput:
- def __init__(self,process,live_path,live,wait,output):
+ def __init__(self,process,live_path,live,wait,output,focus_required=False):
   self.process,self.path,self.live,self.wait,self.output=process,live_path,live,wait,output
+  self.focus_path=live_path.parent/'native-input-live.json'
+  self.focus_required=focus_required
   self.hwnd=None
   self.in_console=False
   if os.name=='nt':
@@ -38,8 +40,25 @@ class NativeInput:
    from Xlib.ext import xtest
    self.X,self.XK,self.xtest,self.d=X,XK,xtest,display.Display()
 
+ def read_focus(self):
+  if not self.focus_path.exists():return None
+  try:
+   state=read_ui_json(self.focus_path)
+   return state if state['pid']==self.process.pid else None
+  except (FileNotFoundError,PermissionError,json.JSONDecodeError,KeyError):return None
+
+ def focus_state(self):
+  state=self.read_focus()
+  return self.wait(self.read_focus) if state is None and self.focus_required else state
+
  def settle(self):
-  if self.in_console:return
+  if self.in_console:
+   state=self.focus_state()
+   if state is None:return # Older modules lack opt-in engine input telemetry.
+   for _ in range(2):
+    sequence=state['sequence']
+    state=self.wait(lambda:(s if (s:=self.read_focus()) and s['sequence']!=sequence else None))
+   return
   for _ in range(2):
    stamp=self.wait(lambda:self.path.stat().st_mtime_ns)
    self.wait(lambda:self.path.stat().st_mtime_ns!=stamp)
@@ -165,13 +184,22 @@ class NativeInput:
   self.in_console=True
   try:
    self.key('esc',('shift',))
-   # Console transitions are processed by the engine between frames. UI live
-   # state pauses while the console is open, so settle() cannot acknowledge
-   # them. In particular a Windows clipboard paste must not race its opening,
-   # Enter or closing Escape when SendMessage returns before the next frame.
+   # A fixed sleep is not an acknowledgment of a slow engine input frame.
+   # Hold shortcut transitions across observed ticks, and do not type before
+   # the engine actually routes input to its console. No action is retried.
+   observed=self.focus_state()
+   if observed is not None:
+    opened=self.wait(lambda:(s if (s:=self.read_focus()) and s['destination']&48 and not s['destination']&64 else None))
+    with (self.output/'console-focus.jsonl').open('a',encoding='utf-8') as log:log.write(json.dumps({'stage':'opened','command':command,'state':opened})+'\n')
    time.sleep(.25)
    self.text('/'+command);time.sleep(.25)
    self.key('enter');time.sleep(.25)
    self.key('esc');time.sleep(.25)
-  finally:self.in_console=False
+   if observed is not None:
+    closed=self.wait(lambda:(s if (s:=self.read_focus()) and not s['destination']&48 else None))
+    with (self.output/'console-focus.jsonl').open('a',encoding='utf-8') as log:log.write(json.dumps({'stage':'closed','command':command,'state':closed})+'\n')
+  finally:
+   try:(self.output/'console-last-focus.json').write_text(json.dumps(self.read_focus()),encoding='utf-8')
+   except OSError:pass
+   self.in_console=False
   self.settle()

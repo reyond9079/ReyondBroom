@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <chrono>
 #ifdef _WIN32
+#include <process.h>
 #define VARGS __cdecl
 #else
+#include <unistd.h>
 #define VARGS
 #endif
 typedef int uploadfmt_t;
@@ -1550,8 +1552,27 @@ static void mapReady()
   core->Print("ReyondBroom: permanent workspace restored for map.\n");
 }
 static void profileStartMap(){if(!pendingDocumentFile.empty())return;static bool first=true;if(first){recentLoad();recentWindow=!cvars->GetFloat("ftebroom_skip_setup")&&firstSetupStep<0&&!recentMaps.empty();first=false;}gameProfileLoad();command(gameClassic()?"mapedit maps/start-quake1.map\n":"mapedit maps/start.map\n");}
+// Read-only, opt-in input QA must keep advancing while the console owns focus.
+// The normal ImGui snapshots pause there and cannot acknowledge console input.
+static void inputQaTick()
+{
+  if(!ready || !cvars->GetFloat("ftebroom_input_qa") || !input->GetKeyDest)return;
+  static uint64_t sequence=0;
+#ifdef _WIN32
+  const int pid=_getpid();
+#else
+  const int pid=getpid();
+#endif
+  try {
+    nlohmann::json state{{"pid",pid},{"sequence",++sequence},{"milliseconds",core->GetMilliseconds()},
+      {"destination",input->GetKeyDest()}};
+    std::ofstream out(documentPath("native-input-live.json"),std::ios::binary);
+    out<<state.dump();
+  }catch(...){/* QA output never changes editor state or interrupts a frame. */}
+}
 static void QDECL actionFocusTick(int)
 {
+  inputQaTick();
   libreTick();shaderPackTick();
   updateTick();
   clipboardPump();

@@ -106,6 +106,17 @@ plugin, so its synthetic drag probe is not counted as a successful drag check.
 Native relative-event regressions cover that branch; actual OS stationary,
 keyboard and wheel cases are recorded separately.
 
+The OS driver also observes opt-in engine input telemetry while the console owns
+focus. Normal ImGui snapshots pause there; fixed sleeps previously allowed a
+Windows clipboard command to be lost after an otherwise successful Save/Cancel.
+`ftebroom_input_qa` publishes only PID, tick sequence, time and key destination;
+it is off by default and never invokes editor actions. Console shortcuts retain
+their modifiers across observed ticks and wait for actual console/menu routing.
+The driver records `console-focus.jsonl` and the last input state. The dark1920
+case exports its untouched fixture at a requested2FPS before the original forty
+assertions. `console-input-probe.json` and the actual MAP retain that receipt.
+No Save, console command or failed assertion is automatically repeated.
+
 The PR stays draft through platform CI. Its ready transition reserves the next
 alpha.129 draft and dispatches packaging against the exact PR head. Publication
 runs only after merge into main, verifies identical reviewed/merged source trees,

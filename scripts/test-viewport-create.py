@@ -16,7 +16,7 @@ for f in (data/'maps').glob('creation-qa-*.map'):f.unlink()
 (data/'maps/creation-qa-switch.map').write_bytes((data/'maps/qa_clip.map').read_bytes())
 project=data/'plants/projects/creation-qa.plant.json';project.unlink(missing_ok=True)
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
-stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width',str(a.width),'-height',str(a.height),'-basedir',str(root),'+exec','placement-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
+stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width',str(a.width),'-height',str(a.height),'-basedir',str(root),'+exec','placement-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
 checks=[]
 def live():return read_ui_json(path)
 def wait(fn,timeout=90):
@@ -29,7 +29,7 @@ def wait(fn,timeout=90):
   except (FileNotFoundError,json.JSONDecodeError,KeyError,PermissionError):pass
   time.sleep(.08)
  raise AssertionError('Timed out; latest state='+path.read_text()[:1200])
-ui=NativeInput(process,path,live,wait,out)
+ui=NativeInput(process,path,live,wait,out,focus_required=True)
 def check(ok,name):
  assert ok,name
  checks.append(name);(out/'results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
@@ -70,6 +70,17 @@ def entities(text):return [dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"',x)) for 
 try:
  wait(lambda:live()['plantReady']);ui.position()
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
+ if a.theme=='dark' and a.width==1920:
+  # Reproduce the input driver's slow-frame hazard before exercising Save.
+  # This exports the untouched fixture through real console input; it does not
+  # invoke authoring handlers, repeat actions or change the forty assertions.
+  probe=data/'maps/creation-qa-console-probe.map';probe.unlink(missing_ok=True)
+  ui.console('set cl_maxfps 2');began=time.monotonic()
+  ui.console('mod_terrain_save "" creation-qa-console-probe');wait(probe.is_file)
+  assert '"worldspawn"' in probe.read_text(errors='replace'),'Slow console export is not a MAP'
+  ui.console('set cl_maxfps 30')
+  (out/'slow-console-probe.map').write_bytes(probe.read_bytes())
+  (out/'console-input-probe.json').write_text(json.dumps({'requested_fps':2,'map_saved':True,'seconds':time.monotonic()-began,'focus_acknowledged':ui.focus_required},indent=2))
  close_plant();context('plant',hold=.55);wait(lambda:live()['plantReady'] and live()['plant']['active']);captured=live()['plant']['point'];check(live()['plant']['id']==live()['context']['id'],'plant route binds the initial click')
  (out/'initial-context-gesture.json').write_text(json.dumps({'requested_hold_seconds':.55,'observed':live()['contextGesture']},indent=2))
  # Moving the camera after opening the authoring window must not change the hit.

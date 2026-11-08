@@ -58,7 +58,7 @@ def start(label):
  statepath.unlink(missing_ok=True)
  config.write_text('set ftebroom_skip_setup 1\nexec ftebroom.cfg\nin 7 mapedit maps/'+mapname+'.map\nin 10 ftebroom_compile_mods '+json.dumps(mod)+'\nin 10 setpos 320 -400 280 25 130 0\nin 12 ftebroom_test_desktop reyon8qa\n')
  stream=(out/(label+'.log')).open('wb')
- process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec',config.name],cwd=root,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'},stdout=stream,stderr=subprocess.STDOUT)
+ process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec',config.name],cwd=root,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'},stdout=stream,stderr=subprocess.STDOUT)
  def wait(fn,timeout=30):
   end=time.monotonic()+timeout
   while time.monotonic()<end:
@@ -71,7 +71,7 @@ def start(label):
   raise AssertionError('Timed out: '+label)
  globals()['wait']=wait
  wait(lambda:live()['game']=='quake1' and len(live()['views'])==4)
- ui=NativeInput(process,statepath,live,wait,out);ui.position()
+ ui=NativeInput(process,statepath,live,wait,out,focus_required=True);ui.position()
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
  ui.move(600,300);ui.settle()
 def stop():

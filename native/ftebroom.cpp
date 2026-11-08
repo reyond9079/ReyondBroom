@@ -1079,7 +1079,7 @@ static void panel(float w, float h)
     bool colorsTab=ImGui::BeginTabItem("Colors");runUiRecordGlobal("preferences-colors-tab");
     if(colorsTab)
     {
-      for(auto setting:{std::pair{"Brush edges","ftebroom_color_brush_edges"},std::pair{"2D viewport background","ftebroom_color_2d_background"},std::pair{"Grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
+      for(auto setting:{std::pair{"Brush edges","ftebroom_color_brush_edges"},std::pair{"2D viewport background","ftebroom_color_2d_background"},std::pair{"3D background without sky","ftebroom_color_3d_background"},std::pair{"Grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
       {
         char text[128]={};float color[3]={};cvars->GetString(setting.second,text,sizeof text);std::sscanf(text,"%f %f %f",&color[0],&color[1],&color[2]);
         if(ImGui::ColorEdit3(setting.first,color)){std::snprintf(text,sizeof text,"%.6g %.6g %.6g",color[0],color[1],color[2]);cvars->SetString(setting.second,text);if(!std::strcmp(setting.second,"ftebroom_color_entity_bounds"))cvars->SetFloat("ftebroom_entity_bounds_class_colors",0);preferencesSave();}
@@ -1107,7 +1107,7 @@ static void panel(float w, float h)
     preferencesBackups();
     ImGui::EndTabItem();
     }
-    if(ImGui::BeginTabItem("Keyboard")){preferencesKeyboard();ImGui::EndTabItem();}
+    bool keyboardTab=ImGui::BeginTabItem("Keyboard");runUiRecordGlobal("preferences-keyboard-tab");if(keyboardTab){preferencesKeyboard();ImGui::EndTabItem();}
     if(ImGui::BeginTabItem("Update"))
     {
       ImGui::Text("ReyondBroom %s",editorVersion().c_str());

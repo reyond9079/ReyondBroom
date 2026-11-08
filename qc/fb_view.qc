@@ -76,18 +76,33 @@ void fb_view_input(string kind,float dx,float dy,float scroll)
     for(int other=1;other<=3;other++) fb_view_centers[other]=fb_view_centers[view];
     fb_view_prepare();
 }
+// Screen coordinates must not depend on the FBO's flipped projection matrix.
+// This also lets the cached grid render behind, rather than over, brush edges.
+vector fb_view_background_project(vector point)
+{
+    vector size=getproperty(VF_SIZE),origin=getproperty(VF_MIN);
+    float units=bound(1,cvar("ca_brush_viewsize"),262144)/max(size_x,size_y);
+    vector delta=point-fb_view_centers[(int)cvar("ca_brush_view")];
+    return origin+[size_x*.5+(delta*fb_view_right)/units,size_y*.5-(delta*fb_view_up)/units,0];
+}
 void fb_view_background()
 {
     int view=cvar("ca_brush_view");if(!view) return;
     fb_view_axes(view);
     vector size=getproperty(VF_SIZE),origin=getproperty(VF_MIN);
-    vector lo=unproject(origin),hi=unproject(origin+size);
+    float screenUnits=bound(1,cvar("ca_brush_viewsize"),262144)/max(size_x,size_y);
+    vector centerView=fb_view_centers[view];
+    vector lo=centerView-fb_view_right*size_x*screenUnits*.5-fb_view_up*size_y*screenUnits*.5;
+    vector hi=centerView+fb_view_right*size_x*screenUnits*.5+fb_view_up*size_y*screenUnits*.5;
     float left=min(lo*fb_view_right,hi*fb_view_right),right=max(lo*fb_view_right,hi*fb_view_right);
     float bottom=min(lo*fb_view_up,hi*fb_view_up),top=max(lo*fb_view_up,hi*fb_view_up);
     float step=fb_grid(),units=(right-left)/size_x;
     while(step/units<4) step*=2;
     if(cvar("ftebroom_grid_visible")) {
-        drawsetcliparea(origin_x,origin_y,size_x,size_y);
+        // FTE flips its 2D FBO projection, but scissor coordinates keep the
+        // framebuffer origin. Reflect only the clip rectangle in cached views.
+        vector canvas=getproperty(VF_SCREENVSIZE);
+        drawsetcliparea(origin_x,fb_view_render_cache?canvas_y-origin_y-size_y:origin_y,size_x,size_y);
         for(int axis=0;axis<3;axis++) {
             vector basis='0 0 0';basis[axis]=1;vector n=fb_grid_direction_world(basis);
             float nr=n*fb_view_right,nu=n*fb_view_up,den=nr*nr+nu*nu;
@@ -99,7 +114,7 @@ void fb_view_background()
             vector tangent=normalize(fb_view_right*(-nu)+fb_view_up*nr)*(right-left+top-bottom)*2;
             for(float level=ceil(low/spacing)*spacing;level<=high;level+=spacing) {
                 vector center=(fb_view_right*nr+fb_view_up*nu)*((level-depth)/den)+fb_view_normal*(lo*fb_view_normal);
-                drawline(1,project(center-tangent),project(center+tangent),[.18*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],cvar("ftebroom_grid_alpha"),0);
+                drawline(1,fb_view_background_project(center-tangent),fb_view_background_project(center+tangent),autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1),0);
             }
         }
         drawresetcliparea();
@@ -108,8 +123,8 @@ void fb_view_background()
     string rn="X",un="Y";
     if(view==1) {rc='0.2 1 0.2';rn="Y";}
     if(view!=3) {uc='0.3 0.5 1';un="Z";}
-    drawline(2,project(fb_view_right*left),project(fb_view_right*right),rc,1,0);
-    drawline(2,project(fb_view_up*bottom),project(fb_view_up*top),uc,1,0);
+    drawline(2,fb_view_background_project(fb_view_right*left),fb_view_background_project(fb_view_right*right),rc,1,0);
+    drawline(2,fb_view_background_project(fb_view_up*bottom),fb_view_background_project(fb_view_up*top),uc,1,0);
     vector p=origin+[76,size_y-65,0];
     drawline(2,p,p+'36 0 0',rc,1,0);drawstring(p+'40 -5 0',rn,'8 8 0',rc,1,0);
     drawline(2,p,p+'0 -36 0',uc,1,0);drawstring(p+'-4 -50 0',un,'8 8 0',uc,1,0);
@@ -119,7 +134,7 @@ void fb_view_background()
         vector mn=[stof(argv(0)),stof(argv(1)),stof(argv(2))],mx=[stof(argv(3)),stof(argv(4)),stof(argv(5))];
         float l=min(mn*fb_view_right,mx*fb_view_right),r=max(mn*fb_view_right,mx*fb_view_right);
         float b=min(mn*fb_view_up,mx*fb_view_up),t=max(mn*fb_view_up,mx*fb_view_up);
-        vector a=project(fb_view_right*l+fb_view_up*b),c=project(fb_view_right*r+fb_view_up*t);
+        vector a=fb_view_background_project(fb_view_right*l+fb_view_up*b),c=fb_view_background_project(fb_view_right*r+fb_view_up*t);
         drawline(2,a,[c_x,a_y,0],'1 0.5 0',1,0);drawline(2,[c_x,a_y,0],c,'1 0.5 0',1,0);
         drawline(2,c,[a_x,c_y,0],'1 0.5 0',1,0);drawline(2,[a_x,c_y,0],a,'1 0.5 0',1,0);
     }

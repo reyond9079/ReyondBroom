@@ -101,7 +101,9 @@ try:
  start('editor')
  expect(all(abs(x-y)<.001 for x,y in zip(channels('ftebroom_color_2d_background'),[48/255,50/255,56/255])),'fresh_2d_default_303238')
  expect(pixel_count(lambda c:max(abs(c[i]-[48,50,56][i]) for i in range(3))<3,'2d')>100000,'all_2d_views_render_gray')
- expect(pixel_count(lambda c:32<=c[0]<=43 and 32<=c[1]<=44 and 36<=c[2]<=47,'2d')>20000,'2d_grid_visible_on_gray_background')
+ # The configured RGB is blended by opacity, never multiplied into the
+ # background's brightness. Default170gray at0.65 over48/50/56 is127/128/130.
+ expect(pixel_count(lambda c:120<=c[0]<=136 and 120<=c[1]<=138 and 123<=c[2]<=140,'2d')>20000,'2d_grid_visible_on_gray_background')
  shot('2d-default-dark')
  # Open the real preference dialog and edit RGB fields with native OS input.
  preferences();rgb('ftebroom_color_brush_edges',[0,255,255])

@@ -101,3 +101,11 @@ For an OS-input-only Windows reproduction, dispatch the same workflow with
 that native, CSQC and probe sources match the artifact before reusing those binaries.
 This allows changing the OS input driver without rebuilding unchanged C++ each time.
 The reproduction has a separate concurrency group and does not cancel the full run.
+
+## Profile order
+
+Compile's Profiles toolbar and the Launch Engine list provide Up/Down arrows
+and A–Z sorting. The Game Engines manager has the same controls. Reordering
+keeps the selected profile's tasks/arguments attached to that profile, including
+duplicate names. Array order is persisted per game; it survives restarting the
+editor. The TrenchBroom import button remains above the Compile mini toolbar.

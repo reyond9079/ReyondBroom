@@ -10,7 +10,8 @@ static void testDesktop(){
 
  try {
   if(std::string_view(mode)=="reyon8qa"){
-    recentWindow=false;setupNeeded=false;firstSetupStep=-1;uiScaleChoice=0;uiTheme=0;uiStyle();
+    char theme[16]{};commands->Argv(2,theme,sizeof theme);
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;uiScaleChoice=0;uiTheme=std::string_view(theme)=="light"?1:0;uiStyle();
     viewSetLayout(4);runLoad();runUiLive=true;runWindow=false;frame();frame();
   }
   if(std::string_view(mode)=="reyon8preferences"){preferencesRequest=true;frame();frame();}

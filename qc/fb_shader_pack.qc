@@ -83,7 +83,7 @@ void fb_shader_pack_finish(){RSPFinish();}
 // Cloudless, editor-only background. Explicit map sky surfaces draw over it.
 void fb_editor_clear_sky(){
  fb_clear_sky_faces=0;
- if(!cvar("ftebroom_clear_sky") || cvar("ca_brush_view"))return;
+ if(cvar("ca_brush_view"))return;
  // A MAP sky shell is responsible for its own complete atmosphere. Do not
  // place a second editor backdrop in front of that shell or its water pass.
  static int skyEpoch=-1,hasPackSky;

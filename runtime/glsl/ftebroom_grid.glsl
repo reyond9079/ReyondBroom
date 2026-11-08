@@ -34,6 +34,6 @@ void main() {
     vec2 distanceToLine = abs(fract(coordinate + 0.5) - 0.5) / width;
     float feather = clamp(cvar_ftebroom_grid_aa, 0.05, 2.0);
     float coverage = 1.0 - smoothstep(max(0.0, 0.75-feather*0.5), 0.75+feather*0.5, min(distanceToLine.x, distanceToLine.y));
-    gl_FragColor = vec4(vc.rgb * cvar_ftebroom_grid_color, vc.a * coverage * distanceFade);
+    gl_FragColor = vec4(clamp(cvar_ftebroom_grid_color,0.0,1.0), vc.a * coverage * distanceFade);
 }
 #endif

@@ -116,9 +116,7 @@ void fb_view_cache_draw(int index,vector mn,vector sz)
     shaderforname(image,sprintf("{\n{\nmap $rt:ftebroom_viewcache%i\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}",index));
     drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
     drawpic('0 0 0',image,vidsize,'1 1 1',1,0);
-    // The viewport grid is a screen-space overlay, drawn on the restored main
-    // canvas rather than inside the render target's different projection.
-    fb_view_background();
+    // Grid and axes are cached behind the wireframe, never painted over it.
     fb_pick_draw_entities(TRUE);fb_visual_labels();
     drawresetcliparea();
 }
@@ -314,6 +312,8 @@ void() wrap_renderscene =
             // Cache the complete opaque canvas. Additive compositing over a
             // gray background would tint bright edges and erase black edges.
             drawfill('0 0 0',vidsize,autocvar_ftebroom_color_2d_background,1,0);
+            fb_view_render_cache=TRUE;
+            fb_view_background();
         }
         drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
         mousenear=unproject(curmousepos);mousefar=unproject(curmousepos+'0 0 1');

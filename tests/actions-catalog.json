@@ -1032,6 +1032,22 @@
     "gesture": ""
   },
   {
+    "id": "Menu/Edit/Create func_detail",
+    "label": "Create func_detail",
+    "keys": "",
+    "context": "CtxAnyView|CtxNoTool|CtxNodeSelection",
+    "command": "ftebroom_entity_create \"func_detail\" 1",
+    "gesture": ""
+  },
+  {
+    "id": "Menu/Edit/Create func_group",
+    "label": "Create func_group",
+    "keys": "",
+    "context": "CtxAnyView|CtxNoTool|CtxNodeSelection",
+    "command": "ftebroom_group \"Group\"",
+    "gesture": ""
+  },
+  {
     "id": "Menu/Textures/Reset alignment",
     "label": "Reset alignment",
     "keys": "Shift+r",
@@ -1041,7 +1057,7 @@
   },
   {
     "id": "Menu/Textures/Reset to world aligned",
-    "label": "Reset to world aligned",
+    "label": "Reset texture alignment to world aligned",
     "keys": "Alt+Shift+r",
     "context": "CtxAnyView|CtxAnySelection|(CtxAnyOrNoTool & ~CtxSweepTool)",
     "command": "ftebroom_texture_key world 1 0",

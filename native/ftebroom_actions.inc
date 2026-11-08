@@ -128,8 +128,10 @@ add("Menu/Textures/Rotate Down coarse", "Rotate Down coarse", CtxView3D|CtxFaceS
 add("Menu/Textures/Rotate Down fine", "Rotate Down fine", CtxView3D|CtxFaceSelection|(CtxAnyOrNoTool & ~CtxSweepTool), "Ctrl+pgdn", "ftebroom_texture_key rotate -1 2", "");
 add("Menu/Textures/Flip horizontal", "Flip horizontal", CtxView3D|CtxFaceSelection|(CtxAnyOrNoTool & ~CtxSweepTool), "Ctrl+f", "ftebroom_texture_key fliph 1 0", "");
 add("Menu/Textures/Flip vertical", "Flip vertical", CtxView3D|CtxFaceSelection|(CtxAnyOrNoTool & ~CtxSweepTool), "Ctrl+Alt+f", "ftebroom_texture_key flipv 1 0", "");
+add("Menu/Edit/Create func_detail", "Create func_detail", CtxAnyView|CtxNoTool|CtxNodeSelection, "", "ftebroom_entity_create \"func_detail\" 1", "");
+add("Menu/Edit/Create func_group", "Create func_group", CtxAnyView|CtxNoTool|CtxNodeSelection, "", "ftebroom_group \"Group\"", "");
 add("Menu/Textures/Reset alignment", "Reset alignment", CtxAnyView|CtxAnySelection|(CtxAnyOrNoTool & ~CtxSweepTool), "Shift+r", "ftebroom_texture_key reset 1 0", "");
-add("Menu/Textures/Reset to world aligned", "Reset to world aligned", CtxAnyView|CtxAnySelection|(CtxAnyOrNoTool & ~CtxSweepTool), "Alt+Shift+r", "ftebroom_texture_key world 1 0", "");
+add("Menu/Textures/Reset to world aligned", "Reset texture alignment to world aligned", CtxAnyView|CtxAnySelection|(CtxAnyOrNoTool & ~CtxSweepTool), "Alt+Shift+r", "ftebroom_texture_key world 1 0", "");
 add("Menu/View/Grid/Show Grid", "Show Grid", CtxAny, "0;kp_ins", "ftebroom_grid visible", "");
 add("Menu/View/Grid/Snap to Grid", "Snap to Grid", CtxAny, "Alt+0;Alt+kp_ins", "ftebroom_grid snap", "");
 add("Menu/View/Grid/Increase Grid Size", "Increase Grid Size", CtxAnyView, "+;=;Shift+=;kp_plus", "ftebroom_grid step 1", "");

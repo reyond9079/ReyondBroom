@@ -4,6 +4,7 @@
 #pragma once
 #include <functional>
 #include <cfloat>
+#include "ftebroom_profile_order.h"
 static bool runSettingsWindow=false,runLaunchWindow=false,runEngineWindow=false;
 static std::string runUiPendingDocument;
 static int runUiTaskSelected=-1,runUiEngineSelected=-1,runUiCloseRequest=0;
@@ -208,7 +209,7 @@ static bool runUiTaskCard(RunTask& t,int index,std::string& mutation){
 static std::string runUiElide(std::string text,float width){if(ImGui::CalcTextSize(text.c_str()).x<=width)return text;while(!text.empty()&&ImGui::CalcTextSize((text+"...").c_str()).x>width){size_t at=text.size()-1;while(at>0&&(static_cast<unsigned char>(text[at])&0xc0)==0x80)--at;text.resize(at);}return text+"...";}
 static bool runUiListItem(const std::string& id,const std::string& title,const std::string& subtitle,bool selected){
  const float u=uiScale(),w=ImGui::GetContentRegionAvail().x,h=34*u;auto p=ImGui::GetCursorScreenPos();
- bool clicked=ImGui::Selectable(("##"+id).c_str(),selected,ImGuiSelectableFlags_AllowDoubleClick|ImGuiSelectableFlags_SelectOnNav,{w,h});runUiRecord(id);
+ bool clicked=ImGui::Selectable(("##"+id).c_str(),selected,ImGuiSelectableFlags_AllowDoubleClick|ImGuiSelectableFlags_SelectOnNav,{w,h});runUiRecord(id);if(runUiLive)runUiRects[id]["selected"]=selected;
  auto* draw=ImGui::GetWindowDrawList();draw->PushClipRect(p,{p.x+w,p.y+h},true);
  auto* font=uiBoldFonts[std::clamp(uiScaleChoice,0,4)];if(font)ImGui::PushFont(font);auto name=runUiElide(title,w-8*u);draw->AddText({p.x+4*u,p.y+2*u},ImGui::GetColorU32(ImGuiCol_Text),name.c_str());if(font)ImGui::PopFont();
  draw->AddText({p.x+4*u,p.y+17*u},ImGui::GetColorU32(ImGuiCol_Text),runUiElide(subtitle,w-8*u).c_str());draw->PopClipRect();
@@ -224,6 +225,9 @@ static void runUiProfiles(float height){
  if(runProfiles.empty())ImGui::TextWrapped("Click the '+' button to create a compilation profile.");ImGui::EndChild();
  ImGui::SetCursorPosY(height-44*u);if(ImGui::Button("Import TrenchBroom profiles...",{ImGui::GetContentRegionAvail().x,22*u}))runUiImportRequested=true;runUiRecord("import");
  ImGui::SetCursorPosY(height-20*u);if(runUiIcon("profile-add",'+',"Add profile"))action="add";ImGui::SameLine(0,0);if(runUiIcon("profile-remove",'-',"Remove the selected profile",runSelected>=0&&runSelected<int(runProfiles.size()))){action="remove";actionRow=runSelected;}
+ ImGui::SameLine(0,0);if(runUiIcon("profile-up",'^',"Move profile up",runSelected>0))if(ftebroom::reorderProfiles(runProfiles,runSelected,"up"))runUiSave();
+ ImGui::SameLine(0,0);if(runUiIcon("profile-down",'v',"Move profile down",runSelected>=0&&runSelected+1<int(runProfiles.size())))if(ftebroom::reorderProfiles(runProfiles,runSelected,"down"))runUiSave();
+ ImGui::SameLine(0,2*u);if(ImGui::SmallButton("A-Z##profiles"))if(ftebroom::reorderProfiles(runProfiles,runSelected,"sort"))runUiSave();runUiRecord("profile-sort");runUiHint("Sort profiles by name; keeps the selected profile");
  if(!action.empty())runUiProfileMutation(action,actionRow);
 }
 static void runUiDetails(float height){
@@ -344,6 +348,9 @@ static void runUiEngines(){
   if(runUiEngineDraft.empty())ImGui::TextWrapped("Click the '+' button to create a game engine profile.");ImGui::EndChild();
   if(runUiIcon("engine-add",'+',"Add profile")){runUiEngineDraft.push_back({"engine-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()),"","",""});runUiEngineSelected=int(runUiEngineDraft.size()-1);}
   ImGui::SameLine(0,0);if(runUiIcon("engine-remove",'-',"Remove the selected profile",runUiEngineSelected>=0&&runUiEngineSelected<int(runUiEngineDraft.size()))){runUiEngineDraft.erase(runUiEngineDraft.begin()+runUiEngineSelected);runUiEngineSelected=std::min(runUiEngineSelected,int(runUiEngineDraft.size())-1);}
+  ImGui::SameLine(0,0);if(runUiIcon("engine-up",'^',"Move engine up",runUiEngineSelected>0))ftebroom::reorderProfiles(runUiEngineDraft,runUiEngineSelected,"up");
+  ImGui::SameLine(0,0);if(runUiIcon("engine-down",'v',"Move engine down",runUiEngineSelected>=0&&runUiEngineSelected+1<int(runUiEngineDraft.size())))ftebroom::reorderProfiles(runUiEngineDraft,runUiEngineSelected,"down");
+  ImGui::SameLine(0,2*u);if(ImGui::SmallButton("A-Z##engines"))ftebroom::reorderProfiles(runUiEngineDraft,runUiEngineSelected,"sort");runUiRecord("engine-sort");runUiHint("Sort engines by name; keeps the selected engine");
   if(gameProfile==2){for(const char* name:{"VKQuake","Ironwail"}){if(ImGui::SmallButton(name)){RunEngineProfile e;e.id="engine-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());e.name=name;ftebroom::quakeEngineDefaults(e);runUiEngineDraft.push_back(std::move(e));runUiEngineSelected=int(runUiEngineDraft.size()-1);}ImGui::SameLine();}ImGui::NewLine();}
   ImGui::EndChild();ImGui::SameLine(0,u);
   ImGui::BeginChild("Engine details",{0,body});runUiTitle("Details");
@@ -361,7 +368,7 @@ static void runUiEngines(){
     ImGui::TextWrapped("Variables include GAME_DIR_PATH (game root), MODS[-1] (active mod), MAP_BASE_NAME, WORK_DIR_PATH and ENGINE_DIR_PATH.");
    }ImGui::EndGroup();
   }else ImGui::TextWrapped("Select a game engine profile");ImGui::EndChild();
-  ImGui::SetCursorPosX(std::max(8*u,ImGui::GetContentRegionAvail().x-88*u));if(ImGui::Button("Close",{80*u,24*u}))open=false;runUiRecord("engine-close");
+  ImGui::SetCursorPosX(std::max(8*u,ImGui::GetContentRegionAvail().x-88*u));if(ImGui::Button("Close",{80*u,24*u}))open=false;runUiRecord("engine-close");runUiRecord("engine-manager-close");
  }
  ImGui::End();if(!open){nlohmann::json engines=nlohmann::json::array();for(const auto& e:runUiEngineDraft)engines.push_back(runEngineToJson(e));if(!runUiExecute({{"action","engineProfiles"},{"engines",engines}}).contains("error"))runEngineWindow=false;}
 }
@@ -373,11 +380,16 @@ static void runUiLaunch(){
   ImGui::BeginChild("Launch description",{std::max(120*u,available-side-u),body});ImGui::SetCursorPos({20*u,20*u});ImGui::TextUnformatted("Launch Engine");ImGui::SetCursorPos({20*u,60*u});
   ImGui::PushTextWrapPos(ImGui::GetWindowWidth()-20*u);ImGui::TextUnformatted("Select a game engine from the list on the right and edit the commandline parameters in the text box below. You can use variables to refer to the map name and other values.");ImGui::PopTextWrapPos();
   ImGui::SetCursorPosX(20*u);if(ImGui::Button("Configure engines..."))runEngineWindow=true;runUiRecord("launch-configure");
-  static std::string selectedId;static int selection=-1;if(selection>=int(runEngines.size())||(selection>=0&&runEngines[selection].id!=selectedId))selection=-1;
+  static std::string selectedId;static int selection=-1;
+  auto selectedEngine=std::find_if(runEngines.begin(),runEngines.end(),[&](const auto& e){return e.id==selectedId;});selection=selectedEngine==runEngines.end()?-1:int(selectedEngine-runEngines.begin());
   ImGui::SetCursorPos({20*u,std::max(ImGui::GetCursorPosY()+4*u,body-70*u)});ImGui::TextUnformatted("Parameters");ImGui::SetCursorPosX(20*u);ImGui::SetNextItemWidth(std::max(20*u,ImGui::GetContentRegionAvail().x-20*u));ImGui::BeginDisabled(selection<0);
   if(selection>=0){if(runUiEdit("##Launch parameters",runEngines[selection].parameters,"Parameters passed to the game engine. Variables are allowed.",2))runUiSave();}else{std::string empty;runUiEdit("##Launch parameters",empty);}ImGui::EndDisabled();ImGui::EndChild();ImGui::SameLine(0,u);
-  ImGui::BeginChild("Launch engine profiles",{0,body});for(int i=0;i<int(runEngines.size());++i)if(runUiListItem("launch-engine/"+std::to_string(i),runEngines[i].name,runEngines[i].path,i==selection)){selection=i;selectedId=runEngines[i].id;if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))try{runLaunchConfiguredEngine(runEngines[i]);}catch(const std::exception& e){runError=e.what();}}
+  ImGui::BeginChild("Launch engine profiles",{0,body});ImGui::BeginChild("Launch engine list",{0,-24*u});for(int i=0;i<int(runEngines.size());++i)if(runUiListItem("launch-engine/"+std::to_string(i),runEngines[i].name,runEngines[i].path,i==selection)){selection=i;selectedId=runEngines[i].id;if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))try{runLaunchConfiguredEngine(runEngines[i]);}catch(const std::exception& e){runError=e.what();}}
   if(runEngines.empty())ImGui::TextWrapped("Click the 'Configure engines...' button to create a game engine profile.");ImGui::EndChild();
+  std::string reorder;if(runUiIcon("launch-engine-up",'^',"Move engine up",selection>0))reorder="up";ImGui::SameLine(0,0);
+  if(runUiIcon("launch-engine-down",'v',"Move engine down",selection>=0&&selection+1<int(runEngines.size())))reorder="down";ImGui::SameLine(0,2*u);
+  if(ImGui::SmallButton("A-Z##launch-engines"))reorder="sort";runUiRecord("launch-engine-sort");runUiHint("Sort engines by name; keeps the selected engine");
+  if(!reorder.empty()&&ftebroom::reorderProfiles(runEngines,selection,reorder))runUiSave();ImGui::EndChild();
   ImGui::SetCursorPosX(std::max(8*u,available-174*u));ImGui::BeginDisabled(selection<0);bool launch=ImGui::Button("Launch",{80*u,24*u});runUiRecord("engine-launch");if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)&&ImGui::IsKeyPressed(ImGuiKey_Enter)&&ImGui::GetCurrentContext()->NavId!=ImGui::GetID("Close"))launch=true;
   if(launch&&selection>=0)try{runUiSave();runLaunchConfiguredEngine(runEngines[selection]);}catch(const std::exception& e){runError=e.what();}ImGui::EndDisabled();ImGui::SameLine();if(ImGui::Button("Close",{80*u,24*u}))open=false;runUiRecord("launch-close");
  }
@@ -392,7 +404,7 @@ static void runUiConfirmClose(){
  }
 }
 static void runUiWriteLive(){
- if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";nlohmann::json views=nlohmann::json::array(),colors=nlohmann::json::object();for(int i=0;i<viewLayout;i++){auto& v=viewRects[i];views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});}for(const char* name:{"ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_selected","ftebroom_color_locked"}){char text[128]{};cvars->GetString(name,text,sizeof text);colors[name]=text;}std::ofstream(temp)<<nlohmann::json{{"views",views},{"viewportColors",colors},{"log",runLog},{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError},{"inputTrace",runUiInputTrace}}.dump();
+ if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";nlohmann::json views=nlohmann::json::array(),colors=nlohmann::json::object();for(int i=0;i<viewLayout;i++){auto& v=viewRects[i];views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});}for(const char* name:{"ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_grid_color","ftebroom_clear_sky","ftebroom_color_selected","ftebroom_color_locked"}){char text[128]{};cvars->GetString(name,text,sizeof text);colors[name]=text;}std::ofstream(temp)<<nlohmann::json{{"views",views},{"viewportColors",colors},{"log",runLog},{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError},{"inputTrace",runUiInputTrace}}.dump();
 #ifdef _WIN32
   MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
 #else

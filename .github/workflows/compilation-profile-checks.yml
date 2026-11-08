@@ -199,6 +199,10 @@ jobs:
         run: |
           python tests/make-linux-build-fixture.py bundle/ReyondBroom-Linux-x64
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-create.py bundle/ReyondBroom-Linux-x64 qa/viewport-create
+      - name: Verify viewport appearance, keyboard actions and profile ordering
+        run: |
+          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Linux-x64
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-appearance.py bundle/ReyondBroom-Linux-x64 qa/appearance
       - name: Verify engine launch and viewport colors with real OS input
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py bundle/ReyondBroom-Linux-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4
@@ -321,6 +325,13 @@ jobs:
           python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
           python scripts/test-viewport-create.py bundle/ReyondBroom-Windows-x64 qa/viewport-create
           if ($LASTEXITCODE) { throw 'Viewport Create / Save acceptance failed' }
+      - name: Verify viewport appearance, keyboard actions and profile ordering on Windows
+        shell: pwsh
+        run: |
+          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
+          if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
+          python scripts/test-viewport-appearance.py bundle/ReyondBroom-Windows-x64 qa/appearance
+          if ($LASTEXITCODE) { throw 'Appearance / shortcuts / order acceptance failed' }
       - name: Verify engine launch and viewport colors with real Windows input
         run: python scripts/test-engine-viewport.py bundle/ReyondBroom-Windows-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4

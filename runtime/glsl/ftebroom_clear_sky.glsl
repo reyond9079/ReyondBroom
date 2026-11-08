@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 !!ver 100-450
 !!cvar3f ftebroom_sky_color=0.16,0.39,0.70
+!!cvarf ftebroom_clear_sky=1
+!!cvar3f ftebroom_color_3d_background=0.149019608,0.149019608,0.149019608
 #include "sys/defs.h"
 // Original analytic cloudless atmosphere for the editor background.
 varying vec3 direction;
@@ -13,7 +15,10 @@ void main(){
 #endif
 #ifdef FRAGMENT_SHADER
 uniform vec3 cvar_ftebroom_sky_color;
+uniform float cvar_ftebroom_clear_sky;
+uniform vec3 cvar_ftebroom_color_3d_background;
 void main(){
+    if(cvar_ftebroom_clear_sky<0.5){gl_FragColor=vec4(clamp(cvar_ftebroom_color_3d_background,0.0,1.0),1.0);return;}
     vec3 tint=clamp(cvar_ftebroom_sky_color,0.0,1.0)/vec3(0.16,0.39,0.70);
     float brightness=clamp(dot(cvar_ftebroom_sky_color,vec3(0.2126,0.7152,0.0722))/0.363484,0.0,1.0);
     vec3 rd=normalize(direction),sun=normalize(vec3(-0.45,-0.55,0.85));

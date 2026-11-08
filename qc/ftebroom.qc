@@ -601,11 +601,11 @@ void ftebroom_frame()
         float g=fb_grid_display_step([0,0,z],'0 0 1');
         for (int i=-32;i<=32;i++) {
             R_BeginPolygon("ftebroom/worldgrid");
-            R_PolygonVertex(fb_grid_world([i*g,-32*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1));
-            R_PolygonVertex(fb_grid_world([i*g,32*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
+            R_PolygonVertex(fb_grid_world([i*g,-32*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1));
+            R_PolygonVertex(fb_grid_world([i*g,32*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
             R_BeginPolygon("ftebroom/worldgrid");
-            R_PolygonVertex(fb_grid_world([-32*g,i*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1));
-            R_PolygonVertex(fb_grid_world([32*g,i*g,z]),'0 0',[.16*autocvar_ftebroom_grid_color_x,.18*autocvar_ftebroom_grid_color_y,.2*autocvar_ftebroom_grid_color_z],bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
+            R_PolygonVertex(fb_grid_world([-32*g,i*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1));
+            R_PolygonVertex(fb_grid_world([32*g,i*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
         }
     }
     fb_tool_draw();

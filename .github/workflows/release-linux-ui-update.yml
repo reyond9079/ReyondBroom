@@ -12,6 +12,14 @@ on:
         description: Compatible engine/dependency base for Windows and SDL2
         required: true
         default: 'v0.5.0-alpha.124'
+      capture_catalog:
+        description: Capture the complete plant catalogue when plant visuals change
+        type: boolean
+        default: true
+      viewport_checks:
+        description: Validate viewport color, shortcuts and ordering fixes in all theme / size cases
+        type: boolean
+        default: false
       linux_base_tag:
         description: Native Linux base
         required: true
@@ -89,14 +97,25 @@ jobs:
               xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-create.py "$bundle" "$PWD/qa/viewport-create-$theme-$width" --theme "$theme" --width "$width" --height "$height"
             done
           done
+      - name: Validate packaged viewport fixes in both themes and sizes
+        if: inputs.viewport_checks
+        run: |
+          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
+          python tests/make-linux-build-fixture.py "$bundle"
+          for theme in dark light; do
+            for dimensions in '1920 1080' '1024 768'; do
+              read -r width height <<< "$dimensions"
+              xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-appearance.py "$bundle" "$PWD/qa/appearance-$theme-$width" --theme "$theme" --width "$width" --height "$height"
+            done
+          done
       - name: Capture the complete native botanical catalogue and reference views
-        if: matrix.platform == 'Linux-x64'
+        if: matrix.platform == 'Linux-x64' && inputs.capture_catalog
         run: |
           bundle="$PWD/out/release/ReyondBroom-Linux-x64"
           RB_QA_BUILD="packaged-$VERSION" xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/capture-plant-catalog.py "$bundle" "$PWD/qa/catalog-originals" --extended
           python scripts/plant-contact-sheets.py qa/catalog-originals qa/catalog-sheets
       - uses: actions/upload-artifact@v4
-        if: matrix.platform == 'Linux-x64' && always()
+        if: matrix.platform == 'Linux-x64' && inputs.capture_catalog && always()
         with:
           name: REYON-9-contact-sheets
           path: |
@@ -199,6 +218,19 @@ jobs:
               $height = if ($width -eq 1920) { 1080 } else { 768 }
               python scripts/test-viewport-create.py out/release/ReyondBroom-Windows-x64 "qa/viewport-create-$theme-$width" --theme $theme --width $width --height $height
               if ($LASTEXITCODE) { throw "Packaged viewport acceptance failed: $theme $width" }
+            }
+          }
+      - name: Validate packaged viewport fixes on Windows
+        if: inputs.viewport_checks
+        shell: pwsh
+        run: |
+          python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
+          if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
+          foreach ($theme in @('dark','light')) {
+            foreach ($width in @(1920,1024)) {
+              $height = if ($width -eq 1920) { 1080 } else { 768 }
+              python scripts/test-viewport-appearance.py out/release/ReyondBroom-Windows-x64 "qa/appearance-$theme-$width" --theme $theme --width $width --height $height
+              if ($LASTEXITCODE) { throw "Appearance acceptance failed: $theme / $width" }
             }
           }
       - name: Upload validated packages to the draft release

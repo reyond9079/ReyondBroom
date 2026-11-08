@@ -12,10 +12,15 @@ import shutil
 import tarfile
 import tempfile
 import time
+import http.client
+import urllib.error
 import urllib.request
+import urllib.parse
 
 RELEASES = 'https://api.github.com/repos/reyond9079/ReyondBroom/releases?per_page=100'
 DOWNLOADS = 'https://github.com/reyond9079/ReyondBroom/releases/download/'
+ASSETS = 'https://api.github.com/repos/reyond9079/ReyondBroom/releases/assets/'
+TRANSIENT = (408, 429, 500, 502, 503, 504)
 
 def version(tag):
     match = re.fullmatch(r'v?(\d+)\.(\d+)\.(\d+)(?:-alpha\.(\d+))?', tag)
@@ -34,7 +39,80 @@ def select_release(releases, current, sdl2=False):
     return None
 
 def request(url):
-    return urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'ReyondBroom-Updater'}), timeout=30)
+    fresh = url + ('&' if '?' in url else '?') + '_rb_update=' + str(time.time_ns())
+    headers = {'User-Agent': 'ReyondBroom-Updater', 'Cache-Control': 'no-cache',
+               'Accept': 'application/octet-stream' if url.startswith(ASSETS) else 'application/vnd.github+json',
+               'X-GitHub-Api-Version': '2022-11-28'}
+    return urllib.request.urlopen(urllib.request.Request(fresh, headers=headers), timeout=60)
+
+def asset_urls(asset):
+    browser = asset.get('browser_download_url', '')
+    if not browser.startswith(DOWNLOADS) or urllib.parse.urlsplit(browser).fragment:
+        raise ValueError('Unexpected download URL')
+    api = asset.get('url')
+    if api and not re.fullmatch(re.escape(ASSETS) + r'[1-9][0-9]*', api):
+        raise ValueError('Unexpected asset API URL')
+    return [api, browser] if api else [browser]
+
+def fetch(urls, consume, status):
+    """Retry transport failures, never integrity failures or installation steps."""
+    last = None
+    for index, url in enumerate(urls):
+        for attempt in range(3):
+            try:
+                with request(url) as response:
+                    return consume(response)
+            except urllib.error.HTTPError as error:
+                last = error
+                if error.code not in TRANSIENT:
+                    if error.code in (403, 404) and index + 1 < len(urls):
+                        break
+                    raise
+            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
+                last = error
+            if attempt < 2:
+                status('Temporary download error. Retrying...')
+                time.sleep(attempt + 1)
+        if index + 1 < len(urls):
+            status('Retrying through the alternative GitHub download route...')
+    raise last
+
+def download_release(asset, checksum, updates, tag, status):
+    # Validate both routes before making requests. Asset names must remain files.
+    urls, checksum_urls = asset_urls(asset), asset_urls(checksum)
+    name = asset['name']
+    if PurePosixPath(name).name != name or '/' in name or '\\' in name:
+        raise ValueError('Unexpected asset name')
+    def read_checksum(response):
+        fields = response.read(4097).decode('ascii').split()
+        if len(fields) != 2 or not re.fullmatch('[0-9a-fA-F]{64}', fields[0]) or fields[1] != name:
+            raise ValueError('Invalid release checksum')
+        return fields[0].lower()
+    digest = fetch(checksum_urls, read_checksum, status)
+    if asset.get('digest') and asset['digest'] != 'sha256:' + digest:
+        raise ValueError('Release checksum disagrees with GitHub asset digest')
+    archive = target_under(updates, name)
+    partial = target_under(updates, name + '.part')
+    def transfer(response):
+        received = 0
+        # Each route/retry starts a fresh file, never appending to a failed transfer.
+        with partial.open('wb') as output:
+            while block := response.read(1024*1024):
+                received += len(block)
+                if received > 512*1024**2:
+                    raise ValueError('Update exceeds 512 MiB')
+                output.write(block)
+                status(f'Downloading {tag}: {received//1024**2} / {asset["size"]//1024**2} MiB')
+        if received != asset['size']:
+            raise ConnectionError('Incomplete update download')
+    try:
+        fetch(urls, transfer, status)
+        if file_hash(partial) != digest:
+            raise ValueError('Update checksum mismatch')
+        os.replace(partial, archive)
+    finally:
+        partial.unlink(missing_ok=True)
+    return archive
 
 def file_hash(path):
     digest = hashlib.sha256()
@@ -183,32 +261,13 @@ def main():
             archive = args.local_package
             if not archive:
                 status('Checking GitHub releases...')
-                with request(RELEASES) as response:
-                    release = select_release(json.load(response), args.current_version, (root/'linux-sdl2-build').is_file())
+                releases = fetch([RELEASES], json.load, status)
+                release = select_release(releases, args.current_version, (root/'linux-sdl2-build').is_file())
                 if not release:
                     status('ReyondBroom is up to date for Linux.')
                     return
                 tag, asset, checksum = release
-                for item in (asset, checksum):
-                    if not item['browser_download_url'].startswith(DOWNLOADS):
-                        raise ValueError('Unexpected download URL')
-                with request(checksum['browser_download_url']) as response:
-                    digest = response.read(4096).decode().split()[0].lower()
-                if not re.fullmatch('[0-9a-f]{64}', digest):
-                    raise ValueError('Invalid release checksum')
-                archive = updates/asset['name']
-                partial = target_under(updates, asset['name']+'.part')
-                received = 0
-                with request(asset['browser_download_url']) as response, partial.open('wb') as output:
-                    while block := response.read(1024*1024):
-                        received += len(block)
-                        if received > 512*1024**2:
-                            raise ValueError('Update exceeds 512 MiB')
-                        output.write(block)
-                        status(f'Downloading {tag}: {received//1024**2} / {asset["size"]//1024**2} MiB')
-                if file_hash(partial) != digest:
-                    raise ValueError('Update checksum mismatch')
-                os.replace(partial, archive)
+                archive = download_release(asset, checksum, updates, tag, status)
             stage = Path(tempfile.mkdtemp(prefix='stage-', dir=updates))
             stage_package(archive, stage)
             status('Update downloaded. Close the editor to install it.')

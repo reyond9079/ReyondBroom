@@ -1,0 +1,99 @@
+name: Updater transport and packages
+on:
+  pull_request:
+    paths: ['runtime/update-ftebroom.*', 'scripts/package-updater-fix.py', 'scripts/verify-updater-package.py', 'tests/test-updater*.py', '.github/workflows/updater-transport-checks.yml']
+permissions:
+  contents: read
+concurrency:
+  group: updater-transport-${{ github.head_ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: Windows-x64, os: windows-2022}
+          - {platform: Linux-x64, os: ubuntu-24.04}
+          - {platform: Linux-SDL2-x64, os: ubuntu-24.04}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - name: Preserve source bytes on every runner
+        shell: bash
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch verified alpha130 runtime and complete corresponding sources
+        shell: bash
+        run: |
+          mkdir base
+          suffix=tar.gz
+          if test "$PLATFORM" = Windows-x64; then suffix=zip; fi
+          gh release download v0.5.0-alpha.130 --repo "$GITHUB_REPOSITORY" --dir base --pattern "*-$PLATFORM.$suffix" --pattern "*-$PLATFORM.$suffix.sha256" --pattern "*-$PLATFORM-Sources.zip" --pattern "*-$PLATFORM-Sources.zip.sha256"
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          for f in Path('base').glob('*.sha256'):
+              digest,name=f.read_text().split()
+              with (f.parent/name).open('rb') as s:assert hashlib.file_digest(s,'sha256').hexdigest()==digest
+          PY
+      - name: Package the new updater with unchanged verified editor binaries
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os,sys,subprocess
+          from pathlib import Path
+          platform=os.environ['PLATFORM'];suffix='zip' if platform=='Windows-x64' else 'tar.gz'
+          runtime=next(Path('base').glob('*-'+platform+'.'+suffix));sources=next(Path('base').glob('*-'+platform+'-Sources.zip'))
+          subprocess.run([sys.executable,'scripts/package-updater-fix.py','--platform',platform,'--base-runtime',str(runtime),'--base-sources',str(sources),'--version','0.5.0-alpha.131','--output','out/release'],check=True)
+          subprocess.run([sys.executable,'scripts/verify-updater-package.py','out/release',os.environ['GITHUB_SHA'] if not os.environ.get('CHECK_HEAD') else os.environ['CHECK_HEAD']],check=True)
+          PY
+        env:
+          CHECK_HEAD: ${{ github.event.pull_request.head.sha }}
+      - name: Linux installation, rollback and platform-selection regressions
+        if: runner.os != 'Windows'
+        run: python tests/test-linux-updater.py
+      - name: Windows PowerShell 5.1 installation and rollback regressions
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python tests/test-update.py
+          if ($LASTEXITCODE) { throw 'Existing Windows updater regressions failed' }
+      - name: Real HTTP 504, fallback, truncation, hash rejection and parent waiting
+        shell: bash
+        run: |
+          runtime=out/release/ReyondBroom-Linux-x64
+          if test "$PLATFORM" = Windows-x64; then runtime=out/release/ReyondBroom-Windows-x64; fi
+          python tests/test-updater-network.py --platform "$PLATFORM" --runtime "$runtime" --output qa/network
+      - name: Public GitHub download and real archive installation in a disposable copy
+        shell: bash
+        run: |
+          runtime=out/release/ReyondBroom-Linux-x64
+          if test "$PLATFORM" = Windows-x64; then runtime=out/release/ReyondBroom-Windows-x64; fi
+          python tests/test-updater-public.py --runtime "$runtime" --output qa/public
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-package-${{ matrix.platform }}
+          path: |
+            out/release/*.zip
+            out/release/*.tar.gz
+            out/release/*.sha256
+            out/release/package-proof.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: updater-proof-${{ matrix.platform }}
+          path: |
+            qa/network/**
+            qa/public/*.log
+            qa/public/*.json
+            out/release/verification.json
+            out/release/package-proof.json

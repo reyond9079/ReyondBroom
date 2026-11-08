@@ -27,6 +27,92 @@ function CleanupUpdates([string]$keep){
  }
 }
 function VersionKey([string]$tag){if($tag -notmatch '^v?(\d+)\.(\d+)\.(\d+)(?:-alpha\.(\d+))?$'){return $null};$alpha=if($Matches[4]){[int]$Matches[4]}else{999999};return [version]("{0}.{1}.{2}.{3}" -f $Matches[1],$Matches[2],$Matches[3],$alpha)}
+function Open-UpdateResponse([string]$url){
+ $fresh=$url+$(if($url.Contains('?')){'&'}else{'?'})+'_rb_update='+[DateTime]::UtcNow.Ticks
+ $request=[Net.HttpWebRequest]::Create($fresh)
+ $request.UserAgent='ReyondBroom-Updater';$request.Timeout=60000;$request.ReadWriteTimeout=60000
+ $request.Headers['Cache-Control']='no-cache';$request.Headers['X-GitHub-Api-Version']='2022-11-28'
+ $request.Accept=if($url.StartsWith('https://api.github.com/repos/reyond9079/ReyondBroom/releases/assets/')){'application/octet-stream'}else{'application/vnd.github+json'}
+ return $request.GetResponse()
+}
+function Get-UpdateAssetUrls($asset){
+ if(!$asset.browser_download_url -or !$asset.browser_download_url.StartsWith('https://github.com/reyond9079/ReyondBroom/releases/download/')){throw 'Unexpected download URL'}
+ if($asset.url){
+  if($asset.url -notmatch '^https://api\.github\.com/repos/reyond9079/ReyondBroom/releases/assets/[1-9][0-9]*$'){throw 'Unexpected asset API URL'}
+  [string]$asset.url
+ }
+ [string]$asset.browser_download_url
+}
+function Read-UpdateText($response,[int]$limit=4194304){
+ $stream=$response.GetResponseStream();$memory=[IO.MemoryStream]::new()
+ try{
+  $buffer=New-Object byte[] 4096
+  while(($n=$stream.Read($buffer,0,$buffer.Length)) -gt 0){
+   if($memory.Length+$n -gt $limit){throw 'Unexpected response size'}
+   $memory.Write($buffer,0,$n)
+  }
+  return [Text.Encoding]::UTF8.GetString($memory.ToArray())
+ }finally{$stream.Dispose();$memory.Dispose()}
+}
+function Fetch-Update([string[]]$urls,[scriptblock]$consume){
+ $last=$null
+ for($route=0;$route -lt $urls.Count;$route++){
+  for($attempt=0;$attempt -lt 3;$attempt++){
+   try{
+    $response=Open-UpdateResponse $urls[$route]
+    try{return (& $consume $response)}finally{$response.Dispose()}
+   }catch{
+    $last=$_;$errorObject=$_.Exception.GetBaseException()
+    if($errorObject -is [Net.WebException] -and $errorObject.Response){
+     $code=[int]$errorObject.Response.StatusCode;$errorObject.Response.Close()
+     if($code -notin @(408,429,500,502,503,504)){
+      if($code -in @(403,404) -and $route+1 -lt $urls.Count){break}
+      throw
+     }
+    }elseif($errorObject -isnot [Net.WebException] -and $errorObject -isnot [TimeoutException] -and $errorObject -isnot [IO.EndOfStreamException] -and $errorObject -isnot [Net.Sockets.SocketException]){throw}
+    if($attempt -lt 2){Status 'Temporary download error. Retrying...';Start-Sleep -Seconds ($attempt+1)}
+   }
+  }
+  if($route+1 -lt $urls.Count){Status 'Retrying through the alternative GitHub download route...'}
+ }
+ throw $last
+}
+function Download-Update($asset,$sum,[string]$version){
+ $urls=@(Get-UpdateAssetUrls $asset);$sumUrls=@(Get-UpdateAssetUrls $sum)
+ $name=[string]$asset.name
+ if([IO.Path]::GetFileName($name) -ne $name -or $name.Contains('/') -or $name.Contains('\')){throw 'Unexpected asset name'}
+ $checksum=Fetch-Update $sumUrls {
+  param($response)
+  $fields=(Read-UpdateText $response 4096).Trim() -split '\s+'
+  if($fields.Count -ne 2 -or $fields[0] -notmatch '^[a-fA-F0-9]{64}$' -or $fields[1] -ne $name){throw 'Invalid release checksum'}
+  $fields[0].ToLowerInvariant()
+ }
+ if($asset.digest -and $asset.digest -ne ('sha256:'+$checksum)){throw 'Release checksum disagrees with GitHub asset digest'}
+ $archive=Under $updates $name;$partial=Under $updates ($name+'.part')
+ try{
+  $null=Fetch-Update $urls {
+   param($response)
+   $inputStream=$response.GetResponseStream();$output=[IO.File]::Create($partial)
+   try{
+    $buffer=New-Object byte[] 65536;$received=0L;$last=[DateTime]::MinValue
+    for(;;){
+     try{$n=$inputStream.Read($buffer,0,$buffer.Length)}catch{
+      if($_.Exception.GetBaseException() -is [IO.IOException]){throw [IO.EndOfStreamException]::new('Interrupted update download')}
+      throw
+     }
+     if($n -le 0){break}
+     $received+=$n;if($received -gt 536870912){throw 'Update exceeds 512 MiB'}
+     $output.Write($buffer,0,$n)
+     if(([DateTime]::Now-$last).TotalMilliseconds -gt 200){Status ("Downloading {0}: {1:N1} / {2:N1} MiB" -f $version,($received/1MB),($asset.size/1MB));$last=[DateTime]::Now}
+    }
+    if($received -ne $asset.size){throw [IO.EndOfStreamException]::new('Incomplete update download')}
+   }finally{$output.Dispose();$inputStream.Dispose()}
+  }
+  if((FileHash $partial) -ne $checksum){throw 'Update checksum mismatch'}
+  Move-Item -LiteralPath $partial -Destination $archive -Force
+ }finally{if(Test-Path -LiteralPath $partial){Remove-Item -LiteralPath $partial -Force}}
+ return $archive
+}
 $oldManifest=@{}
 if(Test-Path -LiteralPath "$Root/distribution-manifest.json"){try{$manifest=Get-Content -LiteralPath "$Root/distribution-manifest.json" -Raw | ConvertFrom-Json;foreach($property in $manifest.PSObject.Properties){$oldManifest[$property.Name]=$property.Value}}catch{}}
 function Preserve([string]$name){
@@ -47,7 +133,7 @@ try {
  Status 'Checking GitHub releases...'
  if(!$LocalPackage){
   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-  $releases=Invoke-RestMethod -Uri 'https://api.github.com/repos/reyond9079/ReyondBroom/releases?per_page=100' -Headers @{'User-Agent'='ReyondBroom-Updater'} -TimeoutSec 30
+  $releases=Fetch-Update @('https://api.github.com/repos/reyond9079/ReyondBroom/releases?per_page=100') {param($response);Read-UpdateText $response | ConvertFrom-Json}
   $current=VersionKey $CurrentVersion
   $release=$releases | Where-Object {
    $candidate="ReyondBroom-$($_.tag_name.TrimStart('v'))-Windows-x64.zip"
@@ -58,16 +144,7 @@ try {
   $asset=$release.assets | Where-Object name -eq $name | Select-Object -First 1
   $sum=$release.assets | Where-Object name -eq "$name.sha256" | Select-Object -First 1
   if(!$asset -or !$sum){throw 'The newer release has no complete Windows package yet.'}
-  foreach($a in @($asset,$sum)){if(!$a.browser_download_url.StartsWith('https://github.com/reyond9079/ReyondBroom/releases/download/')){throw 'Unexpected download URL'}}
-  $checksumResponse=(Invoke-WebRequest -UseBasicParsing $sum.browser_download_url -TimeoutSec 30).Content
-  if($checksumResponse -is [byte[]]){$checksumResponse=[Text.Encoding]::UTF8.GetString($checksumResponse)}
-  $checksum=([string]$checksumResponse).Trim().Split(' ')[0].ToLowerInvariant()
-  if($checksum -notmatch '^[a-f0-9]{64}$'){throw 'Invalid release checksum'}
-  $LocalPackage=Join-Path $updates $name
-  $request=[Net.HttpWebRequest]::Create($asset.browser_download_url);$request.UserAgent='ReyondBroom-Updater';$request.Timeout=30000;$response=$request.GetResponse()
-  try{$inputStream=$response.GetResponseStream();$output=[IO.File]::Create($LocalPackage+'.part');try{$buffer=New-Object byte[] 65536;$received=0L;$last=[DateTime]::MinValue;while(($n=$inputStream.Read($buffer,0,$buffer.Length)) -gt 0){$received+=$n;if($received -gt 536870912){throw 'Update exceeds 512 MiB'};$output.Write($buffer,0,$n);if(([DateTime]::Now-$last).TotalMilliseconds -gt 200){Status ("Downloading {0}: {1:N1} / {2:N1} MiB" -f $version,($received/1MB),($asset.size/1MB));$last=[DateTime]::Now}}}finally{$output.Dispose();$inputStream.Dispose()}}finally{$response.Dispose()}
-  if((FileHash ($LocalPackage+'.part')) -ne $checksum){throw 'Update checksum mismatch'}
-  Move-Item -LiteralPath ($LocalPackage+'.part') -Destination $LocalPackage -Force
+  $LocalPackage=Download-Update $asset $sum $version
  }
  Add-Type -AssemblyName System.IO.Compression.FileSystem
  $stage=Join-Path $updates ('stage-'+[guid]::NewGuid());New-Item -ItemType Directory -Path $stage | Out-Null

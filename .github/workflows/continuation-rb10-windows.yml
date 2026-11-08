@@ -171,6 +171,11 @@ jobs:
               const data=fs.readFileSync(path.join('out/release',name));
               await github.rest.repos.uploadReleaseAsset({...repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
             }
+      - name: Collect compact diagnostics without cloned runtime binaries
+        if: always()
+        shell: bash
+        run: |
+          python qa-harness/.github/rb10-qa/compact-windows-artifact.py --qa restored/qa --restoration restored/restoration.json --proof proof --release out/release --output artifact-evidence
       - name: Retain genuine prior evidence, new evidence, restoration and final Windows payloads
         uses: actions/upload-artifact@v4
         if: always()
@@ -178,9 +183,5 @@ jobs:
           name: qa-Windows-x64
           retention-days: 14
           if-no-files-found: error
-          path: |
-            restored/qa/**
-            restored/restoration.json
-            proof/*.json
-            out/release/*.zip
-            out/release/*.sha256
+          compression-level: 0
+          path: artifact-evidence/

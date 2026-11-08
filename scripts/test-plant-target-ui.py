@@ -9,7 +9,7 @@ p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Pat
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'placement-ui-live.json';state.unlink(missing_ok=True)
 # No plant QA/open command here: first ever viewport Create must open its own
 # editor before any hidden unsaved-document confirmation can be drawn.
-(data/'plant-target-ui.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\n')
+(data/'plant-target-ui.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 11 echo RB_PLANT_FIXTURE_READY\n')
 tall=json.loads((Path(__file__).resolve().parents[1]/'tests/fixtures/plant-generator1.json').read_text())[0]['project'];tall['parameters']['height']=1200;tall['name']='Tall native target regression';project=out/'tall.plant.json';project.write_text(json.dumps(tall))
 console_logs=[data/'qconsole.log',root/'qconsole.log']
 for path in console_logs:path.unlink(missing_ok=True)
@@ -51,6 +51,9 @@ try:
  # binding when the delayed map arrives while the plant is generating.
  wait(lambda:live()['views'] and live()['epoch']>=2 and live()['mapPath'].replace('\\','/').endswith('/maps/qa_clip.map'));ui.position()
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
+ # qa-clip schedules its camera/view setup after map load. Wait for that
+ # fixture to finish and fresh UI frames before the first cold context click.
+ wait(lambda:'RB_PLANT_FIXTURE_READY' in current_run_log());ui.settle()
  view=live()['views'][0];ui.click(view['x']+view['width']*.46,view['y']+view['height']*.52,button=3)
  hover('context/create');hover('context/model');click('context/new-plant');wait(lambda:live()['plantOpen'] and live()['plantReady'])
  check(live()['plant']['active'] and live()['plant']['id']==live()['context']['id'],'cold viewport Create opens Plant Editor and retains captured scene click')

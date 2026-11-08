@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run opt-in QC/native RB-10 regressions in disposable packaged runtimes."""
-import argparse, hashlib, json, os, shutil, subprocess, sys
+import argparse, hashlib, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
 repo=Path(__file__).resolve().parents[1];source=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -35,7 +35,8 @@ in 15 quit force
  if console.exists():text+='\n'+console.read_text(errors='replace')
  assert process.returncode==0,(name,process.returncode,text[-4000:])
  assert not any(marker in text for marker in ['_FAIL ','CSQC_Abort','runaway loop error','Host_Error','Program error']), (name,text[-8000:])
- passed=sorted(set(line.strip() for line in text.splitlines() if line.startswith(prefix) and '_PASS ' in line))
+ lines=(re.sub(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ', '', line) for line in text.splitlines())
+ passed=sorted(set(line.strip() for line in lines if line.startswith(prefix) and '_PASS ' in line))
  assert len(passed)>=minimum,(name,passed,text[-4000:])
  if name=='native132':
   for required in ['rb10_closed_plant_opens_without_hidden_confirmation','rb10_dirty_open_plant_preserves_confirmation','rb10_tools_default_top','rb10_tools_compact_content_fits','rb10_tools_expansion_grows_height','rb10_tools_collapse_reclaims_height','rb10_tools_custom_side_dock_preserved','rb10_tutorial_every_stage_requests_fresh_map','rb10_tutorial_stage_map_ready','rb10_tutorial_final_stage','rb10_tutorial_final_stage_has_no_selected_practice_brush','rb10_tutorial_wheel_indicator_rotates']:

@@ -1,0 +1,190 @@
+name: Publish RB-10 with independently verified Windows continuation
+on:
+  pull_request:
+    types: [ready_for_review]
+    branches: [feat/rb-10-editor-polish, main]
+    paths:
+      - scripts/test-rb10-runtime.py
+      - scripts/test-plant-target-ui.py
+      - .github/workflows/continuation-rb10-windows.yml
+      - .github/workflows/publishcontinuation-rb10.yml
+      - .github/rb10-qa/**
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-rb10
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'qa/rb10-windows-harness'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRODUCT_HEAD: 6bd6e2cedcade6e7e4d09cfe8f81901c91655a50
+      QA_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: qa-harness
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require the exact merged product, original Linux jobs and successful Windows continuation
+        id: gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo=context.repo,head=process.env.PRODUCT_HEAD,qa=process.env.QA_HEAD;
+            const {data:qapr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
+            if(qapr.state!=='open'||qapr.draft||qapr.head.sha!==qa||qapr.head.ref!=='qa/rb10-windows-harness'||qapr.head.repo.full_name!==`${repo.owner}/${repo.repo}`||!['feat/rb-10-editor-polish','main'].includes(qapr.base.ref)) throw Error('Unexpected QA approval event');
+            const {data:diff}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:`${head}...${qa}`});
+            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
+            const permitted=name=>allowed.has(name)||name.startsWith('.github/rb10-qa/');
+            if(diff.status!=='ahead'||!diff.files?.length||diff.files.length>=300||diff.files.some(f=>!permitted(f.filename)||(f.previous_filename&&!permitted(f.previous_filename)))) throw Error('QA branch changes product files');
+            const {data:pr}=await github.rest.pulls.get({...repo,pull_number:15});
+            if(!pr.merged||pr.head.sha!==head||pr.head.ref!=='feat/rb-10-editor-polish'||pr.base.ref!=='main'||pr.head.repo.full_name!==`${repo.owner}/${repo.repo}`) throw Error('PR15 has not merged the frozen product');
+            const merged=pr.merge_commit_sha;
+            const [{data:source},{data:merge},{data:main},{data:pin}]=await Promise.all([
+              github.rest.git.getCommit({...repo,commit_sha:head}),github.rest.git.getCommit({...repo,commit_sha:merged}),
+              github.rest.git.getRef({...repo,ref:'heads/main'}),github.rest.git.getRef({...repo,ref:'tags/rb-10-package-'+head})]);
+            if(source.tree.sha!==merge.tree.sha||main.object.sha!==merged||pin.object.sha!==head) throw Error('Merged tree, current main or immutable package source differs');
+            const {data:ci}=await github.rest.actions.getWorkflowRun({...repo,run_id:42497982398});
+            if(ci.head_sha!==head||ci.status!=='completed'||ci.conclusion!=='success'||!ci.path.startsWith('.github/workflows/compilation-profile-checks.yml')) throw Error('Exact product CI is not successful');
+            const cijobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:ci.id});
+            for(const name of ['windows','linux (Linux-x64)','linux (Linux-SDL2-x64)']) if(!cijobs.some(j=>j.name===name&&j.conclusion==='success')) throw Error('Missing successful product CI platform '+name);
+            const {data:old}=await github.rest.actions.getWorkflowRun({...repo,run_id:42498112722});
+            if(old.head_sha!==head||old.status!=='completed'||old.conclusion!=='failure'||old.display_title!==`Release 0.5.0-alpha.132 @ ${head}`||!old.path.startsWith('.github/workflows/release-linux-ui-update.yml')) throw Error('Original package run changed');
+            const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:old.id});
+            for(const name of ['linux (Linux-x64)','linux (Linux-SDL2-x64)']) if(!jobs.some(j=>j.name===name&&j.status==='completed'&&j.conclusion==='success')) throw Error('Original Linux package incomplete: '+name);
+            const win=jobs.find(j=>j.name==='windows'),failed=win?.steps.filter(s=>s.conclusion==='failure')||[];
+            if(win?.conclusion!=='failure'||failed.length!==1||failed[0].name!=='Validate packaged RB-10 workflows on Windows and PowerShell 5.1') throw Error('Unexpected original Windows failure');
+            const {data:runs}=await github.rest.actions.listWorkflowRunsForRepo({...repo,head_sha:qa,status:'completed',per_page:100});
+            const run=runs.workflow_runs.find(r=>r.head_sha===qa&&r.head_branch==='qa/rb10-windows-harness'&&r.event==='pull_request'&&r.conclusion==='success'&&r.path.startsWith('.github/workflows/continuation-rb10-windows.yml'));
+            if(!run) throw Error('No successful continuation for this exact QA head');
+            const newjobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:run.id});
+            if(newjobs.length!==1||newjobs[0].name!=='windows-continuation'||newjobs[0].conclusion!=='success') throw Error('Windows continuation job is not successful');
+            const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,{...repo,run_id:run.id});
+            const found=artifacts.filter(a=>a.name==='qa-Windows-x64'&&!a.expired);
+            if(found.length!==1||found[0].workflow_run?.head_sha!==qa||found[0].workflow_run.id!==run.id||!/^sha256:[a-f0-9]{64}$/.test(found[0].digest||'')) throw Error('Missing uniquely identified continuation artifact');
+            core.setOutput('run',String(run.id));core.setOutput('artifact',String(found[0].id));core.setOutput('merge',merged);
+      - name: Download original and continuation artifacts with authentic metadata
+        shell: bash
+        env:
+          CONTINUATION_ARTIFACT: ${{ steps.gate.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          mkdir evidence
+          for kind in original continuation; do
+            id=13626282101
+            if [ "$kind" = continuation ]; then id="$CONTINUATION_ARTIFACT"; fi
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id" > "evidence/$kind-metadata.json"
+            curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o "evidence/$kind.zip"
+          done
+      - name: Independently verify all genuine prior and new Windows acceptance evidence
+        shell: bash
+        env:
+          CONTINUATION_RUN: ${{ steps.gate.outputs.run }}
+        run: |
+          set -euo pipefail
+          python qa-harness/.github/rb10-qa/verify-qa-artifact.py evidence/continuation-metadata.json evidence/continuation.zip evidence/verified --head "$PRODUCT_HEAD" --workflow-head "$QA_HEAD" --run "$CONTINUATION_RUN" --platform Windows-x64
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,io,json,zipfile
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          root=Path('evidence');proof=json.loads((root/'verified/verification.json').read_text())
+          assert proof['head']=='6bd6e2cedcade6e7e4d09cfe8f81901c91655a50'
+          assert proof['module_sha256']=='758ccd1bc16f941683692d151334704d0dd3d32180c9458a79d1f90d8aaabe42'
+          assert proof['qc_sha256']=='68af71fe06750c996c257841e9b97622d4bdeb5d2e059e4a144f9da52af3e04a'
+          old=(root/'original.zip').read_bytes();assert sha(old)=='c30cfa600a7f9223bca901bd9b084526dc4fe686d86cc57a67053504e8441313'
+          with zipfile.ZipFile(io.BytesIO(old)) as z: original=z.read('qa/rb10/runtime/tutorial132/distribution-manifest.json')
+          manifest=json.loads(original);assert len(manifest)==653
+          with zipfile.ZipFile(root/'continuation.zip') as z:
+              def blob(suffix):
+                  names=[n for n in z.namelist() if n==suffix or n.endswith('/'+suffix)]
+                  assert len(names)==1,(suffix,names)
+                  return z.read(names[0])
+              sources=json.loads(blob('proof/sources.json'))
+              assets={}
+              for name in ['ReyondBroom-0.5.0-alpha.132-Windows-x64.zip','ReyondBroom-0.5.0-alpha.132-Windows-x64-Sources.zip']:
+                  data=blob('out/release/'+name);sidecar=blob('out/release/'+name+'.sha256')
+                  assert sidecar==(sha(data)+'  '+name+'\n').encode('ascii')
+                  assets[name]=sha(data);assets[name+'.sha256']=sha(sidecar)
+                  if name.endswith('-Sources.zip'): assert sources['output_sha256']==sha(data)
+                  else:
+                      with zipfile.ZipFile(io.BytesIO(data)) as runtime:
+                          prefix='ReyondBroom-Windows-x64/'
+                          expected={prefix+n for n in manifest}|{prefix+'distribution-manifest.json'}
+                          assert len(runtime.namelist())==len(expected) and set(runtime.namelist())==expected
+                          assert runtime.read(prefix+'distribution-manifest.json')==original
+                          for n,digest in manifest.items(): assert sha(runtime.read(prefix+n))==digest,n
+          (root/'verified-assets.json').write_text(json.dumps(assets,indent=2))
+          PY
+      - name: Recheck all release invariants and publish the owned draft
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MERGED_COMMIT: ${{ steps.gate.outputs.merge }}
+          CONTINUATION_RUN: ${{ steps.gate.outputs.run }}
+        with:
+          script: |
+            const fs=require('node:fs'),{createHash}=require('node:crypto'),repo=context.repo;
+            const head=process.env.PRODUCT_HEAD,qa=process.env.QA_HEAD,merged=process.env.MERGED_COMMIT;
+            const [{data:qapr},{data:pr},{data:main},{data:pin},{data:release}]=await Promise.all([
+              github.rest.pulls.get({...repo,pull_number:context.issue.number}),github.rest.pulls.get({...repo,pull_number:15}),
+              github.rest.git.getRef({...repo,ref:'heads/main'}),github.rest.git.getRef({...repo,ref:'tags/rb-10-package-'+head}),
+              github.rest.repos.getRelease({...repo,release_id:438298229})]);
+            if(qapr.state!=='open'||qapr.draft||qapr.head.sha!==qa||!pr.merged||pr.head.sha!==head||pr.merge_commit_sha!==merged||main.object.sha!==merged||pin.object.sha!==head) throw Error('Reviewed heads changed during verification');
+            if(!release.draft||release.tag_name!=='v0.5.0-alpha.132'||release.name!=='ReyondBroom 0.5.0-alpha.132'||release.target_commitish!==head) throw Error('Owned draft changed');
+            for(const id of [42497982398,Number(process.env.CONTINUATION_RUN)]) {
+              const {data:run}=await github.rest.actions.getWorkflowRun({...repo,run_id:id});
+              if(run.status!=='completed'||run.conclusion!=='success'||run.head_sha!==(id===42497982398?head:qa)) throw Error('Successful validation was replaced during verification');
+            }
+            const assets=await github.paginate(github.rest.repos.listReleaseAssets,{...repo,release_id:release.id});
+            if(assets.length!==12||assets.some(a=>a.state!=='uploaded'||!a.size)) throw Error('Require exactly twelve complete release assets');
+            const byName=new Map(assets.map(a=>[a.name,a])),windows=JSON.parse(fs.readFileSync('evidence/verified-assets.json','utf8'));
+            for(const platform of ['Windows-x64','Linux-x64','Linux-SDL2-x64']) {
+              const prefix=`ReyondBroom-0.5.0-alpha.132-${platform}`;
+              for(const name of [prefix+(platform==='Windows-x64'?'.zip':'.tar.gz'),prefix+'-Sources.zip']) {
+                const payload=byName.get(name),checksum=byName.get(name+'.sha256');
+                if(!payload||!checksum) throw Error('Missing release asset '+name);
+                const response=await fetch(checksum.url,{headers:{Authorization:`Bearer ${process.env.GITHUB_TOKEN}`,Accept:'application/octet-stream','X-GitHub-Api-Version':'2022-11-28'}});
+                if(!response.ok) throw Error('Cannot read checksum '+name);
+                const bytes=Buffer.from(await response.arrayBuffer()),match=bytes.toString('utf8').trim().match(/^([a-f0-9]{64})\s+([^\s]+)$/);
+                if(!match||match[2]!==name||payload.digest!=='sha256:'+match[1]||checksum.digest!=='sha256:'+createHash('sha256').update(bytes).digest('hex')) throw Error('Release checksum mismatch '+name);
+                if(platform==='Windows-x64'&&(payload.digest!=='sha256:'+windows[name]||checksum.digest!=='sha256:'+windows[name+'.sha256'])) throw Error('Windows asset differs from independently verified continuation');
+              }
+            }
+            let ref;
+            try { ref=(await github.rest.git.getRef({...repo,ref:'tags/v0.5.0-alpha.132'})).data; }
+            catch(error) { if(error.status!==404) throw error; }
+            if(!ref) await github.rest.git.createRef({...repo,ref:'refs/tags/v0.5.0-alpha.132',sha:merged});
+            else {
+              if(ref.object.sha!==head&&ref.object.sha!==merged) throw Error('Draft version tag points to another source');
+              if(ref.object.sha===head&&head!==merged) await github.rest.git.updateRef({...repo,ref:'tags/v0.5.0-alpha.132',sha:merged,force:true});
+            }
+            const body=[
+              'RB-10: исправления редактора по обратной связи пользователей.', '',
+              'Welcome и ресурсы Quake II; файловые браузеры и создание моделей; онбординг; View Options и сетка; растения; горизонтальная Tools; настройки сочетаний клавиш; запуск Ironwail/VKQuake после компиляции с очисткой файлов.', '',
+              `Проверки исходного продукта Windows/native Linux/SDL2: https://github.com/${repo.owner}/${repo.repo}/actions/runs/42497982398`,
+              `Готовые Linux/SDL2 пакеты и каталог растений: https://github.com/${repo.owner}/${repo.repo}/actions/runs/42498112722`,
+              `Windows: исходный workflow остановился на QA-парсере журнала; он сохранён со статусом failure. Оставшиеся проверки выполнены отдельным workflow на тех же 653 исходных файлах, DLL и QC: https://github.com/${repo.owner}/${repo.repo}/actions/runs/${process.env.CONTINUATION_RUN}`,
+              `Исходники продукта ${head}; дерево совпадает со слитым коммитом ${merged}. Отдельная ревизия исправленного QA harness: ${qa}.`,
+              'Windows runtime перепакован без изменения файлов; соответствующие исходники восстановлены из проверенных архивов и закреплённых исходных ревизий. Оригинальный строгий publisher заменён этой явно проверенной процедурой Windows continuation.',
+              'Проверены все 12 runtime/source/checksum файлов. Подробности: docs/qa/rb-10/acceptance.md.'
+            ].join('\n');
+            const {data:published}=await github.rest.repos.updateRelease({...repo,release_id:438298229,tag_name:'v0.5.0-alpha.132',name:'ReyondBroom 0.5.0-alpha.132',target_commitish:merged,body,draft:false,prerelease:false,make_latest:'true'});
+            if(published.draft||published.tag_name!=='v0.5.0-alpha.132'||published.target_commitish!==merged) throw Error('Unexpected publication response');
+            core.info('Published '+published.html_url);
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rb10-continuation-publication-evidence
+          retention-days: 14
+          path: |
+            evidence/*metadata.json
+            evidence/verified-assets.json
+            evidence/verified/**

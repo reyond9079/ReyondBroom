@@ -62,6 +62,8 @@ for label,key in directions:
         add("Textures",("Rotate " if key in ("pgup","pgdn") else "Move ")+label+suffix,mod+key,"CtxView3D|CtxFaceSelection",command="ftebroom_texture_key "+{"Forward":"vertical 1","Back":"vertical -1","Left":"horizontal -1","Right":"horizontal 1","Up":"rotate 1","Down":"rotate -1"}[label]+" "+str({"":0," coarse":1," fine":2}[suffix]))
 for label,key in [("Flip horizontal","Ctrl+f"),("Flip vertical","Ctrl+Alt+f")]:
     add("Textures",label,key,"CtxView3D|CtxFaceSelection",command="ftebroom_texture_key "+("fliph" if "horizontal" in label else "flipv")+" 1 0")
+add("Edit","Create func_detail","","CtxAnyView|CtxNoTool|CtxNodeSelection",command='ftebroom_entity_create "func_detail" 1')
+add("Edit","Create func_group","","CtxAnyView|CtxNoTool|CtxNodeSelection",command='ftebroom_group "Group"')
 add("Textures","Reset alignment","Shift+r","CtxAnyView|CtxAnySelection",command="ftebroom_texture_key reset 1 0")
 add("Textures","Reset to world aligned","Alt+Shift+r","CtxAnyView|CtxAnySelection",command="ftebroom_texture_key world 1 0")
 for label,key,ctx,cmd in [
@@ -176,6 +178,7 @@ for label,key in [("Loop Cut","Ctrl+r"),("Key F","f"),("Stretch","Shift+t"),("Ti
 
 # Preserve established map shortcuts and labels when regenerating the catalogue.
 map_compatibility = {'Menu/Edit/CSG Convex Merge': {'label': 'CSG Convex Merge (Union)'}, 'Menu/Edit/CSG Subtract': {'label': 'CSG Subtract (Difference)'}, 'Menu/View/Grid/Show Grid': {'keys': '0;kp_ins'}, 'Menu/View/Grid/Snap to Grid': {'keys': 'Alt+0;Alt+kp_ins'}, 'Menu/View/Grid/Grid 1': {'keys': '1;kp_end'}, 'Menu/View/Grid/Grid 2': {'keys': '2;kp_downarrow'}, 'Menu/View/Grid/Grid 4': {'keys': '3;kp_pgdn'}, 'Menu/View/Grid/Grid 8': {'keys': '4;kp_leftarrow'}, 'Menu/View/Grid/Grid 16': {'keys': '5;kp_5'}, 'Menu/View/Grid/Grid 32': {'keys': '6;kp_rightarrow'}, 'Menu/View/Grid/Grid 64': {'keys': '7;kp_home'}, 'Menu/View/Grid/Grid 128': {'keys': '8;kp_uparrow'}, 'Menu/View/Grid/Grid 256': {'keys': '9;kp_pgup'}, 'Menu/Run/Build': {'label': 'Compile'}, 'Menu/Run/Build map...': {'label': 'Setup compile'}}
+map_compatibility["Menu/Textures/Reset to world aligned"]={"label":"Reset texture alignment to world aligned"}
 for row in rows:
     row.update(map_compatibility.get(row["id"], {}))
 rows.extend([{'id': 'Menu/View/Prefab collections', 'label': 'Prefab collections', 'context': 'CtxAny', 'keys': '', 'command': 'ftebroom_ui prefabs', 'gesture': ''}, {'id': 'Menu/View/Entity list', 'label': 'Entity list', 'context': 'CtxAny', 'keys': '', 'command': 'ftebroom_ui entitylist', 'gesture': ''}, {'id': 'Menu/Tools/Rotate Grid', 'label': 'Rotate Grid', 'context': 'CtxAnyView', 'keys': '', 'command': 'ftebroom_tool_toggle gridrotate', 'gesture': ''}])

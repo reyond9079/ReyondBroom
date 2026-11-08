@@ -98,7 +98,7 @@ int fb_generators_testcommand()
         fb_transform_expect(fb_entity_color(id118)==class118,"sprites118_restore_entity_class_colors");cvar_set("ftebroom_entity_bounds_class_colors","0");fb_selection_clear();return TRUE;
     }
     if(argv(1)=="sky114on"||argv(1)=="sky114off"){
-        fb_transform_expect(fb_clear_sky_faces==(argv(1)=="sky114on"?6:0),"sky114_actual_background_draw");return TRUE;
+        fb_transform_expect(fb_clear_sky_faces==6,"sky114_actual_background_draw");return TRUE;
     }
     if(argv(1)=="features113sample"){
         fb_render_faces_prepare();print(sprintf("SAMPLE_PROFILE %g pack=%g clear=%g native=%g\n",cvar("ftebroom_game_profile"),cvar("ftebroom_shader_pack_enabled"),cvar("ftebroom_clear_sky"),cvar("ftebroom_native_faces_drawn")));

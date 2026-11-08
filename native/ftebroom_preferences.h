@@ -10,7 +10,7 @@ static const char* preferenceVariables[] = {
   "ftebroom_look_speed","ftebroom_pan_speed","ftebroom_move_speed","ftebroom_fly_speed",
   "ftebroom_fov","ftebroom_invert_horizontal","ftebroom_invert_vertical",
   "ftebroom_move_to_cursor","ftebroom_alt_move","ftebroom_grid_alpha",
-  "ftebroom_grid_color","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
+  "ftebroom_grid_color","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
   "ftebroom_show_entity_names","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
   "ftebroom_texture_lock","ftebroom_uv_lock","ftebroom_auto_integer_snap","ftebroom_sky_overlays","ftebroom_bounds_visible","ftebroom_map_bounds",
@@ -116,18 +116,25 @@ static void preferencesKeyboard()
 {
   auto conflicts=shortcutConflicts();
   if(!conflicts.empty())ImGui::TextColored({1,.35f,.3f,1},"Resolve overlapping shortcuts before closing Preferences.");
-  if(!captureShortcut.empty())ImGui::TextWrapped("Press a key combination (Escape cancels): %s",captureShortcut.c_str());
-  static char search[128]={};ImGui::InputText("Find action",search,sizeof search);
+  // Keep the table stationary while capture starts/ends: moving the clicked
+  // row under the pointer could activate it again on a later mouse event.
+  if(captureShortcut.empty())ImGui::TextDisabled("Select a shortcut to assign a key combination.");
+  else ImGui::TextUnformatted("Press a key combination (Escape cancels).");
+  static char search[128]={};ImGui::InputText("Find action",search,sizeof search);runUiRecordGlobal("keyboard-search");
+  if(runUiLive)runUiGlobalRects["keyboard-capture"]={{"action",captureShortcut}};
+  auto matches=[&](const Action& a){std::string haystack=std::string(a.id)+" "+a.label,query=search;
+    for(auto& c:haystack)c=char(std::tolower(static_cast<unsigned char>(c)));for(auto& c:query)c=char(std::tolower(static_cast<unsigned char>(c)));
+    std::istringstream terms(query);for(std::string term;terms>>term;)if(haystack.find(term)==std::string::npos)return false;return true;};
   if(ImGui::BeginTable("Shortcuts",3,ImGuiTableFlags_ScrollY|ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg,{0,300}))
   {
     ImGui::TableSetupColumn("Action");ImGui::TableSetupColumn("Shortcut");ImGui::TableSetupColumn("Context");ImGui::TableHeadersRow();
     for(auto& a:actions)
     {
-      if(!a.command||*a.gesture||(*search&&!std::strstr(a.id,search)))continue;
+      if(!a.command||*a.gesture||!matches(a))continue;
       ImGui::PushID(a.id);ImGui::TableNextRow();ImGui::TableNextColumn();
       bool conflict=conflicts.count(a.id);if(conflict)ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().danger:ImVec4(1,.35f,.3f,1));
       ImGui::TextWrapped("%s",a.label);ImGui::TableNextColumn();
-      if(ImGui::Selectable(a.shortcutText.empty()?"Click to assign":a.shortcutText.c_str(),captureShortcut==a.id))captureShortcut=a.id;
+      if(ImGui::Selectable(a.shortcutText.empty()?"Click to assign":a.shortcutText.c_str(),captureShortcut==a.id))captureShortcut=a.id;runUiRecordGlobal(std::string("keyboard-binding/")+a.id);
       if(ImGui::BeginPopupContextItem()){if(ImGui::MenuItem("Clear shortcut")){shortcutApply(a,"");shortcutOverrides[shortcutVariable(a.id)]="";}ImGui::EndPopup();}
       ImGui::TableNextColumn();ImGui::Text("0x%04x",a.context);if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",a.id);
       if(conflict)ImGui::PopStyleColor();ImGui::PopID();

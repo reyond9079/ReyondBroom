@@ -1,0 +1,36 @@
+name: Prepare viewport fixes release
+on:
+  pull_request:
+    types: [ready_for_review]
+    branches: [main]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/viewport-grid-shortcuts-profiles'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reserve alpha.130 and build the exact reviewed revision
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo = context.repo, pr = context.payload.pull_request;
+            const {data: checks} = await github.rest.actions.listWorkflowRuns({...repo,
+              workflow_id: 'compilation-profile-checks.yml', head_sha: pr.head.sha, status: 'completed', per_page: 100});
+            if (!checks.workflow_runs.some(r => r.head_sha === pr.head.sha && r.conclusion === 'success'))
+              throw new Error('The final PR head must pass platform CI before reserving its release');
+            const tag = 'v0.5.0-alpha.130';
+            const releases = await github.paginate(github.rest.repos.listReleases, {...repo, per_page: 100});
+            let release = releases.find(r => r.tag_name === tag);
+            if (release && !release.draft) throw new Error('alpha.130 is already published');
+            if (!release) {
+              const {data} = await github.rest.repos.createRelease({...repo, tag_name: tag,
+                target_commitish: pr.head.sha, name: 'ReyondBroom 0.5.0-alpha.130', draft: true,
+                prerelease: false, body: 'Viewport fixes: grid, edges, sky background, keyboard commands and profile order. Packaging and validation in progress.'});
+              release = data;
+            }
+            await github.rest.actions.createWorkflowDispatch({...repo,
+              workflow_id: 'release-linux-ui-update.yml', ref: pr.head.ref,
+              inputs: {version: '0.5.0-alpha.130', base_tag: 'v0.5.0-alpha.129', linux_base_tag: 'v0.5.0-alpha.129', capture_catalog: 'false', viewport_checks: 'true'}});
+            core.info(`Reserved draft ${release.id} for ${pr.head.sha}`);

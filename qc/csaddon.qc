@@ -116,9 +116,7 @@ void fb_view_cache_draw(int index,vector mn,vector sz)
     shaderforname(image,sprintf("{\n{\nmap $rt:ftebroom_viewcache%i\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}",index));
     drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
     drawpic('0 0 0',image,vidsize,'1 1 1',1,0);
-    // The viewport grid is a screen-space overlay, drawn on the restored main
-    // canvas rather than inside the render target's different projection.
-    fb_view_background();
+    // Grid and axes are cached behind the wireframe, never painted over it.
     fb_pick_draw_entities(TRUE);fb_visual_labels();
     drawresetcliparea();
 }
@@ -303,21 +301,28 @@ void() wrap_renderscene =
             drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
             fb_build_preview_draw();perf_renderscene();drawresetcliparea();continue;
         }
-        int cached=type && count>1 && !fb_active && !fb_clip_count && !cvar("ftebroom_tool") && !cvar("ftebroom_view_cache_disable");
+        // Keep orthographic rasterization identical while dragging and idle.
+        // A multisampled window backbuffer and the single-sample cache produce
+        // different thin-line coverage (notably with Windows' default 8x MSAA).
+        // Always use the same 2D canvas; only reuse its pixels while idle.
+        int offscreen=type!=0;
+        int cached=offscreen && count>1 && !fb_active && !fb_clip_count && !cvar("ftebroom_tool") && !cvar("ftebroom_view_cache_disable");
         string signature="";
-        if(cached) {
-            signature=fb_view_cache_signature(type,mn,sz);
-            if(signature==fb_view_cache_key[index] && !fb_active && !fb_clip_count && gettime(0)-fb_view_cache_time[index]<2) {
+        if(cached) signature=fb_view_cache_signature(type,mn,sz);
+        if(offscreen) {
+            if(cached && signature==fb_view_cache_key[index] && gettime(0)-fb_view_cache_time[index]<2) {
                 fb_view_cache_draw(index,mn,sz);fb_visual_face_hover();continue;
             }
             setproperty(VF_RT_DESTCOLOUR,sprintf("ftebroom_viewcache%i",index),-IMGFMT_R8G8B8A8,vidsize);
             // Cache the complete opaque canvas. Additive compositing over a
             // gray background would tint bright edges and erase black edges.
             drawfill('0 0 0',vidsize,autocvar_ftebroom_color_2d_background,1,0);
+            fb_view_render_cache=TRUE;
+            fb_view_background();
         }
         drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
         mousenear=unproject(curmousepos);mousefar=unproject(curmousepos+'0 0 1');
-        fb_view_render_cache=cached;
+        fb_view_render_cache=offscreen;
         profileTime=gettime(1);
         if(!type) addentities(MASK_ENGINE);
         if(autocvar_ca_editormode==MODE_BRUSHEDIT) editor_brushes_addentities(curmousepos);
@@ -333,13 +338,13 @@ void() wrap_renderscene =
         fb_profile_sum[3]+=gettime(1)-profileTime;profileTime=gettime(1);
         fb_editor_clear_sky();fb_shader_pack_frame();perf_renderscene();fb_shader_pack_finish();
         fb_profile_sum[4]+=gettime(1)-profileTime;
-        if(!cached) {fb_label_native_traces=fb_label_full_traces=0;fb_label_trace_seconds=fb_label_draw_seconds=0;profileTime=gettime(1);fb_pick_draw_entities(TRUE);fb_profile_sum[5]+=gettime(1)-profileTime;fb_profile_sum[7]+=fb_label_trace_seconds;fb_profile_sum[8]+=fb_label_draw_seconds;profileTime=gettime(1);fb_visual_labels();fb_profile_sum[6]+=gettime(1)-profileTime;if(cvar("ftebroom_benchmark"))cvar_set("ftebroom_label_stats",sprintf("%i %i",fb_label_native_traces,fb_label_full_traces));}
+        if(!offscreen) {fb_label_native_traces=fb_label_full_traces=0;fb_label_trace_seconds=fb_label_draw_seconds=0;profileTime=gettime(1);fb_pick_draw_entities(TRUE);fb_profile_sum[5]+=gettime(1)-profileTime;fb_profile_sum[7]+=fb_label_trace_seconds;fb_profile_sum[8]+=fb_label_draw_seconds;profileTime=gettime(1);fb_visual_labels();fb_profile_sum[6]+=gettime(1)-profileTime;if(cvar("ftebroom_benchmark"))cvar_set("ftebroom_label_stats",sprintf("%i %i",fb_label_native_traces,fb_label_full_traces));}
         fb_view_render_cache=FALSE;
         drawresetcliparea();
-        if(cached) {
+        if(offscreen) {
             setproperty(VF_RT_DESTCOLOUR,"");
             setproperty(VF_MIN,mn);setproperty(VF_SIZE,sz);fb_view_prepare();
-            strunzone(fb_view_cache_key[index]);fb_view_cache_key[index]=strzone(signature);fb_view_cache_time[index]=gettime(0);
+            strunzone(fb_view_cache_key[index]);fb_view_cache_key[index]=cached?strzone(signature):"";fb_view_cache_time[index]=cached?gettime(0):0;
             fb_view_cache_draw(index,mn,sz);
         }
         fb_visual_face_hover();

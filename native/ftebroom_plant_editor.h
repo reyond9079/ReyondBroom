@@ -197,7 +197,10 @@ static void plantAskSave(std::function<void()> next={},bool choose=false) {
   runUiChoose(initial.u8string(),[next](const std::string& p){plantSave(std::filesystem::u8path(p));placementAfterPlantSave(next);},true);
 }
 static void plantRequest(std::function<void()> next) {
-  auto& s=plantState;if(plants::serialize(s.doc).dump()!=s.saved){s.nextAction=std::move(next);s.closeRequest=true;}else next();
+  // The initial preset is not an unsaved document until its editor is opened.
+  // Otherwise the first viewport Create queues a confirmation in a hidden
+  // Plant Editor, and no window ever opens to display that confirmation.
+  auto& s=plantState;if(s.open&&plants::serialize(s.doc).dump()!=s.saved){s.nextAction=std::move(next);s.closeRequest=true;}else next();
 }
 static void plantOpenFile(const std::filesystem::path& file) {
   if(std::filesystem::file_size(file)>4*1024*1024)throw std::runtime_error("Plant project exceeds 4 MiB");
@@ -213,7 +216,11 @@ static void plantExport(const std::filesystem::path& target) {
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
   auto& mesh=s.result->lods[s.lod];auto& maps=*s.result->maps;auto ext=entityLower(target.extension().u8string());
   plants::validate(mesh);
-  if(ext==".glb")plantWriteNew(target,plants::glb(mesh,maps));
+  if(ext==".mdl"||ext==".md2") {
+    int profile=ext==".mdl"?2:3;auto geometry=plants::targetGeometry(s.doc,mesh,profile);auto model=plants::aliasMesh(geometry,"plant");auto skin=plants::aliasSkin(maps.albedo);
+    if(profile==2)plantWriteNew(target,ftebroom::modelExport::mdl(model,{skin},q1Palette()));
+    else {auto image=target.stem().u8string()+".pcx";auto output=ftebroom::modelExport::md2(model,{skin},q2Palette(),image);plantWriteNew(target.parent_path()/std::filesystem::u8path(image),output.skin);plantWriteNew(target,output.model);}
+  }else if(ext==".glb")plantWriteNew(target,plants::glb(mesh,maps));
   else if(ext==".obj") {
     auto stem=target.stem().u8string();auto folder=target.parent_path();
     plantWriteNew(folder/(stem+"-albedo.png"),plants::png(maps.albedo));
@@ -221,45 +228,64 @@ static void plantExport(const std::filesystem::path& target) {
     plantWriteNew(folder/(stem+"-orm.png"),plants::png(maps.orm));
     plantWriteNew(folder/(stem+".mtl"),"newmtl plant\nKd 1 1 1\nd 1\nmap_Kd "+stem+"-albedo.png\nmap_d "+stem+"-albedo.png\nnorm "+stem+"-normal.png\n");
     plantWriteNew(target,plants::obj(mesh,stem+".mtl"));
-  }else throw std::runtime_error("Choose .obj or .glb for a portable plant export");
+  }else throw std::runtime_error("Choose .obj / .glb for portable geometry, .mdl for Quake or .md2 for Quake II");
   s.message="Exported "+target.filename().u8string()+" (static wind fallback)";
+}
+static void placementPublish(const std::map<std::string,std::string>& bundle);
+struct PlantRuntimeAsset {
+  std::map<std::string,std::string> bundle;
+  std::string id,model,source,material,shader;
+  plants::V low{},high{};
+  double scale=1;
+};
+static PlantRuntimeAsset plantBakeRuntime() {
+  auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
+  if(gameProfile==4)throw std::runtime_error("GoldSrc requires a studio model. Export OBJ / GLB and convert it in Model Editor before placing it.");
+  PlantRuntimeAsset out;auto geometry=plants::targetGeometry(s.doc,s.result->lods[0],gameProfile);out.low=geometry.low;out.high=geometry.high;
+  auto mesh=plants::targetModel(geometry,"plant",gameProfile);bool alias=gameProfile==2||gameProfile==3;
+  if(!alias){double extent=0;for(auto& surface:mesh.surfaces)for(auto& vertex:surface.frames[0])for(float x:vertex.position)extent=std::max(extent,std::abs(double(x)));out.scale=std::max(1.,extent/450.);for(auto& surface:mesh.surfaces)for(auto& vertex:surface.frames[0])for(auto& x:vertex.position)x/=out.scale;}
+  auto palette=gameProfile==2?q1Palette():gameProfile==3?q2Palette():std::string{};
+  auto atlas=plants::tga(s.result->maps->albedo);auto identity=alias?ftebroom::modelExport::mdl(mesh,{plants::aliasSkin(s.result->maps->albedo)},palette):ftebroom::modelExport::md3(mesh);std::ostringstream key;key<<"plant-"<<std::hex<<plants::hash("authoring-target-v3:"+plants::serialize(s.doc).dump()+identity+atlas+palette);
+  out.id=key.str()+(gameProfile==0?"-q3":gameProfile==2?"-q1":gameProfile==3?"-q2":"-fte");
+  out.material="textures/reyond-plugins/"+out.id;out.model="models/reyond-plugins/"+out.id+plants::targetExtension(gameProfile);out.source="models/reyond-plugins/"+out.id+".plant.json";
+  plants::Json dependencies=plants::Json::array();
+  if(alias){
+    auto skin=plants::aliasSkin(s.result->maps->albedo);
+    if(gameProfile==2)out.bundle[out.model]=ftebroom::modelExport::mdl(mesh,{skin},palette);
+    else {auto skinName="models/reyond-plugins/"+out.id+".pcx";auto output=ftebroom::modelExport::md2(mesh,{skin},palette,skinName);out.bundle[out.model]=std::move(output.model);out.bundle[skinName]=std::move(output.skin);dependencies.push_back(skinName);}
+  }else{
+    for(auto& surface:mesh.surfaces)surface.material=out.material;out.bundle[out.model]=ftebroom::modelExport::md3(mesh);
+    auto image=out.material+(gameProfile==1?".dds":".tga");out.bundle[image]=gameProfile==1?plants::coverageDds(s.result->maps->albedo):atlas;dependencies.push_back(image);
+    if(gameProfile==1){out.bundle[out.material+".tga"]=atlas;dependencies.push_back(out.material+".tga");}
+    out.shader=plants::shader(out.material,image,gameProfile!=0);auto script="scripts/"+out.id+".shader";out.bundle[script]=out.shader;dependencies.push_back(script);
+  }
+  auto portable=plants::serialize(s.doc);dependencies.push_back(out.source);
+  if(!s.doc.texture.empty()){auto original=std::filesystem::u8path(s.doc.texture);auto name=out.id+"-leaf"+original.extension().u8string();auto dependency="models/reyond-plugins/"+name;out.bundle[dependency]=q1Read(original);dependencies.push_back(dependency);portable["texture"]=name;}
+  out.bundle[out.source]=portable.dump(2);
+  size_t vertices=0,triangles=0;for(auto& surface:mesh.surfaces){vertices+=surface.frames[0].size();triangles+=surface.triangles.size();}
+  out.bundle[out.model+".reyond.json"]=plants::Json{{"kind","reyondbroom-authoring-model"},{"version",2},{"low",out.low},{"high",out.high},{"normalization",out.scale},{"dependencies",dependencies},{"plantProject",portable},
+    // This immutable asset records format capabilities, not the scene entity's
+    // FTE opt-in. Toggling that option must reuse the same model and manifest.
+    {"target",{{"profile",gameProfile},{"format",plants::targetExtension(gameProfile)},{"vertices",vertices},{"triangles",triangles},{"vertexLimit",gameProfile==2?1024:gameProfile==3?2048:0},{"triangleLimit",gameProfile==2?2048:gameProfile==3?4096:0},{"runtimeLod",alias||geometry.faces.size()!=s.result->lods[0].faces.size()},{"opaqueGeometricFoliage",alias},{"coverageMipmaps",gameProfile==1},{"vanillaRequiresCompatibleGameCode",alias},{"fteStaticModelExtensionAvailable",gameProfile==2}}}}.dump(2);
+  return out;
 }
 static void plantAddToMap() {
   if(plantPlacement.active){placementPlantSaved();return;}
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
-  if(gameProfile==3||gameProfile==4)throw std::runtime_error("This profile requires MD2 or studio MDL. Export OBJ, convert with Model Editor, then place its compatible model.");
-  if(gameProfile==2&&!s.allowFteQ1)throw std::runtime_error("Enable the explicit FTE static-model extension for Quake 1, or export and convert to MDL for a compatible mod.");
-  auto id=plants::assetId(s.doc,s.lod)+(gameProfile==0?"-q3":"-fte"),material="textures/reyond-plugins/"+id,model="models/reyond-plugins/"+id+".md3",script="scripts/"+id+".shader";
-  auto& mesh=s.result->lods[s.lod];auto bytes=plants::md3(mesh,material); // Validate before writing anything.
-  auto source=documentPath("ftebroom.cfg").parent_path();std::vector<std::filesystem::path> destinations{source};
-  // FTE may have an authoring asset directory without a separate runtime mod.
-  // Match plugin asset installation: both configured roots must see new models.
-  auto addRoot=[&](const std::filesystem::path& root){if(root.empty()||!std::filesystem::is_directory(root))return;auto canonical=std::filesystem::weakly_canonical(root);if(std::none_of(destinations.begin(),destinations.end(),[&](auto& path){return std::filesystem::weakly_canonical(path)==canonical;}))destinations.push_back(root);};
-  addRoot(modFileRoot());if(gameProfile==1)addRoot(std::filesystem::u8path(baseq3));
-  plants::Json metadata={{"kind","reyondbroom-authoring-model"},{"low",mesh.low},{"high",mesh.high},{"dependencies",{material+".tga",script}},{"plantProject",plants::serialize(s.doc)}};
-  for(auto& root:destinations) {
-    plantWriteNew(root/std::filesystem::u8path(material+".tga"),plants::tga(s.result->maps->albedo));
-    plantWriteNew(root/std::filesystem::u8path(script),plants::shader(material,material+".tga",gameProfile!=0));
-    auto list=root/"scripts/shaderlist.txt";std::string shaderNames;
-    if(std::filesystem::is_regular_file(list))shaderNames=q1Read(list);
-    else {size_t size=0;auto data=static_cast<char*>(files->LoadFile("scripts/shaderlist.txt",&size));if(data){shaderNames.assign(data,size);core->Free(data);}}
-    bb::atomicWrite(list,ftebroom::appendShaderList(shaderNames,{id}));
-    plantWriteNew(root/std::filesystem::u8path(model),bytes);
-    plantWriteNew(root/std::filesystem::u8path(model+".reyond.json"),metadata.dump(2));
-  }
-  auto shader=plants::shader(material,material+".tga",gameProfile!=0);shader=shader.substr(shader.find('{'));
-  s.pendingShaders[id]={material,shader};
-  auto path=source/std::filesystem::u8path(model);auto view=viewRects[viewFocus];
+  auto asset=plantBakeRuntime();placementPublish(asset.bundle);
+  if(!asset.shader.empty()){s.pendingShaders[asset.id]={asset.material,asset.shader.substr(asset.shader.find('{'))};command(("ftebroom_plant shader "+asset.id+"\n").c_str());}
+  auto path=documentPath(asset.model);auto view=viewRects[viewFocus];
   auto vector=[](plants::V v){std::ostringstream out;out.imbue(std::locale::classic());out<<v[0]<<' '<<v[1]<<' '<<v[2];return out.str();};
-  auto action="ftebroom_model_drop "+organizationQuote(model)+" "+std::to_string(view.x+view.w*.5f)+" "+std::to_string(view.y+view.h*.5f)+" "+organizationQuote("func_model")+" authoring "+organizationQuote(vector(mesh.low))+" "+organizationQuote(vector(mesh.high))+(s.allowFteQ1?" fte-q1":"")+"\n";
-  command(("fs_flush\nftebroom_plant shader "+id+"\n"+action).c_str());s.lastModel=path;s.message="Placed model in map — Undo removes the entity; assets remain reusable.";
+  auto action="ftebroom_model_drop "+organizationQuote(asset.model)+" "+std::to_string(view.x+view.w*.5f)+" "+std::to_string(view.y+view.h*.5f)+" "+organizationQuote("func_model")+" authoring "+organizationQuote(vector(asset.low))+" "+organizationQuote(vector(asset.high))+" "+organizationQuote(s.allowFteQ1?"fte-q1":"")+" "+std::to_string(asset.scale)+" "+organizationQuote(asset.source)+"\n";
+  command(action.c_str());s.lastModel=path;s.message="Placed target-format model in map — Undo removes the entity; assets remain reusable.";
+  if(gameProfile==2||gameProfile==3)s.message+=" Runtime placement requires compatible game code; Quake 1 may explicitly use the FTE static-model extension.";
 }
 static void plantPresetSave() {
   auto& s=plantState;auto id=plants::assetId(s.doc,0);auto path=s.userFiles.count(s.doc.preset)?s.userFiles[s.doc.preset]:plantFolder()/"presets"/(id+".json");
   auto doc=s.doc;doc.preset="user:"+path.filename().u8string();bb::atomicWrite(path,plants::serialize(doc).dump(2));s.doc.preset=doc.preset;plantLibraryLoad();s.message="Saved editable user preset";
 }
 static bool plantBeforeDocument(const std::string& next) {
-  auto& s=plantState;if(next!="exit"||!s.open||plants::serialize(s.doc).dump()==s.saved)return false;
+  auto& s=plantState;if(!documentIsExit(next)||!s.open||plants::serialize(s.doc).dump()==s.saved)return false;
   plantRequest([next](){plantClose();documentRequest(next);});return true;
 }
 static void QDECL plantCommand() {

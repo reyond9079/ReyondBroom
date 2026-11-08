@@ -2,6 +2,18 @@
 struct RecentMap { std::string path; int profile=-1; bool favorite=false; };
 static std::vector<RecentMap> recentMaps;
 static bool recentLoaded=false,recentWindow=false,recentFavorites=false;
+enum class WelcomeStage { Updates, Recovery, Recent };
+static WelcomeStage recentStage=WelcomeStage::Recent;
+static bool welcomeUpdatePanel();
+static bool welcomeUpdateCommitted();
+static bool updateCommitRestart();
+static bool updateDiscardRestart();
+static bool welcomeRecoveryPanel();
+static void welcomeQaItem(const char* id);
+static void welcomeQaWindow(const char* id);
+static void welcomeQaPublish();
+static void recentOpen(){recentStage=welcomeUpdateCommitted()?WelcomeStage::Updates:WelcomeStage::Recent;recentWindow=true;}
+static void welcomeStartup(){recentStage=WelcomeStage::Updates;recentWindow=true;}
 static const char* recentProfileName(int profile) {
   return profile==0?"Quake III Arena":profile==1?"FTE Custom game":profile==2?"Quake 1":profile==3?"Quake II":profile==4?"Half-Life":"Unknown profile";
 }
@@ -35,9 +47,13 @@ static bool recentStar(const char* id,bool& value) {
   return changed;
 }
 static void recentPanel() {
-  if(firstSetupStep>=0){recentWindow=false;return;}
-  if(!recentWindow)return;recentLoad();ImGui::SetNextWindowSize({760,520},ImGuiCond_FirstUseEver);
-  if(ImGui::Begin("Welcome to ReyondBroom",&recentWindow)) {
+  if(firstSetupStep>=0){recentWindow=false;welcomeQaPublish();return;}
+  if(!recentWindow){welcomeQaPublish();return;}recentLoad();ImGui::SetNextWindowSize({760,520},ImGuiCond_FirstUseEver);
+  if(ImGui::Begin("Welcome to ReyondBroom",&recentWindow,ImGuiWindowFlags_NoCollapse)) {
+    welcomeQaWindow("welcome/window");
+    if(recentStage==WelcomeStage::Updates){if(welcomeUpdatePanel())recentStage=WelcomeStage::Recovery;}
+    else if(recentStage==WelcomeStage::Recovery){if(welcomeRecoveryPanel())recentStage=WelcomeStage::Recent;}
+    else {
     ImGui::TextUnformatted("Recently edited maps");recentStar("##favorites_only",recentFavorites);if(ImGui::IsItemHovered())ImGui::SetTooltip("Show favorites only");ImGui::SameLine();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Favorites only");
     ImGui::BeginChild("recent-list",{0,-ImGui::GetFrameHeightWithSpacing()*2},ImGuiChildFlags_Borders);
     std::string open;
@@ -61,7 +77,13 @@ static void recentPanel() {
     if(recentMaps.empty())ImGui::TextDisabled("Opened and saved maps will appear here.");
     ImGui::EndChild();
     if(!open.empty()) {recentWindow=false;documentRequest("@"+open);}
-    if(ImGui::Button("Open another map...",{-1,0})){recentWindow=false;openRequest=true;}
-    if(ImGui::Button("Create new map...",{-1,0})){recentWindow=false;documentRequest("__new");}
+    bool another=ImGui::Button("Open another map...",{-1,0});welcomeQaItem("recent/another-map");if(another){recentWindow=false;openRequest=true;}
+    bool create=ImGui::Button("Create new map...",{-1,0});welcomeQaItem("recent/create-map");if(create){recentWindow=false;documentRequest("__new");}
+    }
   }ImGui::End();
+  if(!recentWindow && recentStage==WelcomeStage::Updates && welcomeUpdateCommitted()){
+    // The committed update cannot be dismissed back into an outdated session.
+    recentWindow=true;documentRequest("exit");
+  }
+  welcomeQaPublish();
 }

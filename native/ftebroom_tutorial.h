@@ -14,7 +14,9 @@ static void tourPrepare(int step){
   cvars->SetFloat("ftebroom_tour_step",step);cvars->SetFloat("ftebroom_tour_result",0);cvars->SetFloat("ftebroom_tour_demo",tourDemo);
   cvars->SetFloat("ftebroom_shift",0);cvars->SetFloat("ftebroom_alt",0);
   command("ftebroom_tool_toggle default\n");cvars->SetFloat("ftebroom_tool",0);
-  if(step<=4){tourWaitingForMap=true;tourInputReady=tourStepTime+30;command(gameClassic()?"mapedit maps/reyond-tutorial.map\n":"mapedit maps/reyond-tutorial-q3.map\n");}
+  // Every lesson owns a fresh disposable scene, including the grid/tools pages.
+  // Practice brushes from the preceding lesson must never accumulate.
+  tourWaitingForMap=true;tourInputReady=tourStepTime+30;command(gameClassic()?"mapedit maps/reyond-tutorial.map\n":"mapedit maps/reyond-tutorial-q3.map\n");
   if(step==5)tourGrid=cvars->GetFloat("ca_grid");
 }
 static void tourMapReady(){
@@ -59,6 +61,22 @@ static void tourPointer(const char* phase,ImVec2 p){
   cvars->SetFloat("ftebroom_shift",shift);cvars->SetFloat("ftebroom_alt",alt);
   std::snprintf(text,sizeof text,"ftebroom_pointer %s %.3f %.3f %d 0 %d\n",phase,p.x,p.y,alt,shift?2:0);command(text);
 }
+static float tourWheelPhase(double now){return float(std::fmod(now*2.5,6.283185307179586));}
+static void tourWheelIndicator(float w,float h,double now,float scale){
+  auto draw=ImGui::GetForegroundDrawList();ImVec2 center{w*.5f,h*.58f};
+  draw->AddRectFilled({center.x-51*scale,center.y-53*scale},{center.x+51*scale,center.y+61*scale},IM_COL32(24,26,30,225),12*scale);
+  draw->AddRect({center.x-21*scale,center.y-35*scale},{center.x+21*scale,center.y+43*scale},IM_COL32(240,240,240,255),20*scale,0,2*scale);
+  draw->AddLine({center.x-20*scale,center.y-5*scale},{center.x+20*scale,center.y-5*scale},IM_COL32(240,240,240,255),1.5f*scale);
+  draw->AddLine({center.x,center.y-34*scale},{center.x,center.y-5*scale},IM_COL32(240,240,240,255),1.5f*scale);
+  ImVec2 wheel{center.x,center.y-20*scale};
+  draw->AddRectFilled({wheel.x-4*scale,wheel.y-9*scale},{wheel.x+4*scale,wheel.y+9*scale},IM_COL32(241,161,70,255),4*scale);
+  // A moving arc and arrowhead make the wheel gesture visible before input.
+  float phase=tourWheelPhase(now),end=phase+4.7f,radius=30*scale;
+  draw->PathArcTo(wheel,radius,phase,end,32);draw->PathStroke(IM_COL32(241,161,70,255),0,2.5f*scale);
+  ImVec2 tip{wheel.x+std::cos(end)*radius,wheel.y+std::sin(end)*radius};
+  ImVec2 tangent{-std::sin(end),std::cos(end)},radial{std::cos(end),std::sin(end)};
+  draw->AddTriangleFilled(tip,{tip.x-tangent.x*9*scale+radial.x*5*scale,tip.y-tangent.y*9*scale+radial.y*5*scale},{tip.x-tangent.x*9*scale-radial.x*5*scale,tip.y-tangent.y*9*scale-radial.y*5*scale},IM_COL32(241,161,70,255));
+}
 static void tourPanel(float w,float h){
   const double now=ImGui::GetTime();const float scale=uiScale();
   static const char* titles[]={"Fly around the scene","Create a brush","Move a brush","Move vertically","Extrude a face","Change the grid","Explore the tools"};
@@ -93,13 +111,14 @@ static void tourPanel(float w,float h){
     ImVec2 p{start.x+(end.x-start.x)*t,start.y+(end.y-start.y)*t};bool held=elapsed>=1.4f&&elapsed<3.2f;
     if(elapsed>=1.4f&&!tourDemoPressed){tourPointer("down",start);tourDemoPressed=true;}
     if(held)tourPointer("move",p);
-    if(elapsed>=3.2f){tourPointer("up",end);command("set ftebroom_shift 0\nset ftebroom_alt 0\nset ftebroom_tour_demo 0\nset ftebroom_tour_result 0\n");if(tourStep==1)command("ftebroom_deselect\n");tourDemo=false;tourInputReady=now+.4;}
+    if(elapsed>=3.2f){tourPointer("up",end);command("ftebroom_tour_restore\nset ftebroom_shift 0\nset ftebroom_alt 0\nset ftebroom_tour_demo 0\nset ftebroom_tour_result 0\n");tourDemo=false;tourInputReady=now+.4;}
     auto draw=ImGui::GetForegroundDrawList();draw->AddTriangleFilled(p,{p.x+4*scale,p.y+27*scale},{p.x+12*scale,p.y+17*scale},IM_COL32(255,255,255,255));draw->AddTriangle(p,{p.x+4*scale,p.y+27*scale},{p.x+12*scale,p.y+17*scale},IM_COL32(25,25,25,255),1.5f);
     draw->AddRectFilled({p.x+20*scale,p.y+10*scale},{p.x+58*scale,p.y+46*scale},IM_COL32(24,26,30,230),6*scale);
     draw->AddRect({p.x+29*scale,p.y+15*scale},{p.x+49*scale,p.y+39*scale},IM_COL32(240,240,240,255),6*scale,0,2);
     if(held)draw->AddRectFilled({p.x+30*scale,p.y+16*scale},{p.x+39*scale,p.y+26*scale},IM_COL32(241,161,70,255),3*scale);
     if(tourStep>=3)draw->AddText({p.x+20*scale,p.y+50*scale},IM_COL32_WHITE,uiTr(tourStep==3?"Alt":"Left Shift"));
   }
+  if(tourStep==5&&!tourWaitingForMap)tourWheelIndicator(w,h,now,scale);
   if(tourStep==6){ImGui::SetNextWindowPos({16*scale,150*scale});ImGui::SetNextWindowSize({w-32*scale,0});ImGui::Begin("Tools##lesson",nullptr,ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoMove);ImGui::BeginDisabled();for(int t:{0,1,2,3,7,8,9,5,6}){if(t)ImGui::SameLine();FteIcons::button(("##lessonTool"+std::to_string(t)).c_str(),t,{34*scale,34*scale});}ImGui::EndDisabled();ImGui::End();}
   ImGui::SetNextWindowPos({w*.5f,h-18*scale},ImGuiCond_Always,{.5f,1});
   ImGui::Begin("##lessonNavigation",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking);

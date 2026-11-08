@@ -91,7 +91,7 @@ string fb_clip_field(string fields,string key)
 }
 int fb_clip_apply_face()
 {
-    if(!fb_faces_count()) {fb_map_error="Select destination faces first";return FALSE;}
+    if(!selectedbrushcount) {fb_map_error="Select destination brushes or faces first";return FALSE;}
     brushface_t source=fb_map_items[0].faces[0];
     fb_tx_begin("Paste Face Attributes");
     for(int b=0;b<selectedbrushcount;b++) {
@@ -99,11 +99,13 @@ int fb_clip_apply_face()
         if(count<4 || count>64) continue;
         brushface_t *faces=memalloc(sizeof(brushface_t)*count);int contents;
         brush_get(selectedbrushes[b].model,selectedbrushes[b].id,faces,count,&contents);
-        for(int f=0;f<count;f++) if(selbrush_face(&selectedbrushes[b],f)) {
+        for(int f=0;f<count;f++) if(selbrush_whole(&selectedbrushes[b]) || selbrush_face(&selectedbrushes[b],f)) {
             vector normal=faces[f].planenormal;float dist=faces[f].planedist;
             faces[f]=source;faces[f].planenormal=normal;faces[f].planedist=dist;
         }
-        brush_history_edit(selectedbrushes[b].model,selectedbrushes[b].id,faces,count,contents);memfree(faces);
+        // Contents are brush-wide in the engine; all other attributes (UV axes,
+        // offsets, material, surface flags/value) travel with the copied face.
+        brush_history_edit(selectedbrushes[b].model,selectedbrushes[b].id,faces,count,fb_map_items[0].contents);memfree(faces);
     }
     fb_tx_commit();return TRUE;
 }

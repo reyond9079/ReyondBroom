@@ -117,6 +117,7 @@ fb_pick_tests.qc
 fb_geom_tests.qc
 fb_model_tests.qc
 fb_clipboard_tests.qc
+fb_clipboard_attributes_tests.qc
 fb_materials_tests.qc
 fb_affine_tests.qc
 fb_rotate_tests.qc
@@ -142,6 +143,7 @@ fb_export_tests.qc
 fb_issues_tests.qc
 fb_entity_tests.qc
 fb_filter_tests.qc
+fb_view_options_tests.qc
 fb_material_transfer_tests.qc
 fb_camera_tests.qc
 fb_view_tests.qc
@@ -152,5 +154,7 @@ fb_array_preview_tests.qc
 fb_conversion_tests.qc
 fb_generators_tests.qc
 fb_shader_pack.qc
+fb_tutorial.qc
+fb_tutorial_tests.qc
 csaddon.qc
 #endlist

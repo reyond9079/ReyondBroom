@@ -1,0 +1,55 @@
+name: Prepare RB-10 release
+on:
+  pull_request:
+    types: [ready_for_review]
+    branches: [main]
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: prepare-rb10
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/rb-10-editor-polish'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reserve alpha.132 after exact-head platform CI and package its pinned source
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo = context.repo, eventPr = context.payload.pull_request;
+            const {data: pr} = await github.rest.pulls.get({...repo, pull_number: eventPr.number});
+            if (pr.draft || pr.merged || pr.head.sha !== eventPr.head.sha || pr.head.ref !== 'feat/rb-10-editor-polish')
+              throw new Error('The reviewed PR head changed or is no longer ready for packaging');
+            const {data: checks} = await github.rest.actions.listWorkflowRuns({...repo,
+              workflow_id: 'compilation-profile-checks.yml', head_sha: pr.head.sha, status: 'completed', per_page: 100});
+            const ci = checks.workflow_runs.find(r => r.head_sha === pr.head.sha && r.conclusion === 'success');
+            if (!ci) throw new Error('The exact final PR head must pass platform CI before reserving its release');
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...repo, run_id: ci.id});
+            for (const name of ['windows', 'linux (Linux-x64)', 'linux (Linux-SDL2-x64)'])
+              if (!jobs.some(j => j.name === name && j.conclusion === 'success'))
+                throw new Error(`Missing successful platform ${name} in ${ci.id}`);
+            const tag = 'v0.5.0-alpha.132';
+            const releases = await github.paginate(github.rest.repos.listReleases, {...repo, per_page: 100});
+            let release = releases.find(r => r.tag_name === tag);
+            if (release && (!release.draft || release.target_commitish !== pr.head.sha))
+              throw new Error('alpha.132 is published or its existing draft belongs to a different revision');
+            if (!release) {
+              const {data} = await github.rest.repos.createRelease({...repo, tag_name: tag,
+                target_commitish: pr.head.sha, name: 'ReyondBroom 0.5.0-alpha.132', draft: true,
+                prerelease: false, body: 'RB-10: onboarding, browsers, welcome/update flow, viewport options, plants, Tools and material copying. Packaging and validation in progress; this draft remains unpublished until merge and the final asset checks.'});
+              release = data;
+            }
+            // Workflow dispatch accepts a branch or tag. Pin the packaging source
+            // so a later push cannot silently change the revision being built.
+            const sourceTag = 'rb-10-package-' + pr.head.sha;
+            let sourceRef;
+            try { sourceRef = (await github.rest.git.getRef({...repo, ref: 'tags/' + sourceTag})).data; }
+            catch (error) { if (error.status !== 404) throw error; }
+            if (sourceRef && sourceRef.object.sha !== pr.head.sha) throw new Error('Packaging source tag was moved');
+            if (!sourceRef) await github.rest.git.createRef({...repo, ref: 'refs/tags/' + sourceTag, sha: pr.head.sha});
+            await github.rest.actions.createWorkflowDispatch({...repo,
+              workflow_id: 'release-linux-ui-update.yml', ref: sourceTag,
+              inputs: {version: '0.5.0-alpha.132', base_tag: 'v0.5.0-alpha.131', linux_base_tag: 'v0.5.0-alpha.131', capture_catalog: 'true', viewport_checks: 'true', rb10_checks: 'true'}});
+            core.info(`Reserved draft ${release.id}; packaging ${pr.head.sha}; CI https://github.com/${repo.owner}/${repo.repo}/actions/runs/${ci.id}`);

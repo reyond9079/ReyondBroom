@@ -50,9 +50,11 @@ static bool placementSnapshotPath(const std::filesystem::path& file){
   if(name.size()>8&&name.substr(name.size()-8)==".bbmodel")stem=name.substr(0,name.size()-8);
   else if(name.size()>11&&name.substr(name.size()-11)==".plant.json")stem=name.substr(0,name.size()-11);
   else return false;
-  auto manifest=file.parent_path()/std::filesystem::u8path(stem+".md3.reyond.json");
-  if(!std::filesystem::is_regular_file(manifest)||std::filesystem::file_size(manifest)>4*1024*1024)return false;
-  try{auto j=plants::Json::parse(q1Read(manifest));if(j.value("kind","")!="reyondbroom-authoring-model"||!j.contains("dependencies"))return false;for(auto& dependency:j["dependencies"])if(std::filesystem::u8path(dependency.get<std::string>()).filename()==file.filename())return true;}catch(const std::exception&){}return false;
+  for(auto extension:{".md3",".mdl",".md2"}){
+    auto manifest=file.parent_path()/std::filesystem::u8path(stem+extension+".reyond.json");
+    if(!std::filesystem::is_regular_file(manifest)||std::filesystem::file_size(manifest)>4*1024*1024)continue;
+    try{auto j=plants::Json::parse(q1Read(manifest));if(j.value("kind","")!="reyondbroom-authoring-model"||!j.contains("dependencies"))continue;for(auto& dependency:j["dependencies"])if(std::filesystem::u8path(dependency.get<std::string>()).filename()==file.filename())return true;}catch(const std::exception&){}
+  }return false;
 }
 static void placementCreate(bool plant){
   auto captured=contextPlacement;
@@ -116,18 +118,9 @@ static void placementShutdown(){
 static void placementPlantSaved(){
   auto& p=plantPlacement;auto& s=plantState;if(!p.active)return;placementValid(p);
   if(!plantReady()){placementPlantRevision=s.revision;placementPlantPending=true;return;}
-  auto identity=plants::modelMesh(s.result->lods[0],"plant");plants::V identityLow,identityHigh;placementNormalize(identity,identityLow,identityHigh);
-  auto atlas=plants::tga(s.result->maps->albedo);std::ostringstream key;key<<"plant-"<<std::hex<<plants::hash("authoring-bundle-v1:"+plants::serialize(s.doc).dump()+ftebroom::modelExport::md3(identity)+atlas);
-  auto id=key.str()+(gameProfile==0?"-q3":"-fte");
-  auto material="textures/reyond-plugins/"+id,model="models/reyond-plugins/"+id+".md3",script="scripts/"+id+".shader",source="models/reyond-plugins/"+id+".plant.json";
-  plants::V low,high;auto mesh=plants::modelMesh(s.result->lods[0],material);auto scale=placementNormalize(mesh,low,high);
-  std::map<std::string,std::string> bundle{{model,ftebroom::modelExport::md3(mesh)},{material+".tga",atlas},{script,plants::shader(material,material+".tga",gameProfile!=0)},{source,plants::serialize(s.doc).dump(2)}};
-  auto portable=plants::serialize(s.doc);plants::Json dependencies={material+".tga",script,source};
-  if(!s.doc.texture.empty()){auto original=std::filesystem::u8path(s.doc.texture);auto name=id+"-leaf"+original.extension().u8string();auto dependency="models/reyond-plugins/"+name;bundle[dependency]=q1Read(original);dependencies.push_back(dependency);portable["texture"]=name;bundle[source]=portable.dump(2);}
-  bundle[model+".reyond.json"]=plants::Json{{"kind","reyondbroom-authoring-model"},{"version",1},{"low",low},{"high",high},{"normalization",scale},{"dependencies",dependencies},{"plantProject",portable}}.dump(2);
-  placementPublish(bundle);
-  auto shader=plants::shader(material,material+".tga",gameProfile!=0);s.pendingShaders[id]={material,shader.substr(shader.find('{'))};command(("ftebroom_plant shader "+id+"\n").c_str());
-  placementSend(p,model,source,low,high,scale,s.allowFteQ1);s.lastModel=documentPath(model);s.message="Project and runtime assets saved; updating linked func_model.";
+  auto asset=plantBakeRuntime();placementPublish(asset.bundle);
+  if(!asset.shader.empty()){s.pendingShaders[asset.id]={asset.material,asset.shader.substr(asset.shader.find('{'))};command(("ftebroom_plant shader "+asset.id+"\n").c_str());}
+  placementSend(p,asset.model,asset.source,asset.low,asset.high,asset.scale,s.allowFteQ1);s.lastModel=documentPath(asset.model);s.message="Project and target-format runtime assets saved; updating linked func_model.";
 }
 static void placementAfterPlantSave(std::function<void()> next){
   if(!next)return;if(placementPlantPending||plantPlacement.awaiting){placementPlantNext=std::move(next);return;}next();

@@ -28,8 +28,8 @@ inline std::string prepareStaticModels(const std::string& bytes,int profile,size
   bool marked=e.get("_reyondbroom_authoring")=="1"&&generatedAuthoringPath(e.get("model"));
   bool legacy=generatedIvyPath(e.get("model"));
   if(!marked&&!legacy)continue;
-  if(marked&&(profile==3||profile==4))throw std::runtime_error("This map contains ReyondBroom authoring func_model entities. Quake II / GoldSrc runtime export is unsupported; convert the source model and use a compatible mod entity before compiling.");
-  if(marked&&profile==2&&e.get("_reyondbroom_fte_q1")!="1")throw std::runtime_error("Authoring func_model requires the explicit FTE static-model extension for Quake 1. Enable it in Plant Editor and Save, or convert the model for a compatible mod; vanilla Quake cannot spawn this entity.");
+  if(marked&&(profile==3||profile==4))throw std::runtime_error("The map contains a linked authoring func_model. Quake II plant assets are native MD2, but the base game has no arbitrary-model spawner. Use a compatible mod entity with that model before compiling. GoldSrc also requires studio MDL conversion.");
+  if(marked&&profile==2&&e.get("_reyondbroom_fte_q1")!="1")throw std::runtime_error("Quake plant assets are native MDL, but vanilla game code cannot spawn func_model. Enable the explicit FTE static-model extension in Plant Editor and Save, or use the MDL with a compatible mod entity before compiling.");
   if(marked&&profile==2){
    double scale=1;auto value=e.get("scale");if(value.empty())value=e.get("modelscale");
    if(!value.empty()){std::istringstream in(value);in.imbue(std::locale::classic());if(!(in>>scale)||!std::isfinite(scale))throw std::runtime_error("Invalid authoring model scale in Quake 1 build copy.");}

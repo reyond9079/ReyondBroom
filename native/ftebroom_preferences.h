@@ -13,12 +13,15 @@ static const char* preferenceVariables[] = {
   "ftebroom_grid_color","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
   "ftebroom_show_entity_names","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
+  "ftebroom_grid_plane","ftebroom_show_brushes","ftebroom_show_points","ftebroom_show_models","ftebroom_show_patches",
+  "ftebroom_render_faces","ftebroom_shade_faces","ftebroom_hidden_tags","ftebroom_hidden_classes","ftebroom_entity_links","r_fog_enabled",
   "ftebroom_texture_lock","ftebroom_uv_lock","ftebroom_auto_integer_snap","ftebroom_sky_overlays","ftebroom_bounds_visible","ftebroom_map_bounds",
   "ftebroom_new_scale_x","ftebroom_new_scale_y","ftebroom_new_angle",
   "ftebroom_new_offset_x","ftebroom_new_offset_y","ftebroom_extrude_handle_radius","ftebroom_grid_rotation",
   "ftebroom_symmetry_angle","ftebroom_symmetry_custom_center","ftebroom_symmetry_center_x","ftebroom_symmetry_center_y","ftebroom_symmetry_center_z","ftebroom_symmetry_guides","ftebroom_symmetry_relink"
 };
 static std::map<std::string,std::string> shortcutOverrides;
+static std::map<std::string,std::string> shortcutDefaultBindings;
 static std::string captureShortcut;
 static std::string preferenceError;
 static std::string shortcutVariable(const char* id)
@@ -62,7 +65,18 @@ static void preferencesApplyActions()
     float angle=cvars->GetFloat("ftebroom_grid_rotation");
     cvars->SetFloat("ftebroom_grid_rotation",std::isfinite(angle)?std::clamp(std::round(angle),-180.f,180.f):0);
   }
-  for(auto& a : actions){auto found=shortcutOverrides.find(shortcutVariable(a.id));if(found!=shortcutOverrides.end())shortcutApply(a,found->second);}
+  for(auto& a : actions){
+    shortcutDefaultBindings.emplace(a.id,a.shortcutText);
+    auto found=shortcutOverrides.find(shortcutVariable(a.id));
+    if(found!=shortcutOverrides.end())shortcutApply(a,found->second);
+  }
+}
+static void shortcutRestoreDefault(Action& a)
+{
+  const auto found=shortcutDefaultBindings.find(a.id);
+  if(found==shortcutDefaultBindings.end())return;
+  shortcutOverrides.erase(shortcutVariable(a.id));
+  shortcutApply(a,found->second);
 }
 static bool shortcutOverlap(uint32_t a,uint32_t b)
 {
@@ -89,7 +103,7 @@ static bool preferencesSave()
 {
   auto path=documentPath("ftebroom-preferences.cfg"),temp=path;temp+=".tmp";
   std::ofstream stream(temp);
-  for(auto setting:preferenceVariables){char value[256]={};cvars->GetString(setting,value,sizeof value);stream<<"seta "<<setting<<' '<<std::quoted(value)<<'\n';}
+  for(auto setting:preferenceVariables){char value[16384]={};cvars->GetString(setting,value,sizeof value);stream<<"seta "<<setting<<' '<<std::quoted(value)<<'\n';}
   for(auto& item:shortcutOverrides)stream<<"seta "<<item.first<<' '<<std::quoted(item.second)<<'\n';
   stream.close();if(!stream){preferenceError="Cannot write preferences.";return false;}
 #ifdef _WIN32
@@ -116,6 +130,11 @@ static void preferencesKeyboard()
 {
   auto conflicts=shortcutConflicts();
   if(!conflicts.empty())ImGui::TextColored({1,.35f,.3f,1},"Resolve overlapping shortcuts before closing Preferences.");
+  if(ImGui::Button("Restore default shortcuts")){
+    for(auto& a:actions)shortcutRestoreDefault(a);
+    captureShortcut.clear();conflicts=shortcutConflicts();
+  }
+  runUiRecordGlobal("keyboard-restore-defaults");
   // Keep the table stationary while capture starts/ends: moving the clicked
   // row under the pointer could activate it again on a later mouse event.
   if(captureShortcut.empty())ImGui::TextDisabled("Select a shortcut to assign a key combination.");
@@ -135,7 +154,21 @@ static void preferencesKeyboard()
       bool conflict=conflicts.count(a.id);if(conflict)ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().danger:ImVec4(1,.35f,.3f,1));
       ImGui::TextWrapped("%s",a.label);ImGui::TableNextColumn();
       if(ImGui::Selectable(a.shortcutText.empty()?"Click to assign":a.shortcutText.c_str(),captureShortcut==a.id))captureShortcut=a.id;runUiRecordGlobal(std::string("keyboard-binding/")+a.id);
-      if(ImGui::BeginPopupContextItem()){if(ImGui::MenuItem("Clear shortcut")){shortcutApply(a,"");shortcutOverrides[shortcutVariable(a.id)]="";}ImGui::EndPopup();}
+      if(conflict&&ImGui::IsItemHovered()){
+        ImGui::BeginTooltip();ImGui::TextUnformatted("Overlaps with:");
+        for(const auto& other:actions){
+          if(&other==&a||!other.command||!std::strcmp(a.command,other.command)||!shortcutOverlap(a.context,other.context))continue;
+          bool same=false;for(const auto& x:a.defaults)for(const auto& y:other.defaults)
+            same|=x.key==y.key&&x.ctrl==y.ctrl&&x.alt==y.alt&&x.shift==y.shift;
+          if(same)ImGui::TextUnformatted(other.label);
+        }
+        ImGui::EndTooltip();
+      }
+      if(ImGui::BeginPopupContextItem()){
+        if(ImGui::MenuItem("Restore default shortcut"))shortcutRestoreDefault(a);
+        if(ImGui::MenuItem("Clear shortcut")){shortcutApply(a,"");shortcutOverrides[shortcutVariable(a.id)]="";}
+        ImGui::EndPopup();
+      }
       ImGui::TableNextColumn();ImGui::Text("0x%04x",a.context);if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",a.id);
       if(conflict)ImGui::PopStyleColor();ImGui::PopID();
     }

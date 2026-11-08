@@ -20,6 +20,10 @@ on:
         description: Validate viewport color, shortcuts and ordering fixes in all theme / size cases
         type: boolean
         default: false
+      rb10_checks:
+        description: Validate every RB-10 UI, native target and updater requirement
+        type: boolean
+        default: false
       linux_base_tag:
         description: Native Linux base
         required: true
@@ -73,6 +77,19 @@ jobs:
           cmake --build deps/bullet-build -j2 --target BulletDynamics BulletCollision LinearMath
           g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
           scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
+      - name: Validate RB-10 native formats, browser cache and default shortcuts
+        if: inputs.rb10_checks
+        run: |
+          mkdir -p qa/rb10/units
+          g++ -std=c++17 -O2 tests/plant-runtime-targets.cpp -lz -o deps/plant-runtime-targets
+          deps/plant-runtime-targets qa/rb10/units/plant-targets
+          g++ -std=c++17 -O2 tests/browser132-unit.cpp -o deps/browser132-unit
+          deps/browser132-unit > qa/rb10/units/browser.log
+          g++ -std=c++17 -O2 -pthread -Ideps/imgui tests/entity-preview132-ui.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/entity-preview132-ui
+          deps/entity-preview132-ui > qa/rb10/units/preview.log
+          g++ -std=c++17 -O2 -Ideps/imgui tests/tools-layout.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/tools-layout
+          deps/tools-layout > qa/rb10/units/tools-layout.log
+          python tests/check-default-shortcuts.py deps/fteqw > qa/rb10/units/shortcuts.log
       - name: Package native runtime and corresponding sources
         run: |
           engine_args=()
@@ -106,6 +123,22 @@ jobs:
             for dimensions in '1920 1080' '1024 768'; do
               read -r width height <<< "$dimensions"
               xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-appearance.py "$bundle" "$PWD/qa/appearance-$theme-$width" --theme "$theme" --width "$width" --height "$height"
+            done
+          done
+      - name: Validate packaged RB-10 workflows with actual OS input
+        if: inputs.rb10_checks
+        run: |
+          bundle="$PWD/out/release/ReyondBroom-Linux-x64"
+          python tests/make-linux-build-fixture.py "$bundle"
+          python tests/test-welcome-updater.py --platform "$PLATFORM" --output qa/rb10/updater --runtime "$bundle"
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-runtime.py "$bundle" qa/rb10/runtime
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-browsers.py "$bundle" qa/rb10/browsers
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-welcome.py "$bundle" qa/rb10/welcome
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-target-ui.py "$bundle" qa/rb10/plant-target-ui
+          for theme in dark light; do
+            for dimensions in '1920 1080' '1024 768'; do
+              read -r width height <<< "$dimensions"
+              xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-views.py "$bundle" "qa/rb10/views-$theme-$width" --theme "$theme" --width "$width" --height "$height"
             done
           done
       - name: Capture the complete native botanical catalogue and reference views
@@ -196,6 +229,20 @@ jobs:
           make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
           deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
           g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+      - name: Validate RB-10 native target formats and browser cache on Windows
+        if: inputs.rb10_checks
+        shell: msys2 {0}
+        run: |
+          mkdir -p qa/rb10/units
+          g++ -std=c++17 -O2 tests/plant-runtime-targets.cpp -lz -o deps/plant-runtime-targets.exe
+          deps/plant-runtime-targets.exe qa/rb10/units/plant-targets
+          g++ -std=c++17 -O2 tests/browser132-unit.cpp -o deps/browser132-unit.exe
+          deps/browser132-unit.exe > qa/rb10/units/browser.log
+          g++ -std=c++17 -O2 -pthread -Ideps/imgui tests/entity-preview132-ui.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/entity-preview132-ui.exe
+          deps/entity-preview132-ui.exe > qa/rb10/units/preview.log
+          g++ -std=c++17 -O2 -Ideps/imgui tests/tools-layout.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/tools-layout.exe
+          deps/tools-layout.exe > qa/rb10/units/tools-layout.log
+          python tests/check-default-shortcuts.py deps/fteqw > qa/rb10/units/shortcuts.log
       - name: Package runtime and complete corresponding sources
         shell: msys2 {0}
         run: |
@@ -234,6 +281,33 @@ jobs:
               $height = if ($width -eq 1920) { 1080 } else { 768 }
               python scripts/test-viewport-appearance.py out/release/ReyondBroom-Windows-x64 "qa/appearance-$theme-$width" --theme $theme --width $width --height $height
               if ($LASTEXITCODE) { throw "Appearance acceptance failed: $theme / $width" }
+            }
+          }
+      - name: Validate packaged RB-10 workflows on Windows and PowerShell 5.1
+        if: inputs.rb10_checks
+        shell: pwsh
+        env:
+          RB_QA_RENDERER: gl rb_qa_opengl.dll
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          $bundle = (Resolve-Path out/release/ReyondBroom-Windows-x64).Path
+          python tests/make-linux-build-fixture.py $bundle
+          if ($LASTEXITCODE) { throw 'RB-10 fixture failed' }
+          python tests/test-welcome-updater.py --platform Windows-x64 --output qa/rb10/updater --runtime $bundle
+          if ($LASTEXITCODE) { throw 'Windows PowerShell updater protocol failed' }
+          python scripts/test-rb10-runtime.py $bundle qa/rb10/runtime
+          if ($LASTEXITCODE) { throw 'Native RB-10 regression failed' }
+          python scripts/test-rb10-browsers.py $bundle qa/rb10/browsers
+          if ($LASTEXITCODE) { throw 'Browser acceptance failed' }
+          python scripts/test-rb10-welcome.py $bundle qa/rb10/welcome
+          if ($LASTEXITCODE) { throw 'Welcome acceptance failed' }
+          python scripts/test-plant-target-ui.py $bundle qa/rb10/plant-target-ui
+          if ($LASTEXITCODE) { throw 'Plant native target acceptance failed' }
+          foreach ($theme in @('dark','light')) {
+            foreach ($width in @(1920,1024)) {
+              $height = if ($width -eq 1920) { 1080 } else { 768 }
+              python scripts/test-rb10-views.py $bundle "qa/rb10/views-$theme-$width" --theme $theme --width $width --height $height
+              if ($LASTEXITCODE) { throw "View Options/Tools acceptance failed: $theme / $width" }
             }
           }
       - name: Upload validated packages to the draft release

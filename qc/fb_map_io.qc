@@ -211,7 +211,8 @@ int fb_map_parse(string text)
     fb_map_text=strzone(text);fb_map_next();
     if(fb_map_token=="(") {
         int face=fb_map_add(-1,-1);fb_map_items[face].faces=memalloc(sizeof(brushface_t));
-        fb_map_items[face].count=1;fb_map_face(fb_map_items[face].faces,&fb_map_items[face].contents);
+        fb_map_items[face].count=1;fb_map_items[face].contents=CONTENTBIT_SOLID;
+        fb_map_face(fb_map_items[face].faces,&fb_map_items[face].contents);
     } else while(fb_map_token!="" && fb_map_error=="") {
         if(fb_map_count>65536) {fb_map_error="Too many clipboard objects";break;}
         fb_map_take("{");

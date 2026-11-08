@@ -14,7 +14,27 @@ static void testWorkspace()
   auto& io = ImGui::GetIO();
   const bool trickle = io.ConfigInputTrickleEventQueue;
   io.ConfigInputTrickleEventQueue = false;
-  if (std::string(mode).rfind("tools65",0)==0) {
+  if(std::string(mode)=="rb10tools"){
+    uiScaleChoice=0;uiLocked=false;uiReset=true;extraToolsExpanded=false;
+    cvars->SetFloat("ftebroom_tool",0);
+    auto toolsFrame=[](){event(0,0,0,300,350,640,800);};
+    for(int i=0;i<5;i++)toolsFrame();
+    auto* tools=ImGui::FindWindowByName("Tools");
+    expect(tools&&tools->DockNode&&tools->DockNode->ParentNode&&tools->DockNode->ParentNode->SplitAxis==ImGuiAxis_Y&&tools->DockNode==tools->DockNode->ParentNode->ChildNodes[0],"rb10_tools_default_top");
+    expect(uiToolsHorizontal(tools)&&tools->ScrollMax.x<1&&tools->ScrollMax.y<1,"rb10_tools_compact_content_fits");
+    const float collapsed=tools->Size.y;
+    extraToolsExpanded=true;for(int i=0;i<5;i++)toolsFrame();
+    expect(tools->Size.y>collapsed&&tools->ScrollMax.x<1&&tools->ScrollMax.y<1,"rb10_tools_expansion_grows_height");
+    extraToolsExpanded=false;for(int i=0;i<5;i++)toolsFrame();
+    expect(std::abs(tools->Size.y-collapsed)<2,"rb10_tools_collapse_reclaims_height");
+    auto* central=ImGui::DockBuilderGetCentralNode(uiDockId);ImGuiID side,rest;
+    ImGui::DockBuilderSplitNode(central->ID,ImGuiDir_Left,.25f,&side,&rest);
+    ImGui::DockBuilderDockWindow("Tools",side);ImGui::DockBuilderFinish(uiDockId);
+    for(int i=0;i<4;i++)toolsFrame();
+    expect(tools->DockId==side&&!uiToolsHorizontal(tools),"rb10_tools_custom_side_dock_preserved");
+    uiReset=true;
+  }
+  else if (std::string(mode).rfind("tools65",0)==0) {
     extraToolsExpanded=std::string(mode).find("expanded")!=std::string::npos;
     uiScaleChoice=0;uiLocked=false;uiReset=true;frame();frame();
     if(std::string(mode).find("left")!=std::string::npos || std::string(mode).find("right")!=std::string::npos) {

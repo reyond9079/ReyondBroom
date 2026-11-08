@@ -2,16 +2,20 @@
 var float autocvar_ftebroom_visibility_workers=1;
 var float autocvar_ftebroom_opaque_batches=1;
 var float autocvar_ftebroom_show_brushes=1,autocvar_ftebroom_show_points=1,autocvar_ftebroom_show_models=1;
+var float autocvar_ftebroom_show_patches=1;
 var float autocvar_ftebroom_show_entity_names=1,autocvar_ftebroom_show_entity_bounds=1,autocvar_ftebroom_show_group_bounds=1,autocvar_ftebroom_show_brush_entity_bounds=1;
 var float autocvar_ftebroom_render_faces=0,autocvar_ftebroom_shade_faces=1,autocvar_ftebroom_show_edges=1;
 var float autocvar_ftebroom_tool_opacity=.35;
 var float autocvar_ftebroom_clear_sky=1;
 int fb_clear_sky_faces;
 float fb_surface_shade(vector normal){return autocvar_ftebroom_shade_faces?0.6+0.4*fabs(normal*normalize('0.3 -0.5 1')):1;}
-var float autocvar_ftebroom_bounds_visible=0;
-var float autocvar_ftebroom_hidden_tags=0,autocvar_ftebroom_entity_links=3;
+var float autocvar_ftebroom_bounds_visible=1;
+var float autocvar_ftebroom_hidden_tags=0,autocvar_ftebroom_entity_links=1;
 var string autocvar_ftebroom_hidden_classes="";
-int *fb_filter_tags;int fb_filter_tag_count;
+int *fb_filter_tags;
+int *fb_filter_node_tags;
+int *fb_filter_all_faces_hidden;
+int fb_filter_tag_count;
 hashtable fb_shader_tags,fb_shader_previews,fb_shader_loose;
 string fb_material_preview_key(string source)
 {
@@ -68,6 +72,21 @@ int fb_filter_face_tags(brushface_t *face,int contents)
     if(contents&536870912i)tags|=FB_TAG_TRANSLUCENT;
     return tags;
 }
+int fb_filter_selected(int node)
+{
+    if(node<0 || node>=fb_node_count)return FALSE;
+    if(fb_nodes[node].kind>=FB_NODE_BRUSH){int selected=brush_isselected(fb_nodes[node].model,fb_nodes[node].id);if(selected)return selbrush_whole(&selectedbrushes[selected-1]);return FALSE;}
+    return fb_nodes[node].kind==FB_NODE_ENTITY && fb_entity_selected(fb_nodes[node].id);
+}
+int fb_filter_face_visible(int node,int faceIndex,brushface_t *face,int contents)
+{
+    if(!(int)autocvar_ftebroom_hidden_tags)return TRUE;
+    if(node>=0 && node<fb_node_count){
+        int selected=brush_isselected(fb_nodes[node].model,fb_nodes[node].id);
+        if(selected)if(selbrush_whole(&selectedbrushes[selected-1]) || selbrush_face(&selectedbrushes[selected-1],faceIndex))return TRUE;
+    }
+    return !(fb_filter_face_tags(face,contents)&(int)autocvar_ftebroom_hidden_tags);
+}
 int fb_face_occluder(brushface_t *face,int contents,int node,int model)
 {
     if(!cvar("ftebroom_quake1"))return 0;
@@ -80,26 +99,35 @@ int fb_face_occluder(brushface_t *face,int contents,int node,int model)
 void fb_filter_prepare()
 {
     float profile81Time=gettime(1);
-    static int epoch=-1,materials=-1;static string previous="";
+    static int epoch=-1,materials=-1,tagMask=-1;static string previous="";
     string signature=sprintf("%g %g %g %g %g %g",autocvar_ftebroom_show_brushes,autocvar_ftebroom_show_points,autocvar_ftebroom_show_models,autocvar_ftebroom_render_faces,autocvar_ftebroom_shade_faces,autocvar_ftebroom_show_edges);
     signature=strcat(signature,sprintf(" %g %g %g %g %g %g %i",autocvar_ftebroom_hidden_tags,autocvar_ftebroom_entity_links,autocvar_ftebroom_show_entity_names,autocvar_ftebroom_show_entity_bounds,autocvar_ftebroom_show_group_bounds,autocvar_ftebroom_show_brush_entity_bounds,fb_open_group)," ",autocvar_ftebroom_hidden_classes,ftos(autocvar_ftebroom_bounds_visible));
-    signature=strcat(signature," fog=",cvar_string("r_fog_enabled")," water=",cvar_string("r_wateralpha")," tools=",cvar_string("ftebroom_tool_opacity"));
+    signature=strcat(signature," patches=",ftos(autocvar_ftebroom_show_patches)," fog=",cvar_string("r_fog_enabled"));
+    signature=strcat(signature," water=",cvar_string("r_wateralpha")," tools=",cvar_string("ftebroom_tool_opacity"));
     signature=strcat(signature," ",cvar_string("r_lavaalpha")," ",cvar_string("r_slimealpha")," ",cvar_string("r_telealpha"));
+    int selectionMatters=!autocvar_ftebroom_show_brushes || !autocvar_ftebroom_show_patches || !autocvar_ftebroom_show_points || autocvar_ftebroom_hidden_tags || autocvar_ftebroom_hidden_classes!="";
+    signature=strcat(signature," selected=",itos(selectionMatters?fb_selection_epoch:0));
     if(signature!=previous){strunzone(previous);previous=strzone(signature);fb_filter_epoch++;}
     int materialEpoch=cvar("ftebroom_material_tag_epoch");
     if(materialEpoch!=materials){materials=materialEpoch;fb_filter_materials_load();epoch=-1;}
-    if(epoch==fb_grid_geometry_epoch)return;epoch=fb_grid_geometry_epoch;
-    memfree(fb_filter_tags);fb_filter_tag_count=fb_node_count;fb_filter_tags=memalloc(fb_node_capacity*sizeof(int));
+    if(epoch==fb_grid_geometry_epoch && tagMask==(int)autocvar_ftebroom_hidden_tags)return;epoch=fb_grid_geometry_epoch;tagMask=autocvar_ftebroom_hidden_tags;
+    memfree(fb_filter_tags);memfree(fb_filter_node_tags);memfree(fb_filter_all_faces_hidden);fb_filter_tag_count=fb_node_count;fb_filter_tags=memalloc(fb_node_capacity*sizeof(int));fb_filter_node_tags=memalloc(fb_node_capacity*sizeof(int));fb_filter_all_faces_hidden=memalloc(fb_node_capacity*sizeof(int));
     static brushface_t faces[64];
     for(int n=2;n<fb_node_count;n++) {
         int tags=0;
         if(fb_nodes[n].kind==FB_NODE_BRUSH) {
             int contents,count=brush_get(fb_nodes[n].model,fb_nodes[n].id,faces,64,&contents);
 
-            for(int f=0;f<min(count,64);f++)tags|=fb_filter_face_tags(&faces[f],contents);
+            int allHidden=count>0;
+            for(int f=0;f<min(count,64);f++){int faceTags=fb_filter_face_tags(&faces[f],contents);tags|=faceTags;if(!(faceTags&tagMask))allHidden=FALSE;}
+            fb_filter_all_faces_hidden[n]=allHidden;
+        }else if(fb_nodes[n].kind==FB_NODE_PATCH){
+            patchinfo_t patch;patch_getcp(fb_nodes[n].model,fb_nodes[n].id,__NULL__,0,&patch);brushface_t patchFace={0};patchFace.shadername=patch.shadername;tags=fb_filter_face_tags(&patchFace,patch.contents);
         }
+        int nodeTags=0;
         for(int parent=n;parent>=2;parent=fb_nodes[parent].parent)if(fb_nodes[parent].kind==FB_NODE_ENTITY)
-            if(substring(fb_nodes[parent].fields["classname"],0,8)=="trigger_")tags|=FB_TAG_TRIGGER;
+            if(substring(fb_nodes[parent].fields["classname"],0,8)=="trigger_")nodeTags|=FB_TAG_TRIGGER;
+        fb_filter_node_tags[n]=nodeTags;tags|=nodeTags;
         fb_filter_tags[n]=tags;
     }
     fb_filter_epoch++;
@@ -108,12 +136,21 @@ void fb_filter_prepare()
 int fb_filter_allowed(int node)
 {
     if(node<0 || node>=fb_node_count)return TRUE;
-    if(fb_nodes[node].kind>=FB_NODE_BRUSH && !autocvar_ftebroom_show_brushes)return FALSE;
+    if(fb_filter_selected(node))return TRUE;
+    if(fb_nodes[node].kind==FB_NODE_BRUSH && !autocvar_ftebroom_show_brushes)return FALSE;
+    if(fb_nodes[node].kind==FB_NODE_PATCH && !autocvar_ftebroom_show_patches)return FALSE;
     if(fb_nodes[node].kind==FB_NODE_ENTITY) {
         if(strstrofs(autocvar_ftebroom_hidden_classes,strcat("|",fb_nodes[node].fields["classname"],"|"),0)>=0)return FALSE;
         if(substring(fb_nodes[node].fields["model"],0,1)!="*" && !autocvar_ftebroom_show_points)return FALSE;
     }
-    if(node<fb_filter_tag_count)if(fb_filter_tags[node]&(int)autocvar_ftebroom_hidden_tags)return FALSE;
+    if(node<fb_filter_tag_count){
+        if(fb_nodes[node].kind==FB_NODE_BRUSH){
+            // Face tags hide faces; a brush disappears only when every face is
+            // hidden. Entity-derived trigger tags still apply to the whole node.
+            if(fb_filter_all_faces_hidden[node])return FALSE;
+            if(fb_filter_node_tags[node]&(int)autocvar_ftebroom_hidden_tags)return FALSE;
+        }else if(fb_filter_tags[node]&(int)autocvar_ftebroom_hidden_tags)return FALSE;
+    }
     return TRUE;
 }
 int fb_filter_custom(int node)
@@ -125,6 +162,7 @@ int fb_filter_custom(int node)
     // Map-edit submodels have no server entity submitting their surfaces.
     // Draw them explicitly, independently of selection and point-model visibility.
     if(fb_nodes[node].kind>=FB_NODE_BRUSH && fb_nodes[node].model!=1)return TRUE;
+    if(fb_filter_tags[node]&(int)autocvar_ftebroom_hidden_tags)return TRUE;
     return autocvar_ftebroom_render_faces!=0 || !autocvar_ftebroom_shade_faces || (fb_filter_tags[node] & (FB_TAG_TRIGGER|FB_TAG_CLIP|FB_TAG_CAULK|FB_TAG_HINT|FB_TAG_LIQUID|FB_TAG_TRANSLUCENT|FB_TAG_AREAPORTAL|FB_TAG_CLUSTERPORTAL));
 }
 int *fb_render_access;int fb_render_access_count;
@@ -301,6 +339,7 @@ int fb_render_append_brush(int n,int vertexOffset)
         float brushRadius=hasBounds==2?vlen(brushBounds[1]-brushBounds[0])*0.5+0.1:1000000000.0;
         int firstFace=fb_render_face_count;
         for(int f=0;f<min(count,64);f++) {
+            if(!fb_filter_face_visible(n,f,&faces[f],contents))continue;
             int vertices=brush_getfacepoints(fb_nodes[n].model,fb_nodes[n].id,f+1,points,64);
             if(vertices<3 || vertices>64)continue;
             if(fb_render_face_count==fb_render_face_capacity) {
@@ -357,6 +396,7 @@ void fb_render_faces_prepare()
     nextStyle=strcat(nextStyle," ",cvar_string("r_lavaalpha")," ",cvar_string("r_slimealpha")," ",cvar_string("r_telealpha"));
     nextStyle=strcat(nextStyle," ",cvar_string("ftebroom_tool_opacity"));
     nextStyle=strcat(nextStyle," ",cvar_string("ftebroom_game_profile")," ",cvar_string("ftebroom_shader_pack_enabled"));
+    nextStyle=strcat(nextStyle," tags=",cvar_string("ftebroom_hidden_tags")," selected=",itos(autocvar_ftebroom_hidden_tags?fb_selection_epoch:0));
     if(geometry==fb_grid_geometry_epoch && nextStyle==style && ((fb_incremental_enabled()||cvar("ftebroom_classic_map"))||(filters==fb_filter_epoch&&selection==fb_selection_epoch)))return;
     strunzone(style);style=strzone(nextStyle);
     geometry=fb_grid_geometry_epoch;filters=fb_filter_epoch;selection=fb_selection_epoch;fb_face_upload_epoch++;
@@ -490,7 +530,7 @@ void fb_uv_draw()
     int node=fb_document_brush_node(fb_uv_model,fb_uv_id);if(!fb_render_allowed(node,FB_PICK_LOCKED))return;
     for(int f=0;f<fb_uv_count;f++){
         int count=fb_uv_points_count[f];if(count<3 || count>64)continue;
-        brushface_t face=fb_uv_preview[f];int tags=fb_filter_face_tags(&face,fb_uv_contents);
+        brushface_t face=fb_uv_preview[f];if(!fb_filter_face_visible(node,f,&face,fb_uv_contents))continue;int tags=fb_filter_face_tags(&face,fb_uv_contents);
         if(node<fb_filter_tag_count && (fb_filter_tags[node]&FB_TAG_TRIGGER))tags|=FB_TAG_TRIGGER;
         float alpha=fb_surface_opacity(face.shadername,tags),shade=fb_surface_shade(face.planenormal);
         if(alpha==1 && (vector)getproperty(VF_ORIGIN)*face.planenormal<face.planedist-.01)continue;

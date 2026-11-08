@@ -26,6 +26,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "oak",
       "name": "English oak",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branchAngle": 62,
         "branches": 12,
@@ -33,6 +38,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "crownBase": 0.3,
         "foliageMode": 1,
         "height": 240,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 3,
         "leafSize": 14,
         "leafWidth": 0.55,
@@ -57,6 +67,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "cork-oak",
       "name": "Cork oak",
       "parameters": {
+        "bark": [
+          0.37,
+          0.33,
+          0.27
+        ],
         "barkPattern": 6,
         "branchAngle": 70,
         "clumps": 2,
@@ -65,6 +80,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 190,
+        "leaf": [
+          0.19,
+          0.3,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 8,
         "leafWidth": 0.55,
@@ -101,6 +121,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.65,
         "height": 280,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 8,
         "leafWidth": 0.75,
@@ -135,6 +160,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.18,
         "height": 255,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 11,
         "leafWidth": 0.68,
@@ -158,12 +188,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "maple",
       "name": "Field maple",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branchAngle": 60,
         "crown": 0,
         "crownBase": 0.32,
         "foliageMode": 1,
         "height": 210,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 4,
         "leafSize": 14,
         "leafWidth": 0.9,
@@ -187,6 +227,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "japanese-maple",
       "name": "Japanese maple",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "branches": 10,
         "clumps": 2,
@@ -194,6 +239,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "crownBase": 0.35,
         "foliageMode": 1,
         "height": 130,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 4,
         "leafSize": 12,
         "leafWidth": 1,
@@ -218,6 +268,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "willow",
       "name": "Weeping willow",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branchLength": 0.9,
         "branches": 16,
@@ -226,6 +281,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 1.3,
         "height": 245,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 2,
         "leafSize": 15,
         "leafWidth": 0.14,
@@ -249,6 +309,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "white-willow",
       "name": "White willow",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branches": 14,
         "clumps": 2,
@@ -257,6 +322,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.5,
         "height": 265,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 2,
         "leafSize": 12,
         "leafWidth": 0.2,
@@ -279,6 +349,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "lombardy-poplar",
       "name": "Lombardy poplar",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branchAngle": 23,
         "branches": 22,
@@ -287,6 +362,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "depth": 3,
         "foliageMode": 1,
         "height": 350,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 11,
         "leafWidth": 0.8,
@@ -309,11 +389,21 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "aspen",
       "name": "European aspen",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "crown": 1,
         "crownBase": 0.45,
         "foliageMode": 1,
         "height": 260,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 9,
         "leafWidth": 1.05,
@@ -338,6 +428,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "beech",
       "name": "European beech",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "branchAngle": 57,
         "crown": 1,
@@ -345,6 +440,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "crownFill": 1.05,
         "foliageMode": 1,
         "height": 285,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 12,
         "leafWidth": 0.55,
@@ -367,11 +467,21 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "linden",
       "name": "Small-leaved lime",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "crown": 1,
         "crownBase": 0.25,
         "foliageMode": 1,
         "height": 270,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafProfile": [
           0.12,
           1.2,
@@ -402,12 +512,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "ash",
       "name": "European ash",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "crown": 6,
         "crownBase": 0.4,
         "crownFill": 0.7,
         "foliageMode": 1,
         "height": 300,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 7,
         "leafSize": 24,
         "leafWidth": 0.32,
@@ -434,12 +554,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "elm",
       "name": "English elm",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branchAngle": 48,
         "crown": 6,
         "crownBase": 0.35,
         "foliageMode": 1,
         "height": 300,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 11,
         "leafWidth": 0.65,
@@ -463,12 +593,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "plane",
       "name": "London plane",
       "parameters": {
+        "bark": [
+          0.45,
+          0.44,
+          0.35
+        ],
         "barkPattern": 7,
         "branches": 10,
         "crown": 7,
         "crownBase": 0.28,
         "foliageMode": 1,
         "height": 320,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 4,
         "leafSize": 23,
         "leafWidth": 0.95,
@@ -492,12 +632,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "horse-chestnut",
       "name": "Horse chestnut",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "crown": 0,
         "crownBase": 0.3,
         "crownFill": 1,
         "foliageMode": 1,
         "height": 250,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 7,
         "leafSize": 27,
         "leafWidth": 0.42,
@@ -524,12 +674,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "walnut",
       "name": "Common walnut",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branches": 9,
         "crown": 0,
         "crownBase": 0.32,
         "foliageMode": 1,
         "height": 240,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 7,
         "leafSize": 28,
         "leafWidth": 0.48,
@@ -555,11 +715,21 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "alder",
       "name": "Black alder",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "crown": 5,
         "crownBase": 0.18,
         "foliageMode": 1,
         "height": 240,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 10,
         "leafWidth": 0.85,
@@ -583,11 +753,21 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "rowan",
       "name": "Rowan",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "crown": 1,
         "crownBase": 0.32,
         "foliageMode": 1,
         "height": 180,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 7,
         "leafSize": 21,
         "leafWidth": 0.28,
@@ -613,6 +793,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "apple",
       "name": "Orchard apple",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branches": 8,
         "crown": 0,
@@ -621,6 +806,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 5,
         "foliageMode": 1,
         "height": 120,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 10,
         "leafWidth": 0.65,
@@ -644,12 +834,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "cherry",
       "name": "Wild cherry",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "crown": 6,
         "crownBase": 0.42,
         "flowerSize": 4,
         "foliageMode": 1,
         "height": 185,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 12,
         "leafWidth": 0.5,
@@ -674,6 +874,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "magnolia",
       "name": "Southern magnolia",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "crown": 5,
         "crownBase": 0.18,
@@ -682,6 +887,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 13,
         "foliageMode": 1,
         "height": 195,
+        "leaf": [
+          0.19,
+          0.3,
+          0.15
+        ],
         "leafCurl": 0.15,
         "leafShape": 1,
         "leafSize": 24,
@@ -706,6 +916,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "baobab",
       "name": "African baobab",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "branches": 7,
         "crown": 4,
@@ -713,6 +928,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "depth": 3,
         "foliageMode": 1,
         "height": 240,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 7,
         "leafSize": 20,
         "leafWidth": 0.4,
@@ -740,6 +960,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "umbrella-acacia",
       "name": "Umbrella thorn acacia",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branchAngle": 75,
         "crown": 4,
@@ -748,6 +973,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "crownFill": 0.75,
         "foliageMode": 1,
         "height": 180,
+        "leaf": [
+          0.25,
+          0.36,
+          0.15
+        ],
         "leafShape": 7,
         "leafSize": 22,
         "leafWidth": 0.16,
@@ -773,6 +1003,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "pine",
       "name": "Scots pine",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "branches": 11,
         "crown": 4,
@@ -808,12 +1043,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "maritime-pine",
       "name": "Maritime pine",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "branches": 10,
         "crown": 6,
         "crownBase": 0.48,
         "evergreen": 1,
         "height": 275,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 18,
         "leafWidth": 0.9,
@@ -838,12 +1083,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "stone-pine",
       "name": "Siberian stone pine",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "branches": 15,
         "crown": 1,
         "crownBase": 0.2,
         "evergreen": 1,
         "height": 290,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 14,
         "leaflets": 5,
@@ -868,6 +1123,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "spruce",
       "name": "Norway spruce",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "branches": 17,
         "crown": 5,
@@ -904,6 +1164,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "blue-spruce",
       "name": "Blue spruce",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "branchAngle": 81,
         "branches": 15,
@@ -940,6 +1205,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "fir",
       "name": "Silver fir",
       "parameters": {
+        "bark": [
+          0.43,
+          0.43,
+          0.37
+        ],
         "barkPattern": 1,
         "branches": 16,
         "crown": 5,
@@ -947,6 +1217,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "gravity": -0.05,
         "height": 320,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 9,
         "needleForm": 1,
@@ -971,6 +1246,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "larch",
       "name": "European larch",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branches": 14,
         "crown": 5,
@@ -979,6 +1259,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 0,
         "gravity": 0.48,
         "height": 295,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 9,
         "needleForm": 3,
@@ -1001,6 +1286,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "cedar",
       "name": "Cedar of Lebanon",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branches": 9,
         "crown": 8,
@@ -1009,6 +1299,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "gravity": 0.05,
         "height": 265,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 10,
         "needleForm": 3,
@@ -1032,6 +1327,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "cypress",
       "name": "Mediterranean cypress",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "barkPattern": 0,
         "branches": 21,
         "crown": 2,
@@ -1039,6 +1339,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "crownFill": 1.2,
         "evergreen": 1,
         "height": 290,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 12,
         "needleForm": 2,
@@ -1062,6 +1367,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "tree-juniper",
       "name": "Tree juniper",
       "parameters": {
+        "bark": [
+          0.34,
+          0.27,
+          0.21
+        ],
         "barkPattern": 4,
         "branches": 11,
         "clumps": 2,
@@ -1070,6 +1380,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "curvature": 0.6,
         "evergreen": 1,
         "height": 180,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 10,
         "needleForm": 2,
@@ -1093,12 +1408,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "redwood",
       "name": "Coast redwood",
       "parameters": {
+        "bark": [
+          0.34,
+          0.27,
+          0.21
+        ],
         "barkPattern": 4,
         "branches": 23,
         "crown": 5,
         "crownBase": 0.27,
         "evergreen": 1,
         "height": 460,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 5,
         "leafSize": 10,
         "needleForm": 1,
@@ -1123,12 +1448,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "araucaria",
       "name": "Monkey puzzle tree",
       "parameters": {
+        "bark": [
+          0.35,
+          0.29,
+          0.23
+        ],
         "barkPattern": 3,
         "branches": 10,
         "crown": 5,
         "crownBase": 0.18,
         "evergreen": 1,
         "height": 260,
+        "leaf": [
+          0.17,
+          0.29,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 12,
         "leafWidth": 0.45,
@@ -1154,6 +1489,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "boxwood",
       "name": "Round boxwood",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 6,
         "clumps": 5,
         "crown": 0,
@@ -1162,6 +1502,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 64,
+        "leaf": [
+          0.19,
+          0.3,
+          0.15
+        ],
         "leafShape": 1,
         "leafSize": 5,
         "leafWidth": 0.65,
@@ -1185,6 +1530,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "hedge",
       "name": "Clipped hornbeam hedge",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 5,
         "clumps": 7,
         "crown": 2,
@@ -1193,6 +1543,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 2,
         "foliageMode": 1,
         "height": 104,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 1,
         "leafSize": 8,
         "leafWidth": 0.58,
@@ -1217,6 +1572,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "wild-shrub",
       "name": "Wild hawthorn shrub",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 7,
         "clumps": 5,
         "crown": 7,
@@ -1224,6 +1584,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 3,
         "foliageMode": 1,
         "height": 82,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 3,
         "leafSize": 7,
         "leafWidth": 0.6,
@@ -1247,6 +1612,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "flowering-shrub",
       "name": "Flowering dog rose",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 6,
         "clumps": 4,
         "crown": 6,
@@ -1259,6 +1629,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 7,
         "foliageMode": 1,
         "height": 96,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 7,
         "leafSize": 15,
         "leafWidth": 0.4,
@@ -1285,6 +1660,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "lilac",
       "name": "Common lilac",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 6,
         "clumps": 5,
         "crown": 6,
@@ -1297,6 +1677,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 11,
         "foliageMode": 1,
         "height": 120,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafProfile": [
           0.15,
           1.15,
@@ -1328,6 +1713,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "hydrangea",
       "name": "Bigleaf hydrangea",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 5,
         "clumps": 7,
         "crown": 0,
@@ -1340,6 +1730,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 12,
         "foliageMode": 1,
         "height": 82,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 1,
         "leafSize": 16,
         "leafWidth": 0.8,
@@ -1364,6 +1759,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "rhododendron",
       "name": "Rhododendron",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 7,
         "clumps": 4,
         "crown": 0,
@@ -1377,6 +1777,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 9,
         "foliageMode": 1,
         "height": 110,
+        "leaf": [
+          0.19,
+          0.3,
+          0.15
+        ],
         "leafShape": 2,
         "leafSize": 17,
         "leafWidth": 0.35,
@@ -1401,6 +1806,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "heather",
       "name": "Common heather",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 5,
         "clumps": 12,
         "crown": 5,
@@ -1414,6 +1824,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 3,
         "foliageMode": 1,
         "height": 35,
+        "leaf": [
+          0.19,
+          0.3,
+          0.15
+        ],
         "leafShape": 2,
         "leafSize": 2,
         "leafWidth": 0.2,
@@ -1438,6 +1853,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "viburnum",
       "name": "Guelder rose",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 7,
         "clumps": 4,
         "crown": 6,
@@ -1445,6 +1865,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 8,
         "foliageMode": 1,
         "height": 130,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 4,
         "leafSize": 11,
         "leafWidth": 0.9,
@@ -1470,6 +1895,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "currant",
       "name": "Blackcurrant",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 4,
         "clumps": 8,
         "crown": 7,
@@ -1477,6 +1907,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 3,
         "foliageMode": 1,
         "height": 70,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 4,
         "leafSize": 9,
         "leafWidth": 1,
@@ -1501,6 +1936,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "gooseberry",
       "name": "Gooseberry",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branchAngle": 84,
         "branches": 5,
         "clumps": 6,
@@ -1508,6 +1948,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "depth": 2,
         "foliageMode": 1,
         "height": 65,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 4,
         "leafSize": 6,
         "leafWidth": 0.85,
@@ -1532,6 +1977,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "blackberry",
       "name": "Bramble blackberry",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 5,
         "clumps": 5,
         "crown": 3,
@@ -1539,6 +1989,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.75,
         "height": 95,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 7,
         "leafSize": 22,
         "leafWidth": 0.45,
@@ -1564,6 +2019,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "creeping-juniper",
       "name": "Creeping juniper",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 6,
         "clumps": 6,
         "crown": 4,
@@ -1572,6 +2032,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 28,
+        "leaf": [
+          0.19,
+          0.3,
+          0.15
+        ],
         "leafShape": 5,
         "leafSize": 4,
         "leafWidth": 0.25,
@@ -1595,12 +2060,22 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "barberry",
       "name": "Common barberry",
       "parameters": {
+        "bark": [
+          0.32,
+          0.29,
+          0.24
+        ],
         "branches": 5,
         "clumps": 7,
         "crown": 6,
         "depth": 2,
         "foliageMode": 1,
         "height": 88,
+        "leaf": [
+          0.23,
+          0.34,
+          0.14
+        ],
         "leafShape": 1,
         "leafSize": 5,
         "leafWidth": 0.7,
@@ -1633,6 +2108,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 38,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.045,
         "organ": 0,
         "radius": 0.25
@@ -1659,6 +2139,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 12,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.055,
         "organ": 1,
         "radius": 0.25
@@ -1685,6 +2170,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 30,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.025,
         "organ": 2,
         "radius": 0.25
@@ -1711,6 +2201,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 68,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.018,
         "organ": 3,
         "radius": 0.25
@@ -1737,6 +2232,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 125,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.065,
         "organ": 4,
         "radius": 0.25
@@ -1763,6 +2263,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 165,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.055,
         "organ": 5,
         "radius": 0.25
@@ -1789,6 +2294,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 48,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.055,
         "organ": 6,
         "radius": 0.25
@@ -1815,6 +2325,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 75,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.023,
         "organ": 7,
         "radius": 0.25
@@ -1841,6 +2356,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 65,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.036,
         "organ": 8,
         "radius": 0.25
@@ -1867,6 +2387,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 62,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.045,
         "organ": 9,
         "radius": 0.25
@@ -1893,6 +2418,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 110,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.035,
         "organ": 10,
         "radius": 0.25
@@ -1919,6 +2449,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 3,
         "flowerSize": 9,
         "height": 56,
+        "leaf": [
+          0.31,
+          0.4,
+          0.19
+        ],
         "leafWidth": 0.025,
         "organ": 11,
         "radius": 0.25
@@ -1943,6 +2478,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 65,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 12,
         "leafWidth": 0.24,
         "leaves": 16,
@@ -1969,6 +2509,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 100,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 12,
         "leafWidth": 0.28,
         "leaves": 22,
@@ -1995,6 +2540,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 75,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 12,
         "leafWidth": 0.32,
         "leaves": 20,
@@ -2021,6 +2571,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 70,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 12,
         "leafWidth": 0.16,
         "leaves": 26,
@@ -2047,6 +2602,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 38,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 12,
         "leafWidth": 0.75,
         "leaves": 15,
@@ -2073,6 +2633,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 90,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 12,
         "leafWidth": 0.24,
         "leaves": 10,
@@ -2100,6 +2665,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 35,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 12,
         "leafWidth": 0.35,
         "leaves": 18,
@@ -2127,6 +2697,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "foliageMode": 1,
         "gravity": 0.55,
         "height": 230,
+        "leaf": [
+          0.22,
+          0.36,
+          0.17
+        ],
         "leafSize": 23,
         "leafWidth": 0.2,
         "leaves": 25,
@@ -2158,6 +2733,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 13,
         "height": 42,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 2,
         "leafSize": 11,
         "leafWidth": 0.2,
@@ -2191,6 +2771,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 2,
         "flowerSize": 22,
         "height": 90,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 6,
         "leafSize": 17,
         "leafWidth": 0.5,
@@ -2224,6 +2809,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 5,
         "flowerSize": 13,
         "height": 60,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 7,
         "leafSize": 11,
         "leafWidth": 0.5,
@@ -2258,6 +2848,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 17,
         "height": 50,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 3,
         "leafSize": 11,
         "leafWidth": 0.5,
@@ -2291,6 +2886,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 12,
         "height": 38,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 2,
         "leafSize": 11,
         "leafWidth": 0.2,
@@ -2324,6 +2924,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 12,
         "height": 35,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 2,
         "leafSize": 11,
         "leafWidth": 0.2,
@@ -2357,6 +2962,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 17,
         "height": 60,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 2,
         "leafSize": 11,
         "leafWidth": 0.2,
@@ -2390,6 +3000,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 18,
         "height": 80,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 2,
         "leafSize": 17,
         "leafWidth": 0.2,
@@ -2423,6 +3038,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 5,
         "height": 45,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 2,
         "leafSize": 11,
         "leafWidth": 0.2,
@@ -2456,6 +3076,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 7,
         "height": 90,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 7,
         "leafSize": 17,
         "leafWidth": 0.5,
@@ -2490,6 +3115,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 10,
         "height": 115,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 1,
         "leafSize": 17,
         "leafWidth": 0.5,
@@ -2523,6 +3153,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 12,
         "height": 65,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 2,
         "leafSize": 17,
         "leafWidth": 0.2,
@@ -2556,6 +3191,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 7,
         "height": 25,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 7,
         "leafSize": 11,
         "leafWidth": 0.5,
@@ -2590,6 +3230,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerLayers": 1,
         "flowerSize": 11,
         "height": 28,
+        "leaf": [
+          0.24,
+          0.35,
+          0.16
+        ],
         "leafShape": 3,
         "leafSize": 11,
         "leafWidth": 0.5,
@@ -3158,6 +3803,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "date-palm",
       "name": "Date palm",
       "parameters": {
+        "bark": [
+          0.44,
+          0.41,
+          0.33
+        ],
         "barkPattern": 5,
         "branches": 15,
         "clumps": 1,
@@ -3165,6 +3815,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 280,
+        "leaf": [
+          0.25,
+          0.36,
+          0.17
+        ],
         "leafSize": 30,
         "leafWidth": 0.16,
         "leaves": 26,
@@ -3187,6 +3842,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "coconut-palm",
       "name": "Coconut palm",
       "parameters": {
+        "bark": [
+          0.44,
+          0.41,
+          0.33
+        ],
         "barkPattern": 5,
         "branches": 11,
         "clumps": 1,
@@ -3194,6 +3854,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 340,
+        "leaf": [
+          0.25,
+          0.36,
+          0.17
+        ],
         "leafSize": 38,
         "leafWidth": 0.16,
         "leaves": 26,
@@ -3216,6 +3881,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "washingtonia",
       "name": "Mexican fan palm",
       "parameters": {
+        "bark": [
+          0.44,
+          0.41,
+          0.33
+        ],
         "barkPattern": 5,
         "branches": 19,
         "clumps": 1,
@@ -3223,6 +3893,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 330,
+        "leaf": [
+          0.25,
+          0.36,
+          0.17
+        ],
         "leafSize": 35,
         "leafWidth": 0.16,
         "leaves": 26,
@@ -3245,6 +3920,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "chamaerops",
       "name": "European fan palm",
       "parameters": {
+        "bark": [
+          0.44,
+          0.41,
+          0.33
+        ],
         "barkPattern": 5,
         "branches": 15,
         "clumps": 3,
@@ -3252,6 +3932,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 130,
+        "leaf": [
+          0.25,
+          0.36,
+          0.17
+        ],
         "leafSize": 27,
         "leafWidth": 0.16,
         "leaves": 26,
@@ -3274,6 +3959,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "royal-palm",
       "name": "Royal palm",
       "parameters": {
+        "bark": [
+          0.44,
+          0.41,
+          0.33
+        ],
         "barkPattern": 5,
         "branches": 12,
         "clumps": 1,
@@ -3281,6 +3971,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 380,
+        "leaf": [
+          0.25,
+          0.36,
+          0.17
+        ],
         "leafSize": 37,
         "leafWidth": 0.16,
         "leaves": 26,
@@ -3303,6 +3998,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
       "id": "rhapis",
       "name": "Lady palm",
       "parameters": {
+        "bark": [
+          0.44,
+          0.41,
+          0.33
+        ],
         "barkPattern": 5,
         "branches": 10,
         "clumps": 3,
@@ -3310,6 +4010,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 160,
+        "leaf": [
+          0.25,
+          0.36,
+          0.17
+        ],
         "leafSize": 25,
         "leafWidth": 0.16,
         "leaves": 26,
@@ -3336,6 +4041,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 155,
+        "leaf": [
+          0.19,
+          0.3,
+          0.15
+        ],
         "leafShape": 4,
         "leafSize": 17,
         "leafWidth": 0.9,
@@ -3365,6 +4075,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 0,
         "foliageMode": 1,
         "height": 190,
+        "leaf": [
+          0.22,
+          0.34,
+          0.14
+        ],
         "leafShape": 7,
         "leafSize": 17,
         "leafWidth": 0.45,
@@ -3394,6 +4109,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 0,
         "foliageMode": 1,
         "height": 210,
+        "leaf": [
+          0.22,
+          0.34,
+          0.14
+        ],
         "leafShape": 4,
         "leafSize": 17,
         "leafWidth": 0.95,
@@ -3422,6 +4142,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 0,
         "foliageMode": 1,
         "height": 200,
+        "leaf": [
+          0.22,
+          0.34,
+          0.14
+        ],
         "leafShape": 7,
         "leafSize": 17,
         "leafWidth": 0.35,
@@ -3451,6 +4176,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 0,
         "foliageMode": 1,
         "height": 210,
+        "leaf": [
+          0.22,
+          0.34,
+          0.14
+        ],
         "leafShape": 4,
         "leafSize": 17,
         "leafWidth": 0.85,
@@ -3479,6 +4209,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 0,
         "foliageMode": 1,
         "height": 170,
+        "leaf": [
+          0.22,
+          0.34,
+          0.14
+        ],
         "leafShape": 7,
         "leafSize": 17,
         "leafWidth": 0.4,
@@ -3515,6 +4250,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 210,
+        "leaf": [
+          0.26,
+          0.37,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 20,
         "leafWidth": 0.16,
@@ -3548,6 +4288,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 250,
+        "leaf": [
+          0.26,
+          0.37,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 18,
         "leafWidth": 0.16,
@@ -3581,6 +4326,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 55,
+        "leaf": [
+          0.26,
+          0.37,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 14,
         "leafWidth": 0.16,
@@ -3614,6 +4364,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "evergreen": 1,
         "foliageMode": 1,
         "height": 460,
+        "leaf": [
+          0.26,
+          0.37,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 28,
         "leafWidth": 0.16,
@@ -3643,6 +4398,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 13,
         "foliageMode": 1,
         "height": 130,
+        "leaf": [
+          0.29,
+          0.39,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 30,
         "leafWidth": 0.09,
@@ -3671,6 +4431,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 13,
         "foliageMode": 1,
         "height": 140,
+        "leaf": [
+          0.29,
+          0.39,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 30,
         "leafWidth": 0.045,
@@ -3699,6 +4464,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 13,
         "foliageMode": 1,
         "height": 120,
+        "leaf": [
+          0.29,
+          0.39,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 30,
         "leafWidth": 0.025,
@@ -3727,6 +4497,11 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "flowerSize": 13,
         "foliageMode": 1,
         "height": 55,
+        "leaf": [
+          0.29,
+          0.39,
+          0.18
+        ],
         "leafShape": 2,
         "leafSize": 30,
         "leafWidth": 0.015,

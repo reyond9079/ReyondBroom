@@ -33,6 +33,9 @@ void fb_incremental_settings()
     static string previous;
     string key=strcat(cvar_string("ftebroom_incremental_edits")," ",cvar_string("ftebroom_cached_meshes")," ",cvar_string("ftebroom_render_faces")," ",cvar_string("ftebroom_shade_faces"));
     key=strcat(key," ",cvar_string("ftebroom_material_tag_epoch")," ",cvar_string("ftebroom_native_faces")," ",cvar_string("ftebroom_tool_opacity"));
+    // The retained snapshot omits hidden face fills. A changed tag mask or a
+    // changed selected-face exemption needs a new snapshot, never a per-frame rebuild.
+    key=strcat(key," tags=",cvar_string("ftebroom_hidden_tags")," selected=",itos(cvar("ftebroom_hidden_tags")?fb_selection_epoch:0));
     if(previous!="" && key!=previous){if(fb_incremental_brush_count)fb_document_rebuild();else fb_grid_geometry_epoch++;}
     if(previous!=key){strunzone(previous);previous=strzone(key);}
 }
@@ -201,11 +204,12 @@ int fb_incremental_apply(int first,int last,int redo)
             fb_nodes[node].parent=fb_document_model_parent(model);fb_nodes[node].layer=fb_nodes[fb_nodes[node].parent].layer;
         }
         fb_document_brush_index[sprintf("%i:%i",model,id)]=node+1i;
-        static brushface_t attributes[64];int contents;brush_get(model,id,attributes,64,&contents);int tags=0;
-        for(int f=0;f<faces;f++)tags|=fb_filter_face_tags(&attributes[f],contents);
+        static brushface_t attributes[64];int contents;brush_get(model,id,attributes,64,&contents);int tags=0,allHidden=faces>0;
+        for(int f=0;f<faces;f++){int faceTags=fb_filter_face_tags(&attributes[f],contents);tags|=faceTags;if(!(faceTags&(int)autocvar_ftebroom_hidden_tags))allHidden=FALSE;}
+        int nodeTags=0;
         for(int parent=fb_nodes[node].parent;parent>=2;parent=fb_nodes[parent].parent)if(fb_nodes[parent].kind==FB_NODE_ENTITY)
-            if(substring(fb_nodes[parent].fields["classname"],0,8)=="trigger_")tags|=FB_TAG_TRIGGER;
-        fb_filter_tag_count=fb_render_access_count=fb_node_count;fb_filter_tags[node]=tags;
+            if(substring(fb_nodes[parent].fields["classname"],0,8)=="trigger_")nodeTags|=FB_TAG_TRIGGER;
+        tags|=nodeTags;fb_filter_tag_count=fb_render_access_count=fb_node_count;fb_filter_tags[node]=tags;fb_filter_node_tags[node]=nodeTags;fb_filter_all_faces_hidden[node]=allHidden;
         fb_render_access[node]=((tags&FB_TAG_TRIGGER)?0:4)|(fb_pick_allowed(node,FB_PICK_LOCKED)?1:0)|(fb_pick_allowed(node,0)?2:0)|((fb_filter_custom(node)||brush_isselected(model,id))?16:0);
         fb_incremental_insert(fb_incremental_build(node));fb_visibility_node(node);
         static vector bounds[2];fb_container_cache[node].valid=brush_getfacepoints(model,id,0,bounds,2)==2 && (fb_render_access[node]&1);
@@ -231,6 +235,7 @@ void fb_incremental_draw_grid()
     static vector params[6];params[0]=autocvar_ftebroom_grid_origin;params[1]=autocvar_ftebroom_grid_basis_x;params[2]=autocvar_ftebroom_grid_basis_y;params[3]=autocvar_ftebroom_grid_basis_z;params[4]=[fb_grid(),bound(0,cvar("ftebroom_grid_alpha"),1),0];params[5]=[1,0,0];
     if(autocvar_ftebroom_grid_rotation){float radians=-autocvar_ftebroom_grid_rotation*M_PI/180;params[5]=[cos(radians),sin(radians),0];}
     ftebroom_build_grid(fb_incremental_grid,fb_incremental_grid_count,params);
+    fb_grid_filter_alpha(fb_incremental_grid,fb_incremental_grid_count);
 
 }
 

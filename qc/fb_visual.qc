@@ -508,15 +508,17 @@ void fb_visual_draw()
             }
         } else if(item.kind==FB_NODE_BRUSH) {
             static brushface_t attributes[128];
-            int faces=brush_get(item.model,item.id,attributes,128,__NULL__);
+            int contents,faces=brush_get(item.model,item.id,attributes,128,&contents);
             for(int f=0;f<faces;f++) {
+                int faceVisible=fb_filter_face_visible(node,f,&attributes[f],contents);
                 if(f<128 && !cvar("ca_brush_view") && !autocvar_ftebroom_sky_overlays)
                     if((attributes[f].surfaceflags&4) || fb_sky_material(attributes[f].shadername))continue;
                 if(selected && !locked) if(!selbrush_whole(&selectedbrushes[selected-1])) {
                     if(!selbrush_face(&selectedbrushes[selected-1],f)) continue;fill=0.3;
                 }
                 int count=brush_getfacepoints(item.model,item.id,f+1,points,256);
-                fb_visual_polygon(points,count,color,fill);
+                // TB retains every wire edge of a partially visible brush.
+                fb_visual_polygon(points,count,color,faceVisible?fill:0);
             }
         } else if(item.kind==FB_NODE_PATCH) {
             patchinfo_t info;int total=patch_getmesh(item.model,item.id,__NULL__,0,&info);

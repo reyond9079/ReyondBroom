@@ -9,9 +9,29 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  #include "ftebroom_tutorial_tests.h"
+  #include "ftebroom_welcome132_tests.h"
+  if(std::string_view(mode)=="rb10q1optin"){
+    const auto profile=gameProfile;const bool optin=plantState.allowFteQ1;
+    try{
+      gameProfile=2;plantState.allowFteQ1=false;auto vanilla=plantBakeRuntime();
+      plantState.allowFteQ1=true;auto fte=plantBakeRuntime();
+      expect(vanilla.id==fte.id&&vanilla.model==fte.model&&vanilla.bundle==fte.bundle,"rb10_q1_scene_optin_does_not_mutate_immutable_assets");
+    }catch(...){gameProfile=profile;plantState.allowFteQ1=optin;throw;}
+    gameProfile=profile;plantState.allowFteQ1=optin;return;
+  }
+  if(std::string_view(mode)=="rb10guards"){
+    const bool wasOpen=plantState.open,wasClose=plantState.closeRequest;const auto saved=plantState.saved;auto next=std::move(plantState.nextAction);
+    bool called=false;plantState.open=false;plantState.saved.clear();plantState.closeRequest=false;
+    plantRequest([&](){called=true;});expect(called&&!plantState.closeRequest,"rb10_closed_plant_opens_without_hidden_confirmation");
+    plantState.open=true;called=false;plantRequest([&](){called=true;});expect(!called&&plantState.closeRequest,"rb10_dirty_open_plant_preserves_confirmation");
+    plantState.open=wasOpen;plantState.closeRequest=wasClose;plantState.saved=saved;plantState.nextAction=std::move(next);
+    return;
+  }
+  if(std::string_view(mode)=="browser132"){browser132QaSetup();frame();frame();return;}
   if(std::string_view(mode)=="reyon8qa"){
     char theme[16]{};commands->Argv(2,theme,sizeof theme);
-    recentWindow=false;setupNeeded=false;firstSetupStep=-1;uiScaleChoice=0;uiTheme=std::string_view(theme)=="light"?1:0;uiStyle();
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;uiScaleChoice=0;uiTheme=std::string_view(theme)=="light"?3:0;uiStyle();
     viewSetLayout(4);runLoad();runUiLive=true;runWindow=false;frame();frame();
   }
   if(std::string_view(mode)=="reyon8preferences"){preferencesRequest=true;frame();frame();}
@@ -1641,17 +1661,27 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
   if(std::string(mode)=="modelindices34") {modFilesOpen=false;frame();frame();
    ftebroom::EntityDefinition d;d.name="stress_model";d.model="models/qa/test.md3";d.brush=false;entityDefinitions[d.name]=d;
    cvars->SetFloat("ftebroom_test_model_previews",1);cvars->SetString("ftebroom_test_entity_filter","stress_model");selectEntityTab=true;frame();frame();
+   bool rasterReady=false;
+   for(int retry=0;retry<100;retry++){
+    auto item=entityPreviews.find("models/qa/test.md3:");rasterReady=item!=entityPreviews.end()&&item->second.thumbnail;
+    if(rasterReady)break;std::this_thread::sleep_for(std::chrono::milliseconds(2));frame();
+   }
    auto data=ImGui::GetDrawData();bool split=false,large=false,valid=true;
    for(int n=0;n<data->CmdListsCount;++n){auto list=data->CmdLists[n];large|=list->VtxBuffer.Size>65535;
     for(const auto& cmd:list->CmdBuffer){split|=cmd.VtxOffset>0;for(unsigned int i=0;i<cmd.ElemCount;++i){auto offset=cmd.IdxOffset+i;if(offset>=unsigned(list->IdxBuffer.Size)){valid=false;break;}if(list->IdxBuffer[offset]+cmd.VtxOffset>=unsigned(list->VtxBuffer.Size))valid=false;}}
    }
-   expect(large&&split&&valid,"model_thumbnail_72k_vertices_valid_offsets");
+   expect(rasterReady&&valid&&data->TotalVtxCount>0&&data->TotalVtxCount<65535,"model_thumbnail_raster_bounded_valid_offsets");
   }
 
   if(std::string(mode)=="models"){
 
    ftebroom::EntityDefinition d;d.name="test_md3";d.model="models/qa/test.md3";d.brush=false;entityDefinitions[d.name]=d;d.name="test_mdl";d.model="models/qa/test.mdl";entityDefinitions[d.name]=d;cvars->SetFloat("ftebroom_test_model_previews",1);cvars->SetString("ftebroom_test_entity_filter","test_");selectEntityTab=true;frame();frame();
 
+   for(int retry=0;retry<100;retry++){
+    auto md3=entityPreviews.find("models/qa/test.md3:"),mdl=entityPreviews.find("models/qa/test.mdl:");
+    if(md3!=entityPreviews.end()&&mdl!=entityPreviews.end()&&md3->second.thumbnail&&mdl->second.thumbnail)break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));frame();
+   }
    expect(entityPreviews.count("models/qa/test.md3:")&&entityPreviews["models/qa/test.md3:"].parts.size()==2&&entityPreviews["models/qa/test.md3:"].image,"md3_textured_surfaces");expect(entityPreviews.count("models/qa/test.mdl:")&&entityPreviews["models/qa/test.mdl:"].image,"mdl_uploaded_skin");
 
   }

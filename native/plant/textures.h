@@ -2,6 +2,7 @@
 #pragma once
 #include "schema.h"
 #include "mesh.h"
+#include "botanical_shapes.h"
 #include <zlib.h>
 namespace ftebroom::plant {
 struct Image {int width=0,height=0;std::vector<unsigned char> rgba;};
@@ -82,30 +83,59 @@ inline Texel legacyTexel(const Project& d,int mat,double u,double v) {
 inline Texel texel(const Project& d,int material,double u,double v) {
   if(d.generator==1)return legacyTexel(d,material,u,v);
   int mat=material>=LeafLight&&material<=LeafYoung?Leaf:material>=NeedleLight?Needle:material;
-  auto sample=legacyTexel(d,mat,u,v);auto& p=d.p;uint64_t seed=mix(d.seed,mat);
-  double grain=fractal(u*27,v*33,seed),fine=noise(int(u*256),int(v*256),seed);
-  if(mat==Bark){
-    double broad=fractal(u*5,v*3,seed+20),ridge=fractal(u*24+6*broad,v*4,seed+49);
-    switch(p.barkPattern){
-      case 1:sample.color=mul(p.bark,.80+.32*broad);sample.height=.35+grain*.09;break;
-      case 2:{double scar=std::pow(std::max(0.,smoothNoise(u*9,v*35,seed)-.60)*2.5,2);sample.color=blend(mul(p.bark,.9+.16*grain),{.07,.065,.05},scar);sample.height=.3+.1*grain;break;}
-      case 3:{double scale=fractal(u*16,v*21+u*2,seed);sample.color=mul(p.bark,.60+.7*scale);sample.height=scale*.45;break;}
-      case 4:sample.color=mul(p.bark,.58+.65*ridge);sample.height=.18+.55*ridge;break;
-      case 5:{double scar=.5+.5*std::sin((v*17+grain*.18)*pi*2);sample.color=mul(p.bark,.74+.28*scar+grain*.12);sample.height=.25+scar*.18;break;}
-      case 6:sample.color=mul(p.bark,.55+.85*grain);sample.height=.12+grain*.78;break;
-      case 7:sample.color=blend(mul(p.bark,.62+.4*grain),{.60,.58,.43},std::clamp((broad-.44)*4,0.,1.));sample.height=.30+grain*.07;break;
-      default:sample.color=mul(p.bark,.40+.95*ridge);sample.height=.12+ridge*.70;
+  auto& p=d.p;uint64_t seed=mix(d.seed,mat);Texel sample{};
+  // Only the remaining material types need the legacy basis. Computing a full
+  // legacy leaf/bark sample just to overwrite it doubles atlas generation cost.
+  bool authored=mat==Bark||mat==Wood||mat==Leaf||mat==Needle||mat==Grass||mat==Petal||
+    (d.family==Family::Mushroom&&(mat==Cap||mat==Gills))||(d.family==Family::Flower&&mat==Center)||
+    (d.family==Family::Cactus&&mat==CactusSkin&&p.organ==2);
+  if(!authored)sample=legacyTexel(d,mat,u,v);
+  double grain=fractal(u*27,v*33,seed);
+  if(mat==Bark||mat==Wood){
+    if(d.family==Family::Mushroom){
+      // A stipe has fine axial fibres and mottling, never the exposed lamellae
+      // texture. Decurrent chanterelle stems share the cap's ochre pigment.
+      V base=p.organ==3?blend(p.bark,p.flower,.65):p.bark;
+      double fibre=smoothNoise(u*88,v*6,seed+20),mottle=fractal(u*9,v*11,seed+29);
+      sample.color=mul(base,.82+.16*fibre+.14*mottle);sample.height=.30+.045*fibre+.025*grain;
+      if(p.organ==1){double net=std::pow(std::max(0.,std::sin((u*17+smoothNoise(u*8,v*7,seed)*.6)*pi)*std::sin((v*22+u)*pi)),8);sample.color=blend(sample.color,mul(base,.58),net*.30);sample.height+=net*.045;}
+    }else{
+      double a=u*2*pi,broad=fractal(std::cos(a)*2.4,std::sin(a)*2.4+v*4,seed+20);
+      double warp=smoothNoise(std::cos(a)*3,std::sin(a)*3+v*7,seed+49);
+      double fissure=std::pow(1-std::abs(std::sin((u*17+warp*.8)*pi)),8);
+      double crossBreak=std::pow(1-std::abs(std::sin((v*23+smoothNoise(u*14,v*3,seed+3)*1.4)*pi)),18);
+      double relief=.46+.16*broad+.08*grain-.35*fissure-.06*crossBreak;
+      V base=p.bark;sample.color=mul(base,.82+.28*broad+.10*grain);sample.height=relief;
+      switch(p.barkPattern){
+        case 1:{ // smooth beech/cherry bark, subtle pores and small lenticels
+          double pore=std::pow(std::max(0.,smoothNoise(u*67,v*93,seed)-.64)*2.8,3);
+          sample.color=mul(base,.88+.13*broad+.07*grain-pore*.10);sample.height=.35+.025*grain-.03*pore;break;
+        }
+        case 2:{ // birch: discontinuous horizontal lenticels and peeling sheets
+          double scar=std::pow(std::max(0.,smoothNoise(u*11,v*87,seed+7)-.59)*2.7,2);
+          double peel=std::pow(1-std::abs(std::sin((v*19+warp*.13)*pi)),22)*std::clamp((broad-.42)*5,0.,1.);
+          sample.color=blend(mul(base,.90+.12*grain),{.12,.115,.09},std::clamp(scar*.84+peel*.23,0.,.9));sample.height=.36+.035*grain-.10*scar+.045*peel;break;
+        }
+        case 3:{ // irregular, interlocking scaly plates on pine/alder/chestnut
+          double seam=std::max(fissure*.82,crossBreak*.72),plate=fractal(u*31,v*37,seed+81);
+          sample.color=blend(mul(base,.86+.30*plate),mul(base,.35),seam*.76);sample.height=.45+.16*plate-.30*seam;break;
+        }
+        case 4:sample.color=blend(mul(base,.85+.28*broad),mul(base,.32),fissure*.85);sample.height=.48+.08*grain-.37*fissure;break;
+        case 5:{
+          double scar=std::pow(1-std::abs(std::sin((v*17+warp*.09)*pi)),16);
+          sample.color=mul(base,.87+.14*grain-scar*.24);sample.height=.32+.035*grain-.10*scar;break;
+        }
+        case 6:{double cork=fractal(u*43,v*48,seed+72);sample.color=blend(mul(base,.72+.50*cork),mul(base,.27),fissure*.70);sample.height=.25+.38*cork-.14*fissure;break;}
+        case 7:{double patch=std::clamp((broad-.43)*7,0.,1.);sample.color=blend(mul(base,.76+.24*grain),blend(base,{.61,.60,.48},.55),patch);sample.height=.30+grain*.035+patch*.025;break;}
+        default:sample.color=blend(sample.color,mul(base,.30),fissure*.82+crossBreak*.12);
+      }
+      // Lichen forms sparse cool patches, not an overall green tint.
+      if(p.barkPattern!=2&&d.family!=Family::Bamboo&&d.family!=Family::Palm){double lichen=std::clamp((fractal(u*18,v*28,seed+307)-.69)*6,0.,.34);sample.color=blend(sample.color,{.44,.46,.36},lichen);}
     }
-    sample.color=mul(sample.color,1+p.variation*(fine-.5));
   }else if(mat==Leaf||mat==Needle||mat==Grass){
-    double x=2*(u-.5),width=std::max(0.,std::sin(pi*v));
-    if(p.leafShape==1)width=std::pow(width,.62);
-    if(p.leafShape==2||p.leafShape==7||mat==Grass)width=std::pow(width,1.35);
-    if(p.leafShape==3)width*=.75+.25*std::cos(v*pi*8);
-    if(p.leafShape==6)width=std::max(0.,curve(p.leafProfile,v));
-    width*=1-p.serration*.055*(.5+.5*std::sin(v*pi*43));
+    double x=2*(u-.5),width=botanicalLeafWidth(mat==Grass?2:p.leafShape,v,p.leafProfile,p.serration);
     sample.alpha=std::clamp((width-std::abs(x))*100,0.,1.);
-    if(p.leafShape==4){double px=2*(u-.5),py=2*(v-.5),a=std::atan2(px,py),edge=.65+.35*std::cos(std::clamp(p.leaflets,3,9)*a);sample.alpha=std::clamp((edge-std::hypot(px,py))*80,0.,1.);}
+    if(p.leafShape==4&&mat!=Grass)sample.alpha=botanicalPalmateMask(u,v,p.leaflets)?1:0;
     if(mat==Needle){
       double mask=std::abs(x)<.024?1:0;
       if(p.needleForm==0||p.needleForm==3){
@@ -120,31 +150,68 @@ inline Texel texel(const Project& d,int material,double u,double v) {
         for(int i=0;i<9;i++){double base=.04+i*.095,t=(v-base)/.17;if(t>=0&&t<=1&&std::abs(std::abs(x)-t*.9)<(p.needleForm==4?.14:.075))mask=1;}
       }sample.alpha=mask;
     }
-    // Evergreen phenology keeps evergreen foliage; larch explicitly opts out.
-    if(p.evergreen==1||p.evergreen==3)sample.color=mul(p.leaf,.76+.24*v+.16*grain);
-    double variant=material==LeafLight||material==NeedleLight?1.13:material==LeafMature||material==NeedleMature?.88:material==LeafYoung?1.04:1;
-    sample.color=mul(sample.color,variant*(.96+.07*grain));
-    double vein=std::exp(-std::abs(std::sin((v*12-std::abs(x)*2.9)*pi))*32),mid=std::exp(-std::abs(x)*85);
-    sample.color=blend(sample.color,mul(p.leaf,1.28),mid*.18+vein*.10);sample.height=.28+.10*grain+mid*.17+vein*.08;
+    // Pigment variation follows leaf age, tissue and veins. It is deliberately
+    // low frequency so an individual leaf does not resemble painted static.
+    V base=p.leaf;double age=material==LeafLight||material==NeedleLight?.14:material==LeafYoung?.23:material==LeafMature||material==NeedleMature?-.12:0;
+    if(age>0)base=blend(base,{std::min(1.,base[0]*1.36+.025),std::min(1.,base[1]*1.15+.018),base[2]*.87},age*2);
+    else base=mul(base,1+age);
+    sample.color=mul(base,.84+.12*v+.12*grain);
+    double mid=std::exp(-std::abs(x-.014*std::sin(v*pi))*130),vein=0;
+    if(mat!=Needle&&mat!=Grass){for(int i=0;i<8;i++){double y=.10+i*.105+std::pow(std::abs(x),.85)*.21;vein=std::max(vein,std::exp(-std::abs(v-y)*210));}vein*=std::pow(std::max(0.,1-std::abs(x)),.5);}
+    if(p.leafShape==4&&mat!=Needle&&mat!=Grass){
+      vein=0;
+      for(int i=0;i<std::clamp(p.leaflets,3,9);i++){
+        auto tip=botanicalPalmatePoint(3+i*4,p.leaflets);double dx=tip[0]-.5,dy=tip[1]-.10,t=((u-.5)*dx+(v-.10)*dy)/(dx*dx+dy*dy);
+        if(t>0&&t<1)vein=std::max(vein,std::exp(-std::hypot(u-.5-dx*t,v-.10-dy*t)*220));
+      }
+    }
+    sample.color=blend(sample.color,mul(base,1.24),mid*.38+vein*.16);
+    double margin=std::clamp((std::abs(x)/std::max(.025,width)-.82)*5,0.,1.);
+    sample.color=mul(sample.color,1-margin*.065);sample.height=.32+.025*grain+mid*.085+vein*.026;
+    double dry=p.dryness+((p.evergreen==1||p.evergreen==3)?0:p.season==3?.65:p.season==2?.35:0);
+    if(p.season==2&&p.evergreen!=1&&p.evergreen!=3)sample.color=blend(sample.color,{.55,.28,.085},.53+.12*grain);
+    sample.color=blend(sample.color,{.47,.39,.23},std::clamp(dry,0.,.94));
+    if(p.season==0)sample.color=blend(sample.color,mul(base,1.18),.18);
+  }else if(mat==Petal){
+    double rib=.5+.5*std::sin((u*19+.23*std::sin(v*pi))*pi),base=std::pow(1-v,3);
+    sample.color=mul(p.flower,.88+.10*v+.06*grain+rib*.025);
+    V throat=p.organ==2&&p.petals<=4?V{.10,.075,.07}:blend(p.flower,{.66,.48,.20},.35);
+    sample.color=blend(sample.color,throat,base*.45);sample.height=.25+.025*grain+.018*rib;
+    if(p.organ==10){double spot=std::pow(std::max(0.,smoothNoise(u*21,v*17,seed)-.66)*3,2);sample.color=blend(sample.color,{.25,.045,.15},spot*(1-v));}
+  }else if(mat==Cap&&d.family==Family::Mushroom){
+    double radial=smoothNoise(u*84,v*12,seed+30),mottle=fractal(u*13,v*11,seed+48);
+    sample.color=mul(p.flower,.80+.28*mottle+.06*radial);sample.height=.32+.055*mottle+.02*radial;
+    if(p.organ==0){ // fine cuticle fibres; the warts are small raised organs
+      sample.color=mul(sample.color,1-.06*std::pow(1-v,5));
+    }else if(p.organ==3){sample.color=mul(p.flower,.85+.13*mottle+.05*radial);sample.height=.32+.025*mottle;}
+    else if(p.organ==4){double scale=std::pow(std::max(0.,smoothNoise(u*34,v*49,seed)-.49)*2,2);sample.color=blend(mul(p.bark,.91),mul(p.flower,.73),std::clamp(scale*2,0.,1.));sample.height=.28+.16*scale;}
+    else if(p.organ==6){double ring=.5+.5*std::sin(v*pi*31+grain*.8);sample.color=mul(p.flower,.75+.35*ring+.08*mottle);sample.height=.28+.04*ring;}
+    else if(p.organ==7){
+      // Jittered cellular pits: unequal rounded honeycomb cells rather than a
+      // regular wire grid. The raised pale walls also drive the normal map.
+      double px=u*22,py=v*14,nearest=1e9,second=1e9;int ix=int(px),iy=int(py);
+      for(int y=iy-1;y<=iy+1;y++)for(int x=ix-1;x<=ix+1;x++){
+        double dx=px-(x+.18+.64*noise(x,y,seed+83)),dy=(py-(y+.18+.64*noise(x,y,seed+91)))*1.22;
+        double distance=dx*dx+dy*dy;if(distance<nearest){second=nearest;nearest=distance;}else second=std::min(second,distance);
+      }
+      double wall=std::clamp((.15-(std::sqrt(second)-std::sqrt(nearest)))*8,0.,1.);
+      sample.color=blend(mul(p.flower,.43+.10*grain),mul(p.flower,1.50+.12*grain),wall);sample.height=.12+.62*wall;
+    }
+  }else if(mat==Gills&&d.family==Family::Mushroom){
+    V base=p.organ==3?blend(p.bark,p.flower,.70):p.bark;
+    double ridge=.5+.5*std::sin(u*pi*(16+56*p.gills));
+    sample.color=mul(base,.86+.09*grain+.05*ridge);sample.height=.32+.035*ridge;
+    if(p.organ==1){double pore=std::pow(std::max(0.,smoothNoise(u*97,v*103,seed)-.50)*2,2);sample.color=blend(mul(base,.93),mul(base,.53),pore*.64);sample.height=.34-pore*.15;}
   }else if(mat==CactusSkin&&d.family==Family::Cactus&&p.organ==2){
-    // Opuntia pads have a smooth epidermis with staggered areoles, not the
-    // longitudinal rib pattern used by columnar cacti.
     double column=std::floor(u*11),x=u*11-column-.5,y=v*9+(int(column)%2)*.5;y-=std::floor(y);y-=.5;
     double areole=std::exp(-(x*x+y*y)*110);
     sample.color=blend(mul(p.leaf,.88+.16*grain),{.54,.48,.31},areole*.72);sample.height=.30+grain*.035+areole*.20;
   }else if(mat==Center&&d.family==Family::Flower){
-    sample.color=mul(p.organ==12?V{.24,.14,.035}:V{.94,.60,.055},.75+.35*grain);
-    sample.height=.22+.12*grain;
-  }else if(mat==Cap&&d.family==Family::Mushroom&&p.organ==7){
-    // Morel pits have dark cell interiors and raised, irregular pale ridges.
-    double a=std::sin((u*19+smoothNoise(u*4,v*5,seed)*.5)*pi),c=std::sin((v*11+u*.8)*pi);
-    double edge=std::clamp((.22-std::min(std::abs(a),std::abs(c)))*5,0.,1.);
-    sample.color=blend(mul(p.flower,.38+.22*grain),mul(p.flower,1.65),edge);sample.height=.1+edge*.8;
-  }else if(mat==Petal&&d.family==Family::Flower&&p.organ==10){
-    double spot=std::pow(std::max(0.,smoothNoise(u*21,v*17,seed)-.66)*3,2);
-    sample.color=blend(sample.color,{.25,.045,.15},spot*(1-v));
+    V base=p.organ==2&&p.petals<=4?V{.12,.105,.075}:p.organ==12?V{.27,.20,.075}:V{.73,.49,.10};
+    double cell=std::pow(.5+.5*std::sin(u*pi*47)*std::sin(v*pi*53),2);
+    sample.color=mul(base,.80+.20*grain+.12*cell);sample.height=.25+.09*cell;
   }
-  for(auto& c:sample.color)c=std::clamp(c,0.,1.);
+  for(auto& c:sample.color){c=std::clamp(c,0.,1.);if(p.quality==3)c=std::min(1.,std::round(c*5)/5.+.04);}
   return sample;
 }
 inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const std::atomic<bool>* cancel=nullptr,int tile=256) {

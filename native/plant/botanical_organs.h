@@ -9,8 +9,10 @@ inline void fanOrgan(Builder& b,V base,V aim,double size,int fingers,int mat,Par
     V d1=unit(add(mul(aim,std::cos(a)),mul(right,std::sin(a)))),d2=unit(add(mul(aim,std::cos(c)),mul(right,std::sin(c))));
     V q=add(base,mul(add(d1,d2),size*.31));V tip=add(base,add(mul(unit(add(d1,d2)),size),mul(up,-size*.10)));
     if(!b.room(4))return;b.organ++;
-    auto center=b.vertex(base,up,.5,.03,mat),l=b.vertex(add(base,mul(d1,size*.65)),up,(i+.1)/fingers,.65,mat,.6);
-    auto r=b.vertex(add(base,mul(d2,size*.65)),up,(i+.9)/fingers,.65,mat,.6),t=b.vertex(tip,up,(i+.5)/fingers,.98,mat,1);
+    // Each geometric finger samples the connected centre of the leaf tile.
+    // Spreading UVs across the entire fan clips the outer fingers at the apex.
+    auto center=b.vertex(base,up,.5,.03,mat),l=b.vertex(add(base,mul(d1,size*.65)),up,.38,.55,mat,.6);
+    auto r=b.vertex(add(base,mul(d2,size*.65)),up,.62,.55,mat,.6),t=b.vertex(tip,up,.5,.98,mat,1);
     b.face(center,r,l,mat,part);b.face(l,r,t,mat,part);
   }
 }
@@ -122,6 +124,24 @@ inline void Botanical::palms() {
     }
   }
 }
+inline void botanicalPetal(Botanical& g,V center,double angle,double radius,double width,double lift,double curl,uint64_t id,bool ray=false,bool cup=false) {
+  auto& b=g.b;Rng r(mix(id,g.doc.seed));int steps=g.lod==2?2:g.lod==1?4:8,columns=g.lod?2:4;
+  if(!b.room(steps*columns*2))return;b.organ++;unsigned first=b.mesh.vertices.size();
+  V axis{std::cos(angle),std::sin(angle),0},right{-std::sin(angle),std::cos(angle),0};
+  double uneven=r.range(-.045,.045),roll=r.range(.04,.10);
+  for(int i=0;i<=steps;i++){
+    double t=std::sin(double(i)/steps*pi*.5),outline=std::max(.006,std::pow(std::max(0.,std::sin(pi*t)),ray?.40:.56));
+    for(int j=0;j<=columns;j++){
+      double u=2.*j/columns-1,lateral=radius*width*.5*outline*u;
+      double z=radius*(lift*t+curl*t*t+roll*u*u*std::sin(pi*t)+uneven*u*t);
+      double radial=radius*(cup?t*(1-.42*t*t):t),turn=cup?u*width*.5*outline:0;
+      V q=add(center,add(mul(axis,radial*std::cos(turn)),add(mul(right,cup?radial*std::sin(turn):lateral),V{0,0,z})));
+      V n=unit(add(V{0,0,1},add(mul(axis,-lift-2*curl*t),mul(right,-roll*u*2-uneven*t))));
+      b.vertex(q,n,(u+1)*.5,t,Petal,t);
+    }
+  }
+  for(int i=0;i<steps;i++)for(int j=0;j<columns;j++){unsigned a=first+i*(columns+1)+j,c=a+columns+1;b.quad(a,a+1,c+1,c,Petal,Part::Flowers);}
+}
 inline void botanicalCorolla(Botanical& g,V center,double radius,uint64_t id,int form) {
   auto& b=g.b;auto& p=g.p;radius*=.4+.6*p.bloom;Rng r(mix(id,g.doc.seed));
   if(p.bloom<.22){b.lathe(center,{{radius*.15,0},{radius*.42,radius*.5},{.01,radius}},8,Leaf,Part::Flowers);return;}
@@ -139,16 +159,30 @@ inline void botanicalCorolla(Botanical& g,V center,double radius,uint64_t id,int
     b.lathe(center,{{radius*.13,0},{radius*.20,tall*.35},{radius*.48,tall*.85},{radius*.68,tall},{radius*.60,tall*.92},{radius*.30,tall*.2}},g.lod?8:15,Petal,Part::Flowers,.12);
     for(int k=0;k<5;k++){double a=k*2*pi/5;g.lamina(add(center,{std::cos(a)*radius*.5,std::sin(a)*radius*.5,tall*.94}),{std::cos(a),std::sin(a),.3},{0,0,1},radius*.35,.65,mix(id,k),0,Petal,Part::Flowers);}return;
   }
-  int petals=std::max(3,g.count(p.petals,3));
+  int petals=p.petals;
+  // Tulips and poppies both have a cup, but their petal posture and overlap
+  // differ. Use organ traits (four broad petals versus six upright tepals).
+  bool openCup=form==2&&p.petals<=4;
   for(int layer=0;layer<p.flowerLayers;layer++)for(int i=0;i<petals;i++){
-    double a=(i+.47*layer)*2*pi/petals,tilt=form==1?.5+layer*.12:form==2?1.1:form==4?(i%2?-.55:1.4):form==5?.65:.12;
-    auto dir=unit({std::cos(a),std::sin(a),tilt});
-    double curl=form==1?.65:form==2?.55:form==4?-.25:form==5?.35:.08;
-    auto profile=form==0?std::array<double,5>{.025,.55,.9,1.,.32}:p.leafProfile;
-    b.leaf(add(center,{0,0,layer*radius*.045}),dir,{0,0,1},radius*(1-layer*.10)*r.range(.94,1.06),form==1?.9:form==2?.95:form==5?.55:.38,form==0?6:0,g.lod?1:0,Petal,Part::Flowers,curl,r.range(-.1,.1),profile);
+    double a=(i+.47*layer)*2*pi/petals+r.range(-.025,.025);
+    double lift=form==1?.10+layer*.09:form==2?(openCup?.08:.46):form==4?(i%2?-.40:.70):form==5?.18:.025;
+    double curl=form==1?.12+layer*.07:form==2?(openCup?.15:.73):form==4?-.20:form==5?-.13:.035;
+    double width=form==0?.20:form==12?.15:form==1?1.15:form==2?(openCup?1.70:1.05):form==5?.49:.40;
+    botanicalPetal(g,add(center,{0,0,layer*radius*.025}),a,radius*(1-layer*.12)*r.range(.95,1.05),width,lift,curl,mix(id,layer*43+i),form==0||form==12,form==2&&!openCup);
   }
   if(form==3)b.lathe(center,{{radius*.18,0},{radius*.22,radius*.5},{radius*.38,radius*.7},{radius*.34,radius*.75},{radius*.18,radius*.3}},g.lod?8:15,Center,Part::Flowers,.1);
-  else b.lathe(center,{{.01,-radius*.05},{radius*(form==12?.40:form==0?.26:.12),0},{radius*.10,radius*.12},{.01,radius*.15}},g.lod?8:16,Center,Part::Flowers,.03);
+  else {
+    double disc=form==12?.40:form==0?.24:openCup?.19:.12;
+    b.lathe(center,{{.01,-radius*.035},{radius*disc,0},{radius*disc*.86,radius*.065},{.01,radius*.095}},g.lod?10:20,Center,Part::Flowers,.015);
+    if((form==0||form==12||openCup)&&g.lod<2){
+      int florets=g.lod==1?12:form==12?70:36;
+      for(int k=0;k<florets;k++){
+        double t=std::sqrt((k+.5)/florets),a=k*2.399963,s=radius*(openCup?.012:.018);
+        V q=add(center,{std::cos(a)*radius*disc*t*.88,std::sin(a)*radius*disc*t*.88,radius*(.095-.025*t*t)});
+        b.lathe(q,{{s*.45,0},{s,s*.6},{s*.25,s*1.8}},g.lod?3:5,Center,Part::Flowers);
+      }
+    }
+  }
   if(form==5||form==4)for(int i=0;i<6;i++){
     double a=i*2*pi/6;auto tip=add(center,{std::cos(a)*radius*.2,std::sin(a)*radius*.2,radius*.42});b.tube({center,tip},.055,.025,3,Gills,Part::Flowers);
     b.lathe(tip,{{.01,0},{radius*.045,radius*.035},{.01,radius*.08}},5,Center,Part::Flowers);
@@ -192,26 +226,52 @@ inline void Botanical::fungi() {
     V base{std::cos(az)*height*.28*std::sqrt(double(stem)/p.clumps),std::sin(az)*height*.28*std::sqrt(double(stem)/p.clumps),0};
     if(p.organ==6)base={height*.13,0,stem*height*.26};
     auto stalk=arc(base,add(base,{p.organ==2?h*.25:0,0,h*(p.organ==6?.13:.68)}),.03,std::max(3,count(p.segments)),mix(doc.seed,stem));
-    b.tube(stalk,p.radius*(p.organ==1?1.2:.7),p.radius*.55,sides(),Gills,Part::Trunk);
+    if(p.organ==1){
+      double span=length(sub(stalk.back(),stalk.front()));
+      b.lathe(base,{{p.radius*.75,0},{p.radius*1.06,span*.16},{p.radius*1.19,span*.40},{p.radius*.95,span*.72},{p.radius*.56,span}},std::max(8,sides()),Bark,Part::Trunk,.018);
+    }else b.tube(stalk,p.radius*.75,p.radius*.58,std::max(6,sides()),Bark,Part::Trunk);
     V top=stalk.back();double thickness=radius*p.capThickness;
     std::vector<std::array<double,2>> cap;
     switch(p.organ){
-      case 3:cap={{radius*.28,-thickness},{radius*.72,0},{radius,thickness*.8},{radius*.92,thickness*1.5},{radius*.5,0},{.01,-radius*.22}};break;
+      case 3:cap={{radius*.12,-radius*.32},{radius*.45,-radius*.15},{radius*.80,radius*.05},{radius,radius*.13},{radius*.98,radius*.20},{radius*.80,radius*.14},{radius*.55,-radius*.02},{radius*.24,-radius*.20},{.01,-radius*.25}};break;
       case 4:cap={{radius,-radius*.3},{radius*.92,radius*.35},{radius*.52,radius*.85},{.01,radius*.95}};break;
       case 6:cap={{radius,-thickness},{radius*.98,0},{radius*.8,radius*.2},{radius*.25,radius*.48},{.01,radius*.5}};break;
-      case 7:cap={{radius*.55,0},{radius*.8,radius*.55},{radius*.7,radius*1.2},{radius*.4,radius*1.9},{.01,radius*2.1}};break;
-      default:cap={{radius,-thickness*.12},{radius*.96,thickness*.5},{radius*.74,radius*(p.organ==2?.12:.34)},{radius*.40,radius*.5},{.01,radius*.54}};
+      case 7:cap={{radius*.45,0},{radius*.65,radius*.18},{radius*.78,radius*.42},{radius*.80,radius*.68},{radius*.74,radius*.98},{radius*.63,radius*1.30},{radius*.48,radius*1.60},{radius*.29,radius*1.85},{.01,radius*1.99}};break;
+      default:cap={{radius,-thickness*.12},{radius*.995,thickness*.16},{radius*.94,radius*(p.organ==2?.06:.12)},{radius*.82,radius*(p.organ==2?.12:.28)},{radius*.64,radius*(p.organ==2?.19:.43)},{radius*.39,radius*(p.organ==2?.24:.52)},{radius*.15,radius*(p.organ==2?.26:.55)},{.01,radius*(p.organ==2?.27:.55)}};
     }
-    size_t first=b.mesh.vertices.size();b.lathe(top,cap,std::max(10,count(40,8)),Cap,Part::Surface,p.organ==7?.10:.02+p.irregularity*.025,p.organ==2?.20:0);
+    size_t first=b.mesh.vertices.size();b.lathe(top,cap,std::max(10,count(48,8)),Cap,Part::Surface,0,p.organ==2?.20:0);
+    for(size_t i=first;i<b.mesh.vertices.size();i++){
+      auto& vertex=b.mesh.vertices[i];V q=sub(vertex.p,top);double a=std::atan2(q[1],q[0]),t=q[2]/std::max(.01,radius);
+      double ripple=(p.organ==3?.065:p.organ==7?.038:.014)*p.irregularity/.28;
+      double scale=1+ripple*(.55*std::sin(a*3+stem*1.7)+.30*std::sin(a*7+t*2.1)+.15*std::sin(a*11-t*3));
+      q[0]*=scale;q[1]*=scale;
+      if(p.organ==3)q[2]+=radius*.035*std::pow(std::hypot(q[0],q[1])/radius,2)*std::sin(a*5+stem);
+      vertex.p=add(top,q);
+    }
     if(p.organ==6)for(size_t i=first;i<b.mesh.vertices.size();i++){b.mesh.vertices[i].p[1]*=.55;b.mesh.vertices[i].n=unit({b.mesh.vertices[i].n[0],b.mesh.vertices[i].n[1]/.55,b.mesh.vertices[i].n[2]});}
     if(p.organ==1)b.lathe(top,{{.01,-thickness*.6},{radius*.5,-thickness*.5},{radius,-thickness*.12}},std::max(10,count(36,8)),Gills,Part::Surface);
     else if(p.organ!=7)for(int i=0;i<std::max(10,count(44,10));i++){
-      double a=2*pi*i/std::max(10,count(44,10));b.gill(add(top,{std::cos(a)*p.radius*.5,std::sin(a)*p.radius*.5,-thickness*.4}),add(top,{std::cos(a)*radius*.94,std::sin(a)*radius*.94,-thickness*.1}),radius*.07);
+      double a=2*pi*i/std::max(10,count(44,10));
+      if(p.organ==3){
+        V inner=add(top,{std::cos(a)*p.radius*.64,std::sin(a)*p.radius*.64,-radius*.42});
+        V mid=add(top,{std::cos(a)*radius*.52,std::sin(a)*radius*.52,-radius*.115});
+        V outer=add(top,{std::cos(a)*radius*.96,std::sin(a)*radius*.96,radius*.105});
+        b.gill(inner,mid,radius*.023);b.gill(mid,outer,radius*.018);
+      }else b.gill(add(top,{std::cos(a)*p.radius*.5,std::sin(a)*p.radius*.5,-thickness*.4}),add(top,{std::cos(a)*radius*.94,std::sin(a)*radius*.94,-thickness*.1}),radius*.055);
     }
     if(p.organ==0||p.organ==5){
       auto ring=stalk[stalk.size()*2/3];b.lathe(ring,{{p.radius*.8,-.4},{p.radius*1.7,-1},{p.radius*.7,.3}},std::max(7,sides()),Gills,Part::Trunk);
       if(p.organ==0){b.lathe(base,{{p.radius*1.4,0},{p.radius*1.15,p.radius},{p.radius*.6,p.radius*1.3}},std::max(7,sides()),Gills,Part::Trunk);
-        int spots=std::max(4,count(22,4));for(int i=0;i<spots;i++){double t=std::sqrt((i+.5)/spots)*.85,a=i*2.399963;auto q=add(top,{std::cos(a)*radius*t,std::sin(a)*radius*t,radius*.54*std::sqrt(1-t*t)});lamina(q,{std::cos(a),std::sin(a),.1},{0,0,1},radius*.10,.9,mix(stem,i),1,Gills,Part::Surface);}}
+        if(lod<2){int spots=lod?12:30;
+          for(int i=0;i<spots;i++){
+            double t=std::sqrt((i+.5)/spots)*.91,a=i*2.399963+stem,s=radius*r.range(.025,.045);
+            auto q=add(top,{std::cos(a)*radius*t,std::sin(a)*radius*t,radius*.55*std::pow(1-t*t,.65)});
+            V normal=unit({std::cos(a)*t*.8,std::sin(a)*t*.8,.65}),right=unit(cross(normal,V{0,1,0})),up=unit(cross(right,normal));
+            size_t start=b.mesh.vertices.size();b.lathe({},{{s,0},{s*.86,s*.26},{s*.18,s*.56}},5,Gills,Part::Surface,.12);
+            for(size_t k=start;k<b.mesh.vertices.size();k++){auto& vertex=b.mesh.vertices[k];V pos=vertex.p,n=vertex.n;vertex.p=add(q,add(add(mul(right,pos[0]),mul(up,pos[1])),mul(normal,pos[2])));vertex.n=unit(add(add(mul(right,n[0]),mul(up,n[1])),mul(normal,n[2])));}
+          }
+        }
+      }
     }
   }
 }

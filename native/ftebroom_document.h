@@ -8,6 +8,7 @@
 #endif
 #include <windows.h>
 #endif
+#include "ftebroom_browser_navigation.h"
 
 static std::map<std::string, ImVec2> fileBrowserTestItems;
 static void fileBrowserTestItem(const std::string& name)
@@ -18,6 +19,7 @@ static void fileBrowserTestItem(const std::string& name)
   fileBrowserTestItems[name] = {(a.x + b.x) * .5f, (a.y + b.y) * .5f};
 }
 static std::string documentName = "start", documentError, documentNext;
+static bool documentIsExit(const std::string& next){return next=="exit"||next=="__update_restart";}
 static std::string saveTemporary, saveDestination;
 static std::filesystem::path documentFile, pendingDocumentFile, saveNativeTarget, fileBrowserFolder;
 static std::string pendingDocumentAlias;
@@ -38,7 +40,7 @@ static int newMapProfile;
 static unsigned long long saveSerial;
 static auto lastBackup = std::chrono::steady_clock::now();
 static std::filesystem::path recoveryFile, recoverySource;
-static bool recoveryRequest, recoveryOpening;
+static bool recoveryRequest, recoveryOpening, recoveryChecked;
 static std::string backupStorageName()
 {
   if (documentFile.empty()) return "untitled";
@@ -148,8 +150,13 @@ static void documentProceed()
 {
   const auto next = documentNext;
   documentNext.clear();
-  if (next == "exit")
+  if (documentIsExit(next)){
+    // No restart token exists until compilation, model, plant and map-save
+    // guards have all accepted this exact terminal request.
+    if(next=="__update_restart"&&!updateCommitRestart())return;
+    if(next=="exit"&&!updateDiscardRestart())return;
     action("quit force\n");
+  }
   else if (next.rfind("__profile:",0)==0) {
     int selected=std::atoi(next.c_str()+10);if(selected<0||selected>4)return;
     if(gameProfile<2)q3Root=baseq3;gameProfile=selected;
@@ -374,7 +381,7 @@ static void documentRequest(const std::string& next)
     if(!ftebroom::pak::exists(path)){documentError="The requested map is missing or unreadable.";return;}
 
   }
-  else if (next != "exit" && next != "__new" && next != "__tour" && next.rfind("__profile:",0)!=0)
+  else if (!documentIsExit(next) && next != "__new" && next != "__tour" && next.rfind("__profile:",0)!=0)
   {
     qhandle_t handle;
     const int size = files->Open(("maps/" + next + ".map").c_str(), &handle, 1);
@@ -410,7 +417,6 @@ static void crashContextTick()
 static void documentTick()
 {
   crashContextTick();
-  static bool recoveryChecked = false;
   if (!recoveryChecked)
   {
     recoveryChecked = true;
@@ -445,16 +451,18 @@ static void documentTick()
     lastBackup = now;
   }
 }
+static bool welcomeRecoveryPanel()
+{
+  if(!recoveryChecked)return false;
+  if(!recoveryRequest)return true;
+    ImGui::TextUnformatted("Recover autosave");ImGui::Spacing();
+    ImGui::TextWrapped("A newer autosave is available for %s. Restore it as an unsaved document?",recoverySource.empty()?"an untitled map":recoverySource.u8string().c_str());
+    bool recover=ImGui::Button("Recover",{-1,0});welcomeQaItem("recovery/recover");if(recover) {recoveryRequest=false;recoveryOpening=true;recentWindow=false;documentRequest("@"+recoveryFile.u8string());}
+    bool keep=ImGui::Button("Keep editing",{-1,0});welcomeQaItem("recovery/keep-editing");if(keep){recoveryRequest=false;return true;}
+  return false;
+}
 static void documentDialogs()
 {
-  if (recoveryRequest) {ImGui::OpenPopup("Recover autosave?");recoveryRequest=false;}
-  if (uiDialog("Recover autosave?"))
-  {
-    ImGui::TextWrapped("A newer autosave is available for %s. Restore it as an unsaved document?",recoverySource.empty()?"an untitled map":recoverySource.u8string().c_str());
-    if(ImGui::Button("Recover")) {recoveryOpening=true;documentRequest("@"+recoveryFile.u8string());ImGui::CloseCurrentPopup();}
-    ImGui::SameLine();if(ImGui::Button("Keep current map")) ImGui::CloseCurrentPopup();
-    ImGui::EndPopup();
-  }
   if (confirmDocument)
   {
     ImGui::OpenPopup("Save changes?");
@@ -463,7 +471,7 @@ static void documentDialogs()
   if (uiDialog("Save changes?"))
   {
     ImGui::Text("Save changes to %s.map?", documentName.c_str());
-    if (ImGui::Button("Save"))
+    bool save=ImGui::Button("Save");welcomeQaItem("save/save");if(save)
     {
       if (documentUntitled)
       {
@@ -475,13 +483,13 @@ static void documentDialogs()
       ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Don't Save"))
+    bool discard=ImGui::Button("Don't Save");welcomeQaItem("save/discard");if(discard)
     {
       documentProceed();
       ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
+    bool cancel=ImGui::Button("Cancel");welcomeQaItem("save/cancel");if(cancel || ImGui::IsKeyPressed(ImGuiKey_Escape))
     {
       documentNext.clear();
       ImGui::CloseCurrentPopup();
@@ -496,7 +504,7 @@ static void documentDialogs()
     if (uiDialog("Document error"))
     {
       ImGui::TextWrapped("%s", documentError.c_str());
-      if (ImGui::Button("OK"))
+      bool okay=ImGui::Button("OK");welcomeQaItem("error/ok");if(okay)
       {
         documentError.clear();
         ImGui::CloseCurrentPopup();
@@ -534,6 +542,28 @@ static void definitionsChoose(const std::filesystem::path& path);
 
 static char fileBrowserPath[4096] = {}, fileBrowserName[1024] = {};
 static std::filesystem::path overwriteTarget;
+static std::map<std::filesystem::path,std::vector<std::filesystem::path>> fileBrowserTree;
+static std::optional<std::filesystem::path> fileBrowserFolderTree(const std::filesystem::path& path,int depth,int& budget){
+  if(depth>24||--budget<0)return {};
+  auto relative=fileBrowserFolder.lexically_relative(path);
+  const bool ancestor=path==fileBrowserFolder||(!relative.empty()&&*relative.begin()!="..");
+  if(ancestor)ImGui::SetNextItemOpen(true,ImGuiCond_Once);
+  auto label=path.filename().u8string();if(label.empty())label=path.u8string();
+  ImGui::PushID(path.u8string().c_str());
+  bool expanded=ImGui::TreeNodeEx("folder",ImGuiTreeNodeFlags_OpenOnArrow|ImGuiTreeNodeFlags_SpanAvailWidth|(path==fileBrowserFolder?ImGuiTreeNodeFlags_Selected:0),"%s",label.c_str());
+  std::optional<std::filesystem::path> chosen;
+  if(ImGui::IsItemClicked()&&!ImGui::IsItemToggledOpen())chosen=path;
+  if(expanded){
+    auto cached=fileBrowserTree.find(path);
+    if(cached==fileBrowserTree.end()){
+      std::vector<std::filesystem::path> children;try{for(const auto& entry:ftebroom::pak::list(path))if(entry.first&&(gameClassic()||entry.second.extension()!=".pak"))children.push_back(entry.second);}catch(...){}
+      std::sort(children.begin(),children.end());cached=fileBrowserTree.emplace(path,std::move(children)).first;
+    }
+    for(const auto& child:cached->second){if(budget<=0)break;if(auto next=fileBrowserFolderTree(child,depth+1,budget))chosen=next;}
+    ImGui::TreePop();
+  }
+  ImGui::PopID();return chosen;
+}
 static void documentFileBrowser()
 {
   if (newMapRequest || openRequest || saveRequest || definitionsRequest || exportRequest || traceRequest || objRequest)
@@ -568,11 +598,13 @@ static void documentFileBrowser()
       std::snprintf(fileBrowserPath,sizeof fileBrowserPath,"%s",fileBrowserFolder.u8string().c_str());
     }
     documentError.clear();
+    fileBrowserTree.clear();
     ImGui::OpenPopup("Map files");
   }
   ImGui::SetNextWindowSize({720, 520}, ImGuiCond_FirstUseEver);
   if (uiDialog("Map files",{760,540}))
   {
+    welcomeQaWindow("files/window");
     if(fileBrowserNew) {
       ImGui::TextUnformatted("Create a new map: choose its game profile and destination.");
       if(ImGui::Combo("Game profile",&newMapProfile,gameProfileNames)) {
@@ -590,61 +622,25 @@ static void documentFileBrowser()
       : fileBrowserNew         ? "Choose where to create the map"
       : fileBrowserSaving      ? "Save map as"
                                : "Open map");
-    bool canGoUp = fileBrowserFolder.has_parent_path() && fileBrowserFolder.parent_path() != fileBrowserFolder;
-    ImGui::BeginDisabled(!canGoUp);
-    bool upClicked = ImGui::Button("Up one level");
-    ImGui::EndDisabled();
-    fileBrowserTestItem("up");
-    if (upClicked)
-    {
-      fileBrowserFolder = fileBrowserFolder.parent_path();
-      documentError.clear();
-      if (!fileBrowserSaving) fileBrowserName[0] = 0;
-      std::snprintf(
-        fileBrowserPath,
-        sizeof fileBrowserPath,
-        "%s",
-        fileBrowserFolder.u8string().c_str());
+    bool canGoUp=fileBrowserFolder.has_parent_path()&&fileBrowserFolder.parent_path()!=fileBrowserFolder;
+    ImGui::BeginDisabled(!canGoUp);bool up=browserNavigationButton(true);ImGui::EndDisabled();fileBrowserTestItem("up");welcomeQaItem("files/up");
+    if(up){fileBrowserFolder=fileBrowserFolder.parent_path();documentError.clear();if(!fileBrowserSaving)fileBrowserName[0]=0;}
+    ImGui::SameLine();bool refresh=browserNavigationButton(false);welcomeQaItem("files/refresh");if(refresh)fileBrowserTree.clear();
+    static BrowserNavigationState navigation;
+    if(auto folder=browserNavigation("map-path",navigation,fileBrowserFolder)) {
+      bool readable=false;try{ftebroom::pak::list(*folder);readable=true;}catch(...){}
+      if(readable) {
+        fileBrowserFolder=*folder;documentError.clear();
+        if(!fileBrowserSaving)fileBrowserName[0]=0;
+        std::snprintf(fileBrowserPath,sizeof fileBrowserPath,"%s",fileBrowserFolder.u8string().c_str());
+      }else documentError="Folder does not exist or cannot be read.";
     }
-#ifdef _WIN32
-    ImGui::SameLine();
-    if (ImGui::BeginCombo("Drive", fileBrowserFolder.root_name().u8string().c_str()))
-    {
-      DWORD drives = GetLogicalDrives();
-      for (int i = 0; i < 26; i++)
-        if (drives & (1u << i))
-        {
-          char drive[] = "A:/";
-          drive[0] += i;
-          if (ImGui::Selectable(drive))
-          {
-            fileBrowserFolder = std::filesystem::u8path(drive);
-            std::snprintf(fileBrowserPath, sizeof fileBrowserPath, "%s", drive);
-          }
-        }
-      ImGui::EndCombo();
-    }
-#endif
-    bool go = ImGui::InputText(
-      "Folder",
-      fileBrowserPath,
-      sizeof fileBrowserPath,
-      ImGuiInputTextFlags_EnterReturnsTrue);
-    ImGui::SameLine();
-    go |= ImGui::Button("Go");
-    if (go)
-    {
-      std::error_code error;
-      auto folder = std::filesystem::u8path(fileBrowserPath);
-      if (std::filesystem::is_directory(folder, error) || (gameClassic() && [&](){try{ftebroom::pak::list(folder);return true;}catch(...){return false;}}()))
-      {
-        fileBrowserFolder = folder;
-        documentError.clear();
-      }
-      else
-        documentError = "Folder does not exist or cannot be read.";
-    }
-    ImGui::BeginChild("File list", {0, -105}, ImGuiChildFlags_Borders);
+    const float contentsHeight=std::max(80.f,ImGui::GetContentRegionAvail().y-105);
+    ImGui::BeginChild("Folder hierarchy",{std::min(230.f,ImGui::GetContentRegionAvail().x*.35f),contentsHeight},ImGuiChildFlags_Borders|ImGuiChildFlags_ResizeX);
+    int treeBudget=2000;auto treeRoot=fileBrowserFolder.root_path();if(treeRoot.empty())treeRoot=fileBrowserFolder;
+    if(auto folder=fileBrowserFolderTree(treeRoot,0,treeBudget)){fileBrowserFolder=*folder;documentError.clear();if(!fileBrowserSaving)fileBrowserName[0]=0;}
+    ImGui::EndChild();ImGui::SameLine();
+    ImGui::BeginChild("File list", {0, contentsHeight}, ImGuiChildFlags_Borders);
     std::error_code error;
     std::vector<std::pair<bool, std::filesystem::path>> entries;
     try {
@@ -685,10 +681,12 @@ static void documentFileBrowser()
       ImGui::TextWrapped("Cannot read this folder: %s", error.message().c_str());
     ImGui::EndChild();
     ImGui::InputText("File name", fileBrowserName, sizeof fileBrowserName);
+    welcomeQaItem("files/name");
     if (!documentError.empty())
       ImGui::TextWrapped("%s", documentError.c_str());
     bool primaryClicked = ImGui::Button(fileBrowserNew ? "Create map" : fileBrowserSaving ? "Save" : "Open");
     fileBrowserTestItem("primary");
+    welcomeQaItem("files/primary");
     if (primaryClicked)
     {
       auto target = fileBrowserFolder / std::filesystem::u8path(fileBrowserName);
@@ -747,9 +745,8 @@ static void documentFileBrowser()
       }
     }
     ImGui::SameLine();
-    if (
-      ImGui::Button("Cancel")
-      || (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("Replace map?")))
+    bool cancel=ImGui::Button("Cancel");welcomeQaItem("files/cancel");
+    if (cancel || (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("Replace map?")))
     {
       documentNext.clear();
       documentError.clear();

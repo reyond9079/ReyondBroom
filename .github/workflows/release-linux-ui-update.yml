@@ -325,5 +325,6 @@ jobs:
             qa/viewport-create-*/**
             qa/appearance-*/**
             qa/engine-viewport/**
+            qa/rb10/**
             audio-deps/ffmpeg-8.0.1/ffbuild/config.log
             audio-deps/lame-source/config.log

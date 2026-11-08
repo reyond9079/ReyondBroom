@@ -1,6 +1,6 @@
 # Keep the existing workflow filename so it can be dispatched from a fix branch.
-name: RB-133 Windows verification
-run-name: Windows ${{ inputs.version }} source c77680c @ ${{ github.sha }}
+name: RB-133 immutable Windows QA continuation
+run-name: Windows QA continuation ${{ inputs.version }} source c77680c @ ${{ github.sha }}
 on:
   workflow_dispatch:
     inputs:
@@ -30,13 +30,15 @@ on:
         default: 'v0.5.0-alpha.125'
 permissions:
   contents: write
+  actions: read
 jobs:
   windows:
     runs-on: windows-2022
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
-      BASE_TAG: ${{ inputs.base_tag }}
+      RB_QA_RENDERER: gl rb_qa_opengl.dll
+      GALLIUM_DRIVER: llvmpipe
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,120 +49,61 @@ jobs:
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          path-type: inherit
           update: false
-          install: >-
-            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-make mingw-w64-x86_64-zlib
-            mingw-w64-x86_64-pkgconf git curl diffutils tar make
-      - name: Fetch and verify runtime, converter source and native dependencies
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force base, sdk, deps, audio-deps | Out-Null
-          gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' --pattern '*-Windows-x64-Sources.zip' --pattern '*-Windows-x64-Sources.zip.sha256'
-          if ($LASTEXITCODE -ne 0) { throw 'Base runtime download failed' }
-          gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY --dir sdk --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
-          if ($LASTEXITCODE -ne 0) { throw 'SDK download failed' }
-          foreach ($checksum in Get-ChildItem base/*.sha256,sdk/*.sha256) {
-            $parts = (Get-Content $checksum.FullName) -split '\s+'
-            $file = Join-Path $checksum.DirectoryName $parts[1]
-            if ((Get-FileHash $file -Algorithm SHA256).Hash.ToLower() -ne $parts[0]) { throw "Checksum mismatch: $file" }
-          }
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = (Get-ChildItem base/*-Sources.zip).FullName
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
-          try { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz'), "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true) } finally { $zip.Dispose() }
-          Expand-Archive (Get-ChildItem sdk/*-Sources.zip).FullName deps/base
-          foreach ($name in @('bullet','fteqw','imgui')) { Expand-Archive "deps/base/sources/$name-source.zip" "deps/$name" }
-      - name: Rebuild and test the complete audio helper
-        shell: msys2 {0}
-        run: |
-          scripts/build-audio.sh "$PWD/audio-deps"
-          scripts/test-audio-core.sh "$PWD/audio-qa" "$(cygpath -m "$PWD/tools/audio/ffmpeg.exe")"
-      - name: Build native editor and test the profile importer
-        shell: msys2 {0}
-        run: |
-          cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
-          cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
-          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests --generator 'MinGW Makefiles'
-          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
-          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
-          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
-      - name: Validate RB-10 native target formats and browser cache on Windows
-        if: inputs.rb10_checks
-        shell: msys2 {0}
-        run: |
-          mkdir -p qa/rb10/units
-          g++ -std=c++17 -O2 tests/plant-runtime-targets.cpp -lz -o deps/plant-runtime-targets.exe
-          deps/plant-runtime-targets.exe qa/rb10/units/plant-targets
-          g++ -std=c++17 -O2 tests/browser132-unit.cpp -o deps/browser132-unit.exe
-          deps/browser132-unit.exe > qa/rb10/units/browser.log
-          g++ -std=c++17 -O2 -pthread -Ideps/imgui tests/entity-preview132-ui.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/entity-preview132-ui.exe
-          deps/entity-preview132-ui.exe > qa/rb10/units/preview.log
-          g++ -std=c++17 -O2 -Ideps/imgui tests/tools-layout.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/tools-layout.exe
-          deps/tools-layout.exe > qa/rb10/units/tools-layout.log
-          python tests/check-default-shortcuts.py deps/fteqw > qa/rb10/units/shortcuts.log
-          python tests/check-run-workspace-selection.py > qa/rb10/units/workspace-selection.log
-          g++ -std=c++17 -O2 tests/pak-resource-names.cpp -lz -o deps/pak-resource-names.exe
-          deps/pak-resource-names.exe > qa/rb10/units/q2-pak.log
-          g++ -std=c++17 -O2 tests/quake2-roots.cpp -o deps/quake2-roots.exe
-          deps/quake2-roots.exe > qa/rb10/units/q2-roots.log
-      - name: Package runtime and complete corresponding sources
-        shell: msys2 {0}
-        run: |
-          python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --audio-dir tools/audio --version "$VERSION" --output out/release
-          (cd out/release && sha256sum -c ./*.sha256)
-      - name: Use reviewed OS-queue paste harness after packaging immutable product source
+          install: mingw-w64-x86_64-gcc
+      - name: Load immutable reviewed QA harness while keeping product checkout unchanged
         shell: pwsh
         run: |
           git fetch --no-tags --depth=1 origin $env:GITHUB_SHA
           if ($LASTEXITCODE) { throw 'Fetching exact QA harness failed' }
-          $source = git show "$($env:GITHUB_SHA):scripts/editor_os_input.py"
-          if ($LASTEXITCODE) { throw 'Reading exact QA harness failed' }
-          $text = ($source -join "`n") + "`n"
-          [System.IO.File]::WriteAllText("$PWD/scripts/editor_os_input.py", $text, [System.Text.UTF8Encoding]::new($false))
+          New-Item -ItemType Directory -Force .qa-tools | Out-Null
+          foreach ($pair in @(@('scripts/editor_os_input.py','scripts/editor_os_input.py'),@('scripts/continue-windows133-qa.py','.qa-tools/continue-windows133-qa.py'))) {
+            $source = git show "$($env:GITHUB_SHA):$($pair[0])"
+            if ($LASTEXITCODE) { throw 'Reading exact QA harness failed' }
+            [System.IO.File]::WriteAllText((Join-Path $PWD $pair[1]), (($source -join "`n") + "`n"), [System.Text.UTF8Encoding]::new($false))
+          }
+      - name: Verify original product archives and retain only completed prior checks
+        shell: pwsh
+        run: |
+          python .qa-tools/continue-windows133-qa.py
+          if ($LASTEXITCODE) { throw 'Immutable SDK / successful evidence verification failed' }
           New-Item -ItemType Directory -Force qa/harness | Out-Null
           Copy-Item scripts/editor_os_input.py qa/harness/editor-os-input.txt
-          @{ source = 'c77680c7f0d78118c6aa69cc9edd63bfcab40e68'; workflow = $env:GITHUB_SHA; harness_sha256 = (Get-FileHash scripts/editor_os_input.py -Algorithm SHA256).Hash.ToLower(); method = 'Only QA input transport changes after runtime and corresponding Sources are packaged; assertions are unchanged.' } | ConvertTo-Json | Set-Content -Encoding utf8 qa/harness/provenance.json
-      - name: Stage immutable Windows packages in the owned draft for independent validation
+          @{ source = 'c77680c7f0d78118c6aa69cc9edd63bfcab40e68'; workflow = $env:GITHUB_SHA; harness_sha256 = (Get-FileHash scripts/editor_os_input.py -Algorithm SHA256).Hash.ToLower(); method = 'Single OS-queued V tap; modifiers held over observed ticks; product archives reused unchanged; original assertions.' } | ConvertTo-Json | Set-Content -Encoding utf8 qa/harness/provenance.json
+      - name: Build the actual standalone process argument probe
+        shell: msys2 {0}
+        run: |
+          mkdir -p deps/profile-core
+          g++ -std=c++17 -O2 -static -pthread -municode tests/compilation-profile-probe.cpp -o deps/profile-core/compilation-profile-probe.exe
+      - name: Prepare the same verified software renderer for actual OS input
         shell: pwsh
         run: |
-          if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft' }
-          $files = (Get-ChildItem out/release/*.zip,out/release/*.sha256).FullName
-          gh release upload "v$env:VERSION" @files --clobber
-          if ($LASTEXITCODE) { throw 'Staging draft packages failed' }
-      - name: Validate PK3 import and the inner audio window in the packaged editor
-        shell: pwsh
-        run: |
-          ./scripts/test-audio-archive-windows.ps1 -Runtime out/release/ReyondBroom-Windows-x64 -Output qa/audio-archive
           python -m pip install Pillow pywinauto
-          python scripts/test-engine-viewport.py out/release/ReyondBroom-Windows-x64 qa/engine-viewport --probe deps/profile-core/compilation-profile-probe.exe
-          if ($LASTEXITCODE) { throw 'Windows engine/viewport acceptance failed' }
-      - name: Validate Space in every pane and all onboarding stages before the full UI matrix
+          if ($LASTEXITCODE) { throw 'OS input dependencies failed' }
+          $runtime = (Resolve-Path out/release/ReyondBroom-Windows-x64).Path
+          $mesa = Join-Path $env:RUNNER_TEMP 'reyond-audio-mesa'
+          New-Item -ItemType Directory -Force $mesa | Out-Null
+          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir $mesa --pattern mesa3d-25.3.3-release-msvc.7z --clobber
+          if ($LASTEXITCODE) { throw 'Mesa test renderer download failed' }
+          $archive = Join-Path $mesa 'mesa3d-25.3.3-release-msvc.7z'
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Mesa checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x $archive "-o$mesa/extracted" -y | Out-Null
+          if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
+          $gl = Get-ChildItem "$mesa/extracted" -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
+          if (!$gl) { throw '64-bit Mesa DLL missing' }
+          Copy-Item (Join-Path $gl.DirectoryName '*.dll') "$runtime/bin" -Force
+          Copy-Item $gl.FullName "$runtime/bin/rb_qa_opengl.dll" -Force
+          if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) { Set-DisplayResolution -Width 1920 -Height 1080 -Force }
+      - name: Validate the failed and unexecuted appearance cases with single-tap paste
         shell: pwsh
-        env:
-          RB_QA_RENDERER: gl rb_qa_opengl.dll
-          GALLIUM_DRIVER: llvmpipe
-        run: |
-          python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
-          if ($LASTEXITCODE) { throw 'Input fixture failed' }
-          python scripts/test-editor133-input.py out/release/ReyondBroom-Windows-x64 qa/early-editor133-input
-          if ($LASTEXITCODE) { throw 'Actual Space/onboarding input failed' }
-      - name: Validate packaged viewport fixes on Windows
-        if: inputs.viewport_checks
-        shell: pwsh
-        env:
-          RB_QA_RENDERER: gl rb_qa_opengl.dll
-          GALLIUM_DRIVER: llvmpipe
         run: |
           python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
           if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
-          foreach ($theme in @('light','dark')) {
-            foreach ($width in @(1024,1920)) {
-              $height = if ($width -eq 1920) { 1080 } else { 768 }
-              python scripts/test-viewport-appearance.py out/release/ReyondBroom-Windows-x64 "qa/appearance-$theme-$width" --theme $theme --width $width --height $height
-              if ($LASTEXITCODE) { throw "Appearance acceptance failed: $theme / $width" }
-            }
+          foreach ($case in @(@('light',1920),@('dark',1024),@('dark',1920))) {
+            $theme = $case[0]; $width = $case[1]
+            $height = if ($width -eq 1920) { 1080 } else { 768 }
+            python scripts/test-viewport-appearance.py out/release/ReyondBroom-Windows-x64 "qa/appearance-$theme-$width" --theme $theme --width $width --height $height
+            if ($LASTEXITCODE) { throw "Appearance acceptance failed: $theme / $width" }
           }
       - name: Validate packaged Create / Save in both themes and window sizes
         shell: pwsh
@@ -209,14 +152,7 @@ jobs:
               if ($LASTEXITCODE) { throw "View Options/Tools acceptance failed: $theme / $width" }
             }
           }
-      - name: Upload validated packages to the draft release
-        shell: pwsh
-        run: |
-          if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
-          $files = (Get-ChildItem out/release/*.zip,out/release/*.sha256).FullName
-          gh release upload "v$env:VERSION" @files --clobber
-          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
-      - name: Collect compact release evidence
+      - name: Collect byte-preserved prior evidence and new acceptance results
         if: always()
         shell: pwsh
         run: |

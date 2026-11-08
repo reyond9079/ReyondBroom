@@ -177,13 +177,15 @@ class NativeInput:
     # observed when the engine later consumes its queued paste key event.
     self.position();self.mod('ctrl',True)
     try:
+     # A tap is queued in order; ImGui preserves its down/up transitions.
+     # Holding V over slow render frames triggers InputText paste repeat.
      self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),0,0)
-     try:time.sleep(.05);self.settle()
-     finally:self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),2,0);self.settle()
+     self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),2,0)
+     self.settle()
     finally:self.mod('ctrl',False)
     with (self.output/'clipboard-paste.log').open('a',encoding='utf-8') as log:
      import hashlib
-     log.write(json.dumps({'length':len(text),'sha256':hashlib.sha256(text.encode('utf-8')).hexdigest(),'method':'OS keybd_event Ctrl+V held over observed engine ticks','focus':self.read_focus()})+'\n')
+     log.write(json.dumps({'length':len(text),'sha256':hashlib.sha256(text.encode('utf-8')).hexdigest(),'method':'OS queued Ctrl+V single tap; modifiers span observed ticks','focus':self.read_focus()})+'\n')
    else:self.key('v',('ctrl',))
    return
   if os.name=='nt':self.strokes(''.join('{'+c+'}' if c in '+^%~(){}' else c for c in text));return

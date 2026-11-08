@@ -14,7 +14,7 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/rb-10-editor-polish'
     runs-on: ubuntu-24.04
     steps:
-      - name: Reserve alpha.132 after exact-head platform CI and package its pinned source
+      - name: Prepare pinned draft packages while retaining final publication checks
         uses: actions/github-script@v7
         with:
           script: |
@@ -22,19 +22,55 @@ jobs:
             const {data: pr} = await github.rest.pulls.get({...repo, pull_number: eventPr.number});
             if (pr.draft || pr.merged || pr.head.sha !== eventPr.head.sha || pr.head.ref !== 'feat/rb-10-editor-polish')
               throw new Error('The reviewed PR head changed or is no longer ready for packaging');
-            const {data: checks} = await github.rest.actions.listWorkflowRuns({...repo,
-              workflow_id: 'compilation-profile-checks.yml', head_sha: pr.head.sha, status: 'completed', per_page: 100});
-            const ci = checks.workflow_runs.find(r => r.head_sha === pr.head.sha && r.conclusion === 'success');
-            if (!ci) throw new Error('The exact final PR head must pass platform CI before reserving its release');
+            const tag = 'v0.5.0-alpha.132';
+            const releases = await github.paginate(github.rest.repos.listReleases, {...repo, per_page: 100});
+            let release = releases.find(r => r.tag_name === tag);
+            if (release && !release.draft) throw new Error('alpha.132 is already published');
+            let previousHead;
+            if (release && release.target_commitish !== pr.head.sha) {
+              previousHead = release.target_commitish;
+              const assets = await github.paginate(github.rest.repos.listReleaseAssets, {...repo, release_id: release.id});
+              if (assets.length) throw new Error('An existing draft with uploaded assets requires separate verification');
+              const {data: previousRef} = await github.rest.git.getRef({...repo, ref: 'tags/rb-10-package-' + previousHead});
+              if (previousRef.object.sha !== previousHead) throw new Error('The empty draft has no matching pinned source');
+              const {data: comparison} = await github.rest.repos.compareCommitsWithBasehead({...repo, basehead: previousHead + '...' + pr.head.sha});
+              const testPath = p => p.startsWith('tests/') || p.startsWith('scripts/test-') || p.startsWith('.github/workflows/') || p === 'docs/qa/rb-10/acceptance.md';
+              if (comparison.status !== 'ahead' || !comparison.files.length || comparison.files.length >= 300 ||
+                  comparison.files.some(f => !testPath(f.filename) || (f.previous_filename && !testPath(f.previous_filename))))
+                throw new Error('Only test/documentation/workflow repairs may retry an empty draft');
+              const {data: previousPackages} = await github.rest.actions.listWorkflowRuns({...repo,
+                workflow_id: 'release-linux-ui-update.yml', head_sha: previousHead, per_page: 100});
+              const relevant = previousPackages.workflow_runs.filter(r => r.display_title === `Release 0.5.0-alpha.132 @ ${previousHead}`);
+              if (!relevant.length || relevant.some(r => r.status !== 'completed'))
+                throw new Error('The previous draft package run must be finished before a retry');
+            }
+            const successfulCi = async head => {
+              const {data} = await github.rest.actions.listWorkflowRuns({...repo,
+                workflow_id: 'compilation-profile-checks.yml', head_sha: head, status: 'completed', per_page: 100});
+              return data.workflow_runs.find(r => r.head_sha === head && r.conclusion === 'success');
+            };
+            let ci = await successfulCi(pr.head.sha);
+            // A failed empty draft can be rebuilt while CI rechecks a test-only
+            // repair. Publication still requires exact final-head CI and packages.
+            if (!ci && previousHead) ci = await successfulCi(previousHead);
+            if (!ci) throw new Error('No successful platform CI for this source or its unchanged-production predecessor');
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...repo, run_id: ci.id});
             for (const name of ['windows', 'linux (Linux-x64)', 'linux (Linux-SDL2-x64)'])
               if (!jobs.some(j => j.name === name && j.conclusion === 'success'))
                 throw new Error(`Missing successful platform ${name} in ${ci.id}`);
-            const tag = 'v0.5.0-alpha.132';
-            const releases = await github.paginate(github.rest.repos.listReleases, {...repo, per_page: 100});
-            let release = releases.find(r => r.tag_name === tag);
-            if (release && (!release.draft || release.target_commitish !== pr.head.sha))
-              throw new Error('alpha.132 is published or its existing draft belongs to a different revision');
+            const sourceTag = 'rb-10-package-' + pr.head.sha;
+            let sourceRef;
+            try { sourceRef = (await github.rest.git.getRef({...repo, ref: 'tags/' + sourceTag})).data; }
+            catch (error) { if (error.status !== 404) throw error; }
+            if (sourceRef && sourceRef.object.sha !== pr.head.sha) throw new Error('Packaging source tag was moved');
+            if (previousHead) {
+              let draftRef;
+              try { draftRef = (await github.rest.git.getRef({...repo, ref: 'tags/' + tag})).data; }
+              catch (error) { if (error.status !== 404) throw error; }
+              if (draftRef && draftRef.object.sha !== previousHead && draftRef.object.sha !== pr.head.sha) throw new Error('Unexpected unpublished draft tag');
+              if (draftRef && draftRef.object.sha === previousHead) await github.rest.git.updateRef({...repo, ref: 'tags/' + tag, sha: pr.head.sha, force: true});
+              release = (await github.rest.repos.updateRelease({...repo, release_id: release.id, target_commitish: pr.head.sha})).data;
+            }
             if (!release) {
               const {data} = await github.rest.repos.createRelease({...repo, tag_name: tag,
                 target_commitish: pr.head.sha, name: 'ReyondBroom 0.5.0-alpha.132', draft: true,
@@ -43,11 +79,6 @@ jobs:
             }
             // Workflow dispatch accepts a branch or tag. Pin the packaging source
             // so a later push cannot silently change the revision being built.
-            const sourceTag = 'rb-10-package-' + pr.head.sha;
-            let sourceRef;
-            try { sourceRef = (await github.rest.git.getRef({...repo, ref: 'tags/' + sourceTag})).data; }
-            catch (error) { if (error.status !== 404) throw error; }
-            if (sourceRef && sourceRef.object.sha !== pr.head.sha) throw new Error('Packaging source tag was moved');
             if (!sourceRef) await github.rest.git.createRef({...repo, ref: 'refs/tags/' + sourceTag, sha: pr.head.sha});
             await github.rest.actions.createWorkflowDispatch({...repo,
               workflow_id: 'release-linux-ui-update.yml', ref: sourceTag,

@@ -146,6 +146,14 @@ empty or relative working directories without rewriting them.
 `rb-10-package-<full-head-SHA>` source ref and dispatches packaging against it.
 All runtime/dependency bases are verified `v0.5.0-alpha.131` assets.
 
+An empty unpublished draft whose package run has finished can be retried after
+test, workflow or QA-documentation repairs. The previous pinned source must be
+an ancestor, its platform CI must have passed, and production files must be
+unchanged. Draft packaging can then overlap the new revision's CI. Each retry
+gets a new immutable source ref; earlier source refs remain unchanged. The final
+publication gate still requires successful CI and packaging for the exact final
+PR head, identical merged trees and all twelve verified assets.
+
 `release-linux-ui-update.yml` runs with `capture_catalog`, `viewport_checks` and
 `rb10_checks` enabled. It compiles the actual source, packages complete matching
 sources and verifies checksums. Gates include native target/cache/layout/key

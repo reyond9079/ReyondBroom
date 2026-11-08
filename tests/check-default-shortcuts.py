@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
-engine = Path(sys.argv[1]) / "engine/client"
+engine = Path(sys.argv[1]).resolve() / "engine/client"
 actions = (root / "native/ftebroom_actions.h").read_text()
 preferences = (root / "native/ftebroom_preferences.h").read_text()
 keys = (engine / "keys.c").read_text()
@@ -48,7 +48,7 @@ source = r'''
 #define Q_strncasecmp strncasecmp
 #define Q_strcasecmp strcasecmp
 '''
-source += '#include "' + str(engine / "keys.h") + '"\n'
+source += '#include "' + (engine / "keys.h").as_posix() + '"\n'
 source += table + key_parser
 source += r'''
 struct TestInput {
@@ -62,7 +62,7 @@ for signature in ("static std::string shortcutVariable(", "static void shortcutA
                   "static bool shortcutOverlap(", "static std::set<std::string> shortcutConflicts("):
     source += function(preferences, signature) + "\n"
 source += "int main(){\n" + add
-source += '#include "' + str(root / "native/ftebroom_actions.inc") + '"\n'
+source += '#include "' + (root / "native/ftebroom_actions.inc").as_posix() + '"\n'
 source += r'''
   for(const auto& a:actions)for(const auto& key:a.defaults)assert(key.key>0);
   auto defaults=shortcutConflicts();

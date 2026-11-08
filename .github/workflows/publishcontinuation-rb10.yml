@@ -8,6 +8,7 @@ on:
       - scripts/test-plant-target-ui.py
       - tests/test-welcome-updater.py
       - .github/workflows/continuation-rb10-windows.yml
+      - .github/workflows/recovery-rb10-windows.yml
       - .github/workflows/publishcontinuation-rb10.yml
       - .github/rb10-qa/**
 permissions:
@@ -39,13 +40,16 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const repo=context.repo,head=process.env.PRODUCT_HEAD,qa=process.env.QA_HEAD;
+            const repo=context.repo,head=process.env.PRODUCT_HEAD,qa=process.env.QA_HEAD,testHead='877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c';
             const {data:qapr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
             if(qapr.state!=='open'||qapr.draft||qapr.head.sha!==qa||qapr.head.ref!=='qa/rb10-windows-harness'||qapr.head.repo.full_name!==`${repo.owner}/${repo.repo}`||!['feat/rb-10-editor-polish','main'].includes(qapr.base.ref)) throw Error('Unexpected QA approval event');
             const {data:diff}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:`${head}...${qa}`});
-            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','tests/test-welcome-updater.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
+            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','tests/test-welcome-updater.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/recovery-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
             const permitted=name=>allowed.has(name)||name.startsWith('.github/rb10-qa/');
             if(diff.status!=='ahead'||!diff.files?.length||diff.files.length>=300||diff.files.some(f=>!permitted(f.filename)||(f.previous_filename&&!permitted(f.previous_filename)))) throw Error('QA branch changes product files');
+            const {data:post}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:`${testHead}...${qa}`});
+            const postAllowed=n=>['.github/workflows/continuation-rb10-windows.yml','.github/workflows/recovery-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml'].includes(n)||n.startsWith('.github/rb10-qa/');
+            if(post.status!=='ahead'||!post.files?.length||post.files.length>=300||post.files.some(f=>!postAllowed(f.filename)||(f.previous_filename&&!postAllowed(f.previous_filename)))) throw Error('Accepted test drivers or product changed after successful acceptance');
             const {data:pr}=await github.rest.pulls.get({...repo,pull_number:15});
             if(!pr.merged||pr.head.sha!==head||pr.head.ref!=='feat/rb-10-editor-polish'||pr.base.ref!=='main'||pr.head.repo.full_name!==`${repo.owner}/${repo.repo}`) throw Error('PR15 has not merged the frozen product');
             const merged=pr.merge_commit_sha;
@@ -63,11 +67,20 @@ jobs:
             for(const name of ['linux (Linux-x64)','linux (Linux-SDL2-x64)']) if(!jobs.some(j=>j.name===name&&j.status==='completed'&&j.conclusion==='success')) throw Error('Original Linux package incomplete: '+name);
             const win=jobs.find(j=>j.name==='windows'),failed=win?.steps.filter(s=>s.conclusion==='failure')||[];
             if(win?.conclusion!=='failure'||failed.length!==1||failed[0].name!=='Validate packaged RB-10 workflows on Windows and PowerShell 5.1') throw Error('Unexpected original Windows failure');
+            {
+              const {data:run}=await github.rest.actions.getWorkflowRun({...repo,run_id:42510451845});
+              if(run.head_sha!==testHead||run.head_branch!=='qa/rb10-windows-harness'||run.event!=='pull_request'||run.run_attempt!==1||run.status!=='completed'||run.conclusion!=='failure'||!run.path.startsWith('.github/workflows/continuation-rb10-windows.yml')) throw Error('Unexpected source acceptance run');
+              const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:run.id});
+              const job=jobs.find(j=>j.name==='windows-continuation'),failed=job?.steps.filter(s=>s.conclusion==='failure')||[];
+              if(jobs.length!==1||job?.status!=='completed'||job.conclusion!=='failure'||failed.length!==1||failed[0].name!=='Validate composite evidence and pack only pristine original runtime bytes'||!job.steps.some(s=>s.name==='Run the complete remaining Windows RB-10 acceptance step'&&s.conclusion==='success')) throw Error('All actual acceptance must have passed before the sole known aggregation failure');
+              const {data:a}=await github.rest.actions.getArtifact({...repo,artifact_id:13630111106});
+              if(a.name!=='qa-Windows-x64'||a.expired||a.size_in_bytes!==314234025||a.workflow_run?.id!==run.id||a.workflow_run.head_sha!==testHead||a.digest!=='sha256:a1442892a49cb19525ca3a23a01b47edf7d74d2f61546e29bd4adb25997176b6') throw Error('Accepted evidence artifact changed');
+            }
             const {data:runs}=await github.rest.actions.listWorkflowRunsForRepo({...repo,head_sha:qa,status:'completed',per_page:100});
-            const run=runs.workflow_runs.find(r=>r.head_sha===qa&&r.head_branch==='qa/rb10-windows-harness'&&r.event==='pull_request'&&r.conclusion==='success'&&r.path.startsWith('.github/workflows/continuation-rb10-windows.yml'));
+            const run=runs.workflow_runs.find(r=>r.head_sha===qa&&r.head_branch==='qa/rb10-windows-harness'&&r.event==='pull_request'&&r.conclusion==='success'&&r.path.startsWith('.github/workflows/recovery-rb10-windows.yml'));
             if(!run) throw Error('No successful continuation for this exact QA head');
             const newjobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:run.id});
-            if(newjobs.length!==1||newjobs[0].name!=='windows-continuation'||newjobs[0].conclusion!=='success') throw Error('Windows continuation job is not successful');
+            if(newjobs.length!==1||newjobs[0].name!=='windows-aggregation-recovery'||newjobs[0].conclusion!=='success') throw Error('Windows continuation job is not successful');
             const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,{...repo,run_id:run.id});
             const found=artifacts.filter(a=>a.name==='qa-Windows-x64'&&!a.expired);
             if(found.length!==1||found[0].workflow_run?.head_sha!==qa||found[0].workflow_run.id!==run.id||!/^sha256:[a-f0-9]{64}$/.test(found[0].digest||'')) throw Error('Missing uniquely identified continuation artifact');
@@ -79,9 +92,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir evidence
-          for kind in original continuation; do
+          for kind in original continuation source-test; do
             id=13626282101
             if [ "$kind" = continuation ]; then id="$CONTINUATION_ARTIFACT"; fi
+            if [ "$kind" = source-test ]; then id=13630111106; fi
             gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id" > "evidence/$kind-metadata.json"
             curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o "evidence/$kind.zip"
           done
@@ -91,7 +105,7 @@ jobs:
           CONTINUATION_RUN: ${{ steps.gate.outputs.run }}
         run: |
           set -euo pipefail
-          python qa-harness/.github/rb10-qa/verify-qa-artifact.py evidence/continuation-metadata.json evidence/continuation.zip evidence/verified --head "$PRODUCT_HEAD" --workflow-head "$QA_HEAD" --run "$CONTINUATION_RUN" --platform Windows-x64
+          python qa-harness/.github/rb10-qa/verify-qa-artifact.py evidence/continuation-metadata.json evidence/continuation.zip evidence/verified --head "$PRODUCT_HEAD" --workflow-head "$QA_HEAD" --run "$CONTINUATION_RUN" --platform Windows-x64 --source-test-metadata evidence/source-test-metadata.json --source-test-archive evidence/source-test.zip
           python - <<'PY'
           from pathlib import Path
           import hashlib,io,json,zipfile
@@ -144,6 +158,8 @@ jobs:
               const {data:run}=await github.rest.actions.getWorkflowRun({...repo,run_id:id});
               if(run.status!=='completed'||run.conclusion!=='success'||run.head_sha!==(id===42497982398?head:qa)) throw Error('Successful validation was replaced during verification');
             }
+            const {data:accepted}=await github.rest.actions.getWorkflowRun({...repo,run_id:42510451845});
+            if(accepted.head_sha!=='877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c'||accepted.run_attempt!==1||accepted.status!=='completed'||accepted.conclusion!=='failure') throw Error('Known source acceptance run changed during verification');
             const assets=await github.paginate(github.rest.repos.listReleaseAssets,{...repo,release_id:release.id});
             if(assets.length!==12||assets.some(a=>a.state!=='uploaded'||!a.size)) throw Error('Require exactly twelve complete release assets');
             const byName=new Map(assets.map(a=>[a.name,a])),windows=JSON.parse(fs.readFileSync('evidence/verified-assets.json','utf8'));
@@ -172,8 +188,8 @@ jobs:
               'Welcome и ресурсы Quake II; файловые браузеры и создание моделей; онбординг; View Options и сетка; растения; горизонтальная Tools; настройки сочетаний клавиш; запуск Ironwail/VKQuake после компиляции с очисткой файлов.', '',
               `Проверки исходного продукта Windows/native Linux/SDL2: https://github.com/${repo.owner}/${repo.repo}/actions/runs/42497982398`,
               `Готовые Linux/SDL2 пакеты и каталог растений: https://github.com/${repo.owner}/${repo.repo}/actions/runs/42498112722`,
-              `Windows: исходный workflow остановился на QA-парсере журнала; он сохранён со статусом failure. Оставшиеся проверки выполнены отдельным workflow на тех же 653 исходных файлах, DLL и QC: https://github.com/${repo.owner}/${repo.repo}/actions/runs/${process.env.CONTINUATION_RUN}`,
-              `Исходники продукта ${head}; дерево совпадает со слитым коммитом ${merged}. Отдельная ревизия исправленного QA harness: ${qa}.`,
+              `Windows: все оставшиеся UI проверки прошли в acceptance run https://github.com/${repo.owner}/${repo.repo}/actions/runs/42510451845 (QA head 877b0a6); его статус failure сохранён из-за последующей ошибки агрегации доказательств. Агрегация и упаковка восстановлены без повтора/изменения UI доказательств: https://github.com/${repo.owner}/${repo.repo}/actions/runs/${process.env.CONTINUATION_RUN}`,
+              `Исходники продукта ${head}; дерево совпадает со слитым коммитом ${merged}. Ревизия UI acceptance: 877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c. Отдельная ревизия recovery/агрегации: ${qa}.`,
               'Windows runtime перепакован без изменения файлов; соответствующие исходники восстановлены из проверенных архивов и закреплённых исходных ревизий. Оригинальный строгий publisher заменён этой явно проверенной процедурой Windows continuation.',
               'Проверены все 12 runtime/source/checksum файлов. Подробности: docs/qa/rb-10/acceptance.md.'
             ].join('\n');

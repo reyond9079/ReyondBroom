@@ -1,0 +1,139 @@
+name: Recover RB-10 Windows packaging from completed acceptance evidence
+run-name: Recover Windows aggregation 877b0a6 / ${{ github.event.pull_request.head.sha }}
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [feat/rb-10-editor-polish]
+    paths:
+      - .github/workflows/recovery-rb10-windows.yml
+      - .github/workflows/continuation-rb10-windows.yml
+      - .github/workflows/publishcontinuation-rb10.yml
+      - .github/rb10-qa/**
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: rb10-windows-continuation
+  cancel-in-progress: false
+jobs:
+  windows-aggregation-recovery:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'qa/rb10-windows-harness'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRODUCT_HEAD: 6bd6e2cedcade6e7e4d09cfe8f81901c91655a50
+      QA_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6bd6e2cedcade6e7e4d09cfe8f81901c91655a50
+          path: product
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: qa-harness
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require the exact completed acceptance step and sole aggregation failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo=context.repo,head=process.env.PRODUCT_HEAD,qa=process.env.QA_HEAD,testHead='877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c';
+            const {data:pr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
+            if(pr.state!=='open'||pr.head.sha!==qa||pr.head.ref!=='qa/rb10-windows-harness'||pr.head.repo.full_name!==`${repo.owner}/${repo.repo}`||pr.base.ref!=='feat/rb-10-editor-polish') throw Error('Unexpected recovery PR');
+            const workflows=new Set(['.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml','.github/workflows/recovery-rb10-windows.yml']);
+            const drivers=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','tests/test-welcome-updater.py']);
+            for(const [base,allowDrivers] of [[head,true],[testHead,false]]) {
+              const {data:diff}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:`${base}...${qa}`});
+              const permitted=n=>workflows.has(n)||n.startsWith('.github/rb10-qa/')||(allowDrivers&&drivers.has(n));
+              if(diff.status!=='ahead'||!diff.files?.length||diff.files.length>=300||diff.files.some(f=>!permitted(f.filename)||(f.previous_filename&&!permitted(f.previous_filename)))) throw Error('Recovery changes product or already-accepted test drivers');
+            }
+            const {data:run}=await github.rest.actions.getWorkflowRun({...repo,run_id:42510451845});
+            if(run.head_sha!==testHead||run.head_branch!=='qa/rb10-windows-harness'||run.event!=='pull_request'||run.run_attempt!==1||run.status!=='completed'||run.conclusion!=='failure'||!run.path.startsWith('.github/workflows/continuation-rb10-windows.yml')) throw Error('Unexpected source acceptance run');
+            const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:run.id});
+            const job=jobs.find(j=>j.name==='windows-continuation'),failed=job?.steps.filter(s=>s.conclusion==='failure')||[];
+            if(jobs.length!==1||job?.status!=='completed'||job.conclusion!=='failure'||failed.length!==1||failed[0].name!=='Validate composite evidence and pack only pristine original runtime bytes'||!job.steps.some(s=>s.name==='Run the complete remaining Windows RB-10 acceptance step'&&s.conclusion==='success')) throw Error('All actual acceptance must have passed before the sole known aggregation failure');
+            const {data:a}=await github.rest.actions.getArtifact({...repo,artifact_id:13630111106});
+            if(a.name!=='qa-Windows-x64'||a.expired||a.size_in_bytes!==314234025||a.workflow_run?.id!==run.id||a.workflow_run.head_sha!==testHead||a.digest!=='sha256:a1442892a49cb19525ca3a23a01b47edf7d74d2f61546e29bd4adb25997176b6') throw Error('Accepted evidence artifact changed');
+      - name: Restore original runtime and all unchanged accepted evidence entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir proof
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/13626282101" > proof/original-metadata.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/13630111106" > proof/source-test-artifact-metadata.json
+          curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/13626282101/zip" -o "$RUNNER_TEMP/original-runtime-evidence.zip"
+          curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/13630111106/zip" -o "$RUNNER_TEMP/accepted877.zip"
+          python qa-harness/.github/rb10-qa/restore-windows-payload.py --metadata proof/original-metadata.json --archive "$RUNNER_TEMP/original-runtime-evidence.zip" --output restored --head "$PRODUCT_HEAD" --run 42498112722 --artifact-id 13626282101 --sha256 c30cfa600a7f9223bca901bd9b084526dc4fe686d86cc57a67053504e8441313
+          python qa-harness/.github/rb10-qa/recover-accepted-windows-evidence.py --metadata proof/source-test-artifact-metadata.json --archive "$RUNNER_TEMP/accepted877.zip" --output final-evidence
+      - name: Aggregate existing genuine test evidence without running the editor or tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python qa-harness/.github/rb10-qa/aggregate-windows-continuation.py --restoration final-evidence/restoration.json --qa final-evidence/qa --runtime restored/runtime --source-evidence final-evidence/proof/sources.json --output final-evidence/proof/continuation.json --head "$PRODUCT_HEAD" --workflow-head "$QA_HEAD" --run "$GITHUB_RUN_ID" --source-test-metadata final-evidence/proof/source-test-artifact-metadata.json --source-test-archive "$RUNNER_TEMP/accepted877.zip"
+      - name: Validate reused corresponding sources and package only the original runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,io,json,subprocess,tarfile,zipfile
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          root=Path('restored/runtime');manifest=json.loads((root/'distribution-manifest.json').read_text());actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+          assert len(manifest)==653 and actual==set(manifest)|{'distribution-manifest.json'}
+          for name,digest in manifest.items():assert sha((root/name).read_bytes())==digest,name
+          release=Path('final-evidence/out/release');sources=release/'ReyondBroom-0.5.0-alpha.132-Windows-x64-Sources.zip';source_bytes=sources.read_bytes();report=json.loads(Path('final-evidence/proof/sources.json').read_text())
+          assert sha(source_bytes)==report['output_sha256'] and sources.with_name(sources.name+'.sha256').read_bytes()==(sha(source_bytes)+'  '+sources.name+'\n').encode('ascii')
+          # Reproduce the original Windows git archive conversion, respecting
+          # .gitattributes forced-LF paths and binary files without blanket normalization.
+          raw=subprocess.check_output(['git','-c','core.autocrlf=true','archive','HEAD'],cwd='product')
+          with tarfile.open(fileobj=io.BytesIO(raw)) as tar:expected={m.name:sha(tar.extractfile(m).read()) for m in tar.getmembers() if m.isfile()}
+          assert len(expected)==1766
+          with zipfile.ZipFile(io.BytesIO(source_bytes)) as z:
+              found={n.removeprefix('sources/ftebroom/'):sha(z.read(n)) for n in z.namelist() if n.startswith('sources/ftebroom/') and not n.endswith('/')}
+              assert found==expected
+              assert z.read('RELEASE-BUILD.txt').startswith((root/'build-info.txt').read_bytes())
+              assert z.testzip() is None
+          archive=release/'ReyondBroom-0.5.0-alpha.132-Windows-x64.zip';assert not archive.exists()
+          with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
+              for name in sorted(actual):z.write(root/name,'ReyondBroom-Windows-x64/'+name)
+          archive.with_name(archive.name+'.sha256').write_bytes((sha(archive.read_bytes())+'  '+archive.name+'\n').encode('ascii'))
+          assert sum(p.stat().st_size for p in Path('final-evidence').rglob('*') if p.is_file())<500*1024*1024
+          PY
+      - name: Recheck the QA head and upload only four Windows assets to the owned draft
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const fs=require('node:fs'),path=require('node:path'),repo=context.repo;
+            const {data:pr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
+            if(pr.state!=='open'||pr.head.sha!==process.env.QA_HEAD||pr.head.ref!=='qa/rb10-windows-harness'||pr.head.repo.full_name!==`${repo.owner}/${repo.repo}`) throw Error('QA head changed during validation');
+            const {data:release}=await github.rest.repos.getRelease({...repo,release_id:438298229});
+            if(!release.draft||release.tag_name!=='v0.5.0-alpha.132'||release.name!=='ReyondBroom 0.5.0-alpha.132'||release.target_commitish!==process.env.PRODUCT_HEAD) throw Error('Owned draft changed');
+            const {data:pin}=await github.rest.git.getRef({...repo,ref:'tags/rb-10-package-'+process.env.PRODUCT_HEAD});
+            if(pin.object.sha!==process.env.PRODUCT_HEAD) throw Error('Product source pin changed');
+            const names=['ReyondBroom-0.5.0-alpha.132-Windows-x64.zip','ReyondBroom-0.5.0-alpha.132-Windows-x64.zip.sha256','ReyondBroom-0.5.0-alpha.132-Windows-x64-Sources.zip','ReyondBroom-0.5.0-alpha.132-Windows-x64-Sources.zip.sha256'];
+            const assets=await github.paginate(github.rest.repos.listReleaseAssets,{...repo,release_id:release.id});
+            const linux=new Set(['Linux-x64','Linux-SDL2-x64'].flatMap(p=>{const n=`ReyondBroom-0.5.0-alpha.132-${p}`;return[n+'.tar.gz',n+'.tar.gz.sha256',n+'-Sources.zip',n+'-Sources.zip.sha256'];}));
+            if(assets.some(a=>!linux.has(a.name))) throw Error('Draft already has Windows or unknown assets; do not overwrite or blindly rerun');
+            for(const name of names) {
+              const {data:fresh}=await github.rest.repos.getRelease({...repo,release_id:release.id});
+              const {data:current}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
+              if(!fresh.draft||fresh.tag_name!==release.tag_name||fresh.name!==release.name||fresh.target_commitish!==process.env.PRODUCT_HEAD||current.state!=='open'||current.head.sha!==process.env.QA_HEAD) throw Error('Draft or QA head changed during uploads');
+              const data=fs.readFileSync(path.join('final-evidence/out/release',name));
+              await github.rest.repos.uploadReleaseAsset({...repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
+            }
+      - name: Retain all genuine accepted entries plus new aggregation and packaging proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-Windows-x64
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+          path: final-evidence/

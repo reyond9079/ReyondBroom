@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
+import zipfile
 
 HEAD = '6bd6e2cedcade6e7e4d09cfe8f81901c91655a50'
 PRIOR_ID = 13626282101
@@ -14,6 +15,11 @@ PRIOR_SHA = 'c30cfa600a7f9223bca901bd9b084526dc4fe686d86cc57a67053504e8441313'
 MANIFEST_SHA = '2c5a137f56d21e82913c8afa7d29d0e0ddb1a481120bc9807188d5075c4e858d'
 MODULE_SHA = '758ccd1bc16f941683692d151334704d0dd3d32180c9458a79d1f90d8aaabe42'
 QC_SHA = '68af71fe06750c996c257841e9b97622d4bdeb5d2e059e4a144f9da52af3e04a'
+TEST_HEAD = '877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c'
+TEST_RUN = 42510451845
+TEST_ARTIFACT = 13630111106
+TEST_SHA = 'a1442892a49cb19525ca3a23a01b47edf7d74d2f61546e29bd4adb25997176b6'
+TEST_SIZE = 314234025
 
 
 def require(value, message):
@@ -45,6 +51,40 @@ def validate_source_evidence(value):
             'Sources evidence must retain the actual reconstructed ZIP digest')
 
 
+def verify_source_test(metadata, archive, qa, restoration, source_evidence):
+    meta = json.loads(metadata.read_text())
+    require(meta['id'] == TEST_ARTIFACT and meta['name'] == 'qa-Windows-x64' and
+            meta['workflow_run']['id'] == TEST_RUN and
+            meta['workflow_run']['head_sha'] == TEST_HEAD and
+            meta['size_in_bytes'] == TEST_SIZE and meta['digest'] == 'sha256:' + TEST_SHA,
+            'Wrong original source-test artifact metadata')
+    require(archive.stat().st_size == TEST_SIZE and digest(archive) == TEST_SHA,
+            'Original source-test artifact bytes do not match GitHub digest')
+    bound = {}
+    with zipfile.ZipFile(archive) as z:
+        names = z.namelist()
+        require(len(names) == len(set(names)), 'Duplicate source-test artifact entries')
+        source_files = {'qa/' + p.relative_to(qa).as_posix(): p
+                        for p in qa.rglob('*') if p.is_file()}
+        require(set(source_files) == {n for n in names if n.startswith('qa/') and not n.endswith('/')},
+                'Recovered QA must contain exactly all genuine source-test proof files')
+        source_files.update({n: qa.parent / relative(n) for n in names if not n.endswith('/')})
+        require(source_files['restoration.json'] == restoration.resolve(strict=True) and
+                source_files['proof/sources.json'] == source_evidence.resolve(strict=True),
+                'Recovered restoration and Sources proof must retain canonical artifact paths')
+        for name, path in source_files.items():
+            relative(name)
+            require(not path.is_symlink(), 'Recovered proof must not be a symlink')
+            expected = hashlib.sha256(z.read(name)).hexdigest()
+            require(digest(path) == expected, 'Recovered source-test proof changed: ' + name)
+            bound[name] = expected
+    return {'source_test_run': TEST_RUN, 'source_test_head': TEST_HEAD,
+            'test_workflow_head': TEST_HEAD, 'source_test_artifact_id': TEST_ARTIFACT,
+            'source_test_artifact_sha256': TEST_SHA, 'source_test_artifact_size': TEST_SIZE,
+            'source_test_metadata_sha256': digest(metadata), 'source_test_entry_hashes': bound,
+            'source_tests_rerun_in_aggregation_workflow': False}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     for key in ('restoration', 'qa', 'runtime', 'source-evidence', 'output'):
@@ -52,7 +92,11 @@ def main():
     p.add_argument('--head', required=True)
     p.add_argument('--workflow-head', required=True)
     p.add_argument('--run', required=True, type=int)
+    p.add_argument('--source-test-metadata', type=Path)
+    p.add_argument('--source-test-archive', type=Path)
     a = p.parse_args()
+    require(bool(a.source_test_metadata) == bool(a.source_test_archive),
+            'Source-test metadata and archive must be supplied together')
     require(a.head == HEAD and re.fullmatch('[0-9a-f]{40}', a.workflow_head) and a.run > 0,
             'Invalid product/workflow source identity')
     require(not a.output.exists() and not a.output.is_symlink(), 'Proof output must not exist')
@@ -148,7 +192,13 @@ def main():
     for folder, minimum in (('quake2', 17), ('engine-cleanup', 12), ('compilation-paths', 35)):
         checks('rb10/' + folder, minimum)
         value = source('rb10/' + folder, qc=True)
-        require(value['checks'] == counts['rb10/' + folder], 'Fresh provenance count mismatch')
+        if folder == 'compilation-paths':
+            # This frozen producer records counts only in results.json/cases.json.
+            require(value['platform'] == 'Windows-x64' and
+                    re.fullmatch('[0-9a-f]{64}', value['probe_sha256']),
+                    'Invalid genuine compilation-path provenance')
+        else:
+            require(value['checks'] == counts['rb10/' + folder], 'Fresh provenance count mismatch')
         if folder == 'engine-cleanup':
             require(value['engine_sha256'] == files['bin/fteqw64.exe'], 'Wrong process-probe engine')
     require(len(obj('rb10/compilation-paths/cases.json')) == 11, 'Expected eleven map-origin cases')
@@ -185,11 +235,15 @@ def main():
         'restoration_sha256': digest(a.restoration), 'source_evidence_sha256': digest(a.source_evidence),
         'metadata_rewritten': False, 'original_release_zip_recreated': False,
     }
+    if a.source_test_metadata:
+        result.update(verify_source_test(a.source_test_metadata, a.source_test_archive,
+                                        qa, a.restoration, a.source_evidence))
     a.output.parent.mkdir(parents=True, exist_ok=True)
     with a.output.open('x', encoding='utf-8') as stream:
         stream.write(json.dumps(result, indent=2) + '\n')
     print(json.dumps({k: v for k, v in result.items() if k not in
-                      ('carried_entry_hashes', 'new_suite_evidence_hashes', 'runtime_file_sha256')}, indent=2))
+                      ('carried_entry_hashes', 'new_suite_evidence_hashes', 'runtime_file_sha256',
+                       'source_test_entry_hashes')}, indent=2))
 
 
 if __name__ == '__main__':

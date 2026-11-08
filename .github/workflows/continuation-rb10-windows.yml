@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   windows-continuation:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'qa/rb10-windows-harness'
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'qa/rb10-windows-harness' && github.event.pull_request.head.sha == '877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c'
     runs-on: windows-2022
     timeout-minutes: 75
     env:

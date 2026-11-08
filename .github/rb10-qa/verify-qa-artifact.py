@@ -2,13 +2,15 @@
 from pathlib import Path,PurePosixPath
 from collections import Counter
 import argparse,hashlib,json,re,stat,zipfile
-p=argparse.ArgumentParser();p.add_argument('metadata',type=Path);p.add_argument('archive',type=Path);p.add_argument('output',type=Path);p.add_argument('--head',required=True);p.add_argument('--run',required=True,type=int);p.add_argument('--platform',required=True,choices=('Linux-x64','Linux-SDL2-x64','Windows-x64'));p.add_argument('--version',default='0.5.0-alpha.132');p.add_argument('--workflow-head',help='Explicit external QA revision for a byte-identical Windows continuation');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('metadata',type=Path);p.add_argument('archive',type=Path);p.add_argument('output',type=Path);p.add_argument('--head',required=True);p.add_argument('--run',required=True,type=int);p.add_argument('--platform',required=True,choices=('Linux-x64','Linux-SDL2-x64','Windows-x64'));p.add_argument('--version',default='0.5.0-alpha.132');p.add_argument('--workflow-head',help='Explicit external QA revision for a byte-identical Windows continuation');p.add_argument('--source-test-metadata',type=Path);p.add_argument('--source-test-archive',type=Path);a=p.parse_args()
 meta=json.loads(a.metadata.read_text());digest=hashlib.file_digest(a.archive.open('rb'),'sha256').hexdigest()
 assert re.fullmatch('[0-9a-f]{40}',a.head) and meta['name']=='qa-'+a.platform
+assert bool(a.source_test_metadata)==bool(a.source_test_archive), 'Both source acceptance inputs are required'
 workflow_head=a.workflow_head or a.head
 assert re.fullmatch('[0-9a-f]{40}',workflow_head)
 assert meta['workflow_run']['head_sha']==workflow_head and meta['workflow_run']['id']==a.run
 if workflow_head!=a.head:assert a.platform=='Windows-x64'
+if a.source_test_archive:assert a.platform=='Windows-x64' and workflow_head!=a.head, 'Recovery only applies to external Windows QA'
 assert a.archive.stat().st_size==meta['size_in_bytes'] and meta['digest']=='sha256:'+digest
 assert not a.output.exists();a.output.mkdir(parents=True);proof={'platform':a.platform,'version':a.version,'head':a.head,'run':a.run,'artifact_id':meta['id'],'artifact_sha256':digest,'workflow_head':workflow_head,'cases':[]}
 with zipfile.ZipFile(a.archive) as z:
@@ -35,6 +37,34 @@ with zipfile.ZipFile(a.archive) as z:
   assert set(continuation['new_suite_paths'])==required_new
   proof['continuation']={key:continuation[key] for key in expected_continuation}
   proof['carried_proof_files']=len(carried)
+  if a.source_test_archive:
+   source_meta=json.loads(a.source_test_metadata.read_text())
+   source_expected={'id':13630111106,'name':'qa-Windows-x64','size_in_bytes':314234025,'digest':'sha256:a1442892a49cb19525ca3a23a01b47edf7d74d2f61546e29bd4adb25997176b6'}
+   for key,value in source_expected.items():assert source_meta.get(key)==value,(key,'source acceptance artifact mismatch')
+   assert source_meta['workflow_run']['id']==42510451845 and source_meta['workflow_run']['head_sha']=='877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c'
+   assert a.source_test_archive.stat().st_size==source_expected['size_in_bytes']
+   with a.source_test_archive.open('rb') as source_stream:assert hashlib.file_digest(source_stream,'sha256').hexdigest()==source_expected['digest'][7:]
+   assert continuation['source_test_run']==42510451845 and continuation['source_test_head']=='877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c'
+   reused={};unpacked=0
+   with zipfile.ZipFile(a.source_test_archive) as original:
+    for entry in original.infolist():
+     path=PurePosixPath(entry.filename)
+     assert not path.is_absolute() and '..' not in path.parts and '\\' not in entry.filename and not stat.S_ISLNK(entry.external_attr>>16)
+     assert entry.filename not in reused and not entry.is_dir()
+     unpacked+=entry.file_size;assert unpacked<20*1024**3
+     with original.open(entry) as source_stream:expected_hash=hashlib.file_digest(source_stream,'sha256').hexdigest()
+     with z.open(name(entry.filename)) as recovered_stream:assert hashlib.file_digest(recovered_stream,'sha256').hexdigest()==expected_hash,('changed actual acceptance output',entry.filename)
+     reused[entry.filename]=expected_hash
+   assert len(reused)==2504
+   expected_recovery={'source_test_artifact_id':13630111106,'source_test_artifact_sha256':source_expected['digest'][7:],'source_test_artifact_size':314234025,'test_workflow_head':'877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c','source_tests_rerun_in_aggregation_workflow':False}
+   for key,value in expected_recovery.items():assert continuation.get(key)==value,(key,'recovery provenance mismatch')
+   assert continuation['source_test_entry_hashes']==reused,'Recovery inventory differs from actual 2504 source files'
+   receipt=data('proof/source-test-artifact-metadata.json');assert hashlib.sha256(receipt).hexdigest()==continuation['source_test_metadata_sha256']
+   receipt_meta=json.loads(receipt)
+   for key,value in source_expected.items():assert receipt_meta.get(key)==value
+   assert receipt_meta['workflow_run']['id']==42510451845 and receipt_meta['workflow_run']['head_sha']==expected_recovery['test_workflow_head']
+   proof['source_test_recovery']={'run':42510451845,'head':source_meta['workflow_run']['head_sha'],'artifact_id':source_meta['id'],'artifact_sha256':source_expected['digest'][7:],'unchanged_entries':len(reused)}
+  else:assert 'source_test_run' not in continuation,'Recovery evidence requires authentic source acceptance inputs'
  audio=data('audio-archive/combined.log').decode('utf-8',errors='replace')
  assert not any(x in audio for x in ('DESKTOP_FAIL','CSQC_Abort','Assertion failed'))
  audio_checks=['pk3_file_manager_double_click','pk3_sound_in_media_and_timeline','sound_is_inner_window','import_queued_while_decoding','long_pk3_and_compressed_audio_imported','import_reveals_selected_media','pk3_import_preserves_archive','inner_window_can_move','inner_window_can_resize']

@@ -1,0 +1,79 @@
+name: Publish validated updater fix
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-updater-fix.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all three packages and publish alpha131
+        uses: actions/github-script@v7
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');
+            const repo=context.repo,version='0.5.0-alpha.131',tag='v'+version;
+            const associated=await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,{...repo,commit_sha:context.sha});
+            const candidate=associated.find(p=>p.merged_at&&p.merge_commit_sha===context.sha&&p.head.ref==='fix/updater-github-504');
+            if(!candidate)throw Error('Expected the merged updater fix PR');
+            const {data:pr}=await github.rest.pulls.get({...repo,pull_number:candidate.number});
+            const {data:head}=await github.rest.git.getCommit({...repo,commit_sha:pr.head.sha});
+            const {data:merged}=await github.rest.git.getCommit({...repo,commit_sha:context.sha});
+            if(!pr.merged||head.tree.sha!==merged.tree.sha)throw Error('Built and merged source trees differ');
+            const {data:runs}=await github.rest.actions.listWorkflowRuns({...repo,workflow_id:'updater-transport-checks.yml',head_sha:pr.head.sha,status:'completed',per_page:100});
+            const run=runs.workflow_runs.find(r=>r.head_sha===pr.head.sha&&r.conclusion==='success');
+            if(!run)throw Error('No successful updater checks for the final PR head');
+            const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:run.id});
+            const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,{...repo,run_id:run.id});
+            const payloads=[];
+            for(const platform of ['Windows-x64','Linux-x64','Linux-SDL2-x64']){
+              if(!jobs.some(j=>j.name===platform&&j.conclusion==='success'))throw Error('Missing platform '+platform);
+              const artifact=artifacts.find(a=>a.name==='updater-package-'+platform&&!a.expired);
+              if(!artifact)throw Error('Missing package artifact '+platform);
+              const response=await fetch(artifact.archive_download_url,{headers:{Authorization:'Bearer '+process.env.GH_TOKEN}});
+              if(!response.ok)throw Error('Cannot download verified artifact: '+response.status);
+              const bytes=Buffer.from(await response.arrayBuffer());
+              if(bytes.length!==artifact.size_in_bytes||artifact.digest!=='sha256:'+crypto.createHash('sha256').update(bytes).digest('hex'))throw Error('Artifact digest mismatch');
+              fs.writeFileSync('artifact.zip',bytes);
+              const folder='payloads/'+platform;fs.mkdirSync(folder,{recursive:true});
+              // The archive itself is authenticated above; restrict its flat file names before extraction.
+              cp.execFileSync('python3',['-c','import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);names=z.namelist();assert len(names)==5 and len(set(names))==5 and all("/" not in n and "\\\\" not in n and n not in (".","..") for n in names);z.extractall(sys.argv[2])','artifact.zip',folder]);
+              cp.execFileSync('python3',['scripts/verify-updater-package.py',folder,pr.head.sha],{stdio:'inherit'});
+              const prefix='ReyondBroom-'+version+'-'+platform;
+              for(const name of [prefix+(platform==='Windows-x64'?'.zip':'.tar.gz'),prefix+'-Sources.zip']){
+                payloads.push(folder+'/'+name,folder+'/'+name+'.sha256');
+              }
+            }
+            let release=(await github.paginate(github.rest.repos.listReleases,{...repo,per_page:100})).find(r=>r.tag_name===tag);
+            if(release&&!release.draft)throw Error('alpha131 is already published');
+            if(release&&![context.sha,pr.head.sha].includes(release.target_commitish))throw Error('Draft source mismatch');
+            if(!release)release=(await github.rest.repos.createRelease({...repo,tag_name:tag,target_commitish:context.sha,name:'ReyondBroom '+version,draft:true,prerelease:false})).data;
+            cp.execFileSync('gh',['release','upload',tag,...payloads,'--repo',repo.owner+'/'+repo.repo,'--clobber'],{stdio:'inherit'});
+            const uploaded=await github.paginate(github.rest.repos.listReleaseAssets,{...repo,release_id:release.id});
+            if(uploaded.length!==12)throw Error('Expected twelve runtime/source/checksum assets');
+            for(const path of payloads){
+              const name=path.split('/').pop(),asset=uploaded.find(a=>a.name===name);
+              if(!asset||asset.state!=='uploaded'||asset.size!==fs.statSync(path).size||asset.digest!=='sha256:'+crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex'))throw Error('Uploaded asset mismatch: '+name);
+            }
+            let ref;try{ref=(await github.rest.git.getRef({...repo,ref:'tags/'+tag})).data;}catch(e){if(e.status!==404)throw e;}
+            if(ref&&ref.object.sha!==context.sha)throw Error('Tag points to another source');
+            if(!ref)await github.rest.git.createRef({...repo,ref:'refs/tags/'+tag,sha:context.sha});
+            const body=[
+              'Исправлен встроенный обновлятор при HTTP 504 и других временных сетевых сбоях.', '',
+              '- Файлы скачиваются через публичный GitHub API; обычные ссылки остаются запасным маршрутом.',
+              '- Добавлены ограниченные повторные попытки и повторная загрузка оборванного файла с нуля.',
+              '- Сохраняются SHA-256, установка после закрытия редактора, пользовательские настройки, карты и резервная копия.',
+              '- Нативный модуль, движок, CSQC и инструменты совпадают побайтно с проверенной alpha130.', '',
+              'Если старый обновлятор не может получить исправление, один раз замените ftebroom/update-ftebroom.ps1 файлом https://raw.githubusercontent.com/'+repo.owner+'/'+repo.repo+'/'+tag+'/runtime/update-ftebroom.ps1 и снова нажмите Check for updates.', '',
+              'Windows PowerShell 5.1, Linux и SDL2: https://github.com/'+repo.owner+'/'+repo.repo+'/actions/runs/'+run.id,
+              'Проверены настоящий HTTP 504, запасной маршрут, обрыв загрузки, отказ при неверном хэше, ожидание закрытия процесса, сохранность карт/настроек, публичная загрузка и установка реального архива.',
+              'Исходники обновлятора: '+pr.head.sha+'; дерево совпадает со слитым коммитом '+context.sha+'.'
+            ].join('\n');
+            await github.rest.repos.updateRelease({...repo,release_id:release.id,target_commitish:context.sha,body,draft:false,prerelease:false,make_latest:'true'});
+            core.info('Published '+release.html_url);

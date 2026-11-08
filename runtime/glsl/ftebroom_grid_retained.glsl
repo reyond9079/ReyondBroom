@@ -34,7 +34,19 @@ void main() {
     vec2 width = derivative / spacing;
     vec2 distanceToLine = abs(fract(coordinate + 0.5) - 0.5) / width;
     float feather = clamp(cvar_ftebroom_grid_aa, 0.05, 2.0);
-    float coverage = 1.0 - smoothstep(max(0.0, 0.75-feather*0.5), 0.75+feather*0.5, min(distanceToLine.x, distanceToLine.y));
+    float coarse = 1.0 - smoothstep(max(0.0, 0.75-feather*0.5), 0.75+feather*0.5, min(distanceToLine.x, distanceToLine.y));
+    float coverage=coarse;
+    if(spacing>1.0){
+        coverage=coarse*0.45;
+        // Preserve the selected grid below the old 4-pixel coarsening threshold.
+        // Only subpixel lines fade; each projected axis is filtered separately.
+        if(min(derivative.x,derivative.y)<1.5){
+            vec2 fineDistance=abs(fract(tc+0.5)-0.5)/derivative;
+            vec2 fine=vec2(1.0)-smoothstep(vec2(max(0.0,0.75-feather*0.5)),vec2(0.75+feather*0.5),fineDistance);
+            fine*=vec2(1.0)-smoothstep(vec2(0.75),vec2(1.5),derivative);
+            coverage=max(max(fine.x,fine.y),coverage);
+        }
+    }
     gl_FragColor = vec4(clamp(cvar_ftebroom_grid_color,0.0,1.0), vc.a * coverage * distanceFade);
 }
 #endif

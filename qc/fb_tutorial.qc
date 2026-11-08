@@ -3,12 +3,30 @@
 // A journal checkpoint preserves texture attributes, selection and entity data
 // as well as geometry; creation demonstrations leave no brush behind.
 var int fb_tutorial_checkpoint=-1;
+void fb_tutorial_stage_check();
 void fb_tutorial_prepare(int step)
 {
     if(!cvar("ftebroom_tour_active"))return;
     fb_cancel();fb_tool_deactivate();fb_selection_clear();
-    if(step>=2 && step<=4)fb_createbox('0 0 32','96 96 64');
+    // This command only operates in the lesson's disposable map. Clear both
+    // the map's fixture and any practice geometry before preparing a stage.
+    static int ids[128];static vector axes[1];static float distances[1];
+    int count;
+    fb_tx_begin("Prepare lesson");
+    while((count=brush_findinvolume(1,axes,distances,0,ids,__NULL__,128))>0){
+        // The brush store may remap IDs on deletion. Use the normal selection
+        // deletion path, which tracks those remaps, rather than stale IDs.
+        for(int i=0;i<min(count,128);i++)brush_select(1,ids[i]);
+        if(!selectedbrushcount)break;
+        fb_delete_geometry();
+    }
+    fb_tx_commit();fb_selection_clear();
+    // Camera and grid lessons need one reference brush; creation starts empty.
+    if(step==0 || (step>=2 && step<=5))fb_createbox('0 0 32','96 96 64');
+    if(step==0 || step==5)fb_selection_clear();
+    if(cvar("ftebroom_skip_setup"))cvar_set("ftebroom_tour_fixture_ready",ftos(step+1));
     fb_tutorial_checkpoint=history;
+    if(cvar("ftebroom_skip_setup") && cvar("ftebroom_followup133_qa"))fb_tutorial_stage_check();
 }
 void fb_tutorial_restore()
 {

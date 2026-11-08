@@ -11,7 +11,7 @@ static void tourRecord(const char* status){if(!cvars->GetFloat("ftebroom_skip_se
 static void tourPrepare(int step){
   cancelGesture();cameraEnd();tourStep=step;tourDone=false;tourCameraBaseline=tourCameraMoved=tourCameraLooked=false;
   tourStepTime=ImGui::GetTime();tourDemo=step>=1&&step<=4;tourDemoPressed=false;tourInputReady=tourStepTime+.6;
-  cvars->SetFloat("ftebroom_tour_step",step);cvars->SetFloat("ftebroom_tour_result",0);cvars->SetFloat("ftebroom_tour_demo",tourDemo);
+  cvars->SetFloat("ftebroom_tour_fixture_ready",0);cvars->SetFloat("ftebroom_tour_step",step);cvars->SetFloat("ftebroom_tour_result",0);cvars->SetFloat("ftebroom_tour_demo",tourDemo);
   cvars->SetFloat("ftebroom_shift",0);cvars->SetFloat("ftebroom_alt",0);
   command("ftebroom_tool_toggle default\n");cvars->SetFloat("ftebroom_tool",0);
   // Every lesson owns a fresh disposable scene, including the grid/tools pages.

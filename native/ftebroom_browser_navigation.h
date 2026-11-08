@@ -3,7 +3,7 @@
 #include "ftebroom_browser_paths.h"
 #include <optional>
 #include <map>
-struct BrowserQaRect {ImVec2 min,max;bool visible=false,active=false;};
+struct BrowserQaRect {ImVec2 min,max;bool visible=false,active=false;float scrollY=0,scrollMax=0;};
 static bool browserQaEnabled=false;
 static std::map<std::string,BrowserQaRect> browserQaWidgets;
 static int browserQaMaterialSize=64;
@@ -16,7 +16,7 @@ static void browserQaItem(const std::string& name){
   // QA clicks the visible portion of a partially clipped tile, as a user does.
   browserQaWidgets[name]={visible?hit.Min:min,visible?hit.Max:max,visible,ImGui::IsItemActive()};
 }
-static void browserQaWindow(const std::string& name){if(browserQaEnabled){auto p=ImGui::GetWindowPos(),s=ImGui::GetWindowSize();browserQaWidgets[name]={p,{p.x+s.x,p.y+s.y},true,false};}}
+static void browserQaWindow(const std::string& name){if(browserQaEnabled){auto p=ImGui::GetWindowPos(),s=ImGui::GetWindowSize();browserQaWidgets[name]={p,{p.x+s.x,p.y+s.y},true,false,ImGui::GetScrollY(),ImGui::GetScrollMaxY()};}}
 static bool browserNavigationButton(bool up) {
   const float height=ImGui::GetFrameHeight(),size=height*.64f;
   const bool clicked=ImGui::Button(up?"##folder-up":"##folder-refresh",{height,height});
@@ -91,11 +91,12 @@ static std::optional<std::filesystem::path> browserNavigation(const char* id,Bro
   }
   ImGui::SetWindowFontScale(1);ImGui::EndChild();ImGui::PopStyleVar();ImGui::PopStyleColor();ImGui::PopID();return navigate;
 }
-// Call inside the scrollable tile child. Disabling scroll-with-mouse on that
-// child prevents a wheel gesture from both scrolling and changing tile size.
+// Plain wheel scrolls the tile child; Ctrl+wheel changes only thumbnail size.
 static void browserHoverZoom(int& size,int low,int high) {
-  if(ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)&&!ImGui::IsAnyItemActive())
+  if(ImGui::GetIO().KeyCtrl&&ImGui::GetIO().MouseWheel!=0&&ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)&&!ImGui::IsAnyItemActive()){
+    ImGui::SetKeyOwner(ImGuiKey_MouseWheelY,ImGui::GetCurrentWindow()->ID);
     size=ftebroom::browser::zoom(size,ImGui::GetIO().MouseWheel,low,high);
+  }
 }
 static void browserThumbnailFooter(const char* id,int& size,int low,int high) {
   ImGui::PushID(id);const float height=ImGui::GetFrameHeight(),width=std::min(90.f,ImGui::GetContentRegionAvail().x*.28f);

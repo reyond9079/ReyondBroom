@@ -18,7 +18,7 @@ static void browser132QaSetup(){
 static void browser132QaWrite(){
  if(!browserQaEnabled)return;static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
  nlohmann::json widgets=nlohmann::json::object();
- for(auto& item:browserQaWidgets){auto& r=item.second;widgets[item.first]={{"x",r.min.x},{"y",r.min.y},{"width",r.max.x-r.min.x},{"height",r.max.y-r.min.y},{"visible",r.visible},{"active",r.active}};}
+ for(auto& item:browserQaWidgets){auto& r=item.second;widgets[item.first]={{"x",r.min.x},{"y",r.min.y},{"width",r.max.x-r.min.x},{"height",r.max.y-r.min.y},{"visible",r.visible},{"active",r.active},{"scrollY",r.scrollY},{"scrollMax",r.scrollMax}};}
  for(auto name:{"Entity","Face","Mod file manager"})if(auto w=ImGui::FindWindowByName(name))if(w->DockNode&&w->DockNode->TabBar){
   auto bar=w->DockNode->TabBar;for(const auto& tab:bar->Tabs)if(tab.ID==w->TabId){
    float x=bar->BarRect.Min.x+tab.Offset-bar->ScrollingAnim;

@@ -332,7 +332,7 @@ static void executeAction(const Action& a, bool down = true)
   if(traceAction(cmd))return;
   command((cmd + "\n").c_str());
 }
-static bool dispatchAction(int key, bool down, bool inScene)
+static bool dispatchAction(int key, bool down, bool inScene, int targetView=-1)
 {
   initActions();
   for(int f=1;f<=12;f++){auto name="f"+std::to_string(f);if(key==input->GetKeyCode(name.c_str(),nullptr))return false;}
@@ -402,8 +402,10 @@ static bool dispatchAction(int key, bool down, bool inScene)
         chosen = &a;
     }
   }
-  if (chosen)
+  if (chosen){
+    if(targetView>=0&&chosen->command&&std::string_view(chosen->command)=="ftebroom_ui cycle")viewActivate(targetView);
     executeAction(*chosen);
+  }
   return chosen != nullptr;
 }
 static std::string historyActionLabel(const Action& a);

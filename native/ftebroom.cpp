@@ -1501,7 +1501,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    if (!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()))) dispatchAction(key, down, inScene);
+    if (!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()))) dispatchAction(key, down, inScene, hit);
   }
   return qtrue;
 }
@@ -1687,15 +1687,17 @@ static void testViewLayout()
   viewAction("cycle");
   viewAction("cycle");
   expect(viewTypes[0] == 0, "cycle_single_wrap");
-  viewSetLayout(2);
-  viewAction("cycle");
-  expect(viewTypes[0] == 0 && viewTypes[1] == 2, "cycle_two");
-  viewSetLayout(3);
-  viewAction("cycle");
-  expect(viewTypes[2] == 1 && viewTypes[1] == 3, "cycle_three");
+  for(int count=2;count<=4;count++)for(int active=0;active<count;active++){
+    viewSetLayout(count);viewActivate(active);
+    int before[4];std::copy(viewTypes,viewTypes+4,before);
+    viewAction("cycle");
+    bool valid=viewTypes[active]!=(before[active]);
+    for(int other=0;other<count;other++)if(other!=active)valid&=viewTypes[other]==before[other];
+    expect(valid,("cycle_layout_"+std::to_string(count)+"_pane_"+std::to_string(active)).c_str());
+    for(int repeat=0;repeat<3;repeat++)viewAction("cycle");
+    expect(std::equal(viewTypes,viewTypes+4,before),("cycle_wrap_"+std::to_string(count)+"_pane_"+std::to_string(active)).c_str());
+  }
   viewSetLayout(4);
-  viewAction("cycle");
-  expect(viewTypes[3] == 1 && viewTypes[2] == 2, "cycle_four_noop");
   viewActivate(2);
   viewAction("maximize");
   viewCompute(1280, 800);

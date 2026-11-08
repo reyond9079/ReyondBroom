@@ -105,7 +105,13 @@ def edit_folder(path):
 def shot(name):
  ui.move(1268,782);ui.settle();ImageGrab.grab().save(caseout/(name+'.png'));(caseout/(name+'.json')).write_text(json.dumps(live(),indent=2))
 def saved_profile():return int((root/'ftebroom-game-profile.txt').read_text().split()[0])
-def logtext():return (caseout/'editor.log').read_text(errors='replace')
+def logtext():
+ # Windows GUI builds write console output to qconsole.log instead of stdout.
+ chunks=[]
+ for path in [caseout/'editor.log',root/'qconsole.log',data/'qconsole.log']:
+  try:chunks.append(path.read_text(errors='replace'))
+  except FileNotFoundError:pass
+ return '\n'.join(chunks)
 def preserved_other_profiles(expected_hl=hl):
  q=shlex.split((root/'ftebroom-quake1.txt').read_text());legacy=shlex.split((root/'reyondbroom-legacy-games.txt').read_text())
  return Path(q[1])==q1 and Path(q[6])==q3 and legacy[1]==str(expected_hl)

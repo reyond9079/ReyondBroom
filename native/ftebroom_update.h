@@ -30,8 +30,10 @@ static void welcomeQaPublish(){
       {"windowOpen",recentWindow},{"welcomeStage",recentStage==WelcomeStage::Updates?"updates":recentStage==WelcomeStage::Recovery?"recovery":"recent"},
       {"stage",updateStage},{"committed",updateCommitted},{"currentVersion",editorVersion()},{"availableVersion",updateAvailable},{"session",updateSession},
       {"received",updateReceived},{"total",updateTotal},{"message",updateMessage},{"recoveryPending",recoveryRequest},{"recoveryOpening",recoveryOpening},
-      {"dirty",bool(cvars->GetFloat("ftebroom_dirty"))},{"pendingDocument",documentNext},{"saveChangesOpen",ImGui::IsPopupOpen("Save changes?",ImGuiPopupFlags_AnyPopupId)},
+      {"dirty",bool(cvars->GetFloat("ftebroom_dirty"))},{"pendingDocument",documentNext},{"saveChangesOpen",widgets.contains("save/cancel")},
       {"mapFilesOpen",ImGui::IsPopupOpen("Map files",ImGuiPopupFlags_AnyPopupId)},{"legacyRecoveryPopup",ImGui::IsPopupOpen("Recover autosave?",ImGuiPopupFlags_AnyPopupId)},
+      {"gameProfile",gameProfile},{"resourceError",assetError},{"resourcesOpen",widgets.contains("resources/window")},
+      {"resourcesLoading",assetsLoading},{"resourceFolder",baseq3},{"q2Mod",q2Mod},
       {"folder",fileBrowserFolder.u8string()},{"document",documentFile.u8string()}};
     auto path=documentPath("welcome-ui-live.json");std::ofstream out(path,std::ios::binary|std::ios::trunc);out<<value.dump();
   }catch(...){} // Read-only telemetry must never interrupt the editor.

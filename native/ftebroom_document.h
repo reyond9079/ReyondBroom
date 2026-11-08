@@ -159,6 +159,7 @@ static void documentProceed()
   }
   else if (next.rfind("__profile:",0)==0) {
     int selected=std::atoi(next.c_str()+10);if(selected<0||selected>4)return;
+    if(next.size()>=10 && next.compare(next.size()-10,10,":resources")==0)gameResourcesRequested=true;
     if(gameProfile<2)q3Root=baseq3;gameProfile=selected;
     std::snprintf(baseq3,sizeof baseq3,"%s",selected==3?q2Mod:(selected==2||selected==4)?q1Authoring().c_str():q3Root.c_str());
     q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();

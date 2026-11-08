@@ -184,6 +184,11 @@ def preserve(root, name, old):
     leaf = path.name
     if name.startswith(('updates/', 'downloads/', 'ftebroom/autosave/', 'ftebroom/cache/')):
         return True
+    # Game directories/definitions and per-game compilation workspaces belong
+    # to the user even when an earlier package happened to contain these files.
+    if name in ('reyondbroom-legacy-games.txt', 'ftebroom/reyondbroom-legacy-games.txt', 'ftebroom/reyondbroom-quake2-build-options.txt',
+                'ftebroom/reyondbroom-halflife-build-options.txt', 'ftebroom/compilation-profiles.json'):
+        return path.exists()
     if leaf in ('appearance.cfg', 'workspace.ini', 'config.cfg', 'fte.cfg', 'installed.lst'):
         return path.exists()
     if re.match(r'ftebroom-(project|game-profile|quake1|build|preferences|run|plugins|camera|recent)', leaf):

@@ -142,6 +142,9 @@ if(Test-Path -LiteralPath "$Root/distribution-manifest.json"){try{$manifest=Get-
 function Preserve([string]$name){
  $p=$name.Replace('\','/');$leaf=[IO.Path]::GetFileName($p)
  $existing=Under $Root $p
+ # Saved game folders/definitions and per-game compiler workspaces are user
+ # settings, including copies that still match an earlier package manifest.
+ if($p -in @('reyondbroom-legacy-games.txt','ftebroom/reyondbroom-legacy-games.txt','ftebroom/reyondbroom-quake2-build-options.txt','ftebroom/reyondbroom-halflife-build-options.txt','ftebroom/compilation-profiles.json')){return (Test-Path -LiteralPath $existing)}
  if((Test-Path -LiteralPath $existing) -and $p -match '^ftebroom/.*\.(cfg|ini|map|wad|def|ent|fgd)$'){
   if(!$oldManifest.ContainsKey($p)){return $true}
   if((FileHash $existing) -ne $oldManifest[$p]){return $true}

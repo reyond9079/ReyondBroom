@@ -110,6 +110,17 @@ user overrides are never silently discarded.
 
 ## Required release gates and provenance
 
+The additional Quake II report is covered by a custom-named mod fixture with
+PAK/WAL resources and a sibling `baseq2`. Choosing a pending profile in Preferences
+and opening Game / resources uses the normal guarded profile switch, including
+Save/Discard/Cancel. The resource dialog must display the selected game's fields,
+not the old Quake III fields or a stale `baseq3` error. Resource commands update
+the active game's directory. A missing legacy-game settings file
+recovers the last successful resource path; any existing file remains authoritative.
+Both updater implementations preserve `reyondbroom-legacy-games.txt`. Browsing
+PAKs tolerates official Q2 non-canonical aliases while reads reject traversal
+and archive mutations retain strict validation.
+
 `prepare-rb10.yml` runs when the PR is marked ready. It requires exact-head
 `compilation-profile-checks.yml` success for `windows`, `linux (Linux-x64)` and
 `linux (Linux-SDL2-x64)`. It reserves draft `v0.5.0-alpha.132`, verifies an immutable

@@ -1100,17 +1100,23 @@ static void panel(float w, float h)
       if(ImGui::Checkbox("Use entity class colors for bounds",&classColors))cvars->SetFloat("ftebroom_entity_bounds_class_colors",classColors);
       ImGui::EndTabItem();
     }
-    if(ImGui::BeginTabItem("Game profile"))
+    bool profileTab=ImGui::BeginTabItem("Game profile");runUiRecordGlobal("preferences-profile-tab");if(profileTab)
     {
       int& chosen=chosenProfile;if(chosen<0)chosen=gameProfile;
       ImGui::Text("Active: %s",gameProfileName());
-      ImGui::Combo("Profile",&chosen,gameProfileNames);
+      ImGui::Combo("Profile",&chosen,gameProfileNames);runUiRecordGlobal("preferences-profile-combo");
       ImGui::TextWrapped("Switching closes the current map and opens the selected game's starter scene. Unsaved changes can be saved first.");
       ImGui::BeginDisabled(chosen==gameProfile||assetsLoading||gameProfileLocked);
-      if(ImGui::Button("Switch profile") && preferencesSave()){documentRequest("__profile:"+std::to_string(chosen));ImGui::CloseCurrentPopup();}
+      bool switchProfile=ImGui::Button("Switch profile");runUiRecordGlobal("preferences-profile-switch");if(switchProfile && preferencesSave()){documentRequest("__profile:"+std::to_string(chosen));ImGui::CloseCurrentPopup();}
       ImGui::EndDisabled();
       ImGui::TextWrapped("Authoring directory: %s",*baseq3?baseq3:"Not configured");
-      if(ImGui::Button("Game / resources...") && shortcutConflicts().empty() && preferencesSave()){setupNeeded=true;ImGui::CloseCurrentPopup();}
+      ImGui::BeginDisabled(assetsLoading||(chosen!=gameProfile&&gameProfileLocked));
+      bool openResources=ImGui::Button("Game / resources...");runUiRecordGlobal("preferences-profile-resources");
+      if(openResources && shortcutConflicts().empty() && preferencesSave()){
+        if(chosen!=gameProfile)documentRequest("__profile:"+std::to_string(chosen)+":resources");else setupNeeded=true;
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndDisabled();
       ImGui::EndTabItem();
     }
     if(ImGui::BeginTabItem("Backups"))

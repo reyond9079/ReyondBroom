@@ -2,7 +2,7 @@
 static ImVec2 setupGameCenters[5],setupModCenters[2];
 static void setupPathField(const char* label,char* value,size_t capacity,bool multiline=false){
   ImGui::TextWrapped("%s",uiTr(label));ImGui::PushID(label);ImGui::SetNextItemWidth(-1);
-  if(multiline)ImGui::InputTextMultiline("##path",value,capacity,{-1,60*uiScale()});else ImGui::InputText("##path",value,capacity);
+  bool changed=multiline?ImGui::InputTextMultiline("##path",value,capacity,{-1,60*uiScale()}):ImGui::InputText("##path",value,capacity);if(changed)assetError.clear();
   ImGui::PopID();
 }
 static bool setupChoice(const char* id,const char* title,const char* subtitle,bool selected,const char* logo=nullptr,ImVec2* center=nullptr,float progress=-1,const char* progressLabel=nullptr) {
@@ -40,6 +40,7 @@ static void setupGameChoices() {
   const char* captions[]={"Classic Quake maps, WAD textures and mods","Quake II maps, WAL textures and PAK archives","Quake III maps, patches and shaders","GoldSrc maps, WAD3 textures, FreeHL / FreeCS","Custom FTE games and engine features"};
   const char* logos[]={"ui/games/quake1.png","ui/games/quake2.png","ui/games/quake3.png","ui/games/halflife.png","ui/games/fte.png"};
   for(int i=0;i<5;i++)if(setupChoice(ids[i],titles[i],captions[i],gameProfile==order[i],logos[i],&setupGameCenters[i])){
+    assetError.clear();
     if(gameProfile<2)q3Root=baseq3;
     gameProfile=order[i];
     std::snprintf(baseq3,sizeof baseq3,"%s",gameProfile==3?q2Mod:gameWad()?q1Authoring().c_str():q3Root.c_str());
@@ -73,7 +74,7 @@ static void setupModBrowse() {
     ImGui::BeginChild("Mod folders",{0,-85*uiScale()},ImGuiChildFlags_Borders);
     ImGuiListClipper clip;clip.Begin(setupModDirectories.size());while(clip.Step())for(int i=clip.DisplayStart;i<clip.DisplayEnd;i++)if(ImGui::Selectable(setupModDirectories[i].filename().u8string().c_str(),false,ImGuiSelectableFlags_NoAutoClosePopups))std::snprintf(setupModBrowsePath,sizeof setupModBrowsePath,"%s",setupModDirectories[i].u8string().c_str());
     ImGui::EndChild();
-    if(ImGui::Button("Use this folder")){try{auto path=std::filesystem::absolute(std::filesystem::u8path(setupModBrowsePath));if(!std::filesystem::is_directory(path))throw std::runtime_error("Choose an existing directory.");auto text=path.u8string();if(text.size()>=sizeof q1Mod)throw std::runtime_error("Directory path is too long.");auto target=setupModBrowseProfile==3?q2Mod:setupModBrowseProfile==4?hlMod:q1Mod;std::snprintf(target,1024,"%s",text.c_str());if(setupModBrowseProfile==2)q1UseLibre=false;setupModBrowseOpen=false;}catch(const std::exception& e){setupModBrowseError=e.what();}}
+    if(ImGui::Button("Use this folder")){try{auto path=std::filesystem::absolute(std::filesystem::u8path(setupModBrowsePath));if(!std::filesystem::is_directory(path))throw std::runtime_error("Choose an existing directory.");auto text=path.u8string();if(text.size()>=sizeof q1Mod)throw std::runtime_error("Directory path is too long.");auto target=setupModBrowseProfile==3?q2Mod:setupModBrowseProfile==4?hlMod:q1Mod;std::snprintf(target,1024,"%s",text.c_str());if(setupModBrowseProfile==2)q1UseLibre=false;assetError.clear();setupModBrowseOpen=false;}catch(const std::exception& e){setupModBrowseError=e.what();}}
     {auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();setupModBrowseUseCenter={(a.x+b.x)*.5f,(a.y+b.y)*.5f};}
     ImGui::SameLine();if(ImGui::Button("Cancel##mod"))setupModBrowseOpen=false;
     if(!setupModBrowseError.empty())ImGui::TextWrapped("%s",setupModBrowseError.c_str());
@@ -88,12 +89,12 @@ static void setupQuakeModFields() {
   uint64_t done=0,total=0;std::string phase;char progressLabel[128]={};
   if(libreBusy()){std::ifstream(libreInstall()/"progress.txt")>>done>>total>>phase;std::snprintf(progressLabel,sizeof progressLabel,"%s  %.1f / %.1f MiB",uiTr(phase.empty()?"Connecting...":phase.c_str()),done/1048576.,total/1048576.);}
   ImGui::BeginDisabled(libreBusy());
-  if(setupChoice("libre","Download LibreQuake (recommended)",libreReady()?"Installed and ready to use":"Downloads automatically when you start",setupModChoice==0,nullptr,&setupModCenters[0],libreBusy()?(total?float(double(done)/total):0.f):-1,progressLabel)){setupModChoice=0;q1UseLibre=libreReady();}
-  if(setupChoice("own","Choose my own mod","Select a directory with your mod resources",setupModChoice==1,nullptr,&setupModCenters[1])){setupModChoice=1;q1UseLibre=false;}
+  if(setupChoice("libre","Download LibreQuake (recommended)",libreReady()?"Installed and ready to use":"Downloads automatically when you start",setupModChoice==0,nullptr,&setupModCenters[0],libreBusy()?(total?float(double(done)/total):0.f):-1,progressLabel)){setupModChoice=0;q1UseLibre=libreReady();assetError.clear();}
+  if(setupChoice("own","Choose my own mod","Select a directory with your mod resources",setupModChoice==1,nullptr,&setupModCenters[1])){setupModChoice=1;q1UseLibre=false;assetError.clear();}
   ImGui::EndDisabled();
   if(setupModChoice==0 && !libreError.empty())ImGui::TextWrapped("%s",libreError.c_str());
   if(setupModChoice==1) {
-    ImGui::SetNextItemWidth(-110*uiScale());ImGui::InputText("##moddirectory",q1Mod,sizeof q1Mod);ImGui::SameLine();
+    ImGui::SetNextItemWidth(-110*uiScale());if(ImGui::InputText("##moddirectory",q1Mod,sizeof q1Mod))assetError.clear();ImGui::SameLine();
     if(ImGui::Button("Browse...##mod"))setupModBrowseStart(2);
     ImGui::TextWrapped("Choose the game or mod folder. If it contains id1, that folder is selected automatically. Otherwise the selected folder is used as the mod. A sibling id1 supplies base assets for a custom mod, with mod overrides. Mapping uses the standard Quake palette when the mod has no palette. Playing an expansion such as AD still requires the base game.");
   }

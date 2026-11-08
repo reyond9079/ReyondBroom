@@ -12,6 +12,7 @@ static char gameWallFile[4096]="";
 static void gameWallBrowse();
 static void gameWallBrowser();
 static bool gameProfileLocked;
+static bool gameResourcesRequested=false;
 static char gameMod[1024]="";
 static char gameEngine[1024]="";
 static bool gamePreviewAfterBuild=false;
@@ -87,10 +88,12 @@ static void gameProfileFields(bool wizard=false)
 {
   gameProfileLoad();
   ImGui::BeginDisabled(gameProfileLocked);
-  int old=gameProfile;
-  if(!wizard && ImGui::Combo("Game profile",&gameProfile,gameProfileNames)) {
-    if(old<2)q3Root=baseq3;
-    std::snprintf(baseq3,sizeof baseq3,"%s",gameProfile==3?q2Mod:gameWad()?q1Authoring().c_str():q3Root.c_str());
+  if(!wizard){
+    int selected=gameProfile;bool changed=ImGui::Combo("Game profile",&selected,gameProfileNames);welcomeQaItem("resources/profile");
+    if(changed&&selected!=gameProfile){
+      ImGui::EndDisabled();ImGui::CloseCurrentPopup();
+      documentRequest("__profile:"+std::to_string(selected)+":resources");return;
+    }
   }
   if(gameProfile==2) {
     setupQuakeModFields();
@@ -99,7 +102,7 @@ static void gameProfileFields(bool wizard=false)
     auto path=gameProfile==3?q2Mod:hlMod;
     ImGui::TextUnformatted(gameProfile==3?"Quake II game / mod folder (required)":"Half-Life game / mod folder (required)");
     ImGui::SetNextItemWidth(std::max(100.f,ImGui::GetContentRegionAvail().x-110*uiScale()));
-    ImGui::InputText("##legacyModDirectory",path,1024);ImGui::SameLine();
+    if(ImGui::InputText("##legacyModDirectory",path,1024))assetError.clear();welcomeQaItem("resources/folder");ImGui::SameLine();
     if(ImGui::Button("Browse...##legacyMod"))setupModBrowseStart(gameProfile);
     ImGui::TextWrapped(gameProfile==3?"Choose the Quake II installation, baseq2, or a mod folder. An installation root selects baseq2 automatically. A sibling baseq2 supplies base resources. PAK archives and WAL textures are supported.":"Choose the Half-Life installation, valve, or cstrike. An installation root selects valve for FreeHL or cstrike for FreeCS. A sibling valve supplies base resources. WAD3 textures retain their own palettes.");
     if(gameProfile==4){ImGui::Combo("Game runtime",&hlRuntime,"FreeHL (Half-Life)\0FreeCS (Counter-Strike 1.5)\0");ImGui::TextWrapped("Runtime installation adds a separate ReyondBroom package. Original game files are not replaced. Retail assets are required; arbitrary DLL mods are not supported by FreeHL/FreeCS.");}

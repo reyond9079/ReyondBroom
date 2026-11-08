@@ -15,6 +15,7 @@ p.add_argument('--capture-only',action='store_true');p.add_argument('--theme',ch
 p.add_argument('--width',type=int,default=1920);p.add_argument('--height',type=int,default=1080)
 a=p.parse_args();root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 data=root/'ftebroom';state=data/'compilation-ui-live.json';store=data/'compilation-profiles.json'
+render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 (data/'ftebroom-preferences.cfg').unlink(missing_ok=True)
 profiles=[{'name':n+' compile','workdir':'${MAP_DIR_PATH}','trenchBroom':True,'tasks':[]} for n in ['Zulu','alpha','beta']]
 engines=[{'id':str(i),'name':n+' engine','path':'unused-engine-'+str(i),'parameters':'argument-'+str(i)} for i,n in enumerate(['Zulu','alpha','beta'])]
@@ -40,7 +41,7 @@ def start(label):
  (data/'appearance-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_input_qa 1\nin 12 ftebroom_test_desktop reyon8qa '+a.theme+'\n')
  engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
  stream=(out/(label+'.log')).open('wb')
- process=subprocess.Popen([str(engine),'-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width',str(a.width),'-height',str(a.height),'-basedir',str(root),'+set','ftebroom_skip_setup','1','+exec','appearance-qa.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
+ process=subprocess.Popen([str(engine),*render,'+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width',str(a.width),'-height',str(a.height),'-basedir',str(root),'+set','ftebroom_skip_setup','1','+exec','appearance-qa.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
  wait(lambda:live()['views'] and live()['game'])
  ui=NativeInput(process,state,live,wait,out,focus_required=True);ui.position()
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
@@ -135,9 +136,18 @@ try:
   expect([x['name'] for x in saved()['profiles']]==[x['name'] for x in wanted['profiles']] and [x['id'] for x in saved()['engines']]==[x['id'] for x in wanted['engines']],'restart_keeps_both_profile_orders')
   colors=live()['viewportColors'];expect(all(abs(float(x)-45/255)<.001 for x in colors['ftebroom_color_3d_background'].split()) and all(abs(float(x)-170/255)<.001 for x in colors['ftebroom_grid_color'].split()),'restart_keeps_grid_and_3d_background_colors')
  stop()
+except BaseException:
+ # Preserve the failed screen and read-only state instead of losing the
+ # evidence when a headless host cannot draw or acknowledge input frames.
+ try:ImageGrab.grab().save(out/'failure.png')
+ except Exception:pass
+ for path in [state,data/'native-input-live.json',data/'qconsole.log',root/'qconsole.log']:
+  try:shutil.copy2(path,out/('failure-'+path.name))
+  except OSError:pass
+ raise
 finally:
  if 'process' in globals() and process.poll() is None:process.kill();process.wait(timeout=15)
  if 'stream' in globals():stream.close()
  (out/'metrics.json').write_text(json.dumps(metrics,indent=2))
  module=root/('fteplug_ftebroom_x64.dll' if os.name=='nt' else 'fteplug_ftebroom_amd64.so')
- (out/'provenance.json').write_text(json.dumps({'build_info':(root/'build-info.txt').read_text(),'module_sha256':hashlib.sha256(module.read_bytes()).hexdigest(),'capture_only':a.capture_only,'theme':a.theme,'window':[a.width,a.height],'method':'Real OS input; screenshots/pixel checks; process/console focus acknowledgment; no external game-engine launch'},indent=2))
+ (out/'provenance.json').write_text(json.dumps({'build_info':(root/'build-info.txt').read_text(),'module_sha256':hashlib.sha256(module.read_bytes()).hexdigest(),'capture_only':a.capture_only,'theme':a.theme,'window':[a.width,a.height],'renderer_requested':os.environ.get('RB_QA_RENDERER','default'),'method':'Real OS input; screenshots/pixel checks; process/console focus acknowledgment; no external game-engine launch'},indent=2))

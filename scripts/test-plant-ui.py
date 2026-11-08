@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import time
 from PIL import Image,ImageGrab
-from editor_os_input import NativeInput
+from editor_os_input import NativeInput,read_ui_json
 
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--scene-only',action='store_true',help='Focus OS input on installed model visibility and map lifecycle');a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom'
@@ -22,10 +22,10 @@ path=data/'plant-ui-live.json';path.unlink(missing_ok=True)
 for name in ['plant-placed','plant-undo','plant-redo','plant-reopened']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'plant-asset-qa.json').unlink(missing_ok=True)
 shutil.rmtree(data/'plant-qa-build',ignore_errors=True)
-(data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\n'+'in 12 ftebroom_plant qa dark\n')
+(data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\n'+'in 12 ftebroom_plant qa dark\n')
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
-stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
+stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
 checks=[]
 def live():
  deadline=time.monotonic()+2
@@ -48,7 +48,7 @@ def ready():return wait(lambda:live()['ready'],90)
 def expect(value,name):
  assert value,name
  checks.append(name);(out/'ui-results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
-ui=NativeInput(process,path,live,wait,out)
+ui=NativeInput(process,path,live,wait,out,focus_required=True)
 def click(name,mods=()):
  for _ in range(12):
   r=wait(lambda:live()['widgets'].get(name));x,y=r['x']+r['width']*.5,r['y']+r['height']*.5
@@ -62,7 +62,9 @@ def click(name,mods=()):
 def edit(name,text,scalar=False):
  click(name,('ctrl',) if scalar else ())
  wait(lambda:live()['widgets'][name].get('active'))
- ui.key('a',('ctrl',));ui.key('backspace');ui.text(str(text));ui.key('enter');time.sleep(.2)
+ ui.key('a',('ctrl',));ui.key('backspace');ui.text(str(text))
+ if name=='file-path':wait(lambda:read_ui_json(data/'placement-ui-live.json')['browsePath']==str(text))
+ ui.key('enter');time.sleep(.2)
 def choose(target):
  wait(lambda:'file-path' in live()['widgets']);edit('file-path',str(target).replace('\\','/'));click('file-choose');wait(lambda:'file-path' not in live()['widgets'])
 def screenshot(name):
@@ -97,6 +99,7 @@ try:
   # Select representative species through the actual search and preset rows.
   for preset,search in [('oak','English oak'),('pine','Scots pine'),('wild-shrub','Wild hawthorn'),('meadow-grass','Meadow grass'),('amanita','Fly agaric'),('daisy','Oxeye daisy'),('bracken','Common bracken')]:
    edit('search',search);click('preset/'+preset);ready();expect(live()['project']['preset']==preset and live()['lods'][0]['triangles']>0,'native generation '+preset);screenshot(preset+'-dark')
+  click('assets/textures');wait(lambda:all(live()['widgets'].get('texture-map/'+str(i),{}).get('loaded') for i in range(3)));screenshot('plant-texture-maps');expect(True,'texture inspector loads albedo, normal and ORM after deferred upload');click('assets/variations')
   # Settings use the actual editor theme; geometry and project stay intact.
   console('ftebroom_plant qa light');wait(lambda:live()['theme']==3);screenshot('plant-editor-light');expect(live()['project']['preset']=='bracken','Modern Light changes the UI without replacing the plant')
   console('ftebroom_plant qa dark');wait(lambda:live()['theme']==0)
@@ -141,7 +144,9 @@ try:
  pixels=visible_foliage(out/'plant-placed-map.png');(out/'scene-render-result.json').write_text(json.dumps({'visible_foliage_pixels':pixels},indent=2));expect(pixels>250,'placed plant visibly renders in the map after reopen')
  print('Plant UI:',len(checks),'checks passed',flush=True)
 finally:
- try:(out/'last-state.json').write_text(json.dumps(live(),indent=2));ImageGrab.grab().save(out/'last-desktop.png')
+ try:
+  (out/'last-state.json').write_text(json.dumps(live(),indent=2));ImageGrab.grab().save(out/'last-desktop.png')
+  (out/'last-chooser-state.json').write_text(json.dumps(read_ui_json(data/'placement-ui-live.json'),indent=2))
  except Exception:pass
  if process.poll() is None:process.terminate();process.wait(timeout=20)
  stream.close()

@@ -4,7 +4,8 @@
 #include <atomic>
 #include <map>
 namespace ftebroom::plant {
-enum Material { Bark, Leaf, Needle, Petal, Center, Cap, Gills, CactusSkin, Grass, Wood, Count };
+enum Material { Bark, Leaf, Needle, Petal, Center, Cap, Gills, CactusSkin, Grass, Wood,
+                LeafLight, LeafMature, LeafYoung, NeedleLight, NeedleMature, Count };
 struct Vertex {V p,n;std::array<double,2> uv;double wind=0,phase=0;};
 struct Face {std::array<unsigned,3> i;int material;Part part;unsigned organ;};
 struct Mesh {

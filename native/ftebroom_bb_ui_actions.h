@@ -349,6 +349,7 @@ static void bbAction(const std::string &action) {
     }
     if (action == "Close") {
       bbLeave([] {
+        placementCancel(modelPlacement);
         bbActive = false;
         modelViewerOpen = modelEditorActive = false;
         modelEditorCameraEnd();
@@ -1054,10 +1055,10 @@ static void bbAction(const std::string &action) {
 static void bbMenus() {
   if (!ImGui::BeginMenuBar())
     return;
-  if (ImGui::BeginMenu("File")) {
-    for (auto name : {"New model", "Open", "Import", "Save", "Save as", "Export", "Close"})
-      if (ImGui::MenuItem(name))
-        bbAction(name);
+  bool fileMenu=ImGui::BeginMenu("File");placementRect("model/file-menu");
+  if (fileMenu) {
+    for (auto name : {"New model", "Open", "Import", "Save", "Save as", "Export", "Close"}){
+      if (ImGui::MenuItem(name))bbAction(name);placementRect((std::string("model/file/")+name).c_str());}
     if (ImGui::MenuItem("Project settings..."))
       bbProjectSettingsOpen = true;
     ImGui::EndMenu();
@@ -1071,7 +1072,8 @@ static void bbMenus() {
       bbSettingsOpen = true;
     ImGui::EndMenu();
   }
-  if (ImGui::BeginMenu("Transform")) {
+  bool transformMenu=ImGui::BeginMenu("Transform");placementRect("model/transform-menu");
+  if (transformMenu) {
     for (auto name : {"Add Cube",
                       "Add Group",
                       "Add Mesh",
@@ -1095,9 +1097,8 @@ static void bbMenus() {
                       "Lock",
                       "Toggle export",
                       "Remove blank faces",
-                      "Auto UV"})
-      if (ImGui::MenuItem(name))
-        bbAction(name);
+                      "Auto UV"}){
+      if (ImGui::MenuItem(name))bbAction(name);placementRect((std::string("model/transform/")+name).c_str());}
     ImGui::EndMenu();
   }
   if (ImGui::BeginMenu("Mesh")) {
@@ -1397,8 +1398,8 @@ static void bbDialogs() {
       ImGui::TextWrapped("%s", e.what());
     }
     ImGui::EndChild();
-    ImGui::InputText("Filename", bbChooseName, sizeof bbChooseName);
-    if (ImGui::Button(bbChooseSave ? "Save" : "Open") && *bbChooseName) {
+    ImGui::InputText("Filename", bbChooseName, sizeof bbChooseName);placementRect("model/file-name");
+    if (placementButton(bbChooseSave ? "Save" : "Open","model/file-accept") && *bbChooseName) {
       auto path = bbChooseFolder / std::filesystem::u8path(bbChooseName);
       auto callback = bbChooseCallback;
       bbChooseOpen = false;
@@ -1418,21 +1419,19 @@ static void bbDialogs() {
   if (ImGui::BeginPopupModal("Unsaved model project", &bbGuardOpen,
                              ImGuiWindowFlags_AlwaysAutoResize)) {
     ImGui::TextWrapped("Save changes to the model project before continuing?");
-    if (ImGui::Button("Save")) {
+    if (placementButton("Save","model/guard-save")) {
       auto pending = bbPending;
       bbGuardOpen = false;
       ImGui::CloseCurrentPopup();
       if (bbProject.path.empty())
         bbChoose(true, modFileRoot() / (bbProject.root.value("name", "untitled") + ".bbmodel"),
                  [pending](auto path) {
-                   if (bbSave(path) && pending)
-                     pending();
+                   if (bbSave(path))placementAfterModelSave(pending);
                  });
-      else if (bbSave(std::filesystem::u8path(bbProject.path)) && pending)
-        pending();
+      else if (bbSave(std::filesystem::u8path(bbProject.path)))placementAfterModelSave(pending);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Discard")) {
+    if (placementButton("Discard","model/guard-discard")) {
       bbGuardOpen = false;
       ImGui::CloseCurrentPopup();
       auto next = std::move(bbPending);
@@ -1452,12 +1451,13 @@ static void bbDialogs() {
     ImGui::OpenPopup("New model");
   ImGui::SetNextWindowSize({650 * uiScale(), 430 * uiScale()}, ImGuiCond_FirstUseEver);
   if (ImGui::BeginPopupModal("New model", &bbNewOpen)) {
-    ImGui::InputText("Name", bbName, sizeof bbName);
-    ImGui::Combo("Template", &bbNewType,
-                 "Empty\0Quake monster\0Weapon view model\0Item pickup\0Prop\0");
+    ImGui::InputText("Name", bbName, sizeof bbName);placementRect("model/new-name");
+    const char* templates[]={"Empty","Quake monster","Weapon view model","Item pickup","Prop"};
+    bool templateOpen=ImGui::BeginCombo("Template",templates[bbNewType]);placementRect("model/new-template");
+    if(templateOpen){for(int i=0;i<5;i++){if(ImGui::Selectable(templates[i],bbNewType==i))bbNewType=i;placementRect((std::string("model/template/")+templates[i]).c_str());}ImGui::EndCombo();}
     ImGui::Combo("Target format", &bbTarget,
                  "Quake MDL\0Quake II MD2\0MD3\0GoldSrc studio MDL\0OBJ\0IQM\0MD5MESH\0");
-    ImGui::InputText("Folder", bbFolder, sizeof bbFolder);
+    ImGui::InputText("Folder", bbFolder, sizeof bbFolder);placementRect("model/new-folder");
     if (ImGui::Button("Choose folder...")) {
       bbNewOpen = false;
       ImGui::CloseCurrentPopup();
@@ -1469,7 +1469,8 @@ static void bbDialogs() {
     ImGui::InputInt("Texture resolution", &bbNewResolution);
     ImGui::Checkbox("Box UV", &bbNewBox);
     ImGui::Checkbox("Create texture", &bbNewTexture);
-    if (ImGui::Button("Create")) {
+    if(gameProfile==2){ImGui::Checkbox("Use FTE static models for Quake 1",&bbNewFteQ1);placementRect("model/fte-q1");}
+    if (placementButton("Create","model/new-create")) {
       try {
         auto folder = std::filesystem::u8path(bbFolder);
         modFileValidate(folder);
@@ -1482,6 +1483,7 @@ static void bbDialogs() {
             e["box_uv"] = bbNewBox;
         const char *formats[] = {"mdl", "md2", "md3", "studio", "obj", "iqm", "md5mesh"};
         p.root["reyondbroom"]["target_format"] = formats[bbTarget];
+        p.root["reyondbroom"]["fte_static_model"] = bbNewFteQ1;
         p.path = (folder / (std::string(bbName) + ".bbmodel")).u8string();
         if (std::filesystem::exists(std::filesystem::u8path(p.path)))
           throw std::runtime_error("A project with this name already exists; choose another name");
@@ -1491,7 +1493,7 @@ static void bbDialogs() {
         bbNewOpen = false;
         ImGui::CloseCurrentPopup();
         bbLeave([p = std::move(p)]() mutable {
-          bbActivate(std::move(p));
+          auto binding=modelNewPlacement;bbActivate(std::move(p));modelPlacement=binding;
           bbSavedStamp = ~uint64_t(0);
         });
       } catch (const std::exception &e) {
@@ -1499,8 +1501,8 @@ static void bbDialogs() {
       }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
-      bbNewOpen = false;
+    if (placementButton("Cancel","model/new-cancel")) {
+      bbNewOpen = false;placementCancel(modelNewPlacement);
       ImGui::CloseCurrentPopup();
     }
     if (!bbMessage.empty())
@@ -1687,6 +1689,7 @@ static void bbDialogs() {
                             : front == 3 ? "west"
                                          : "north";
       });
+    if(gameProfile==2){bool enabled=settings.value("fte_static_model",false);if(ImGui::Checkbox("Use FTE static models for Quake 1",&enabled))bbEdit("FTE static-model extension",[&](){settings["fte_static_model"]=enabled;});}
     bool base = settings.value("include_base_frame", true);
     if (ImGui::Checkbox("Include base frame", &base))
       bbEdit("Base frame export", [&] { settings["include_base_frame"] = base; });
@@ -1813,7 +1816,7 @@ static void bbPanel() {
     ImGui::End();
   }
   bool open = true;
-  ImGui::SetNextWindowSize({1400 * uiScale(), 850 * uiScale()}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({std::min(1400*uiScale(),ImGui::GetIO().DisplaySize.x-28),std::min(850*uiScale(),ImGui::GetIO().DisplaySize.y-54)},ImGuiCond_FirstUseEver);
   if (ImGui::Begin("Model editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
     bbFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     bbMenus();

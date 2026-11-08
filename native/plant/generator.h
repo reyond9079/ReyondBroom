@@ -306,8 +306,12 @@ struct Generator {
     b.mesh.bounds();validate(b.mesh);return std::move(b.mesh);
   }
 };
+}
+#include "botanical.h"
+#include "botanical_organs.h"
+namespace ftebroom::plant {
 inline Mesh generateBase(const Project& d,int lod=0,const std::atomic<bool>* cancel=nullptr) {
-  validate(d);if(lod<0||lod>2)throw std::runtime_error("Invalid plant LOD");return Generator(d,lod,cancel).runBase();
+  validate(d);if(lod<0||lod>2)throw std::runtime_error("Invalid plant LOD");return d.generator==1?Generator(d,lod,cancel).runBase():Botanical(d,lod,cancel).run();
 }
 inline Mesh generate(const Project& d,int lod=0,const std::atomic<bool>* cancel=nullptr) {
   auto result=hierarchy(generateBase(d,lod,cancel),d,lod);

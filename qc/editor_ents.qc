@@ -507,6 +507,14 @@ void(entedit_t *nent) editor_ents_updated =
 		}
 	}
 
+    // Authoring objects share one transform convention across scene/build views.
+    if(nent->fields["_reyondbroom_authoring"]=="1"){
+        nent->scale=1;if(nent->fields["modelscale"]!="")nent->scale=stof(nent->fields["modelscale"]);
+        if(nent->fields["scale"]!="")nent->scale=stof(nent->fields["scale"]);
+        if(nent->scale==0)nent->scale=1;
+        nent->modelaxes='1 1 1';if(nent->fields["modelscale_vec"]!="")nent->modelaxes=stov(nent->fields["modelscale_vec"]);
+        if(nent->fields["modelscale_vec"]!=""){nent->modelaxes*=nent->scale;nent->scale=1;}
+    }
     // Definitions without a model must not erase the standard Quake player marker.
     string playerClass=nent->fields["classname"];
     if(!nent->modelindex && cvar("ftebroom_game_profile")==2 &&
@@ -517,6 +525,21 @@ void(entedit_t *nent) editor_ents_updated =
 	else if(nent->fields["mangle"]!="")nent->ang=stov(nent->fields["mangle"]);
 	if (nent->isbsp)
 		nent->ang = '0 0 0';	//bsp entities should not be displayed rotated, because that just messes everything up.
+
+    // Use the actual generated model for picking/framing, rather than the
+    // generic func_model marker's tiny box. Cache its rotated world-axis box.
+    if(nent->fields["_reyondbroom_authoring"]=="1" && nent->modelindex && !nent->isbsp){
+        if(!tempent)tempent=spawn();setmodelindex(tempent,nent->modelindex);
+        vector modelLow=tempent.mins,modelHigh=tempent.maxs,modelAxes=nent->modelaxes;
+        if(modelAxes=='1 1 1')modelAxes=[nent->scale,nent->scale,nent->scale];
+        makevectors(nent->ang);vector modelForward=v_forward,modelRight=v_right,modelUp=v_up;
+        nent->mins='100000000 100000000 100000000';nent->maxs='-100000000 -100000000 -100000000';
+        for(int corner=0;corner<8;corner++){
+            vector modelCorner=[(corner&1i)?modelHigh_x:modelLow_x,(corner&2i)?modelHigh_y:modelLow_y,(corner&4i)?modelHigh_z:modelLow_z];
+            vector rotated=modelForward*modelCorner_x*modelAxes_x-modelRight*modelCorner_y*modelAxes_y+modelUp*modelCorner_z*modelAxes_z;
+            for(int axis=0;axis<3;axis++){nent->mins[axis]=min(nent->mins[axis],rotated[axis]);nent->maxs[axis]=max(nent->maxs[axis],rotated[axis]);}
+        }
+    }
 
     // Existing box pointers remain stable across entity-cache growth.
     fb_entity_release_vertices(nent);

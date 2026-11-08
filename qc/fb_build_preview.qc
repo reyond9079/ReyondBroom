@@ -7,6 +7,7 @@ float fb_build_source_fullbright,fb_build_source_clear;
 string fb_build_source_clearcolour;
 entity fb_build_entities;
 .entity fb_build_next;
+.vector fb_build_axes;
 void fb_build_preview_leave()
 {
     if(!fb_build_preview_active)return;
@@ -34,7 +35,7 @@ void fb_build_preview_enter(string path)
     getentitytoken("");
     while(getentitytoken()=="{") {
         string modelPath="",positionText="",anglesText="",yawText="",className="",key;
-        float modelScale=1,modelSkin=0,modelFrame=0;
+        float modelScale=1,modelSkin=0,modelFrame=0;vector modelAxes='1 1 1';string scalarText="";
         while((key=getentitytoken())!="}" && key!="") {
             key=strzone(key);string value=getentitytoken();
             if(key=="model")modelPath=strzone(value);
@@ -42,7 +43,9 @@ void fb_build_preview_enter(string path)
             if(key=="angles")anglesText=strzone(value);
             if(key=="angle")yawText=strzone(value);
             if(key=="classname")className=strzone(value);
-            if(key=="scale")modelScale=stof(value);
+            if(key=="modelscale")modelScale=stof(value);
+            if(key=="scale")scalarText=strzone(value);
+            if(key=="modelscale_vec")modelAxes=stov(value);
             if(key=="skin")modelSkin=stof(value);
             if(key=="frame")modelFrame=stof(value);
             strunzone(key);
@@ -54,18 +57,25 @@ void fb_build_preview_enter(string path)
         if(className=="misc_model"&&cvar("ftebroom_game_profile")<2)external=FALSE;
         if(submodel||external) {
             entity item=spawn();setmodel(item,submodel?strcat(modelPath,":",path):modelPath);
-            if(!item.modelindex){remove(item);strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);continue;}
+            if(!item.modelindex){remove(item);strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);strunzone(scalarText);continue;}
             item.origin=stov(positionText);entityCount++;
             item.angles=stov(anglesText);if(anglesText=="")if(external||!cvar("ftebroom_quake1"))item.angles_y=stof(yawText);
-            if(external){if(modelScale>0)item.scale=modelScale;item.skin=modelSkin;item.frame=modelFrame;}
+            if(external){if(scalarText!="")modelScale=stof(scalarText);if(modelScale==0)modelScale=1;item.scale=modelScale;item.fb_build_axes=modelAxes;item.skin=modelSkin;item.frame=modelFrame;}
             item.fb_build_next=fb_build_entities;fb_build_entities=item;
         }
-        strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);
+        strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);strunzone(scalarText);
     }
     strunzone(path);cvar_set("ftebroom_bsp_entities",itos(entityCount));
 }
 void fb_build_preview_draw()
 {
-    for(entity item=fb_build_entities;item;item=item.fb_build_next)addentity(item);
+    for(entity item=fb_build_entities;item;item=item.fb_build_next){
+        float savedScale=item.scale;
+        if(item.fb_build_axes!='0 0 0' && item.fb_build_axes!='1 1 1'){
+            makevectors(item.angles);v_forward*=item.fb_build_axes_x*savedScale;v_right*=item.fb_build_axes_y*savedScale;v_up*=item.fb_build_axes_z*savedScale;
+            item.renderflags=RF_USEAXIS;item.scale=1;
+        }
+        addentity(item);item.scale=savedScale;
+    }
 }
 

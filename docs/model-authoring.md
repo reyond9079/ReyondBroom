@@ -8,6 +8,21 @@ editable project** to build an editable first-pose project. Choose **File > New
 model** in the main editor, or the file manager's New menu, to start authoring.
 Double-click a `.bbmodel` file to open it directly.
 
+To create directly in the scene, right-click a 3D or orthographic viewport and
+choose **Create > Model > 3d model**. Create a nonempty project, then Save: the
+editor writes its runtime model and inserts one authoring `func_model` at the
+original click. Subsequent Save and Save As update the same object and preserve
+its map transforms. The parallel **plants/trees/grass** command opens Plant
+Editor with the same placement rules. No separate Export or Place in map is
+required for these viewport workflows.
+
+Placement is cancelled when its map or game profile changes, or its scene
+entity is deleted. Assets use immutable revisions so map Undo/Redo can restore
+the previous geometry. Opening a revision's source starts an unbound copy and
+requires Save As, protecting history. Ordinary project opens never insert an
+object automatically. See [Plant Editor](plant-editor.md) for supported runtime
+profiles and the explicit Quake 1/FTE extension.
+
 Authoring projects support cubes, polygon meshes, hierarchical groups, pivots,
 UVs, pixel painting and group keyframe animation. They use the Generic `.bbmodel`
 5.0 codec. The editor uses its own icons, themes and native ImGui interface.

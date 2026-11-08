@@ -12,12 +12,14 @@ vector fb_entity_drop_position(string classname,vector pixel)
     vector origin=fb_snap(point-normal*support);float penetration=point*normal-(origin*normal+support);if(penetration>0)origin+=normal*penetration;
     return origin;
 }
+string fb_context_vector(vector p){return sprintf("%.9g %.9g %.9g",p_x,p_y,p_z);}
 void fb_context_query(vector pixel)
 {
     fb_document_tick();cvar_set("ftebroom_context_group","0");cvar_set("ftebroom_context_entity","0");cvar_set("ftebroom_context_brush_entity","0");cvar_set("ftebroom_context_layer","0");cvar_set("ftebroom_context_material","");cvar_set("ftebroom_context_class","");
-    vector point=fb_view_plane_point(pixel,cvar("ca_brush_view"),[0,0,cvar("ftebroom_plane")]);
+    vector point=fb_view_plane_point(pixel,cvar("ca_brush_view"),[0,0,cvar("ftebroom_plane")]),normal='0 0 1';
+    if(cvar("ca_brush_view")){fb_view_axes(cvar("ca_brush_view"));normal=fb_view_normal;}
     if(fb_pick(pixel)>0) {
-        fb_hit_t hit=fb_hits[0];point=hit.point;
+        fb_hit_t hit=fb_hits[0];point=hit.point;if(vlen(hit.normal)>.1)normal=normalize(hit.normal);
         if(hit.kind==FB_HIT_BRUSH && hit.face>0){static brushface_t faces[64];int count=brush_get(hit.model,hit.id,faces,64,__NULL__);if(hit.face<=count)cvar_set("ftebroom_context_material",faces[hit.face-1].shadername);}
         if(hit.node>=0)for(int n=hit.node,steps=0;n>=2 && steps++<fb_node_count;n=fb_nodes[n].parent) {
             if(fb_nodes[n].kind==FB_NODE_GROUP && !cvar("ftebroom_context_group"))cvar_set("ftebroom_context_group",itos(fb_nodes[n].id));
@@ -25,7 +27,9 @@ void fb_context_query(vector pixel)
             if(fb_nodes[n].kind==FB_NODE_ENTITY){cvar_set("ftebroom_context_class",fb_nodes[n].fields["classname"]);cvar_set("ftebroom_context_entity",itos(fb_nodes[n].id));if(!fb_selection_leaf(n))cvar_set("ftebroom_context_brush_entity","1");}
         }
     }
-    cvar_set("ftebroom_context_point",vtos(fb_snap(point)));cvar_set("ftebroom_context_serial",ftos(cvar("ftebroom_context_serial")+1));
+    cvar_set("ftebroom_context_point",sprintf("%.9g %.9g %.9g",point_x,point_y,point_z));cvar_set("ftebroom_context_normal",fb_context_vector(normal));cvar_set("ftebroom_context_active_layer",itos(fb_active_layer));cvar_set("ftebroom_context_grid",ftos(cvar("ftebroom_grid_snap")?fb_grid():0));cvar_set("ftebroom_context_grid_origin",fb_context_vector(autocvar_ftebroom_grid_origin));
+    cvar_set("ftebroom_context_basis0",fb_context_vector(fb_grid_direction_world('1 0 0')));cvar_set("ftebroom_context_basis1",fb_context_vector(fb_grid_direction_world('0 1 0')));cvar_set("ftebroom_context_basis2",fb_context_vector(fb_grid_direction_world('0 0 1')));
+    cvar_set("ftebroom_context_serial",ftos(cvar("ftebroom_context_serial")+1));
 }
 void fb_entity_move_to(int id)
 {
@@ -49,8 +53,52 @@ void fb_entity_drop_preview()
     for(int d=0;d<fb_entity_definition_count;d++)if(fb_entity_definitions[d].classname==classname){low=fb_entity_definitions[d].mins;high=fb_entity_definitions[d].maxs;break;}
     fb_visual_box(point+low,point+high,'1 0.8 0',0.7,FALSE);
 }
+// Immutable world-space placement protocol. IDs survive selection changes and
+// map history; a missing linked entity is never recreated by a later Save.
+void fb_authoring_save()
+{
+    string request=strzone(argv(1)),guid=strzone(argv(3)),model=strzone(argv(4)),source=strzone(argv(5));
+    int epoch=stoi(argv(2)),create=stoi(argv(6)),layer=stoi(argv(8));vector origin=stov(argv(7));
+    string optin=strzone(argv(9)),status="stale";float normalization=stof(argv(10));
+    if(epoch==cvar("ftebroom_map_instance")){
+        fb_tool_refresh();fb_document_tick();int id=-1,matches=0;
+        for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY)if(fb_nodes[n].fields["_reyondbroom_placement"]==guid){id=fb_nodes[n].id;matches++;}
+        if(matches>1 || (create && matches))status="ambiguous";
+        else if(id<0 && !create)status="missing";
+        else {
+            int parent=fb_organize_node(layer),valid=TRUE;
+            if(parent<1 && layer)valid=FALSE;
+            for(int a=0;a<3;a++)if(!fb_geom_finite(origin[a])||fabs(origin[a])>autocvar_ftebroom_world_bound)valid=FALSE;
+            if(!valid)status="invalid";
+            else {
+                fb_tx_begin(id<0?"Create authoring model":"Update authoring model");
+                if(id<0){
+                    id=terrain_edit(TEREDIT_ENT_ADD,"");
+                    fb_tx_entity_set(id,sprintf("\"classname\" \"func_model\"\n\"origin\" \"%.9g %.9g %.9g\"\n",origin_x,origin_y,origin_z),HIST_ENTITY);
+                    fb_organize_parent(id,parent<1?1:parent);fb_selection_clear();fb_entity_select(id,TRUE);
+                }
+                float oldNormalization=1,oldScale=1;string scaleKey="modelscale";
+                for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY && fb_nodes[n].id==id){
+                    if(fb_nodes[n].fields["_reyondbroom_normalization"]!="")oldNormalization=stof(fb_nodes[n].fields["_reyondbroom_normalization"]);
+                    if(fb_nodes[n].fields["modelscale"]!="")oldScale=stof(fb_nodes[n].fields["modelscale"]);
+                    if(fb_nodes[n].fields["scale"]!=""){oldScale=stof(fb_nodes[n].fields["scale"]);scaleKey="scale";}
+                }
+                if(normalization>0 && oldNormalization>0){fb_tx_set_key(id,scaleKey,ftos(oldScale*normalization/oldNormalization),HIST_ENTITY);fb_tx_set_key(id,"_reyondbroom_normalization",ftos(normalization),HIST_ENTITY);}
+                fb_tx_set_key(id,"model",model,HIST_ENTITY);
+                fb_tx_set_key(id,"_reyondbroom_authoring","1",HIST_ENTITY);
+                fb_tx_set_key(id,"_reyondbroom_placement",guid,HIST_ENTITY);
+                fb_tx_set_key(id,"_reyondbroom_source",source,HIST_ENTITY);
+                fb_tx_set_key(id,"_reyondbroom_fte_q1",optin,HIST_ENTITY);
+                fb_tx_commit();status="ok";
+            }
+        }
+    }
+    cvar_set("ftebroom_placement_status",status);cvar_set("ftebroom_placement_ack",request);
+    strunzone(request);strunzone(guid);strunzone(model);strunzone(source);strunzone(optin);
+}
 float fb_context_command()
 {
+    if(argv(0)=="ftebroom_authoring_save"){fb_authoring_save();return TRUE;}
     if(argv(0)=="ftebroom_entity_at_cursor") {
         string classname=strzone(argv(1));vector cursorPosition=fb_entity_drop_position(classname,curmousepos);
         fb_entity_create(classname,FALSE,cursorPosition);strunzone(classname);return TRUE;
@@ -67,7 +115,7 @@ float fb_context_command()
 
         for(int axis=0;axis<3;axis++)if(!fb_geom_finite(modelPosition[axis])||fabs(modelPosition[axis])>autocvar_ftebroom_world_bound){strunzone(model);return TRUE;}
         fb_tx_begin("Import model");fb_entity_create(modelClass,FALSE,modelPosition);
-        fb_entity_property("set","model",model);if(authoring){fb_entity_property("set","_reyondbroom_authoring","1");fb_entity_property("set","origin",sprintf("%g %g %g",modelPosition_x,modelPosition_y,modelPosition_z));}fb_tx_commit();strunzone(model);return TRUE;
+        fb_entity_property("set","model",model);if(authoring){fb_entity_property("set","_reyondbroom_authoring","1");if(argv(8)=="fte-q1")fb_entity_property("set","_reyondbroom_fte_q1","1");fb_entity_property("set","origin",sprintf("%g %g %g",modelPosition_x,modelPosition_y,modelPosition_z));}fb_tx_commit();strunzone(model);return TRUE;
     }
     if(argv(0)=="ftebroom_entity_drop"){
         string name=strzone(argv(1));vector pixel=[stof(argv(2)),stof(argv(3)),0];vector position=fb_entity_drop_position(name,pixel);fb_entity_create(name,FALSE,position);strunzone(name);return TRUE;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild SDL2 so window-close events use the editor's document/compilation guard.
+# Rebuild SDL2 with document/compilation guards and native GUI UTF-8 composition.
 set -euo pipefail
 src=$(cd "$(dirname "$0")/.." && pwd)
 engine=${1:?Pass a dedicated engine source/build directory}

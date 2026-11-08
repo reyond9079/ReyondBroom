@@ -1,0 +1,15 @@
+--- a/engine/client/menu.c
++++ b/engine/client/menu.c
+@@ -161,7 +161,11 @@
+ 	if (promptmenu)
+ 		return promptmenu->showosk;
+ 	if (topmenu)
+-		return topmenu->showosk;
++	{
++		// Plugin GUIs publish their actual composition request. In SDL2,
++		// closing the console otherwise stops UTF-8 input for these menus.
++		return topmenu->showosk || (topmenu->ctx && Cvar_VariableValue("ftebroom_text_input"));
++	}
+ 	return -1;
+ }
+ 

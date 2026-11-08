@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <chrono>
 #ifdef _WIN32
+#include <process.h>
 #define VARGS __cdecl
 #else
+#include <unistd.h>
 #define VARGS
 #endif
 typedef int uploadfmt_t;
@@ -96,6 +98,7 @@ static void initialize()
     return;
   IMGUI_CHECKVERSION();
   cvars->SetFloat("ftebroom_mod_preview",0);
+  cvars->GetNVFDG("ftebroom_text_input","0",0,"Native GUI UTF-8 composition request","ReyondBroom");
   ImGui::CreateContext();
   auto& io = ImGui::GetIO();
   io.IniFilename = nullptr;
@@ -247,6 +250,7 @@ static bool bbBeforeDocument(const std::string& next);
 #include "ftebroom_view_options.h"
 static bool terrainCreateWindow;
 // Context menus share entity and organization panels.
+#include "ftebroom_placement_state.h"
 #include "ftebroom_context.h"
 #include "ftebroom_issues.h"
 #include "ftebroom_run.h"
@@ -269,6 +273,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_unity.h"
 #include "ftebroom_plugins.h"
 #include "ftebroom_plant_editor.h"
+#include "ftebroom_placement.h"
 #include "ftebroom_texture_folders.h"
 #include "ftebroom_prefabs.h"
 #include "ftebroom_entity_list.h"
@@ -1014,6 +1019,8 @@ static void panel(float w, float h)
   buildLeakDialog();
   modControlsPanel();
   ImGui::BeginDisabled(modEmbedded);
+  placementWidgets=nlohmann::json::object();
+  placementTick();
   sceneContextPanel();
   documentFileBrowser();
   documentDialogs();
@@ -1139,6 +1146,8 @@ static void panel(float w, float h)
 #endif
   uiCursorUpdate(sceneLook||modelEditCameraCaptured||modCaptured,uiCursorPercent/100.f);
   uiReachableWindows();
+  cvars->SetFloat("ftebroom_text_input",io.WantTextInput&&input->HasMenuFocus()&&!sceneLook&&!modelEditCameraCaptured&&!modCaptured);
+  placementWriteQa();
   runUiWriteLive(); // Include widgets drawn after Compile, such as Preferences.
   render();
   modEmbedTick(w,h);
@@ -1249,7 +1258,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     }
     if(inScene)return qtrue;
   }
-  if (inScene && !sceneDrag && !sceneLook && !io.WantTextInput)
+  if (inScene && !sceneDrag && !sceneLook && (!io.WantTextInput||(type==1&&key==mouseKeys[1])))
   {
     if (type == 1 && (key == mouseKeys[0] || key == mouseKeys[1] || key == mouseKeys[2]))
       viewFocusArmed = true;
@@ -1375,7 +1384,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     }
     if (key == mouseKeys[1] || key == mouseKeys[2])
     {
-      if (down && inScene && !io.WantTextInput && !sceneLook)
+      if (down && inScene && (!io.WantTextInput||key==mouseKeys[1]) && !sceneLook)
       {
         cancelGesture();
         sceneLook = true;
@@ -1402,6 +1411,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     }
     if (down && (key == wheelUp || key == wheelDown))
     {
+      if(sceneLook&&cameraButton==1)sceneContextCandidate=false;
       if ((inScene || sceneLook) && !sceneDrag && !io.WantTextInput && !popupOpen)
       {
         if (ctrlHeld && !altHeld && !shiftHeld && !sceneLook)
@@ -1487,6 +1497,8 @@ static void mapReady()
   static std::string loadedAlias;
   entitySelectionEpoch = organizationReadEpoch = -1;
   ++organizationMapEpoch;
+  cvars->SetFloat("ftebroom_map_instance",organizationMapEpoch);sceneContextPending=false;
+  placementCancel(contextPlacement);placementCancel(plantPlacement);placementCancel(modelPlacement);placementCancel(modelNewPlacement);
   cameraEnd();
   cameraMapReady();
   char loadedName[256];
@@ -1540,8 +1552,27 @@ static void mapReady()
   core->Print("ReyondBroom: permanent workspace restored for map.\n");
 }
 static void profileStartMap(){if(!pendingDocumentFile.empty())return;static bool first=true;if(first){recentLoad();recentWindow=!cvars->GetFloat("ftebroom_skip_setup")&&firstSetupStep<0&&!recentMaps.empty();first=false;}gameProfileLoad();command(gameClassic()?"mapedit maps/start-quake1.map\n":"mapedit maps/start.map\n");}
+// Read-only, opt-in input QA must keep advancing while the console owns focus.
+// The normal ImGui snapshots pause there and cannot acknowledge console input.
+static void inputQaTick()
+{
+  if(!ready || !cvars->GetFloat("ftebroom_input_qa") || !input->GetKeyDest)return;
+  static uint64_t sequence=0;
+#ifdef _WIN32
+  const int pid=_getpid();
+#else
+  const int pid=getpid();
+#endif
+  try {
+    nlohmann::json state{{"pid",pid},{"sequence",++sequence},{"milliseconds",core->GetMilliseconds()},
+      {"destination",input->GetKeyDest()}};
+    std::ofstream out(documentPath("native-input-live.json"),std::ios::binary);
+    out<<state.dump();
+  }catch(...){/* QA output never changes editor state or interrupts a frame. */}
+}
 static void QDECL actionFocusTick(int)
 {
+  inputQaTick();
   libreTick();shaderPackTick();
   updateTick();
   clipboardPump();
@@ -1815,11 +1846,15 @@ static void testNavigationInput()
   expect(!moveHeld[5], "ctrl_guard");
   key("x", false);
   key("ctrl", false);
+  sceneContextPending = false;
   key("mouse2", true);
   expect(sceneLook && cameraButton == 1, "right_capture");
   event(3, 0, 0, 4000, -2000, 1280, 800);
   key("mouse2", false);
   expect(!sceneLook, "right_release");
+  expect(!sceneContextPending,"relative_drag_does_not_open_context");
+  key("mouse2",true);key("w",true);key("w",false);key("mouse2",false);
+  expect(!sceneContextPending,"flight_tap_does_not_open_context");
   key("mouse3", true);
   expect(sceneLook && cameraButton == 2, "middle_capture");
   event(3, 0, 0, 100, 20, 1280, 800);
@@ -1929,6 +1964,7 @@ static void testModControls()
 }
 static void shutdownEditor()
 {
+  cvars->SetFloat("ftebroom_text_input",0);
   plantShutdown();
   pluginsShutdown();
   settleCancel=true;if(settleJob.valid())settleJob.wait();

@@ -19,7 +19,7 @@ inline double fractal(double x,double y,uint64_t seed) {
 }
 inline V blend(V a,V b,double t){return add(mul(a,1-t),mul(b,t));}
 struct Texel {V color;double height=0,alpha=1;};
-inline Texel texel(const Project& d,int mat,double u,double v) {
+inline Texel legacyTexel(const Project& d,int mat,double u,double v) {
   auto& p=d.p;uint64_t seed=mix(d.seed,mat);double n=fractal(u*14,v*18,seed),fine=noise(int(u*256),int(v*256),seed);
   V c=mat==Bark||mat==Wood?p.bark:mat==Petal||mat==Cap?p.flower:mat==Gills?(d.family==Family::Mushroom?p.bark:V{.79,.73,.57}):mat==Center?V{.35,.23,.055}:p.leaf;
   double h=n*.35,alpha=1;
@@ -79,12 +79,80 @@ inline Texel texel(const Project& d,int mat,double u,double v) {
   c=mul(c,1+p.variation*(fine-.5));for(double& x:c){x=std::clamp(x,0.,1.);if(p.quality==3)x=std::min(1.,std::round(x*5)/5.+.04);}
   return {c,h,alpha};
 }
+inline Texel texel(const Project& d,int material,double u,double v) {
+  if(d.generator==1)return legacyTexel(d,material,u,v);
+  int mat=material>=LeafLight&&material<=LeafYoung?Leaf:material>=NeedleLight?Needle:material;
+  auto sample=legacyTexel(d,mat,u,v);auto& p=d.p;uint64_t seed=mix(d.seed,mat);
+  double grain=fractal(u*27,v*33,seed),fine=noise(int(u*256),int(v*256),seed);
+  if(mat==Bark){
+    double broad=fractal(u*5,v*3,seed+20),ridge=fractal(u*24+6*broad,v*4,seed+49);
+    switch(p.barkPattern){
+      case 1:sample.color=mul(p.bark,.80+.32*broad);sample.height=.35+grain*.09;break;
+      case 2:{double scar=std::pow(std::max(0.,smoothNoise(u*9,v*35,seed)-.60)*2.5,2);sample.color=blend(mul(p.bark,.9+.16*grain),{.07,.065,.05},scar);sample.height=.3+.1*grain;break;}
+      case 3:{double scale=fractal(u*16,v*21+u*2,seed);sample.color=mul(p.bark,.60+.7*scale);sample.height=scale*.45;break;}
+      case 4:sample.color=mul(p.bark,.58+.65*ridge);sample.height=.18+.55*ridge;break;
+      case 5:{double scar=.5+.5*std::sin((v*17+grain*.18)*pi*2);sample.color=mul(p.bark,.74+.28*scar+grain*.12);sample.height=.25+scar*.18;break;}
+      case 6:sample.color=mul(p.bark,.55+.85*grain);sample.height=.12+grain*.78;break;
+      case 7:sample.color=blend(mul(p.bark,.62+.4*grain),{.60,.58,.43},std::clamp((broad-.44)*4,0.,1.));sample.height=.30+grain*.07;break;
+      default:sample.color=mul(p.bark,.40+.95*ridge);sample.height=.12+ridge*.70;
+    }
+    sample.color=mul(sample.color,1+p.variation*(fine-.5));
+  }else if(mat==Leaf||mat==Needle||mat==Grass){
+    double x=2*(u-.5),width=std::max(0.,std::sin(pi*v));
+    if(p.leafShape==1)width=std::pow(width,.62);
+    if(p.leafShape==2||p.leafShape==7||mat==Grass)width=std::pow(width,1.35);
+    if(p.leafShape==3)width*=.75+.25*std::cos(v*pi*8);
+    if(p.leafShape==6)width=std::max(0.,curve(p.leafProfile,v));
+    width*=1-p.serration*.055*(.5+.5*std::sin(v*pi*43));
+    sample.alpha=std::clamp((width-std::abs(x))*100,0.,1.);
+    if(p.leafShape==4){double px=2*(u-.5),py=2*(v-.5),a=std::atan2(px,py),edge=.65+.35*std::cos(std::clamp(p.leaflets,3,9)*a);sample.alpha=std::clamp((edge-std::hypot(px,py))*80,0.,1.);}
+    if(mat==Needle){
+      double mask=std::abs(x)<.024?1:0;
+      if(p.needleForm==0||p.needleForm==3){
+        int needles=p.needleForm==0?9:12;
+        for(int i=0;i<needles;i++){
+          double base=.10+i*.055,t=(v-base)/.37;
+          if(t>=0&&t<=1&&std::abs(std::abs(x)-t*(.60+.25*(i%3))*(1-.15*t))<.036)mask=1;
+        }
+      }else if(p.needleForm==2){
+        double edge=(1-v)*(.58+.18*std::sin(v*pi*12));mask=std::abs(x)<edge?.95:mask;
+      }else{
+        for(int i=0;i<9;i++){double base=.04+i*.095,t=(v-base)/.17;if(t>=0&&t<=1&&std::abs(std::abs(x)-t*.9)<(p.needleForm==4?.14:.075))mask=1;}
+      }sample.alpha=mask;
+    }
+    // Evergreen phenology keeps evergreen foliage; larch explicitly opts out.
+    if(p.evergreen==1||p.evergreen==3)sample.color=mul(p.leaf,.76+.24*v+.16*grain);
+    double variant=material==LeafLight||material==NeedleLight?1.13:material==LeafMature||material==NeedleMature?.88:material==LeafYoung?1.04:1;
+    sample.color=mul(sample.color,variant*(.96+.07*grain));
+    double vein=std::exp(-std::abs(std::sin((v*12-std::abs(x)*2.9)*pi))*32),mid=std::exp(-std::abs(x)*85);
+    sample.color=blend(sample.color,mul(p.leaf,1.28),mid*.18+vein*.10);sample.height=.28+.10*grain+mid*.17+vein*.08;
+  }else if(mat==CactusSkin&&d.family==Family::Cactus&&p.organ==2){
+    // Opuntia pads have a smooth epidermis with staggered areoles, not the
+    // longitudinal rib pattern used by columnar cacti.
+    double column=std::floor(u*11),x=u*11-column-.5,y=v*9+(int(column)%2)*.5;y-=std::floor(y);y-=.5;
+    double areole=std::exp(-(x*x+y*y)*110);
+    sample.color=blend(mul(p.leaf,.88+.16*grain),{.54,.48,.31},areole*.72);sample.height=.30+grain*.035+areole*.20;
+  }else if(mat==Center&&d.family==Family::Flower){
+    sample.color=mul(p.organ==12?V{.24,.14,.035}:V{.94,.60,.055},.75+.35*grain);
+    sample.height=.22+.12*grain;
+  }else if(mat==Cap&&d.family==Family::Mushroom&&p.organ==7){
+    // Morel pits have dark cell interiors and raised, irregular pale ridges.
+    double a=std::sin((u*19+smoothNoise(u*4,v*5,seed)*.5)*pi),c=std::sin((v*11+u*.8)*pi);
+    double edge=std::clamp((.22-std::min(std::abs(a),std::abs(c)))*5,0.,1.);
+    sample.color=blend(mul(p.flower,.38+.22*grain),mul(p.flower,1.65),edge);sample.height=.1+edge*.8;
+  }else if(mat==Petal&&d.family==Family::Flower&&p.organ==10){
+    double spot=std::pow(std::max(0.,smoothNoise(u*21,v*17,seed)-.66)*3,2);
+    sample.color=blend(sample.color,{.25,.045,.15},spot*(1-v));
+  }
+  for(auto& c:sample.color)c=std::clamp(c,0.,1.);
+  return sample;
+}
 inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const std::atomic<bool>* cancel=nullptr,int tile=256) {
   if(tile<16||tile>256)throw std::runtime_error("Invalid plant atlas resolution");
   Textures out;const int size=tile*4;
   for(auto image:{&out.albedo,&out.normal,&out.orm}){image->width=image->height=size;image->rgba.assign(size_t(size)*size*4,0);}
   std::vector<double> heights(size_t(tile)*tile);
-  for(int mat=0;mat<Count;mat++) {
+  for(int mat=0;mat<(d.generator==1?10:Count);mat++) {
     for(int y=0;y<tile;y++) {
       if(cancel&&cancel->load())throw std::runtime_error("Plant generation cancelled");
       for(int x=0;x<tile;x++) {
@@ -93,7 +161,7 @@ inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const
         auto sample=texel(d,mat,u,v);size_t at=((mat/4*tile+y)*size+mat%4*tile+x)*4;
         for(int a=0;a<3;a++)out.albedo.rgba[at+a]=unsigned(std::round(sample.color[a]*255));
         out.albedo.rgba[at+3]=unsigned(sample.alpha*255);heights[y*tile+x]=sample.height;
-        if(imported&&(mat==Leaf||mat==Needle||mat==Grass)&&imported->width>0&&imported->height>0&&imported->rgba.size()==size_t(imported->width)*imported->height*4) {
+        if(imported&&(mat==Leaf||mat==Needle||mat==Grass||mat>=LeafLight)&&imported->width>0&&imported->height>0&&imported->rgba.size()==size_t(imported->width)*imported->height*4) {
           int sx=std::clamp(int(u*(imported->width-1)),0,imported->width-1),sy=std::clamp(int(v*(imported->height-1)),0,imported->height-1);
           for(int a=0;a<4;a++)out.albedo.rgba[at+a]=imported->rgba[(sy*imported->width+sx)*4+a];
         }

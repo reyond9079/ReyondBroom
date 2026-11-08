@@ -1,0 +1,91 @@
+name: Publish validated REYON-9 release
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-reyon-9.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-reyon-9
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify the merged source, platform checks and twelve release assets
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {createHash} = require('node:crypto');
+            const repo = context.repo, version = '0.5.0-alpha.129', tag = 'v' + version;
+            const {data: pr} = await github.rest.pulls.get({...repo, pull_number: 12});
+            if (!pr.merged || pr.merge_commit_sha !== context.sha) throw new Error('Expected merged REYON-9 PR 12');
+            const {data: head} = await github.rest.git.getCommit({...repo, commit_sha: pr.head.sha});
+            const {data: merged} = await github.rest.git.getCommit({...repo, commit_sha: context.sha});
+            if (head.tree.sha !== merged.tree.sha) throw new Error('Merged source differs from the reviewed/package source');
+            const required = ['windows', 'linux (Linux-x64)', 'linux (Linux-SDL2-x64)'];
+            const passed = async (workflow_id, title) => {
+              const {data} = await github.rest.actions.listWorkflowRuns({...repo, workflow_id,
+                head_sha: pr.head.sha, status: 'completed', per_page: 100});
+              const run = data.workflow_runs.find(r => r.head_sha === pr.head.sha && r.conclusion === 'success' && (!title || r.display_title.startsWith(title)));
+              if (!run) throw new Error(`No successful ${workflow_id} run for ${pr.head.sha}`);
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...repo, run_id: run.id});
+              for (const name of required) if (!jobs.some(j => j.name === name && j.conclusion === 'success'))
+                throw new Error(`Missing successful platform ${name} in ${run.id}`);
+              return run;
+            };
+            const ci = await passed('compilation-profile-checks.yml');
+            const packages = await passed('release-linux-ui-update.yml', `Release ${version} @`);
+            const releases = await github.paginate(github.rest.repos.listReleases, {...repo, per_page: 100});
+            const release = releases.find(r => r.tag_name === tag);
+            if (!release || !release.draft) throw new Error('Expected reserved unpublished alpha.129 draft');
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {...repo, release_id: release.id});
+            if (assets.length !== 12 || assets.some(a => a.state !== 'uploaded' || !a.size))
+              throw new Error('Expected twelve complete runtime/source/checksum assets');
+            const byName = new Map(assets.map(a => [a.name, a]));
+            for (const platform of ['Windows-x64','Linux-x64','Linux-SDL2-x64']) {
+              const prefix = `ReyondBroom-${version}-${platform}`;
+              for (const name of [prefix + (platform === 'Windows-x64' ? '.zip' : '.tar.gz'), prefix + '-Sources.zip']) {
+                const payload = byName.get(name), checksum = byName.get(name + '.sha256');
+                if (!payload || !checksum) throw new Error(`Missing ${name}`);
+                const response = await fetch(checksum.url, {headers: {Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                  Accept: 'application/octet-stream', 'X-GitHub-Api-Version': '2022-11-28'}});
+                if (!response.ok) throw new Error(`Cannot read checksum ${name}: ${response.status}`);
+                const bytes = Buffer.from(await response.arrayBuffer());
+                const match = bytes.toString('utf8').trim().match(/^([a-f0-9]{64})\s+([^\s]+)$/);
+                if (!match || match[2] !== name || payload.digest !== 'sha256:' + match[1] ||
+                    checksum.digest !== 'sha256:' + createHash('sha256').update(bytes).digest('hex'))
+                  throw new Error(`Checksum mismatch for ${name}`);
+                core.info(`Verified ${name}`);
+              }
+            }
+            // The draft is unpublished; never retarget an unrelated existing tag.
+            let ref;
+            try { ref = (await github.rest.git.getRef({...repo, ref: 'tags/' + tag})).data; }
+            catch (error) { if (error.status !== 404) throw error; }
+            if (!ref) await github.rest.git.createRef({...repo, ref: 'refs/tags/' + tag, sha: context.sha});
+            else if (ref.object.sha !== context.sha) {
+              if (ref.object.sha !== pr.head.sha) throw new Error('Draft tag points to an unexpected commit');
+              await github.rest.git.updateRef({...repo, ref: 'tags/' + tag, sha: context.sha, force: true});
+            }
+            const body = [
+              'REYON-9: растения и создание моделей из вьюпорта.', '',
+              '- 121 готовый пресет, 12 ботанических категорий, поиск по названиям/латинским именам/тегам. Новая архитектура крон, побегов и органов; три LOD.',
+              '- Старые проекты generator 1 сохраняют исходную геометрию и текстуры. Переход на generator 2 выполняется явно.',
+              '- ПКМ → Create → Model → 3d model / plants/trees/grass. Первый Save создаёт один func_model в точке клика; дальнейшие Save и Save As обновляют его.',
+              '- Версии ресурсов для Undo/Redo, отмена устаревших запросов, защита от восстановления удалённой сущности и перезаписи исходников истории.',
+              '- Quake III адаптирует authoring func_model только в копии для компиляции. Расширение Quake 1/FTE включается явно; неподдерживаемые runtime получают понятную диагностику.',
+              '- Исправлен ввод UTF-8 в окнах SDL2 после закрытия консоли.', '',
+              'Проверены Windows x64, Linux x64 и Linux SDL2: сборки, генерация 121 × 3 seed × 3 LOD, точное сравнение со старым генератором на той же платформе, реальный ввод ОС и готовые пакеты в двух темах при 1920×1080 и 1024×768.',
+              `Исходники пакетов: ${pr.head.sha}; дерево исходников совпадает со слитым коммитом ${context.sha}.`,
+              `CI: https://github.com/${repo.owner}/${repo.repo}/actions/runs/${ci.id}`,
+              `Пакеты и настоящие снимки каталога: https://github.com/${repo.owner}/${repo.repo}/actions/runs/${packages.id}`,
+              'Инструкция: https://github.com/reyond9079/ReyondBroom/blob/main/docs/plant-editor.md',
+              'Задача: https://reyond.atlassian.net/browse/REYON-9'
+            ].join('\n');
+            const {data: published} = await github.rest.repos.updateRelease({...repo, release_id: release.id,
+              target_commitish: context.sha, body, draft: false, prerelease: false, make_latest: 'true'});
+            core.info(`Published ${published.html_url}`);
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

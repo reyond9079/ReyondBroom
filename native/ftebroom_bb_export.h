@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "ftebroom_bb_anim.h"
+#include <atomic>
 #include "ftebroom_model_export.h"
 namespace ftebroom::bb {
 struct Baked {
@@ -8,12 +9,13 @@ struct Baked {
   std::vector<int> textures;
   std::vector<std::string> warnings;
 };
-inline Baked bake(const Project &p, bool animated = true) {
+inline Baked bake(const Project &p, bool animated = true,const std::atomic<bool>* cancel=nullptr) {
   Baked result;
   auto frames = animated ? bakeFrames(p) : std::vector<BakeFrame>{{}};
   std::map<int, size_t> surfaces;
   std::vector<std::pair<std::string, std::string>> topology;
   for (size_t frame = 0; frame < frames.size(); frame++) {
+    if(cancel&&cancel->load())throw std::runtime_error("Model export cancelled");
     auto &f = frames[frame];
     auto poses = f.animation < 0 ? std::map<std::string, Pose>{}
                                  : animationPose(p.root["animations"][f.animation], f.time);
@@ -39,6 +41,7 @@ inline Baked bake(const Project &p, bool animated = true) {
                              : "bb-missing-texture";
       std::vector<modelExport::Vertex> vertices;
       for (auto t : tris) {
+        if(cancel&&cancel->load())throw std::runtime_error("Model export cancelled");
         for (int i = 0; i < 3; i++) {
           auto pos = bbToQuake(t->p[i], p.front(), p.exportScale()),
                normal = unit(bbToQuake(t->n[i], p.front()));

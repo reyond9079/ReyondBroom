@@ -34,6 +34,7 @@ static int bbMode = 0, bbTool = 0, bbSelectionMode = 0, bbSpace = 0, bbTexture =
            bbAnimation = 0, bbDisplay = 0, bbFillMode = 3;
 static float bbGrid = 1, bbRotationSnap = 15, bbPlayTime = 0, bbPlaySpeed = 1, bbUndoSteps = 128,
              bbDefaultCube = 2, bbAutosaveMinutes = 2;
+static bool bbNewFteQ1=false;
 static bool bbEmbed = true, bbQuakeInspector = false, bbPixelGrid = true, bbBrushOutline = true,
             bbLoopPreview = true;
 static uint64_t bbSavedStamp = 0;
@@ -200,6 +201,7 @@ static void bbSettingsSave() {
   }
 }
 static void bbActivate(bb::Project project) {
+  placementCancel(modelPlacement);placementCancel(modelNewPlacement);
   bbSettingsLoad();
   bbResetInteraction();
   bbOutlinerOrder.clear();
@@ -267,18 +269,21 @@ static void bbOpen(const std::string &path) {
           return modFileBytes(path);
         return modelImportTexture(texture);
       });
-      if (!modFilePacked(file))
-        p.path = file.u8string();
+      bool snapshot=!modFilePacked(file)&&placementSnapshotPath(file);
+      if (!modFilePacked(file)&&!snapshot)p.path = file.u8string();else p.path.clear();
       bbActivate(std::move(p));
+      if(snapshot)bbMessage="Opened an immutable source snapshot. Save As creates an editable copy; history assets stay intact.";
     } catch (const std::exception &e) {
       bbNotice(e);
     }
   });
 }
 static void bbNew(const std::filesystem::path &folder) {
+  placementCancel(modelNewPlacement);bbNewFteQ1=false;
   bbLeave([folder] {
     bbNewOpen = true;
     auto path = folder.empty() ? modFileRoot() : folder;
+    if(folder.empty()&&!std::filesystem::is_directory(path)&&gameProfile==1)path=std::filesystem::u8path(baseq3);
     std::snprintf(bbFolder, sizeof bbFolder, "%s", path.u8string().c_str());
     bbTarget = gameProfile == 2 ? 0 : gameProfile == 3 ? 1 : gameProfile == 4 ? 3 : 2;
   });
@@ -296,6 +301,7 @@ static bool bbSave(const std::filesystem::path &path) {
     bbSavedStamp = bbHistory.state();
     bbSaved = bb::serialize(bbProject, bbEmbed);
     bbMessage = "Project saved";
+    placementModelSaved();
     modFilesRefresh = true;
     return true;
   } catch (const std::exception &e) {
@@ -313,6 +319,7 @@ static void bbChoose(bool save, std::filesystem::path initial,
   bbChooseFolder = initial.has_extension() ? initial.parent_path() : initial;
   if (!std::filesystem::is_directory(bbChooseFolder))
     bbChooseFolder = modFileRoot();
+  if (!std::filesystem::is_directory(bbChooseFolder)&&gameProfile==1)bbChooseFolder=std::filesystem::u8path(baseq3);
   if (!std::filesystem::is_directory(bbChooseFolder))
     bbChooseFolder = documentPath("").parent_path();
   std::snprintf(bbChoosePath, sizeof bbChoosePath, "%s", bbChooseFolder.u8string().c_str());

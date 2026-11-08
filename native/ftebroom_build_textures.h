@@ -43,7 +43,7 @@ static bool runPrepareExport(const std::filesystem::path& target){
     std::filesystem::copy_file(documentPath("data/export-map.map"),target,std::filesystem::copy_options::overwrite_existing);
     auto source=q1Read(target);runMissingNames.clear();runPlaceholderNames.clear();
     size_t migratedModels=0;source=ftebroom::prepareStaticModels(source,gameProfile,migratedModels);
-    if(migratedModels){buildWriteTexture(target,source);runAppend("Quake 1: migrated "+std::to_string(migratedModels)+" static ivy entities to FTE misc_model in the build copy; original MAP and progs.dat unchanged.\n");}
+    if(migratedModels){buildWriteTexture(target,source);runAppend("Adapted "+std::to_string(migratedModels)+" authoring models to misc_model in the disposable build copy; source MAP unchanged.\n");}
     stageGeneratedModels(source,target.parent_path());
     shaderPackStage(target.parent_path());
     if(gameProfile==3){size_t corrected=0;auto prepared=ftebroom::q2CompileContents(source,corrected);if(corrected){source=std::move(prepared);buildWriteTexture(target,source);runAppend("Quake II: removed legacy inferred SOLID alongside one explicit non-solid visible type (WINDOW/AUX/LAVA/SLIME/WATER/MIST) on "+std::to_string(corrected)+" faces in the compile copy; source MAP unchanged.\n");}}

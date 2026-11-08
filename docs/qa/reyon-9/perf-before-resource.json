@@ -1,0 +1,10 @@
+{
+  "elapsed_seconds": 2.086231426001177,
+  "peak_rss_kib": 21584,
+  "user_seconds": 1.946301,
+  "system_seconds": 0.136717,
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "flags": "-std=c++17 -O2",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "cpu": "model name\t: AMD EPYC 9V74 80-Core Processor"
+}

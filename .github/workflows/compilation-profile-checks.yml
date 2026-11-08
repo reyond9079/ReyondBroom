@@ -1,7 +1,7 @@
 name: Compilation profile parity
 on:
   pull_request:
-    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', '.github/workflows/compilation-profile-checks.yml']
+    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', 'docs/qa/reyon-9/**', '.github/workflows/compilation-profile-checks.yml', '.github/workflows/release-linux-ui-update.yml']
   workflow_dispatch:
     inputs:
       prepared_run_id:
@@ -167,6 +167,12 @@ jobs:
         run: |
           bash scripts/build-sdl2-engine.sh deps/sdl-engine
           cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/fteqw-gl64
+      - name: Build SDL2 with native UTF-8 input and document guards
+        if: matrix.platform == 'Linux-SDL2-x64'
+        run: |
+          bash scripts/build-sdl2-engine.sh deps/sdl-engine
+          cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/fteqw-gl64
+          cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/tools/runtimes/fteqw-preview64
       - name: Run real editor regression, restart, processes, files and UI atlas
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
       - name: Exercise actual ImGui controls with OS input
@@ -175,6 +181,13 @@ jobs:
         run: |
           g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests
           deps/plant-editor-tests qa/plants/core
+          g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests
+          git fetch --no-tags --depth=1 origin 9e5b30a57724602b0d1e0f261af742dd68ae571b
+          mkdir -p deps/plant-baseline
+          git archive 9e5b30a57724602b0d1e0f261af742dd68ae571b native/plant native/ftebroom_bb_math.h native/third_party/json.hpp | tar -x -C deps/plant-baseline
+          g++ -std=c++17 -O2 -Ideps/plant-baseline/native tests/plant-legacy-corpus.cpp -lz -o deps/plant-legacy-corpus
+          deps/plant-legacy-corpus > qa/plants/legacy-platform.json
+          deps/plant-botanical-tests qa/plants/legacy-platform.json qa/plants/botanical-results.json
           python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
           python scripts/test-plant-exports.py qa/plants/core
       - name: Exercise native Plant Editor and map placement with OS input
@@ -182,6 +195,10 @@ jobs:
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-ui.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
           python scripts/test-plant-exports.py qa/plants/ui
           python scripts/test-plant-map.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
+      - name: Verify viewport creation through both authoring editors
+        run: |
+          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Linux-x64
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-create.py bundle/ReyondBroom-Linux-x64 qa/viewport-create
       - name: Verify engine launch and viewport colors with real OS input
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py bundle/ReyondBroom-Linux-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4
@@ -278,6 +295,13 @@ jobs:
         run: |
           g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests.exe
           deps/plant-editor-tests.exe qa/plants/core
+          g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests.exe
+          git fetch --no-tags --depth=1 origin 9e5b30a57724602b0d1e0f261af742dd68ae571b
+          mkdir -p deps/plant-baseline
+          git archive 9e5b30a57724602b0d1e0f261af742dd68ae571b native/plant native/ftebroom_bb_math.h native/third_party/json.hpp | tar -x -C deps/plant-baseline
+          g++ -std=c++17 -O2 -Ideps/plant-baseline/native tests/plant-legacy-corpus.cpp -lz -o deps/plant-legacy-corpus.exe
+          deps/plant-legacy-corpus.exe > qa/plants/legacy-platform.json
+          deps/plant-botanical-tests.exe qa/plants/legacy-platform.json qa/plants/botanical-results.json
       - name: Exercise actual Windows Plant Editor and independent model import
         shell: pwsh
         run: |
@@ -291,6 +315,12 @@ jobs:
           if ($LASTEXITCODE) { throw 'Independent UI model reimport failed' }
           python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
           if ($LASTEXITCODE) { throw 'Real plant BSP compilation failed' }
+      - name: Verify viewport creation through both authoring editors on Windows
+        shell: pwsh
+        run: |
+          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
+          python scripts/test-viewport-create.py bundle/ReyondBroom-Windows-x64 qa/viewport-create
+          if ($LASTEXITCODE) { throw 'Viewport Create / Save acceptance failed' }
       - name: Verify engine launch and viewport colors with real Windows input
         run: python scripts/test-engine-viewport.py bundle/ReyondBroom-Windows-x64 qa/engine-viewport
       - uses: actions/upload-artifact@v4

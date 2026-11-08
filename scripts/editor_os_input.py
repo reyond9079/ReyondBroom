@@ -5,9 +5,23 @@ import os
 import time
 
 
+def read_ui_json(path,timeout=2):
+ # The engine periodically replaces these read-only QA snapshots. Windows can
+ # briefly deny access during replacement; existence alone is not a read ack.
+ # Retry only the file read, never a user action or a failed UI assertion.
+ deadline=time.monotonic()+timeout
+ while True:
+  try:return json.loads(path.read_text(encoding='utf-8'))
+  except (FileNotFoundError,PermissionError,json.JSONDecodeError):
+   if time.monotonic()>=deadline:raise
+   time.sleep(.02)
+
+
 class NativeInput:
- def __init__(self,process,live_path,live,wait,output):
+ def __init__(self,process,live_path,live,wait,output,focus_required=False):
   self.process,self.path,self.live,self.wait,self.output=process,live_path,live,wait,output
+  self.focus_path=live_path.parent/'native-input-live.json'
+  self.focus_required=focus_required
   self.hwnd=None
   self.in_console=False
   if os.name=='nt':
@@ -26,10 +40,27 @@ class NativeInput:
    from Xlib.ext import xtest
    self.X,self.XK,self.xtest,self.d=X,XK,xtest,display.Display()
 
+ def read_focus(self):
+  if not self.focus_path.exists():return None
+  try:
+   state=read_ui_json(self.focus_path)
+   return state if state['pid']==self.process.pid else None
+  except (FileNotFoundError,PermissionError,json.JSONDecodeError,KeyError):return None
+
+ def focus_state(self):
+  state=self.read_focus()
+  return self.wait(self.read_focus) if state is None and self.focus_required else state
+
  def settle(self):
-  if self.in_console:return
+  if self.in_console:
+   state=self.focus_state()
+   if state is None:return # Older modules lack opt-in engine input telemetry.
+   for _ in range(2):
+    sequence=state['sequence']
+    state=self.wait(lambda:(s if (s:=self.read_focus()) and s['sequence']!=sequence else None))
+   return
   for _ in range(2):
-   stamp=self.path.stat().st_mtime_ns
+   stamp=self.wait(lambda:self.path.stat().st_mtime_ns)
    self.wait(lambda:self.path.stat().st_mtime_ns!=stamp)
 
  def position(self):
@@ -53,6 +84,7 @@ class NativeInput:
   u=self.user;target=u.GetWindowThreadProcessId(self.hwnd,None);current=ctypes.windll.kernel32.GetCurrentThreadId()
   assert u.AttachThreadInput(current,target,True)
   state=(ctypes.c_ubyte*256)();assert u.GetKeyboardState(state);initial=bytes(state);stack=[]
+  paced=bool(text) and text[0] in "^+%"
   try:
    for action in self.keyboard.parse_keys(text,with_spaces=True,with_tabs=True,with_newlines=True):
     vk,scan,flags=action.get_key_info();modifiers=0
@@ -69,13 +101,18 @@ class NativeInput:
      if stack:state=(ctypes.c_ubyte*256).from_buffer_copy(stack.pop())
      else:state[vk]&=127
      assert u.SetKeyboardState(state)
+    # A shortcut spans multiple ImGui key transitions. Keep the target-thread
+    # modifier state until each transition has reached fresh UI frames.
+    if paced:time.sleep(.03);self.settle()
   finally:u.SetKeyboardState((ctypes.c_ubyte*256).from_buffer_copy(initial));u.AttachThreadInput(current,target,False)
   self.settle()
 
  def mod(self,name,down):
   if os.name=='nt':
    code={'ctrl':17,'shift':16,'alt':18}[name];scan=self.user.MapVirtualKeyW(code,0)
-   self.user.SendMessageW(self.hwnd,0x100 if down else 0x101,code,1|(scan<<16)|(0 if down else 3<<30));self.settle()
+   # Mouse events below enter the OS queue. Their modifier state must come
+   # from that same queue, rather than an isolated WM_KEYDOWN to the window.
+   self.user.keybd_event(code,scan,0 if down else 2,0);time.sleep(.05);self.settle()
   else:
    code=self.d.keysym_to_keycode(self.XK.string_to_keysym({'ctrl':'Control_L','shift':'Shift_L','alt':'Alt_L'}[name]));self.xtest.fake_input(self.d,self.X.KeyPress if down else self.X.KeyRelease,code);self.d.sync();time.sleep(.07)
 
@@ -84,20 +121,22 @@ class NativeInput:
   if os.name=='nt':self.user.SetCursorPos(int(ox+x*self.scale[0]),int(oy+y*self.scale[1]));self.settle()
   else:self.xtest.fake_input(self.d,self.X.MotionNotify,x=int(ox+x),y=int(oy+y));self.d.sync();time.sleep(.08)
 
- def click(self,x,y,button=1,mods=()):
+ def click(self,x,y,button=1,mods=(),hold=None):
   self.move(x,y)
   for mod in mods:self.mod(mod,True)
-  if os.name=='nt':
-   self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0);time.sleep(.10);self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
-  else:
-   self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync();time.sleep(.08);self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
-  for mod in reversed(mods):self.mod(mod,False)
+  try:
+   if os.name=='nt':
+    self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0);time.sleep(.10 if hold is None else hold);self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
+   else:
+    self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync();time.sleep(.08 if hold is None else hold);self.xtest.fake_input(self.d,self.X.ButtonRelease,button);self.d.sync()
+  finally:
+   for mod in reversed(mods):self.mod(mod,False)
   time.sleep(.25)
   self.settle()
 
  def key(self,name,mods=()):
   names={'enter':'Return','esc':'Escape','tab':'Tab','backspace':'BackSpace','grave':'grave'}
-  if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`'}.get(name,name));return
+  if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
   for mod in mods:self.mod(mod,True)
   code=self.d.keysym_to_keycode(self.XK.string_to_keysym(names.get(name,name)));self.xtest.fake_input(self.d,self.X.KeyPress,code);self.xtest.fake_input(self.d,self.X.KeyRelease,code);self.d.sync()
   for mod in reversed(mods):self.mod(mod,False)
@@ -105,6 +144,25 @@ class NativeInput:
   self.settle()
 
  def text(self,text):
+  if any(ord(c)>127 for c in text) or (os.name=='nt' and len(text)>20):
+   # Clipboard paste is real OS input and preserves UTF-8 paths that cannot be
+   # represented by the active keyboard layout. Long Windows paths/commands
+   # also paste through the OS; short ASCII probes still use key events.
+   if os.name=='nt':
+    from ctypes import wintypes
+    u,k=self.user,ctypes.windll.kernel32;k.GlobalAlloc.argtypes=[wintypes.UINT,ctypes.c_size_t];k.GlobalAlloc.restype=wintypes.HGLOBAL;k.GlobalLock.argtypes=[wintypes.HGLOBAL];k.GlobalLock.restype=ctypes.c_void_p;k.GlobalUnlock.argtypes=[wintypes.HGLOBAL];u.SetClipboardData.argtypes=[wintypes.UINT,wintypes.HANDLE];u.SetClipboardData.restype=wintypes.HANDLE
+    for attempt in range(20):
+     if u.OpenClipboard(None):break
+     time.sleep(.03)
+    else:raise AssertionError('Cannot acquire OS clipboard for Unicode input')
+    try:
+     assert u.EmptyClipboard();data=text.encode('utf-16-le')+b'\0\0';handle=k.GlobalAlloc(2,len(data));assert handle;pointer=k.GlobalLock(handle);assert pointer;ctypes.memmove(pointer,data,len(data));k.GlobalUnlock(handle);assert u.SetClipboardData(13,handle)
+    finally:u.CloseClipboard()
+   else:
+    import shutil,subprocess
+    executable=os.environ.get('RB_QA_XCLIP') or shutil.which('xclip');assert executable,'Unicode OS-input QA requires xclip'
+    subprocess.run([executable,'-selection','clipboard'],input=text.encode('utf-8'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True,timeout=10)
+   self.key('v',('ctrl',));return
   if os.name=='nt':self.strokes(''.join('{'+c+'}' if c in '+^%~(){}' else c for c in text));return
   shift=self.d.keysym_to_keycode(self.XK.string_to_keysym('Shift_L'))
   for char in text:
@@ -124,6 +182,24 @@ class NativeInput:
 
  def console(self,command):
   self.in_console=True
-  try:self.key('esc',('shift',));self.text('/'+command);self.key('enter');self.key('esc');time.sleep(.25)
-  finally:self.in_console=False
+  try:
+   self.key('esc',('shift',))
+   # A fixed sleep is not an acknowledgment of a slow engine input frame.
+   # Hold shortcut transitions across observed ticks, and do not type before
+   # the engine actually routes input to its console. No action is retried.
+   observed=self.focus_state()
+   if observed is not None:
+    opened=self.wait(lambda:(s if (s:=self.read_focus()) and s['destination']&48 and not s['destination']&64 else None))
+    with (self.output/'console-focus.jsonl').open('a',encoding='utf-8') as log:log.write(json.dumps({'stage':'opened','command':command,'state':opened})+'\n')
+   time.sleep(.25)
+   self.text('/'+command);time.sleep(.25)
+   self.key('enter');time.sleep(.25)
+   self.key('esc');time.sleep(.25)
+   if observed is not None:
+    closed=self.wait(lambda:(s if (s:=self.read_focus()) and not s['destination']&48 else None))
+    with (self.output/'console-focus.jsonl').open('a',encoding='utf-8') as log:log.write(json.dumps({'stage':'closed','command':command,'state':closed})+'\n')
+  finally:
+   try:(self.output/'console-last-focus.json').write_text(json.dumps(self.read_focus()),encoding='utf-8')
+   except OSError:pass
+   self.in_console=False
   self.settle()

@@ -42,7 +42,8 @@ jobs:
           gh release download "$BASE_TAG" --repo "$GITHUB_REPOSITORY" --dir base \
             --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' \
             --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
-          (cd base && sha256sum -c ./*.sha256) 2>&1 | tee qa/build/base-checksums.log
+          # Windows sidecars use CRLF; normalize the text before the same digest check.
+          (cd base && for checksum in ./*.sha256; do tr -d '\r' < "$checksum" | sha256sum -c -; done) 2>&1 | tee qa/build/base-checksums.log
           unzip -q base/*-Windows-x64.zip -d bundle
           unzip -q base/*-Linux-x64-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
           for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done

@@ -345,6 +345,7 @@ static void documentSaveFinished()
       fileBrowserFolder=target.parent_path();
       cvars->SetString("ftebroom_document_path",target.u8string().c_str());
       documentName = target.stem().u8string();
+      cvars->SetString("ftebroom_document_title",documentName.c_str());
       documentUntitled = false;
       std::snprintf(mapName, sizeof mapName, "%s", documentName.c_str());
       command(("ftebroom_document_saved " + std::to_string(saveRevision) + "\n").c_str());

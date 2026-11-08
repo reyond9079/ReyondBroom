@@ -154,6 +154,7 @@ jobs:
       - name: Build core, upstream corpus, host and CSQC
         run: |
           python scripts/build-profile-support.py core --build-dir deps/profile-core --tests
+          python tests/check-run-workspace-selection.py
           cmake -S deps/bullet -B deps/bullet-build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
           cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
           g++ -std=c++17 -O1 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o bundle/ReyondBroom-Linux-x64/fteplug_ftebroom_amd64.so
@@ -173,7 +174,12 @@ jobs:
           bash scripts/build-sdl2-engine.sh deps/sdl-engine
           cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/fteqw-gl64
           cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/tools/runtimes/fteqw-preview64
-      - name: Run real editor regression, restart, processes, files and UI atlas
+      - name: Verify Quake II resources and source/working paths with OS input
+        run: |
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-quake2-resources.py bundle/ReyondBroom-Linux-x64 qa/rb10/quake2
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-cleanup.py bundle/ReyondBroom-Linux-x64 qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-paths.py bundle/ReyondBroom-Linux-x64 qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe
+      - name: Run existing editor regression, restart, processes, files and UI atlas
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
       - name: Exercise actual ImGui controls with OS input
         run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-ui.py bundle/ReyondBroom-Linux-x64 qa/ui
@@ -243,6 +249,7 @@ jobs:
         shell: msys2 {0}
         run: |
           python scripts/build-profile-support.py core --build-dir deps/profile-core --tests --generator 'MinGW Makefiles'
+          python tests/check-run-workspace-selection.py
           cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
           cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
           g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
@@ -288,7 +295,16 @@ jobs:
             # Match the supported desktop used by packaged-release acceptance.
             Set-DisplayResolution -Width 1920 -Height 1080 -Force
           }
-      - name: Verify viewport appearance, keyboard actions and profile ordering on Windows
+      - name: Verify Quake II resources and source/working paths on Windows
+        shell: pwsh
+        run: |
+          python scripts/test-quake2-resources.py bundle/ReyondBroom-Windows-x64 qa/rb10/quake2
+          if ($LASTEXITCODE) { throw 'Quake II custom-mod acceptance failed' }
+          python scripts/test-engine-cleanup.py bundle/ReyondBroom-Windows-x64 qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe.exe
+          if ($LASTEXITCODE) { throw 'Quake engine copy/cleanup launch failed' }
+          python scripts/test-compilation-paths.py bundle/ReyondBroom-Windows-x64 qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe.exe
+          if ($LASTEXITCODE) { throw 'TrenchBroom source/working paths failed' }
+      - name: Verify existing viewport appearance, keyboard actions and profile ordering on Windows
         shell: pwsh
         run: |
           # Isolate preferences/profiles and run the changed behavior first,

@@ -1532,9 +1532,18 @@ static void mapReady()
         documentFile = pendingDocumentFile;
         documentName = documentFile.stem().u8string();
       }
-      else if(loadedAlias!=name || documentFile.empty())
+      else if(loadedAlias!=name || documentFile.empty()) {
         documentFile = documentUntitled ? std::filesystem::path{}
                                         : documentPath("maps/" + name + ".map");
+        // A mapedit command may load a map from the mounted game's directory
+        // or archive. Resolve the read source, rather than the editor's writable
+        // game directory, so compilation variables refer to the actual map.
+        char source[4096]{};
+        if(!documentUntitled&&files->NativePath(("maps/"+name+".map").c_str(),(fs_relative)4,source,sizeof source)){
+          auto path=std::filesystem::u8path(source);
+          if(ftebroom::pak::exists(path))documentFile=path;
+        }
+      }
       if(loadedAlias!=name)++documentGeneration;
       loadedAlias=name;
       if(name=="reyond-island-sample"&&gameProfile==1)command("in 0.35 ftebroom_camera_restore 0 -300 180 6 90 0 90\n");

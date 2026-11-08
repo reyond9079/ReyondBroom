@@ -121,6 +121,25 @@ Both updater implementations preserve `reyondbroom-legacy-games.txt`. Browsing
 PAKs tolerates official Q2 non-canonical aliases while reads reject traversal
 and archive mutations retain strict validation.
 
+Quake engine launch also accepts the exact already-deployed, valid BSP when a
+TrenchBroom profile has copied it into the selected game's mod/maps directory
+and deleted the temporary build output. An existing invalid build BSP still
+fails validation; a missing or invalid deployed BSP also fails. This preserves
+the user's copy/cleanup stages and deployed lighting files. Custom engine
+commands without automatic map staging keep their exact parameters.
+
+`WORK_DIR_PATH` retains TrenchBroom semantics: the compilation profile's
+interpolated Working directory. `${MAP_DIR_PATH}` refers to the source map's
+directory. The chosen profile index now survives a workspace restart, so an
+unrelated first profile cannot silently replace its working directory. Tests
+exercise actual workspace serializers and atomic writes, including duplicate
+profile names, per-game selections and older stores without a selection.
+Maps loaded directly from mounted game folders resolve their actual read source
+instead of an editor-local writable path. Compilation and engine launch require
+a saved map, as in TrenchBroom, instead of treating an untitled map's empty
+directory as the editor process directory. Saved profiles retain explicitly
+empty or relative working directories without rewriting them.
+
 `prepare-rb10.yml` runs when the PR is marked ready. It requires exact-head
 `compilation-profile-checks.yml` success for `windows`, `linux (Linux-x64)` and
 `linux (Linux-SDL2-x64)`. It reserves draft `v0.5.0-alpha.132`, verifies an immutable

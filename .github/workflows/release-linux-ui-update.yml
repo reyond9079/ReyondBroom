@@ -90,6 +90,7 @@ jobs:
           g++ -std=c++17 -O2 -Ideps/imgui tests/tools-layout.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/tools-layout
           deps/tools-layout > qa/rb10/units/tools-layout.log
           python tests/check-default-shortcuts.py deps/fteqw > qa/rb10/units/shortcuts.log
+          python tests/check-run-workspace-selection.py > qa/rb10/units/workspace-selection.log
           g++ -std=c++17 -O2 tests/pak-resource-names.cpp -lz -o deps/pak-resource-names
           deps/pak-resource-names > qa/rb10/units/q2-pak.log
           g++ -std=c++17 -O2 tests/quake2-roots.cpp -o deps/quake2-roots
@@ -139,6 +140,8 @@ jobs:
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-browsers.py "$bundle" qa/rb10/browsers
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-welcome.py "$bundle" qa/rb10/welcome
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-quake2-resources.py "$bundle" qa/rb10/quake2
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-cleanup.py "$bundle" qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-paths.py "$bundle" qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-target-ui.py "$bundle" qa/rb10/plant-target-ui
           for theme in dark light; do
             for dimensions in '1920 1080' '1024 768'; do
@@ -248,6 +251,7 @@ jobs:
           g++ -std=c++17 -O2 -Ideps/imgui tests/tools-layout.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/tools-layout.exe
           deps/tools-layout.exe > qa/rb10/units/tools-layout.log
           python tests/check-default-shortcuts.py deps/fteqw > qa/rb10/units/shortcuts.log
+          python tests/check-run-workspace-selection.py > qa/rb10/units/workspace-selection.log
           g++ -std=c++17 -O2 tests/pak-resource-names.cpp -lz -o deps/pak-resource-names.exe
           deps/pak-resource-names.exe > qa/rb10/units/q2-pak.log
           g++ -std=c++17 -O2 tests/quake2-roots.cpp -o deps/quake2-roots.exe
@@ -312,6 +316,10 @@ jobs:
           if ($LASTEXITCODE) { throw 'Welcome acceptance failed' }
           python scripts/test-quake2-resources.py $bundle qa/rb10/quake2
           if ($LASTEXITCODE) { throw 'Quake II custom-mod resources acceptance failed' }
+          python scripts/test-engine-cleanup.py $bundle qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe.exe
+          if ($LASTEXITCODE) { throw 'Quake engine copy/cleanup launch acceptance failed' }
+          python scripts/test-compilation-paths.py $bundle qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe.exe
+          if ($LASTEXITCODE) { throw 'TrenchBroom compilation source/working-path acceptance failed' }
           python scripts/test-plant-target-ui.py $bundle qa/rb10/plant-target-ui
           if ($LASTEXITCODE) { throw 'Plant native target acceptance failed' }
           foreach ($theme in @('dark','light')) {

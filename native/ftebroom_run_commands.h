@@ -13,6 +13,7 @@ static nlohmann::json runUiState(){
   {"running",runActive},{"runningName",runningProfile.name},{"log",runLog},{"error",runError},{"migration",runMigrationMessage}};
 }
 static void runLaunchConfiguredEngine(const RunEngineProfile& engine){
+ if(documentFile.empty())throw std::runtime_error("Save the map before launching an engine.");
  auto oldStrict=runStrict;runStrict=true;
  try{auto vars=runWorkdirVariables();
   if(runSelected>=0&&runSelected<int(runProfiles.size()))vars["WORK_DIR_PATH"]=ftebroom::profile::interpolate(runProfiles[runSelected].work,vars);

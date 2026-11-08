@@ -1,0 +1,77 @@
+name: Inspect existing RB-10 Windows cold-click evidence
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [feat/rb-10-editor-polish]
+    paths: [.github/workflows/inspect-rb10-cold-click.yml]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: inspect-rb10-cold-click
+  cancel-in-progress: false
+jobs:
+  inspect:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'diag/rb10-cold-click'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download and verify the exact existing artifact without running the editor
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p inspection
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/13628075652" > inspection/original-metadata.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('inspection/original-metadata.json').read_text())
+          assert m['id']==13628075652 and m['name']=='qa-Windows-x64' and m['expired'] is False
+          assert m['size_in_bytes']==2559132655
+          assert m['workflow_run']['id']==42505903900
+          assert m['workflow_run']['head_sha']=='3cfb070149d4233e2d1262e8b6e8e17072f39056'
+          assert m['workflow_run']['head_repository_id']==1425178769
+          assert m['digest']=='sha256:e9fb7df6a3eb1d995326d39acde40e836a5d683a422654db258f1bbd5b0b25d0'
+          PY
+          curl --fail --location --silent --show-error --retry 0 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/13628075652/zip" -o "$RUNNER_TEMP/rb10-cold-click-original.zip"
+          python - <<'PY'
+          import hashlib,json,os,stat,zipfile
+          from pathlib import Path,PurePosixPath
+          archive=Path(os.environ['RUNNER_TEMP'])/'rb10-cold-click-original.zip'
+          assert archive.stat().st_size==2559132655
+          with archive.open('rb') as stream:digest=hashlib.file_digest(stream,'sha256').hexdigest()
+          assert digest=='e9fb7df6a3eb1d995326d39acde40e836a5d683a422654db258f1bbd5b0b25d0'
+          report={'artifact_id':13628075652,'run':42505903900,'workflow_head':'3cfb070149d4233e2d1262e8b6e8e17072f39056','product_head':'6bd6e2cedcade6e7e4d09cfe8f81901c91655a50','archive_bytes':archive.stat().st_size,'archive_sha256':digest,'method':'Read existing artifact only; no editor/test execution or source modification','selected':[]}
+          with zipfile.ZipFile(archive) as z:
+              names=set();selected=[]
+              for f in z.infolist():
+                  p=PurePosixPath(f.filename)
+                  assert not p.is_absolute() and '..' not in p.parts and '\\' not in f.filename and ':' not in f.filename and f.filename not in names
+                  assert not stat.S_ISLNK(f.external_attr>>16)
+                  names.add(f.filename)
+                  namespace=any(p.parts[i:i+2]==('rb10','plant-target-ui') for i in range(len(p.parts)-1))
+                  if namespace and not f.is_dir():selected.append(f)
+              assert selected and len(selected)<1000
+              total=sum(f.file_size for f in selected)
+              assert total<=19*1024*1024,('Selected namespace exceeds bounded artifact size',total)
+              for f in selected:
+                  data=z.read(f)
+                  path=Path('inspection/members')/f.filename
+                  path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
+                  report['selected'].append({'path':f.filename,'bytes':len(data),'zip_crc32':f'{f.CRC:08x}','sha256':hashlib.sha256(data).hexdigest()})
+          report['selected_bytes']=sum(f['bytes'] for f in report['selected'])
+          Path('inspection/extraction-proof.json').write_text(json.dumps(report,indent=2)+'\n')
+          assert sum(p.stat().st_size for p in Path('inspection').rglob('*') if p.is_file())<20*1024*1024
+          print('Verified original artifact and extracted',len(report['selected']),'cold-click evidence files; no tests executed.')
+          PY
+      - name: Retain only bounded cold-click evidence and original provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rb10-cold-click-existing-evidence
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: inspection/

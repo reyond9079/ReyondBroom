@@ -7,6 +7,7 @@ on:
     paths:
       - scripts/test-rb10-runtime.py
       - scripts/test-plant-target-ui.py
+      - tests/test-welcome-updater.py
       - .github/workflows/continuation-rb10-windows.yml
       - .github/workflows/publishcontinuation-rb10.yml
       - .github/rb10-qa/**
@@ -51,7 +52,7 @@ jobs:
             const {data:pr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
             if(pr.state!=='open'||pr.head.sha!==qa||pr.head.ref!=='qa/rb10-windows-harness'||pr.head.repo.full_name!==`${repo.owner}/${repo.repo}`||pr.base.ref!=='feat/rb-10-editor-polish') throw Error('Unexpected QA PR');
             const {data:diff}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:`${head}...${qa}`});
-            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
+            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','tests/test-welcome-updater.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
             const permitted=name=>allowed.has(name)||name.startsWith('.github/rb10-qa/');
             if(diff.status!=='ahead'||!diff.files?.length||diff.files.length>=300||diff.files.some(f=>!permitted(f.filename)||(f.previous_filename&&!permitted(f.previous_filename)))) throw Error('QA branch changes product files');
             const {data:run}=await github.rest.actions.getWorkflowRun({...repo,run_id:42498112722});
@@ -81,6 +82,7 @@ jobs:
           Copy-Item restored/runtime qa-runtime -Recurse
           Copy-Item qa-harness/scripts/test-rb10-runtime.py product/scripts/test-rb10-runtime.py
           Copy-Item qa-harness/scripts/test-plant-target-ui.py product/scripts/test-plant-target-ui.py
+          Copy-Item qa-harness/tests/test-welcome-updater.py product/tests/test-welcome-updater.py
           $mesa = Join-Path $env:RUNNER_TEMP 'rb10-continuation-mesa'
           New-Item -ItemType Directory -Force $mesa | Out-Null
           gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir $mesa --pattern mesa3d-25.3.3-release-msvc.7z

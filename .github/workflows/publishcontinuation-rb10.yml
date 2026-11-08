@@ -6,6 +6,7 @@ on:
     paths:
       - scripts/test-rb10-runtime.py
       - scripts/test-plant-target-ui.py
+      - tests/test-welcome-updater.py
       - .github/workflows/continuation-rb10-windows.yml
       - .github/workflows/publishcontinuation-rb10.yml
       - .github/rb10-qa/**
@@ -42,7 +43,7 @@ jobs:
             const {data:qapr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
             if(qapr.state!=='open'||qapr.draft||qapr.head.sha!==qa||qapr.head.ref!=='qa/rb10-windows-harness'||qapr.head.repo.full_name!==`${repo.owner}/${repo.repo}`||!['feat/rb-10-editor-polish','main'].includes(qapr.base.ref)) throw Error('Unexpected QA approval event');
             const {data:diff}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:`${head}...${qa}`});
-            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
+            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','tests/test-welcome-updater.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
             const permitted=name=>allowed.has(name)||name.startsWith('.github/rb10-qa/');
             if(diff.status!=='ahead'||!diff.files?.length||diff.files.length>=300||diff.files.some(f=>!permitted(f.filename)||(f.previous_filename&&!permitted(f.previous_filename)))) throw Error('QA branch changes product files');
             const {data:pr}=await github.rest.pulls.get({...repo,pull_number:15});

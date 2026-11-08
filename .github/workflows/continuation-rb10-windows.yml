@@ -1,0 +1,187 @@
+name: Continue RB-10 Windows QA on unchanged product
+run-name: Windows QA continuation 6bd6e2c / ${{ github.event.pull_request.head.sha }}
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [feat/rb-10-editor-polish]
+    paths:
+      - scripts/test-rb10-runtime.py
+      - scripts/test-plant-target-ui.py
+      - tests/test-welcome-updater.py
+      - .github/workflows/continuation-rb10-windows.yml
+      - .github/workflows/publishcontinuation-rb10.yml
+      - .github/rb10-qa/**
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: rb10-windows-continuation
+  cancel-in-progress: false
+jobs:
+  windows-continuation:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'qa/rb10-windows-harness' && github.event.pull_request.head.sha == '877b0a6e89d9f8412b45b0ffc9fa2d60f9846c5c'
+    runs-on: windows-2022
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRODUCT_HEAD: 6bd6e2cedcade6e7e4d09cfe8f81901c91655a50
+      QA_HEAD: ${{ github.event.pull_request.head.sha }}
+      RB_QA_RENDERER: gl rb_qa_opengl.dll
+      GALLIUM_DRIVER: llvmpipe
+    steps:
+      - name: Check out the frozen product without rebuilding it
+        uses: actions/checkout@v4
+        with:
+          ref: 6bd6e2cedcade6e7e4d09cfe8f81901c91655a50
+          path: product
+          persist-credentials: false
+      - name: Check out the separately identified QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: qa-harness
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify QA scope and original failed run provenance
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo=context.repo, head=process.env.PRODUCT_HEAD, qa=process.env.QA_HEAD;
+            const {data:pr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
+            if(pr.state!=='open'||pr.head.sha!==qa||pr.head.ref!=='qa/rb10-windows-harness'||pr.head.repo.full_name!==`${repo.owner}/${repo.repo}`||pr.base.ref!=='feat/rb-10-editor-polish') throw Error('Unexpected QA PR');
+            const {data:diff}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:`${head}...${qa}`});
+            const allowed=new Set(['scripts/test-rb10-runtime.py','scripts/test-plant-target-ui.py','tests/test-welcome-updater.py','.github/workflows/continuation-rb10-windows.yml','.github/workflows/publishcontinuation-rb10.yml']);
+            const permitted=name=>allowed.has(name)||name.startsWith('.github/rb10-qa/');
+            if(diff.status!=='ahead'||!diff.files?.length||diff.files.length>=300||diff.files.some(f=>!permitted(f.filename)||(f.previous_filename&&!permitted(f.previous_filename)))) throw Error('QA branch changes product files');
+            const {data:run}=await github.rest.actions.getWorkflowRun({...repo,run_id:42498112722});
+            if(run.head_sha!==head||run.display_title!==`Release 0.5.0-alpha.132 @ ${head}`||!run.path.startsWith('.github/workflows/release-linux-ui-update.yml')) throw Error('Original package run changed');
+            const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...repo,run_id:run.id});
+            const win=jobs.find(j=>j.name==='windows');
+            const failed=win?.steps.filter(s=>s.conclusion==='failure')||[];
+            if(win?.status!=='completed'||win.conclusion!=='failure'||failed.length!==1||failed[0].name!=='Validate packaged RB-10 workflows on Windows and PowerShell 5.1') throw Error('Original failure is not the reviewed QA harness step');
+            const {data:artifact}=await github.rest.actions.getArtifact({...repo,artifact_id:13626282101});
+            if(artifact.name!=='qa-Windows-x64'||artifact.expired||artifact.workflow_run?.id!==run.id||artifact.workflow_run.head_sha!==head||artifact.digest!=='sha256:c30cfa600a7f9223bca901bd9b084526dc4fe686d86cc57a67053504e8441313') throw Error('Original artifact changed');
+      - name: Download the exact original QA artifact and verified source bases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p proof base out/release
+          gh api repos/$GITHUB_REPOSITORY/actions/artifacts/13626282101 > proof/original-artifact-metadata.json
+          curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/13626282101/zip" -o proof/original-artifact.zip
+          gh release download v0.5.0-alpha.131 --repo "$GITHUB_REPOSITORY" --dir base --pattern '*-Windows-x64-Sources.zip' --pattern '*-Windows-x64-Sources.zip.sha256' --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+          (cd base && for checksum in ./*.sha256; do tr -d '\r' < "$checksum" | sha256sum -c -; done)
+          python qa-harness/.github/rb10-qa/restore-windows-payload.py --metadata proof/original-artifact-metadata.json --archive proof/original-artifact.zip --output restored --head "$PRODUCT_HEAD" --run 42498112722 --artifact-id 13626282101 --sha256 c30cfa600a7f9223bca901bd9b084526dc4fe686d86cc57a67053504e8441313
+          python qa-harness/.github/rb10-qa/reconstruct-windows-sources.py --repo product --revision "$PRODUCT_HEAD" --runtime restored/runtime --base-sources base/*-Windows-x64-Sources.zip --sdk-sources base/*-Linux-x64-Sources.zip --output out/release/ReyondBroom-0.5.0-alpha.132-Windows-x64-Sources.zip --evidence proof/sources.json
+      - name: Prepare a separate QA runtime and verified Mesa renderer
+        shell: pwsh
+        run: |
+          python -m pip install Pillow pywinauto
+          if ($LASTEXITCODE) { throw 'QA dependencies failed' }
+          Copy-Item restored/runtime qa-runtime -Recurse
+          Copy-Item qa-harness/scripts/test-rb10-runtime.py product/scripts/test-rb10-runtime.py
+          Copy-Item qa-harness/scripts/test-plant-target-ui.py product/scripts/test-plant-target-ui.py
+          Copy-Item qa-harness/tests/test-welcome-updater.py product/tests/test-welcome-updater.py
+          $mesa = Join-Path $env:RUNNER_TEMP 'rb10-continuation-mesa'
+          New-Item -ItemType Directory -Force $mesa | Out-Null
+          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir $mesa --pattern mesa3d-25.3.3-release-msvc.7z
+          if ($LASTEXITCODE) { throw 'Mesa download failed' }
+          $archive = Join-Path $mesa 'mesa3d-25.3.3-release-msvc.7z'
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Mesa checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x $archive "-o$mesa/extracted" -y | Out-Null
+          if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
+          $gl = Get-ChildItem "$mesa/extracted" -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
+          if (!$gl) { throw '64-bit Mesa missing' }
+          Copy-Item (Join-Path $gl.DirectoryName '*.dll') qa-runtime/bin -Force
+          Copy-Item $gl.FullName qa-runtime/bin/rb_qa_opengl.dll
+          if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) { Set-DisplayResolution -Width 1920 -Height 1080 -Force }
+      - name: Run the complete remaining Windows RB-10 acceptance step
+        shell: pwsh
+        working-directory: product
+        run: |
+          $bundle = (Resolve-Path ../qa-runtime).Path
+          $qa = (Resolve-Path ../restored/qa).Path
+          $probe = Join-Path $qa 'engine-viewport/Engine executable with spaces/engine 0.exe'
+          if ((Get-FileHash $probe -Algorithm SHA256).Hash.ToLower() -ne '133045ae35c2ebd46422d1113e91084917d9ae55326c733e7fdcb8a37dec4e9d') { throw 'Original process probe changed' }
+          python tests/make-linux-build-fixture.py $bundle
+          if ($LASTEXITCODE) { throw 'RB-10 fixture failed' }
+          python tests/test-welcome-updater.py --platform Windows-x64 --output "$qa/rb10/updater" --runtime $bundle
+          if ($LASTEXITCODE) { throw 'Windows PowerShell updater protocol failed' }
+          python scripts/test-rb10-runtime.py $bundle "$qa/rb10/runtime"
+          if ($LASTEXITCODE) { throw 'Native RB-10 regression failed' }
+          python scripts/test-rb10-browsers.py $bundle "$qa/rb10/browsers"
+          if ($LASTEXITCODE) { throw 'Browser acceptance failed' }
+          python scripts/test-rb10-welcome.py $bundle "$qa/rb10/welcome"
+          if ($LASTEXITCODE) { throw 'Welcome acceptance failed' }
+          python scripts/test-quake2-resources.py $bundle "$qa/rb10/quake2"
+          if ($LASTEXITCODE) { throw 'Quake II resources acceptance failed' }
+          python scripts/test-engine-cleanup.py $bundle "$qa/rb10/engine-cleanup" --probe $probe
+          if ($LASTEXITCODE) { throw 'Engine cleanup acceptance failed' }
+          python scripts/test-compilation-paths.py $bundle "$qa/rb10/compilation-paths" --probe $probe
+          if ($LASTEXITCODE) { throw 'Compilation path acceptance failed' }
+          python scripts/test-plant-target-ui.py $bundle "$qa/rb10/plant-target-ui"
+          if ($LASTEXITCODE) { throw 'Plant native target acceptance failed' }
+          foreach ($theme in @('dark','light')) {
+            foreach ($width in @(1920,1024)) {
+              $height = if ($width -eq 1920) { 1080 } else { 768 }
+              python scripts/test-rb10-views.py $bundle "$qa/rb10/views-$theme-$width" --theme $theme --width $width --height $height
+              if ($LASTEXITCODE) { throw "View Options/Tools acceptance failed: $theme / $width" }
+            }
+          }
+      - name: Validate composite evidence and pack only pristine original runtime bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python qa-harness/.github/rb10-qa/aggregate-windows-continuation.py --restoration restored/restoration.json --qa restored/qa --runtime restored/runtime --source-evidence proof/sources.json --output proof/continuation.json --head "$PRODUCT_HEAD" --workflow-head "$QA_HEAD" --run "$GITHUB_RUN_ID"
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,zipfile
+          root=Path('restored/runtime'); manifest=json.loads((root/'distribution-manifest.json').read_text())
+          actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+          assert len(manifest)==653 and actual==set(manifest)|{'distribution-manifest.json'}
+          for name,digest in manifest.items(): assert hashlib.sha256((root/name).read_bytes()).hexdigest()==digest,name
+          archive=Path('out/release/ReyondBroom-0.5.0-alpha.132-Windows-x64.zip')
+          with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
+              for name in sorted(actual): z.write(root/name,'ReyondBroom-Windows-x64/'+name)
+          for payload in sorted(Path('out/release').glob('*.zip')):
+              payload.with_name(payload.name+'.sha256').write_bytes((hashlib.sha256(payload.read_bytes()).hexdigest()+'  '+payload.name+'\n').encode('ascii'))
+          PY
+      - name: Recheck the QA head and upload only four Windows assets to the owned draft
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const fs=require('node:fs'),path=require('node:path'),repo=context.repo;
+            const {data:pr}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
+            if(pr.state!=='open'||pr.head.sha!==process.env.QA_HEAD||pr.head.ref!=='qa/rb10-windows-harness'||pr.head.repo.full_name!==`${repo.owner}/${repo.repo}`) throw Error('QA head changed during validation');
+            const {data:release}=await github.rest.repos.getRelease({...repo,release_id:438298229});
+            if(!release.draft||release.tag_name!=='v0.5.0-alpha.132'||release.name!=='ReyondBroom 0.5.0-alpha.132'||release.target_commitish!==process.env.PRODUCT_HEAD) throw Error('Owned draft changed');
+            const {data:pin}=await github.rest.git.getRef({...repo,ref:'tags/rb-10-package-'+process.env.PRODUCT_HEAD});
+            if(pin.object.sha!==process.env.PRODUCT_HEAD) throw Error('Product source pin changed');
+            const names=['ReyondBroom-0.5.0-alpha.132-Windows-x64.zip','ReyondBroom-0.5.0-alpha.132-Windows-x64.zip.sha256','ReyondBroom-0.5.0-alpha.132-Windows-x64-Sources.zip','ReyondBroom-0.5.0-alpha.132-Windows-x64-Sources.zip.sha256'];
+            const assets=await github.paginate(github.rest.repos.listReleaseAssets,{...repo,release_id:release.id});
+            const linux=new Set(['Linux-x64','Linux-SDL2-x64'].flatMap(p=>{const n=`ReyondBroom-0.5.0-alpha.132-${p}`;return[n+'.tar.gz',n+'.tar.gz.sha256',n+'-Sources.zip',n+'-Sources.zip.sha256'];}));
+            if(assets.some(a=>!linux.has(a.name))) throw Error('Draft already has Windows or unknown assets; do not overwrite or blindly rerun');
+            for(const name of names) {
+              const {data:fresh}=await github.rest.repos.getRelease({...repo,release_id:release.id});
+              const {data:current}=await github.rest.pulls.get({...repo,pull_number:context.issue.number});
+              if(!fresh.draft||fresh.tag_name!==release.tag_name||fresh.name!==release.name||fresh.target_commitish!==process.env.PRODUCT_HEAD||current.state!=='open'||current.head.sha!==process.env.QA_HEAD) throw Error('Draft or QA head changed during uploads');
+              const data=fs.readFileSync(path.join('out/release',name));
+              await github.rest.repos.uploadReleaseAsset({...repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
+            }
+      - name: Collect compact diagnostics without cloned runtime binaries
+        if: always()
+        shell: bash
+        run: |
+          python qa-harness/.github/rb10-qa/compact-windows-artifact.py --qa restored/qa --restoration restored/restoration.json --proof proof --release out/release --output artifact-evidence
+      - name: Retain genuine prior evidence, new evidence, restoration and final Windows payloads
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-Windows-x64
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+          path: artifact-evidence/

@@ -69,6 +69,28 @@ local='http://127.0.0.1:'+str(server.server_port)
 results=[]
 def flag(name):return '-'+''.join(word.title() for word in name.split('-')) if windows else '--'+name
 
+def wait_restart_probe(root,timeout_ms=5000):
+ # Only our native Windows probe writes this PID into its fresh private root.
+ if os.name!='nt' or not (root/'restarted.pid').exists():return
+ pid=int((root/'restarted.pid').read_text(encoding='utf-8-sig').strip())
+ if not 0<pid<=0xffffffff or pid==os.getpid():raise RuntimeError('Invalid owned restart-probe PID')
+ import ctypes
+ kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+ kernel.OpenProcess.argtypes=[ctypes.c_uint32,ctypes.c_int,ctypes.c_uint32];kernel.OpenProcess.restype=ctypes.c_void_p
+ kernel.WaitForSingleObject.argtypes=[ctypes.c_void_p,ctypes.c_uint32];kernel.WaitForSingleObject.restype=ctypes.c_uint32
+ kernel.CloseHandle.argtypes=[ctypes.c_void_p];kernel.CloseHandle.restype=ctypes.c_int
+ handle=kernel.OpenProcess(0x00100000,False,pid) # SYNCHRONIZE only; never terminate a process.
+ if not handle:
+  error=ctypes.get_last_error()
+  if error==87:return # ERROR_INVALID_PARAMETER: the probe has already exited.
+  raise ctypes.WinError(error)
+ try:
+  result=kernel.WaitForSingleObject(handle,timeout_ms)
+  if result==258:raise TimeoutError('Owned restart probe did not exit before fixture cleanup')
+  if result==0xffffffff:raise ctypes.WinError(ctypes.get_last_error())
+  if result!=0:raise RuntimeError('Unexpected restart-probe wait result: '+str(result))
+ finally:kernel.CloseHandle(handle)
+
 def run_case(case,restart=None):
  with tempfile.TemporaryDirectory(prefix='welcome updater with spaces ') as temp:
   root=Path(temp);(root/engine).write_bytes(b'old engine');(root/'ftebroom/maps').mkdir(parents=True)
@@ -82,7 +104,7 @@ def run_case(case,restart=None):
    exe=root/'ReyondBroom.exe'
    if os.name=='nt':
     # A tiny real Windows executable proves Start-Process ran after installation.
-    code='using System;using System.IO;class WelcomeRestartProbe {static void Main(){File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"restarted.txt"),"restarted");}}'
+    code='using System;using System.IO;class WelcomeRestartProbe {static void Main(){File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"restarted.pid"),System.Diagnostics.Process.GetCurrentProcess().Id.ToString());File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"restarted.txt"),"restarted");}}'
     compile_script=root/'launcher.ps1';compile_script.write_text("Add-Type -TypeDefinition '"+code+"' -OutputAssembly '"+str(exe).replace("'","''")+"' -OutputType ConsoleApplication\n")
     subprocess.run([a.powershell,'-NoProfile','-File',str(compile_script)],check=True,capture_output=True)
    else:
@@ -151,7 +173,8 @@ def run_case(case,restart=None):
    if (updates/'status.json').exists():(a.output/(case+'-status.json')).write_bytes((updates/'status.json').read_bytes())
    if parent and parent.poll() is None:parent.kill();parent.wait()
    if worker.poll() is None:worker.kill();worker.wait()
-   log.close()
+   try:wait_restart_probe(root)
+   finally:log.close()
 try:
  for case,restart in (('check-only',None),('bad-session',None),('prepare-close',None),('foreign-restart',False),('explicit-restart',True)):run_case(case,restart)
 finally:

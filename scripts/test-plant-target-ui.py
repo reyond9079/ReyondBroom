@@ -9,12 +9,21 @@ p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Pat
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'placement-ui-live.json';state.unlink(missing_ok=True)
 # No plant QA/open command here: first ever viewport Create must open its own
 # editor before any hidden unsaved-document confirmation can be drawn.
-(data/'plant-target-ui.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\n')
+(data/'plant-target-ui.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 11 echo RB_PLANT_FIXTURE_READY\n')
 tall=json.loads((Path(__file__).resolve().parents[1]/'tests/fixtures/plant-generator1.json').read_text())[0]['project'];tall['parameters']['height']=1200;tall['name']='Tall native target regression';project=out/'tall.plant.json';project.write_text(json.dumps(tall))
+console_logs=[data/'qconsole.log',root/'qconsole.log']
+for path in console_logs:path.unlink(missing_ok=True)
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');log=(out/'editor.log').open('wb')
-process=subprocess.Popen([str(engine),'-basedir',str(root),'-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','+exec','plant-target-ui.cfg'],cwd=root,stdout=log,stderr=subprocess.STDOUT)
+render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
+process=subprocess.Popen([str(engine),*render,'-basedir',str(root),'-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','+exec','plant-target-ui.cfg'],cwd=root,stdout=log,stderr=subprocess.STDOUT)
 checks=[]
 def live():return read_ui_json(state)
+def current_run_log():
+ chunks=[]
+ for path in [out/'editor.log',*console_logs]:
+  try:chunks.append(path.read_text(errors='replace'))
+  except FileNotFoundError:pass
+ return '\n'.join(chunks)
 def wait(fn,timeout=90):
  end=time.monotonic()+timeout
  while time.monotonic()<end:
@@ -42,6 +51,9 @@ try:
  # binding when the delayed map arrives while the plant is generating.
  wait(lambda:live()['views'] and live()['epoch']>=2 and live()['mapPath'].replace('\\','/').endswith('/maps/qa_clip.map'));ui.position()
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
+ # qa-clip schedules its camera/view setup after map load. Wait for that
+ # fixture to finish and fresh UI frames before the first cold context click.
+ wait(lambda:'RB_PLANT_FIXTURE_READY' in current_run_log());ui.settle()
  view=live()['views'][0];ui.click(view['x']+view['width']*.46,view['y']+view['height']*.52,button=3)
  hover('context/create');hover('context/model');click('context/new-plant');wait(lambda:live()['plantOpen'] and live()['plantReady'])
  check(live()['plant']['active'] and live()['plant']['id']==live()['context']['id'],'cold viewport Create opens Plant Editor and retains captured scene click')
@@ -56,7 +68,7 @@ try:
  metadata=json.loads((data/(entity['model']+'.reyond.json')).read_text());_,_,zmin=struct.unpack_from('<3f',encoded,108);_,_,zmax=struct.unpack_from('<3f',encoded,120)
  check(abs((zmax-zmin)*scale-(metadata['high'][2]-metadata['low'][2]))<.2,'saved model retains tall source height after MD3 coordinate normalization')
  ui.console('ftebroom_test_desktop rb10q1optin')
- wait(lambda:'FTEBROOM_DESKTOP_PASS rb10_q1_scene_optin_does_not_mutate_immutable_assets' in (out/'editor.log').read_text(errors='replace'))
+ wait(lambda:'FTEBROOM_DESKTOP_PASS rb10_q1_scene_optin_does_not_mutate_immutable_assets' in current_run_log())
  check(True,'Quake1 scene opt-in preserves exact immutable target assets')
  ImageGrab.grab().save(out/'plant-target-editor.png')
  # One user action remains one undoable transaction, including normalization.

@@ -1526,6 +1526,7 @@ static void mapReady()
   if(!documentUntitled){recentRemember(documentFile,gameProfile);cacheProjectRemember();}
   if(!documentFile.empty())fileBrowserFolder=documentFile.parent_path();
   cvars->SetString("ftebroom_document_path",documentFile.u8string().c_str());
+  cvars->SetString("ftebroom_document_title",documentName.c_str());
   lastBackup = std::chrono::steady_clock::now();
   sceneDrag = sceneLook = false;
   std::fill(std::begin(moveHeld), std::end(moveHeld), false);

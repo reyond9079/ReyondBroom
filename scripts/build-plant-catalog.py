@@ -176,6 +176,24 @@ def emit():
     assert len({r['id'] for r in ROWS})==len(ROWS)>=120
     for name,count in minimum.items():assert sum(r['category']==name for r in ROWS)>=count
     for row in ROWS:
+        # Botanical pigment defaults are separate from editable RGB controls.
+        # Keep explicit species colours (blue spruce/fescue, birch, black bamboo)
+        # while giving the remaining species a plausible living tissue palette.
+        category=row['category'];traits=row['parameters']
+        evergreen=traits.get('evergreen')==1
+        leaf={'tree':[.25,.36,.15],'conifer':[.17,.29,.18],
+              'shrub':[.23,.34,.14],'grass':[.31,.40,.19],
+              'fern':[.22,.36,.17],'flower':[.24,.35,.16],
+              'palm':[.25,.36,.17],'bamboo':[.26,.37,.18],
+              'vine':[.22,.34,.14],'riparian':[.29,.39,.18]}.get(category)
+        if leaf:
+            if evergreen and category in ('tree','shrub','vine'):leaf=[.19,.30,.15]
+            traits.setdefault('leaf',leaf)
+        if category in ('tree','conifer','shrub','palm'):
+            bark={0:[.32,.29,.24],1:[.43,.43,.37],3:[.35,.29,.23],
+                  4:[.34,.27,.21],5:[.44,.41,.33],6:[.37,.33,.27],
+                  7:[.45,.44,.35]}.get(traits.get('barkPattern',0),[.32,.29,.24])
+            traits.setdefault('bark',bark)
         if row['category'] in ('tree','shrub','fern','palm','bamboo','vine','riparian'):row['parameters'].setdefault('foliageMode',1)
         category=row['category'];traits=row['parameters'];habitat='wetland' if category=='riparian' else 'tropical' if category=='palm' else 'dryland' if category=='cactus' else 'meadow' if category=='grass' else 'woodland' if category in ('tree','conifer','fern','mushroom') else 'garden'
         if row['id'] in ('willow','white-willow','alder'):habitat='wetland'

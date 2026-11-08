@@ -398,7 +398,7 @@ static void runUiLaunch(){
 static void runUiConfirmClose(){
  static int reason=0;if(runUiCloseRequest){reason=runUiCloseRequest;runUiCloseRequest=0;ImGui::OpenPopup("Stop compilation?");}
  if(ImGui::BeginPopupModal("Stop compilation?",nullptr,ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking)){
-  ImGui::TextUnformatted(reason==3?"Changing the map will stop the running compilation. Are you sure?":reason==2?"Closing the editor will stop the running compilation. Are you sure?":"Closing this dialog will stop the running compilation. Are you sure?");
+  ImGui::TextUnformatted((reason==2||(reason==3&&documentIsExit(runUiPendingDocument)))?"Closing the editor will stop the running compilation. Are you sure?":reason==3?"Changing the map will stop the running compilation. Are you sure?":"Closing this dialog will stop the running compilation. Are you sure?");
   if(ImGui::Button("Yes",{80*uiScale(),0})){if(runActive)runStop();runWindow=false;runUiSave();ImGui::CloseCurrentPopup();if(reason==2)documentRequest("exit");else if(reason==3){auto next=std::move(runUiPendingDocument);runUiPendingDocument.clear();documentRequest(next);}}ImGui::SetItemDefaultFocus();runUiRecord("close-confirm-yes");
   ImGui::SameLine();if(ImGui::Button("No",{80*uiScale(),0})||(!ImGui::IsWindowAppearing()&&ImGui::IsKeyPressed(ImGuiKey_Escape)))ImGui::CloseCurrentPopup();runUiRecord("close-confirm-no");ImGui::EndPopup();
  }

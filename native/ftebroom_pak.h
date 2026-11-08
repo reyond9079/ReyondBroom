@@ -50,9 +50,11 @@ inline fs::path diskFolder(const fs::path& path){fs::path a;std::string m;return
 inline std::vector<std::pair<bool,fs::path>> list(const fs::path& folder){
   std::vector<std::pair<bool,fs::path>> result;fs::path archive;std::string prefix;
   if(!split(folder,archive,prefix)){for(auto& e:fs::directory_iterator(folder)){auto ext=e.path().extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);result.push_back({e.is_directory()||ext==".pak"||ext==".pk3",e.path()});}return result;}
+  // Browse safe resources even when a Q2 PAK contains non-canonical aliases.
+  // Mutations still validate the entire archive with strict directory().
   // Only cache the directory, never the archive payload, during browser rendering.
   static fs::path cached;static fs::file_time_type stamp;static uintmax_t size;static std::vector<Entry> entries;
-  auto now=fs::last_write_time(archive);auto length=fs::file_size(archive);if(cached!=archive||stamp!=now||size!=length){entries=directory(archive);cached=archive;stamp=now;size=length;}
+  auto now=fs::last_write_time(archive);auto length=fs::file_size(archive);if(cached!=archive||stamp!=now||size!=length){entries=directory(archive,true);cached=archive;stamp=now;size=length;}
   if(!prefix.empty())prefix+='/';std::map<std::string,bool> children;
   for(const auto& e:entries)if(e.name.rfind(prefix,0)==0){auto rest=e.name.substr(prefix.size());auto slash=rest.find('/');if(!rest.empty())children[rest.substr(0,slash)]=slash!=rest.npos;}
   for(const auto& c:children)result.push_back({c.second,folder/fs::u8path(c.first)});return result;

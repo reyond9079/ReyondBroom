@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "ftebroom_tools_layout.h"
 static bool uiLoaded = false, uiReset = false, uiLocked = false;
 static bool preferencesSave();
 static constexpr float uiDefaultSkyColor[3]={.16f,.39f,.70f};
@@ -158,12 +159,10 @@ static void uiWorkspace(float w, float h, float top, float bottom, float margin)
       std::min(.48f, 370 * uiScale() / std::max(1.f, workspaceSize.x - 64 * uiScale())),
       &right,
       &center);
-    const bool rail=uiModern() && workspaceSize.x>=740*uiScale();
-    const auto* workNode=ImGui::DockBuilderGetNode(center);
-    const float workWidth=workNode?workNode->Size.x:workspaceSize.x;
-    ImGui::DockBuilderSplitNode(center,rail?ImGuiDir_Left:ImGuiDir_Up,
-      rail?std::min(.24f,ModernChrome::railWidth*uiScale()/std::max(1.f,workWidth))
-          :std::min(.3f,120*uiScale()/workspaceSize.y),&info,&center);
+    // Only new/reset workspaces receive the new default. Existing saved docks,
+    // including deliberate side rails and floating toolboxes, remain intact.
+    ImGui::DockBuilderSplitNode(center,ImGuiDir_Up,
+      std::min(.3f,120*uiScale()/workspaceSize.y),&info,&center);
     ImGui::DockBuilderSplitNode(center,ImGuiDir_Down,.34f,&explorer,&center);
     ImGui::DockBuilderDockWindow("Mod file manager",explorer);
     uiExplorerDockChecked=true;

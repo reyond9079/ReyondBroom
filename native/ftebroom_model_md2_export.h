@@ -3,6 +3,7 @@
 #include "ftebroom_model_mdl_export.h"
 #include "ftebroom_quake1.h"
 #include "ftebroom_model_edit_math.h"
+#include <map>
 namespace ftebroom::modelExport {
 struct Md2Output {std::string model,skin;};
 inline std::string transformMd2(std::string bytes,const modelEdit::Matrix& matrix){
@@ -35,12 +36,45 @@ inline Md2Output md2(const Mesh& mesh,const std::vector<Skin>& skins,const std::
   if(mesh.frames>512)throw std::runtime_error("Native Quake II MD2 supports at most 512 frames.");
   auto q=mdl(mesh,skins,palette);auto u=[&](size_t p){return quake1::word(q,p);};
   unsigned w=u(52),h=u(56),nv=u(60),nt=u(64),nf=u(68),frameSize=40+4*nv;
-  unsigned st=68+64,tri=st+nv*4,frames=tri+nt*12,end=frames+nf*frameSize;
-  Binary out;out.bytes="IDP2";for(unsigned n:{8u,w,h,frameSize,1u,nv,nv,nt,0u,nf,68u,st,tri,frames,end,end})out.u32(n);out.text(skinName,64);
+  // Original Quake II's OpenGL renderer draws only the strip/fan command
+  // stream, while its software renderer uses the indexed triangle table.
+  // Emit both: an omitted stream is invisible (or read past EOF) in vanilla GL.
+  size_t uv=88+size_t(w)*h,triangles=uv+nv*12;quake1::range(q,uv,size_t(nv)*12+size_t(nt)*16);
+  std::vector<std::array<unsigned,3>> topology(nt);
+  std::map<std::pair<unsigned,unsigned>,std::vector<unsigned>> edges;
+  for(unsigned t=0;t<nt;t++){
+    for(int a=0;a<3;a++)topology[t][a]=u(triangles+t*16+4+a*4);
+    for(int a=0;a<3;a++)edges[{topology[t][a],topology[t][(a+1)%3]}].push_back(t);
+  }
+  std::vector<bool> used(nt,false);std::vector<unsigned> visited(nt,0);unsigned visit=0;Binary glCommands;
+  for(unsigned seed=0;seed<nt;seed++)if(!used[seed]){
+    std::vector<unsigned> bestVertices,bestFaces;
+    // Three cyclic starts preserve winding. A bounded greedy walk joins
+    // adjacent triangles without crossing UV seams or changing topology.
+    for(int rotation=0;rotation<3;rotation++){
+      ++visit;visited[seed]=visit;std::vector<unsigned> vertices,faces{seed};
+      for(int a=0;a<3;a++)vertices.push_back(topology[seed][(rotation+a)%3]);
+      while(faces.size()<nt){
+        size_t n=vertices.size();unsigned a=vertices[n-2],b=vertices[n-1];if(n%2)std::swap(a,b);
+        auto found=edges.find({a,b});if(found==edges.end())break;unsigned next=nt,tip=0;
+        for(auto candidate:found->second)if(!used[candidate]&&visited[candidate]!=visit){
+          for(int k=0;k<3;k++)if(topology[candidate][k]==a&&topology[candidate][(k+1)%3]==b){next=candidate;tip=topology[candidate][(k+2)%3];break;}
+          if(next!=nt)break;
+        }
+        if(next==nt)break;visited[next]=visit;faces.push_back(next);vertices.push_back(tip);
+      }
+      if(faces.size()>bestFaces.size()){bestVertices=std::move(vertices);bestFaces=std::move(faces);}
+    }
+    for(auto face:bestFaces)used[face]=true;glCommands.u32(bestVertices.size());
+    for(auto vertex:bestVertices){glCommands.real((u(uv+vertex*12+4)+.5f)/w);glCommands.real((u(uv+vertex*12+8)+.5f)/h);glCommands.u32(vertex);}
+  }glCommands.u32(0);
+  unsigned st=68+64,tri=st+nv*4,frames=tri+nt*12,commands=frames+nf*frameSize,numCommands=glCommands.bytes.size()/4,end=commands+glCommands.bytes.size();
+  Binary out;out.bytes="IDP2";for(unsigned n:{8u,w,h,frameSize,1u,nv,nv,nt,numCommands,nf,68u,st,tri,frames,commands,end})out.u32(n);out.text(skinName,64);
   size_t at=88+size_t(w)*h;quake1::range(q,at,nv*12+nt*16);
   for(unsigned v=0;v<nv;v++){out.u16(u(at+v*12+4));out.u16(u(at+v*12+8));}at+=nv*12;
   for(unsigned t=0;t<nt;t++){for(int a=0;a<3;a++)out.u16(u(at+t*16+4+a*4));for(int a=0;a<3;a++)out.u16(u(at+t*16+4+a*4));}at+=nt*16;
   for(unsigned f=0;f<nf;f++){quake1::range(q,at,28+nv*4);out.bytes+=q.substr(8,24);out.bytes+=q.substr(at+12,16);out.bytes+=q.substr(at+28,nv*4);at+=28+nv*4;}
+  out.bytes+=glCommands.bytes;
   return {std::move(out.bytes),pcx(w,h,q.substr(88,size_t(w)*h),palette)};
 }
 }

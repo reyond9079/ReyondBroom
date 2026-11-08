@@ -4,12 +4,26 @@ static void toolOptionFlow(float width)
 {
   const auto right=ImGui::GetWindowPos().x+ImGui::GetWindowContentRegionMax().x;
   if(ImGui::GetItemRectMax().x+ImGui::GetStyle().ItemSpacing.x+width<=right)ImGui::SameLine();
+  else if(ImGui::GetCurrentWindow()->DC.IsSameLine)ImGui::NewLine();
 }
 // Put labels above fields in side docks so both remain readable at narrow widths.
 static const char* toolOptionLabel(bool horizontal,const char* label)
 {
-  if(horizontal)return label;
   static std::string id;
+  if(horizontal){
+    const float labelWidth=ImGui::CalcTextSize(label,nullptr,true).x;
+    const float extra=labelWidth>0?labelWidth+ImGui::GetStyle().ItemInnerSpacing.x:0;
+    const float fullWidth=ImGui::GetWindowContentRegionMax().x-ImGui::GetWindowContentRegionMin().x;
+    if(extra+40>fullWidth){
+      if(ImGui::GetCurrentWindow()->DC.IsSameLine)ImGui::NewLine();
+      ImGui::TextWrapped("%s",label);
+      ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(),std::max(40.f,ImGui::GetContentRegionAvail().x)));
+      id=std::string("###")+label;return id.c_str();
+    }
+    toolOptionFlow(ImGui::CalcItemWidth()+extra);
+    ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(),std::max(40.f,ImGui::GetContentRegionAvail().x-extra)));
+    return label;
+  }
   if(std::strncmp(label,"##",2))ImGui::TextWrapped("%s",label);
   id=std::string("##")+label;
   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);

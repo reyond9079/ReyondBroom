@@ -60,7 +60,8 @@ with tarfile.open(fileobj=io.BytesIO(checkout)) as archive:
 module_name = 'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so'
 shutil.copy2(a.module, root / module_name)
 shutil.copy2(a.csprogs, root/'ftebroom/csaddon.dat')
-for name in ('update-ftebroom.py', 'update-ftebroom.ps1'):
+# Application defaults belong to this source revision, just like the updater.
+for name in ('ftebroom.cfg', 'update-ftebroom.py', 'update-ftebroom.ps1'):
     shutil.copy2(src/'runtime'/name, root/'ftebroom'/name)
 if a.engine:
     shutil.copy2(a.engine, root/('bin/fteqw64.exe' if windows else 'fteqw-gl64'))

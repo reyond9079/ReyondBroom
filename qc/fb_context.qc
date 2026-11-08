@@ -111,11 +111,22 @@ float fb_context_command()
         string model=strzone(argv(1)),modelClass="func_model";if(argv(4)=="misc_model"||argv(4)=="cycler"||argv(4)=="cycler_sprite")modelClass=argv(4);
         vector modelPixel=[stof(argv(2)),stof(argv(3)),0];
         vector modelPosition=fb_entity_drop_position(modelClass,modelPixel);float authoring=argv(5)=="authoring";
+        string modelOptin=strzone(argv(8)),modelSource=strzone(argv(10));float modelNormalization=stof(argv(9));
+        if(!fb_geom_finite(modelNormalization)||modelNormalization<=0)modelNormalization=1;
         if(authoring){vector low=stov(argv(6)),high=stov(argv(7)),modelContact,normal='0 0 1';if(fb_pick(modelPixel)>0){modelContact=fb_hits[0].point;normal=fb_hits[0].normal;}else modelContact=fb_view_plane_point(modelPixel,cvar("ca_brush_view"),[0,0,cvar("ftebroom_plane")]);float support=0;for(int a=0;a<3;a++)support+=normal[a]*(normal[a]>=0?low[a]:high[a]);modelPosition=fb_snap(modelContact-normal*support);modelPosition+=normal*(modelContact*normal-modelPosition*normal-support);}
 
-        for(int axis=0;axis<3;axis++)if(!fb_geom_finite(modelPosition[axis])||fabs(modelPosition[axis])>autocvar_ftebroom_world_bound){strunzone(model);return TRUE;}
+        for(int axis=0;axis<3;axis++)if(!fb_geom_finite(modelPosition[axis])||fabs(modelPosition[axis])>autocvar_ftebroom_world_bound){strunzone(model);strunzone(modelOptin);strunzone(modelSource);return TRUE;}
         fb_tx_begin("Import model");fb_entity_create(modelClass,FALSE,modelPosition);
-        fb_entity_property("set","model",model);if(authoring){fb_entity_property("set","_reyondbroom_authoring","1");if(argv(8)=="fte-q1")fb_entity_property("set","_reyondbroom_fte_q1","1");fb_entity_property("set","origin",sprintf("%g %g %g",modelPosition_x,modelPosition_y,modelPosition_z));}fb_tx_commit();strunzone(model);return TRUE;
+        fb_entity_property("set","model",model);
+        if(authoring){
+            fb_entity_property("set","_reyondbroom_authoring","1");
+            if(modelOptin=="fte-q1")fb_entity_property("set","_reyondbroom_fte_q1","1");
+            fb_entity_property("set","modelscale",ftos(modelNormalization));
+            fb_entity_property("set","_reyondbroom_normalization",ftos(modelNormalization));
+            if(modelSource!="")fb_entity_property("set","_reyondbroom_source",modelSource);
+            fb_entity_property("set","origin",sprintf("%g %g %g",modelPosition_x,modelPosition_y,modelPosition_z));
+        }
+        fb_tx_commit();strunzone(model);strunzone(modelOptin);strunzone(modelSource);return TRUE;
     }
     if(argv(0)=="ftebroom_entity_drop"){
         string name=strzone(argv(1));vector pixel=[stof(argv(2)),stof(argv(3)),0];vector position=fb_entity_drop_position(name,pixel);fb_entity_create(name,FALSE,position);strunzone(name);return TRUE;

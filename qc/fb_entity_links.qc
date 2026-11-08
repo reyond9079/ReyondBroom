@@ -55,12 +55,19 @@ void fb_container_render_prepare()
     }
     fb_commit_profile("fb_container_render_prepare",profile81Time);
 }
+int fb_container_display_allowed(int group,int labels)
+{
+    if(group)return cvar("ftebroom_show_group_bounds")!=0;
+    // Classnames and bounds are independent for brush entities, as they are
+    // for point entities. The group option intentionally controls both.
+    return cvar(labels?"ftebroom_show_entity_names":"ftebroom_show_brush_entity_bounds")!=0;
+}
 void fb_container_draw(int labels)
 {
     static vector bounds[2];vector camera=getproperty(VF_ORIGIN),angles=getproperty(VF_ANGLES);makevectors(angles);vector forward=v_forward,right=v_right,up=v_up;
     vector mn=getproperty(VF_MIN),size=getproperty(VF_SIZE);
     vector fov=getproperty(VF_FOV);float tx=tan(fov_x*M_PI/360),ty=tan(fov_y*M_PI/360);
-    int ortho=cvar("ca_brush_view"),groups=cvar("ftebroom_show_group_bounds"),entities=cvar("ftebroom_show_brush_entity_bounds");
+    int ortho=cvar("ca_brush_view");
     if(!labels && !cvar("ca_brush_view") && cvar("ftebroom_bounds_visible")) {
         if(tokenize(cvar_string("ftebroom_map_bounds"))==6)fb_visual_box([stof(argv(0)),stof(argv(1)),stof(argv(2))],[stof(argv(3)),stof(argv(4)),stof(argv(5))],'1 0.5 0',0.7,FALSE);
     }
@@ -70,7 +77,7 @@ void fb_container_draw(int labels)
     int entries=visibleCount<0?fb_container_render_count:visibleCount;
     for(int entry=0;entry<entries;entry++) {
         int index=visibleCount<0?entry:fb_container_visible[entry];fb_point_render_t *item=&fb_container_render[index];int n=item->node,group=item->id;
-        if(group && !groups)continue;if(!group && !entities)continue;
+        if(!fb_container_display_allowed(group,labels))continue;
         bounds[0]=fb_container_cache[n].mins;bounds[1]=fb_container_cache[n].maxs;
         if(visibleCount<0 && !ortho){vector delta=item->center-camera;float radius=item->radius,depth=delta*forward;if(depth+radius<0||fabs(delta*right)>depth*tx+radius*(1+tx)||fabs(delta*up)>depth*ty+radius*(1+ty))continue;}
         if(labels){vector top=(bounds[0]+bounds[1])*0.5;top_z=bounds[1][2]+12;float labelAlpha=fb_label_alpha(top,fb_selection_selected(n),ortho);if(labelAlpha<=0)continue;if(!ortho && (top-camera)*forward<=0)continue;vector pixel=project(top);pixel_z=0;if(pixel_x<mn_x||pixel_y<mn_y||pixel_x>=mn_x+size_x||pixel_y>=mn_y+size_y)continue;if(!ortho && !fb_label_visible(camera,top,n))continue;fb_label_draw(pixel,fb_nodes[n].name,fb_selection_selected(n),group,labelAlpha);}

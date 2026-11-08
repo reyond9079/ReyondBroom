@@ -271,7 +271,7 @@ static void executeAction(const Action& a, bool down = true)
     }
     else if (name == "open")
     {
-      openRequest = true;
+      recentOpen();
       inspector = true;
     }
     else if (name == "cameraposition")

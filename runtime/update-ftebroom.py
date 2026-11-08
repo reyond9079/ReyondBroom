@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Portable Linux updater. Stage while editing; install only after the editor exits."""
+"""Portable Linux updater, retaining the legacy download-and-wait CLI.
+
+--mode check writes a version offer without downloading. --mode prepare reports
+real byte progress and stages verified files, then waits for the editor to exit.
+Only restart.request containing the matching --session requests a relaunch.
+"""
 import argparse
 import fcntl
 import hashlib
@@ -16,6 +21,7 @@ import http.client
 import urllib.error
 import urllib.request
 import urllib.parse
+import subprocess
 
 RELEASES = 'https://api.github.com/repos/reyond9079/ReyondBroom/releases?per_page=100'
 DOWNLOADS = 'https://github.com/reyond9079/ReyondBroom/releases/download/'
@@ -77,7 +83,7 @@ def fetch(urls, consume, status):
             status('Retrying through the alternative GitHub download route...')
     raise last
 
-def download_release(asset, checksum, updates, tag, status):
+def download_release(asset, checksum, updates, tag, status, progress=None):
     # Validate both routes before making requests. Asset names must remain files.
     urls, checksum_urls = asset_urls(asset), asset_urls(checksum)
     name = asset['name']
@@ -95,6 +101,8 @@ def download_release(asset, checksum, updates, tag, status):
     partial = target_under(updates, name + '.part')
     def transfer(response):
         received = 0
+        if progress:
+            progress(0, asset['size'])
         # Each route/retry starts a fresh file, never appending to a failed transfer.
         with partial.open('wb') as output:
             while block := response.read(1024*1024):
@@ -102,7 +110,10 @@ def download_release(asset, checksum, updates, tag, status):
                 if received > 512*1024**2:
                     raise ValueError('Update exceeds 512 MiB')
                 output.write(block)
-                status(f'Downloading {tag}: {received//1024**2} / {asset["size"]//1024**2} MiB')
+                if progress:
+                    progress(received, asset['size'])
+                else:
+                    status(f'Downloading {tag}: {received//1024**2} / {asset["size"]//1024**2} MiB')
         if received != asset['size']:
             raise ConnectionError('Incomplete update download')
     try:
@@ -173,6 +184,11 @@ def preserve(root, name, old):
     leaf = path.name
     if name.startswith(('updates/', 'downloads/', 'ftebroom/autosave/', 'ftebroom/cache/')):
         return True
+    # Game directories/definitions and per-game compilation workspaces belong
+    # to the user even when an earlier package happened to contain these files.
+    if name in ('reyondbroom-legacy-games.txt', 'ftebroom/reyondbroom-legacy-games.txt', 'ftebroom/reyondbroom-quake2-build-options.txt',
+                'ftebroom/reyondbroom-halflife-build-options.txt', 'ftebroom/compilation-profiles.json'):
+        return path.exists()
     if leaf in ('appearance.cfg', 'workspace.ini', 'config.cfg', 'fte.cfg', 'installed.lst'):
         return path.exists()
     if re.match(r'ftebroom-(project|game-profile|quake1|build|preferences|run|plugins|camera|recent)', leaf):
@@ -241,16 +257,28 @@ def main():
     parser.add_argument('--current-version', required=True)
     parser.add_argument('--parent-id', type=int, default=0)
     parser.add_argument('--local-package', type=Path)
+    parser.add_argument('--mode', choices=('auto', 'check', 'prepare'), default='auto')
+    parser.add_argument('--session', default='')
+    parser.add_argument('--target-version', default='')
     args = parser.parse_args()
     root = args.root.resolve()
     if not (root/'fteqw-gl64').is_file() or not version(args.current_version):
         raise ValueError('Invalid installation or version')
     updates = target_under(root, 'updates')
     updates.mkdir(exist_ok=True)
-    def status(text):
+    if args.session and not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', args.session):
+        raise ValueError('Invalid update session')
+    state = dict(session=args.session, current_version=args.current_version,
+                 available_version='', stage='checking', received=0, total=0)
+    def status(text, **fields):
+        state.update(fields)
+        state['message'] = text
         temporary = target_under(updates, 'status.tmp')
         temporary.write_text(text, encoding='utf-8')
         os.replace(temporary, target_under(updates, 'status.txt'))
+        temporary = target_under(updates, 'status-json.tmp')
+        temporary.write_text(json.dumps(state), encoding='utf-8')
+        os.replace(temporary, target_under(updates, 'status.json'))
     with target_under(updates, 'update.lock').open('a') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -262,27 +290,55 @@ def main():
             if not archive:
                 status('Checking GitHub releases...')
                 releases = fetch([RELEASES], json.load, status)
+                if args.target_version:
+                    releases = [r for r in releases if r.get('tag_name', '').removeprefix('v') == args.target_version.removeprefix('v')]
                 release = select_release(releases, args.current_version, (root/'linux-sdl2-build').is_file())
                 if not release:
-                    status('ReyondBroom is up to date for Linux.')
+                    if args.target_version:
+                        raise ValueError('The selected release is no longer available')
+                    status('ReyondBroom is up to date for Linux.', stage='current')
                     return
                 tag, asset, checksum = release
-                archive = download_release(asset, checksum, updates, tag, status)
+                state['available_version'] = tag.removeprefix('v')
+                if args.mode == 'check':
+                    status('A new version of ReyondBroom is available.', stage='available', total=asset['size'])
+                    return
+                status('Downloading update...', stage='downloading')
+                def progress(received, total):
+                    status(f'Downloading {tag}: {received/1024**2:.1f} / {total/1024**2:.1f} MiB',
+                           stage='downloading', received=received, total=total)
+                archive = download_release(asset, checksum, updates, tag, status, progress)
+            elif args.mode == 'check':
+                raise ValueError('Check-only mode cannot install a local package')
+            status('Verifying and preparing the update...', stage='verifying')
             stage = Path(tempfile.mkdtemp(prefix='stage-', dir=updates))
             stage_package(archive, stage)
-            status('Update downloaded. Close the editor to install it.')
+            status('Update verified. Restart the editor to finish updating.' if args.mode == 'prepare' else
+                   'Update downloaded. Close the editor to install it.', stage='ready')
             while identity and process_identity(args.parent_id) == identity:
                 time.sleep(1)
             backup = Path(tempfile.mkdtemp(prefix='backup-', dir=updates))
+            status('Installing update...', stage='installing')
             install(root, stage, backup)
             try:
                 cleanup_updates(updates, backup)
             except OSError:
                 # A locked cache file must not invalidate a successful installation.
                 pass
-            status('Update installed. Settings and documents were preserved. Start ReyondBroom normally.')
+            status('Update installed. Settings and documents were preserved. Start ReyondBroom normally.', stage='installed')
+            restart = target_under(updates, 'restart.request')
+            if args.mode == 'prepare' and args.session and restart.is_file() and restart.read_text().strip() == args.session:
+                restart.unlink()
+                # Only a button press in the matching editor session can relaunch.
+                try:
+                    subprocess.Popen([str(root/'Launch-ReyondBroom.sh')], cwd=root,
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, start_new_session=True)
+                except OSError:
+                    # Relaunch failure must never roll back a verified installation.
+                    status('Update installed. Start ReyondBroom normally to continue.', stage='installed')
         except Exception as error:
-            status('Update failed: ' + str(error))
+            status('Update failed: ' + str(error), stage='error')
             raise
 
 if __name__ == '__main__':

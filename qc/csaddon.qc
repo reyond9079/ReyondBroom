@@ -775,9 +775,8 @@ float(string cmd) CSQC_ConsoleCommand =
     if (fb_bend_command()) return TRUE;
     if (fb_array_command()) return TRUE;
     if (fb_generator_command()) return TRUE;
-    if(argv(0)=="ftebroom_tour_prepare"){
-        fb_cancel();fb_tool_deactivate();fb_selection_clear();if(stoi(argv(1))>=2)fb_createbox('0 0 32','96 96 64');return TRUE;
-    }
+    if(fb_tutorial_command())return TRUE;
+    if(fb_tutorial_testcommand())return TRUE;
     if (fb_plugin_surfaces_command()) return TRUE;
     if (fb_plugin_batch_command()) return TRUE;
     if (fb_settle_command()) return TRUE;
@@ -791,7 +790,9 @@ float(string cmd) CSQC_ConsoleCommand =
     if (fb_hierarchy_testcommand()) return TRUE;
     if (fb_entity_testcommand()) return TRUE;
     if (fb_filter_testcommand()) return TRUE;
+    if (fb_viewopts_testcommand()) return TRUE;
     if (fb_clip_testcommand()) return TRUE;
+    if (fb_clipattrs_testcommand()) return TRUE;
     if (fb_clip_command()) return TRUE;
     if (fb_model_extract_command()) return TRUE;
     if (fb_model_testcommand()) return TRUE;
@@ -852,6 +853,8 @@ void(float prevprogs) init =
     registercommand("ftebroom_plugin_surfaces");
     registercommand("ftebroom_plugin_workbench_remove");
     registercommand("ftebroom_tour_prepare");
+    registercommand("ftebroom_tour_restore");
+    registercommand("ftebroom_test_tutorial132");
     registercommand("ftebroom_undo");
     registercommand("ftebroom_redo");
     registercommand("ftebroom_delete");
@@ -887,6 +890,8 @@ void(float prevprogs) init =
     registercommand("ftebroom_test_attributes");
     registercommand("ftebroom_test_model");
     registercommand("ftebroom_test_clipboard");
+    registercommand("ftebroom_test_clipboard_attributes132");
+    registercommand("ftebroom_test_view_options132");
     registercommand("ftebroom_test_materials");
     registercommand("ftebroom_copy_file");
     registercommand("ftebroom_paste_file");

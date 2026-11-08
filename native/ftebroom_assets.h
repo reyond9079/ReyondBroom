@@ -38,6 +38,9 @@ static std::filesystem::path settingsPath()
     return {};
   return std::filesystem::u8path(path);
 }
+static void documentRequest(const std::string& next);
+static void welcomeQaItem(const char* id);
+static void welcomeQaWindow(const char* id);
 #include "ftebroom_game_profile.h"
 #include "ftebroom_halflife_runtime.h"
 static std::string token(const std::string& source,size_t& offset){return ftebroom::shaderpreview::token(source,offset);}
@@ -233,7 +236,7 @@ static bool mountAssets()
     if(gameProfile!=3){char cache[4096]{};if(files->NativePath("scripts/reyondbroom-quake2.shader",(fs_relative)5,cache,sizeof cache)&&std::filesystem::exists(std::filesystem::u8path(cache)))std::ofstream(std::filesystem::u8path(cache))<<"// Quake II aliases inactive.\n";}
     auto path = std::filesystem::weakly_canonical(std::filesystem::u8path(baseq3));
     if (!*baseq3 || !std::filesystem::is_directory(path))
-      throw std::runtime_error(gameProfile==2?"Choose the Quake 1 mod folder, or enable LibreQuake.":"Choose an existing baseq3 folder.");
+      throw std::runtime_error(gameProfile==4?"Choose an existing Half-Life game or mod folder.":gameProfile==3?"Choose an existing Quake II game or mod folder.":gameProfile==2?"Choose the Quake 1 mod folder, or enable LibreQuake.":"Choose an existing baseq3 folder.");
     bool hasAssets = std::filesystem::is_directory(path / "textures")
                      || std::filesystem::is_directory(path / "scripts");
     for (auto& entry : std::filesystem::directory_iterator(path))
@@ -276,7 +279,12 @@ static void loadProjectCommand()
 {
   if (commands->IsInsecure())
     return;
+  gameProfileLoad();
   commands->Argv(1, baseq3, sizeof baseq3);
+  // The command selects resources for the active game, just like the resource
+  // picker. mountAssets normalizes each game's own directory field.
+  if(gameProfile>=3)std::snprintf(gameProfile==3?q2Mod:hlMod,1024,"%s",baseq3);
+  else if(gameProfile==2){q1UseLibre=false;setupModChoice=1;std::snprintf(q1Mod,sizeof q1Mod,"%s",baseq3);}
   if (!mountAssets())
     core->Print(("ReyondBroom: " + assetError + "\n").c_str());
 }
@@ -292,7 +300,7 @@ static void projectResourceFields()
     ImGui::TextUnformatted("Map format: Quake 3 (Valve 220)");
     ImGui::TextUnformatted("baseq3 folder");
     ImGui::SetNextItemWidth(-1);
-    ImGui::InputText("##baseq3",baseq3,sizeof baseq3);
+    if(ImGui::InputText("##baseq3",baseq3,sizeof baseq3))assetError.clear();welcomeQaItem("resources/folder");
     ImGui::TextWrapped("Paste the full path to baseq3. PK3 archives and loose textures/scripts are read without modifying your game. Use Save As to choose the map directory.");
   }
   if(!assetError.empty())ImGui::TextWrapped("%s",assetError.c_str());
@@ -331,6 +339,11 @@ static void projectSetup()
     std::getline(settings, saved);
     if(saved.empty() && !cvars->GetFloat("ftebroom_skip_setup"))firstSetupStep=0;
     std::snprintf(baseq3, sizeof baseq3, "%s", saved.c_str());
+    // Recover installations missing the separate legacy-game settings file from
+    // the last successfully mounted project. An existing file, including an
+    // intentionally empty directory, remains authoritative.
+    if(gameProfile>=3&&!std::filesystem::exists(settingsPath().parent_path()/"reyondbroom-legacy-games.txt")&&!*(gameProfile==3?q2Mod:hlMod))
+      std::snprintf(gameProfile==3?q2Mod:hlMod,1024,"%s",baseq3);
     setupNeeded = false;
     if(!saved.empty()) { if(!mountAssets())setupNeeded=cvars->GetFloat("ftebroom_skip_setup")==0; }
     else setupNeeded=cvars->GetFloat("ftebroom_skip_setup")==0;
@@ -393,15 +406,18 @@ static void projectSetup()
     return;
   }
   if(uiClosedDialog=="Game / resources"){resourceDownloadPending=false;setupNeeded=false;uiClosedDialog.clear();}
+  if(gameResourcesRequested&&!assetsLoading){gameResourcesRequested=false;setupNeeded=true;}
   if(setupNeeded){ImGui::OpenPopup("Game / resources");setupNeeded=false;}
   if(uiDialog("Game / resources",{800,550})) {
+    welcomeQaWindow("resources/window");
     projectResourceFields();
     ImGui::BeginDisabled(assetsLoading||gameProfileLocked||libreBusy());
     bool loadRequested=ImGui::Button("Load resources and start");
+    welcomeQaItem("resources/load");
     ImGui::EndDisabled();
     if(projectLoadRequested(loadRequested))ImGui::CloseCurrentPopup();
     ImGui::SameLine();
-    if(ImGui::Button("Close##resources")){resourceDownloadPending=false;setupNeeded=false;ImGui::CloseCurrentPopup();}
+    bool closeResources=ImGui::Button("Close##resources");welcomeQaItem("resources/close");if(closeResources){resourceDownloadPending=false;setupNeeded=false;ImGui::CloseCurrentPopup();}
     if(assetsLoading)ImGui::TextUnformatted("Loading resources...");
     ImGui::EndPopup();
   }

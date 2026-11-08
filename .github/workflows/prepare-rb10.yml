@@ -1,0 +1,165 @@
+name: Prepare RB-10 release
+on:
+  pull_request:
+    types: [ready_for_review]
+    branches: [main]
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: prepare-rb10
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/rb-10-editor-polish'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Prepare pinned draft packages while retaining final publication checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo = context.repo, eventPr = context.payload.pull_request;
+            const {data: pr} = await github.rest.pulls.get({...repo, pull_number: eventPr.number});
+            const ownedRepo = `${repo.owner}/${repo.repo}`.toLowerCase();
+            const verifyPr = value => {
+              if (value.draft || value.merged || value.head.sha !== pr.head.sha || value.head.ref !== 'feat/rb-10-editor-polish' ||
+                  !value.head.repo || value.head.repo.full_name.toLowerCase() !== ownedRepo)
+                throw new Error('The reviewed same-repository PR head changed or is no longer ready');
+            };
+            if (pr.head.sha !== eventPr.head.sha) throw new Error('The event PR head is stale');
+            verifyPr(pr);
+            const checkPr = async () => verifyPr((await github.rest.pulls.get({...repo, pull_number: pr.number})).data);
+            const version = '0.5.0-alpha.132', tag = 'v' + version, releaseName = 'ReyondBroom ' + version;
+            const ownedDraftId = 438298229, oldRunId = 42492926145;
+            const oldHead = '3c502ed2bd988aab518a8ca9e022f6aebd6f4657';
+            if (pr.head.sha === oldHead) throw new Error('Replacement requires a new source revision');
+            const required = ['windows', 'linux (Linux-x64)', 'linux (Linux-SDL2-x64)'];
+            const expectedNames = new Set();
+            for (const platform of ['Windows-x64', 'Linux-x64', 'Linux-SDL2-x64']) {
+              const prefix = `ReyondBroom-${version}-${platform}`;
+              for (const name of [prefix + (platform === 'Windows-x64' ? '.zip' : '.tar.gz'), prefix + '-Sources.zip']) {
+                expectedNames.add(name); expectedNames.add(name + '.sha256');
+              }
+            }
+            const getRef = async ref => {
+              try { return (await github.rest.git.getRef({...repo, ref})).data; }
+              catch (error) { if (error.status !== 404) throw error; }
+            };
+            const checkDraft = async () => {
+              const {data: release} = await github.rest.repos.getRelease({...repo, release_id: ownedDraftId});
+              if (release.id !== ownedDraftId || !release.draft || release.tag_name !== tag ||
+                  release.name !== releaseName || release.target_commitish !== oldHead)
+                throw new Error('Expected the known unpublished alpha.132 draft at its reviewed old target');
+              return release;
+            };
+            const assetsForDraft = async () => {
+              const assets = await github.paginate(github.rest.repos.listReleaseAssets, {...repo, release_id: ownedDraftId});
+              if (assets.length > 12 || new Set(assets.map(a => a.name)).size !== assets.length ||
+                  assets.some(a => !expectedNames.has(a.name) || !Number.isSafeInteger(a.id) || a.id <= 0))
+                throw new Error('Draft contains an unexpected asset; no assets may be deleted');
+              return assets;
+            };
+            await checkDraft();
+            await assetsForDraft();
+            const oldSourceRef = await getRef('tags/rb-10-package-' + oldHead);
+            if (!oldSourceRef || oldSourceRef.object.sha !== oldHead) throw new Error('Old immutable package source does not match');
+            const sourceTag = 'rb-10-package-' + pr.head.sha;
+            const sourceRef = await getRef('tags/' + sourceTag);
+            if (sourceRef && sourceRef.object.sha !== pr.head.sha) throw new Error('New immutable package source tag was moved');
+            const draftRef = await getRef('tags/' + tag);
+            if (draftRef && draftRef.object.sha !== oldHead && draftRef.object.sha !== pr.head.sha)
+              throw new Error('Unexpected unpublished release tag');
+            // A current-head full CI run may overlap PRIVATE packaging. No predecessor
+            // result is accepted; merge and publication still require all jobs to succeed.
+            const {data: checks} = await github.rest.actions.listWorkflowRuns({...repo,
+              workflow_id: 'compilation-profile-checks.yml', head_sha: pr.head.sha, per_page: 100});
+            const ci = checks.workflow_runs.find(run => run.head_sha === pr.head.sha);
+            if (!ci) throw new Error('An exact new-head CI run must exist before private replacement');
+            const pendingOrSuccessful = value =>
+              ((value.status === 'queued' || value.status === 'in_progress') && value.conclusion == null) ||
+              (value.status === 'completed' && value.conclusion === 'success');
+            const checkCurrentCi = async () => {
+              // Pin the selected run ID: a failed run must never be hidden by selecting an
+              // older successful run during cancellation, cleanup or retargeting.
+              const {data: current} = await github.rest.actions.getWorkflowRun({...repo, run_id: ci.id});
+              if (current.head_sha !== pr.head.sha || !pendingOrSuccessful(current))
+                throw new Error('Exact new-head CI is failed, cancelled or in an unsupported state');
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...repo, run_id: ci.id});
+              for (const name of required) {
+                const job = jobs.find(value => value.name === name);
+                if (!job || !pendingOrSuccessful(job))
+                  throw new Error(`Required current-head CI job ${name} is missing, failed, cancelled or unsupported`);
+              }
+            };
+            await checkCurrentCi();
+            const verifyOldRun = run => {
+              if (run.id !== oldRunId || run.head_sha !== oldHead || run.display_title !== `Release ${version} @ ${oldHead}`)
+                throw new Error('The package run is not the explicitly owned old alpha.132 source');
+            };
+            const checkOtherRuns = async () => {
+              const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {...repo,
+                workflow_id: 'release-linux-ui-update.yml', per_page: 100});
+              if (runs.some(r => r.id !== oldRunId && r.status !== 'completed' && r.display_title.startsWith(`Release ${version} @ `)))
+                throw new Error('Another active alpha.132 package run requires separate review');
+            };
+            let cancelled = false, stopped = false;
+            for (let attempt = 0; attempt < 60; ++attempt) {
+              await checkOtherRuns();
+              const {data: run} = await github.rest.actions.getWorkflowRun({...repo, run_id: oldRunId});
+              verifyOldRun(run);
+              if (run.status === 'completed') { stopped = true; break; }
+              if (!cancelled) {
+                try { await github.rest.actions.cancelWorkflowRun({...repo, run_id: oldRunId}); }
+                catch (error) { if (error.status !== 409) throw error; }
+                cancelled = true;
+              }
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+            if (!stopped) throw new Error('Owned old package run did not become terminal; no assets were deleted');
+            const checkQuiescent = async () => {
+              await checkOtherRuns();
+              const {data: run} = await github.rest.actions.getWorkflowRun({...repo, run_id: oldRunId});
+              verifyOldRun(run);
+              if (run.status !== 'completed') throw new Error('The old package run restarted during cleanup');
+            };
+            await checkQuiescent();
+            await checkDraft();
+            // Delete one freshly verified, allowlisted asset at a time. A partial API failure
+            // leaves the same old draft/source; rerunning can safely finish its known subset.
+            for (let deleted = 0; ; ++deleted) {
+              await checkQuiescent();
+              await checkDraft();
+              const remaining = await assetsForDraft();
+              if (!remaining.length) break;
+              if (deleted >= 12) throw new Error('Draft asset list changed during cleanup');
+              await checkCurrentCi(); // Recheck after cancellation and immediately before deletion.
+              await checkPr(); // Immediately before each deletion, including the first.
+              await github.rest.repos.deleteReleaseAsset({...repo, asset_id: remaining[0].id});
+            }
+            await checkQuiescent();
+            await checkDraft();
+            if ((await assetsForDraft()).length) throw new Error('Draft must be empty before retargeting');
+            const latestOldSource = await getRef('tags/rb-10-package-' + oldHead);
+            if (!latestOldSource || latestOldSource.object.sha !== oldHead) throw new Error('Old immutable source changed during cleanup');
+            const latestDraftRef = await getRef('tags/' + tag);
+            if (latestDraftRef && latestDraftRef.object.sha !== oldHead && latestDraftRef.object.sha !== pr.head.sha)
+              throw new Error('Release tag changed during cleanup');
+            await checkCurrentCi(); // A failed current run cannot start another private package build.
+            await checkPr(); // The source must still be current before any new tag/retarget mutation.
+            if (!sourceRef) await github.rest.git.createRef({...repo, ref: 'refs/tags/' + sourceTag, sha: pr.head.sha});
+            if (latestDraftRef && latestDraftRef.object.sha !== pr.head.sha)
+              await github.rest.git.updateRef({...repo, ref: 'tags/' + tag, sha: pr.head.sha, force: true});
+            const {data: release} = await github.rest.repos.updateRelease({...repo, release_id: ownedDraftId,
+              tag_name: tag, name: releaseName, target_commitish: pr.head.sha, draft: true});
+            if (release.id !== ownedDraftId || !release.draft || release.tag_name !== tag ||
+                release.name !== releaseName || release.target_commitish !== pr.head.sha)
+              throw new Error('GitHub did not retain the canonical unpublished replacement draft');
+            try {
+              await github.rest.actions.createWorkflowDispatch({...repo,
+                workflow_id: 'release-linux-ui-update.yml', ref: sourceTag,
+                inputs: {version, base_tag: 'v0.5.0-alpha.131', linux_base_tag: 'v0.5.0-alpha.131', capture_catalog: 'true', viewport_checks: 'true', rb10_checks: 'true'}});
+            } catch (error) {
+              core.error(`The draft is already retargeted to ${pr.head.sha}, with immutable source ${sourceTag}. The dispatch request may already be queued: inspect this head's package runs and draft assets before any manual resume. Do not blindly rerun the old-target cleanup workflow.`);
+              throw error;
+            }
+            core.info(`Replaced only the owned old alpha.132 draft assets; new source ${pr.head.sha}; current-head CI run ${ci.id} (private packages remain unaccepted until final checks succeed)`);

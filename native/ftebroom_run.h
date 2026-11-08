@@ -246,7 +246,7 @@ static void runBegin(const RunProfile& profile,bool test=false)
   if(!profile.trenchBroom&&gameClassic() && std::any_of(profile.tasks.begin(),profile.tasks.end(),[](const RunTask& task){return task.kind==1 && task.source.find("q3map2")!=std::string::npos;})){
     runError="q3map2 cannot compile this game format. Use Compile / Setup compile for the active game profile.";runHadError=true;return;
   }
-  if(!profile.trenchBroom&&documentFile.empty() && !profile.launch && profile.name!="Export selected BSP model"){runError="Save the map before running a profile.";return;}
+  if(documentFile.empty() && !profile.launch && profile.name!="Export selected BSP model"){runError="Save the map before running a profile.";return;}
   try
   {
     runningProfile=lastRunProfile=profile;runStrict=profile.trenchBroom;runTesting=test;

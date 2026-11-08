@@ -102,10 +102,14 @@ static void plantProperties() {
     if(s.result)for(int i=0;i<3;i++)ImGui::Text("LOD%i: %zu triangles",i,s.result->lods[i].faces.size());
   }
   if(ImGui::CollapsingHeader("Export / target")) {
-    ImGui::TextWrapped("OBJ + PNG / GLB: portable editable geometry, UVs, normals and material textures. Add to Map installs MD3 + cutout shader.");
+    ImGui::TextWrapped("OBJ + PNG / GLB retain portable full-detail geometry. Export also accepts .mdl (Quake) and .md2 (Quake II). Add to Map / Save use the active game's native model format.");
+    if(gameProfile==0)ImGui::TextWrapped("Quake III: MD3 with alpha-cutout material, baked by q3map2 when compiling.");
+    if(gameProfile==1)ImGui::TextWrapped("FTE: MD3 with alpha-coverage mipmaps, so distant foliage stays visible.");
+    if(gameProfile==2)ImGui::TextWrapped("Quake: MDL, at most 1024 vertices / 2048 triangles; opaque, double-sided geometric foliage and a paletted skin. The full editable plant is retained.");
+    if(gameProfile==3)ImGui::TextWrapped("Quake II: MD2 + PCX, at most 2048 vertices / 4096 triangles; opaque, double-sided geometric foliage. The full editable plant is retained.");
     if(gameProfile==2)ImGui::Checkbox("Use FTE static models for Quake 1",&s.allowFteQ1);
-    if(gameProfile==2)ImGui::TextWrapped("Vanilla Quake needs an MDL-compatible mod/entity. Convert OBJ with Model Editor for that target.");
-    if(gameProfile==3||gameProfile==4)ImGui::TextWrapped("Quake II / GoldSrc require format conversion in Model Editor before placement.");
+    if(gameProfile==2||gameProfile==3)ImGui::TextWrapped("The editor keeps a linked func_model. The base game has no arbitrary-model spawner: use compatible mod game code, or the explicit FTE extension for Quake. Unsupported compilation stops with a diagnostic.");
+    if(gameProfile==4)ImGui::TextWrapped("GoldSrc requires studio MDL conversion in Model Editor before placement.");
   }
 }
 static void plantStructureNode(size_t index) {

@@ -1,10 +1,32 @@
-param([Parameter(Mandatory=$true)][string]$Root,[Parameter(Mandatory=$true)][string]$CurrentVersion,[int]$ParentId=0,[string]$LocalPackage='')
+# Legacy invocation still downloads and waits for the editor. Check mode never
+# downloads; prepare reports verified progress and waits for ParentId. Relaunch
+# requires restart.request containing the same Session, written by Restart.
+param([Parameter(Mandatory=$true)][string]$Root,[Parameter(Mandatory=$true)][string]$CurrentVersion,[int]$ParentId=0,[string]$LocalPackage='',[ValidateSet('auto','check','prepare')][string]$Mode='auto',[string]$Session='',[string]$TargetVersion='')
 $ErrorActionPreference='Stop'
 $Root=[IO.Path]::GetFullPath($Root)
 if(!(Test-Path -LiteralPath "$Root/fteqw64.exe") -and !(Test-Path -LiteralPath "$Root/bin/fteqw64.exe")){throw 'Invalid editor installation'}
 $updates=Join-Path $Root 'updates'
 New-Item -ItemType Directory -Force -Path $updates | Out-Null
-function Status([string]$text){[IO.File]::WriteAllText("$updates/status.txt",$text)}
+if($Session -and $Session -notmatch '^[a-zA-Z0-9_-]{1,80}$'){throw 'Invalid update session'}
+$state=@{session=$Session;current_version=$CurrentVersion;available_version='';stage='checking';received=0L;total=0L}
+function Write-UpdateStatusFile([string]$name,[string]$text){
+ $temporary=Join-Path $updates ($name+'.tmp');$target=Join-Path $updates $name
+ [IO.File]::WriteAllText($temporary,$text,[Text.UTF8Encoding]::new($false))
+ for($attempt=0;$attempt -lt 5;$attempt++){
+  try{Move-Item -LiteralPath $temporary -Destination $target -Force;return}catch{
+   $cause=$_.Exception.GetBaseException()
+   if($cause -isnot [IO.IOException] -and $cause -isnot [UnauthorizedAccessException]){throw}
+   # Native readers can briefly hold a Windows file handle without delete
+   # sharing. A telemetry collision must not abort a verified update.
+   if($attempt -eq 4){return};Start-Sleep -Milliseconds 20
+  }
+ }
+}
+function Status([string]$text,[string]$stage='', [long]$received=-1,[long]$total=-1){
+ if($stage){$state.stage=$stage};if($received -ge 0){$state.received=$received};if($total -ge 0){$state.total=$total};$state.message=$text
+ Write-UpdateStatusFile 'status.txt' $text
+ Write-UpdateStatusFile 'status.json' ($state | ConvertTo-Json -Compress)
+}
 function Under([string]$base,[string]$relative){$p=[IO.Path]::GetFullPath((Join-Path $base $relative));if(!$p.StartsWith($base.TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe archive path'};return $p}
 function FileHash([string]$path){$stream=[IO.File]::OpenRead($path);$sha=[Security.Cryptography.SHA256]::Create();try{return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','').ToLowerInvariant()}finally{$stream.Dispose();$sha.Dispose()}}
 function CleanupUpdates([string]$keep){
@@ -95,6 +117,7 @@ function Download-Update($asset,$sum,[string]$version){
    $inputStream=$response.GetResponseStream();$output=[IO.File]::Create($partial)
    try{
     $buffer=New-Object byte[] 65536;$received=0L;$last=[DateTime]::MinValue
+    Status 'Downloading update...' 'downloading' 0 $asset.size
     for(;;){
      try{$n=$inputStream.Read($buffer,0,$buffer.Length)}catch{
       if($_.Exception.GetBaseException() -is [IO.IOException]){throw [IO.EndOfStreamException]::new('Interrupted update download')}
@@ -103,9 +126,10 @@ function Download-Update($asset,$sum,[string]$version){
      if($n -le 0){break}
      $received+=$n;if($received -gt 536870912){throw 'Update exceeds 512 MiB'}
      $output.Write($buffer,0,$n)
-     if(([DateTime]::Now-$last).TotalMilliseconds -gt 200){Status ("Downloading {0}: {1:N1} / {2:N1} MiB" -f $version,($received/1MB),($asset.size/1MB));$last=[DateTime]::Now}
+     if(([DateTime]::Now-$last).TotalMilliseconds -gt 200){Status ("Downloading {0}: {1:N1} / {2:N1} MiB" -f $version,($received/1MB),($asset.size/1MB)) 'downloading' $received $asset.size;$last=[DateTime]::Now}
     }
     if($received -ne $asset.size){throw [IO.EndOfStreamException]::new('Incomplete update download')}
+    Status 'Download complete. Verifying...' 'verifying' $received $asset.size
    }finally{$output.Dispose();$inputStream.Dispose()}
   }
   if((FileHash $partial) -ne $checksum){throw 'Update checksum mismatch'}
@@ -118,6 +142,9 @@ if(Test-Path -LiteralPath "$Root/distribution-manifest.json"){try{$manifest=Get-
 function Preserve([string]$name){
  $p=$name.Replace('\','/');$leaf=[IO.Path]::GetFileName($p)
  $existing=Under $Root $p
+ # Saved game folders/definitions and per-game compiler workspaces are user
+ # settings, including copies that still match an earlier package manifest.
+ if($p -in @('reyondbroom-legacy-games.txt','ftebroom/reyondbroom-legacy-games.txt','ftebroom/reyondbroom-quake2-build-options.txt','ftebroom/reyondbroom-halflife-build-options.txt','ftebroom/compilation-profiles.json')){return (Test-Path -LiteralPath $existing)}
  if((Test-Path -LiteralPath $existing) -and $p -match '^ftebroom/.*\.(cfg|ini|map|wad|def|ent|fgd)$'){
   if(!$oldManifest.ContainsKey($p)){return $true}
   if((FileHash $existing) -ne $oldManifest[$p]){return $true}
@@ -129,7 +156,7 @@ try {
  $hash=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($Root.ToLowerInvariant()))).Replace('-','')
  $mutex=New-Object Threading.Mutex($false,('Local\FTEBroomUpdate'+$hash))
  if(!$mutex.WaitOne(0)){exit 0}
- if($ParentId){$process=[Diagnostics.Process]::GetProcessById($ParentId)}
+ if($ParentId){try{$process=[Diagnostics.Process]::GetProcessById($ParentId)}catch [ArgumentException]{}} # Closing the editor before this line is allowed.
  Status 'Checking GitHub releases...'
  if(!$LocalPackage){
   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
@@ -137,22 +164,29 @@ try {
   $current=VersionKey $CurrentVersion
   $release=$releases | Where-Object {
    $candidate="ReyondBroom-$($_.tag_name.TrimStart('v'))-Windows-x64.zip"
-   !$_.draft -and (VersionKey $_.tag_name) -and (VersionKey $_.tag_name) -gt $current -and ($_.assets.name -contains $candidate) -and ($_.assets.name -contains "$candidate.sha256")
+   !$_.draft -and (!$TargetVersion -or $_.tag_name.TrimStart('v') -eq $TargetVersion.TrimStart('v')) -and (VersionKey $_.tag_name) -and (VersionKey $_.tag_name) -gt $current -and ($_.assets.name -contains $candidate) -and ($_.assets.name -contains "$candidate.sha256")
   } | Sort-Object @{Expression={VersionKey $_.tag_name};Descending=$true} | Select-Object -First 1
-  if(!$release){Status 'ReyondBroom is up to date.';exit 0}
+  if(!$release){if($TargetVersion){throw 'The selected release is no longer available'};Status 'ReyondBroom is up to date.' 'current';exit 0}
   $version=$release.tag_name.TrimStart('v');$name="ReyondBroom-$version-Windows-x64.zip"
   $asset=$release.assets | Where-Object name -eq $name | Select-Object -First 1
   $sum=$release.assets | Where-Object name -eq "$name.sha256" | Select-Object -First 1
   if(!$asset -or !$sum){throw 'The newer release has no complete Windows package yet.'}
+  $state.available_version=$version
+  if($Mode -eq 'check'){Status 'A new version of ReyondBroom is available.' 'available' 0 $asset.size;exit 0}
+  Status 'Downloading update...' 'downloading'
   $LocalPackage=Download-Update $asset $sum $version
+ }elseif($Mode -eq 'check'){
+  throw 'Check-only mode cannot install a local package'
  }
+ Status 'Verifying and preparing the update...' 'verifying'
  Add-Type -AssemblyName System.IO.Compression.FileSystem
  $stage=Join-Path $updates ('stage-'+[guid]::NewGuid());New-Item -ItemType Directory -Path $stage | Out-Null
  $zip=[IO.Compression.ZipFile]::OpenRead($LocalPackage)
  try {$total=0L;foreach($entry in $zip.Entries){$name=$entry.FullName.Replace('\','/');if(!$name.StartsWith('ReyondBroom-Windows-x64/')){throw 'Unexpected package layout'};$relative=$name.Substring('ReyondBroom-Windows-x64/'.Length);if(!$relative){continue};$target=Under $stage $relative;$total+=$entry.Length;if($total -gt 2147483648){throw 'Expanded update exceeds 2 GiB'};if($name.EndsWith('/')){New-Item -ItemType Directory -Force $target | Out-Null}else{New-Item -ItemType Directory -Force ([IO.Path]::GetDirectoryName($target)) | Out-Null;[IO.Compression.ZipFileExtensions]::ExtractToFile($entry,$target)}}}finally{$zip.Dispose()}
  if((!(Test-Path "$stage/fteqw64.exe") -and !(Test-Path "$stage/bin/fteqw64.exe")) -or !(Test-Path "$stage/fteplug_ftebroom_x64.dll")){throw 'Incomplete update'}
- Status 'Update downloaded. It will be installed after you close the editor.'
+ if($Mode -eq 'prepare'){Status 'Update verified. Restart the editor to finish updating.' 'ready'}else{Status 'Update downloaded. It will be installed after you close the editor.' 'ready'}
  if($process){$process.WaitForExit()}
+ Status 'Installing update...' 'installing'
  $backup=Join-Path $updates ('backup-'+[guid]::NewGuid());New-Item -ItemType Directory -Path $backup | Out-Null
  foreach($file in Get-ChildItem -LiteralPath $stage -File -Recurse){
   $relative=$file.FullName.Substring($stage.Length+1);if(Preserve $relative){continue};$target=Under $Root $relative;$saved=Under $backup $relative
@@ -166,10 +200,16 @@ try {
   $changed+=,@($target,$saved,$true);Remove-Item -LiteralPath $target
  }
  try{CleanupUpdates $backup}catch{} # Cache cleanup must not roll back a successful install.
- Status 'Update installed. Your settings and documents were preserved. Start ReyondBroom normally.'
+ Status 'Update installed. Your settings and documents were preserved. Start ReyondBroom normally.' 'installed'
+ $restart=Join-Path $updates 'restart.request'
+ if($Mode -eq 'prepare' -and $Session -and (Test-Path -LiteralPath $restart) -and ([IO.File]::ReadAllText($restart).Trim() -eq $Session)){
+  Remove-Item -LiteralPath $restart -Force
+  $launcher=Join-Path $Root 'ReyondBroom.exe'
+  try{Start-Process -FilePath $launcher -WorkingDirectory $Root | Out-Null}catch{Status 'Update installed. Start ReyondBroom normally to continue.' 'installed'}
+ }
 } catch {
  foreach($item in $changed){try{if($item[2]){Copy-Item -LiteralPath $item[1] -Destination $item[0] -Force}else{Remove-Item -LiteralPath $item[0] -Force}}catch{}}
- Status ('Update failed: '+$_.Exception.Message);exit 1
+ Status ('Update failed: '+$_.Exception.Message) 'error';exit 1
 } finally {
  if($process){$process.Dispose()}
  if($mutex){try{$mutex.ReleaseMutex()}catch{};$mutex.Dispose()}

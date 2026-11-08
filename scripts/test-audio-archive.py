@@ -27,20 +27,28 @@ logs = [data / 'qconsole.log', runtime / 'qconsole.log']
 offsets = {path: path.stat().st_size if path.exists() else 0 for path in logs}
 engine = runtime / ('bin/fteqw64.exe' if os.name == 'nt' else 'fteqw-gl64')
 renderer = ['+set', 'vid_renderer', os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
-with (output / 'native.log').open('wb') as log:
-    subprocess.run([str(engine), *renderer, '+set', 'ftebroom_skip_setup', '1',
-                    '-ftebroom-child-processes', '-nohome', '-noupdates', '-nosound',
-                    '-condebug', '-window', '-width', str(a.width), '-height', str(a.height),
-                    '-basedir', str(runtime), '+exec', 'audio-archive-run.cfg'],
-                   cwd=runtime, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'},
-                   stdout=log, stderr=subprocess.STDOUT, timeout=90, check=True)
-text = (output / 'native.log').read_text(errors='replace')
-for path, offset in offsets.items():
-    if path.exists():
-        with path.open('rb') as log:
-            log.seek(offset)
-            text += '\n' + log.read().decode(errors='replace')
-(output / 'combined.log').write_text(text)
+artifacts = ['audio-archive-initial.png', 'audio-archive-window.png']
+for name in artifacts:
+    (data / name).unlink(missing_ok=True)
+try:
+    with (output / 'native.log').open('wb') as log:
+        subprocess.run([str(engine), *renderer, '+set', 'ftebroom_skip_setup', '1',
+                        '-ftebroom-child-processes', '-nohome', '-noupdates', '-nosound',
+                        '-condebug', '-window', '-width', str(a.width), '-height', str(a.height),
+                        '-basedir', str(runtime), '+exec', 'audio-archive-run.cfg'],
+                       cwd=runtime, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'},
+                       stdout=log, stderr=subprocess.STDOUT, timeout=90, check=True)
+finally:
+    text = (output / 'native.log').read_text(errors='replace')
+    for path, offset in offsets.items():
+        if path.exists():
+            with path.open('rb') as log:
+                log.seek(offset)
+                text += '\n' + log.read().decode(errors='replace')
+    (output / 'combined.log').write_text(text)
+    for name in artifacts:
+        if (data / name).is_file():
+            shutil.copy2(data / name, output / name)
 assert not any(error in text for error in ['DESKTOP_FAIL', 'CSQC_Abort', 'Assertion failed']), text[-5000:]
 checks = ['pk3_file_manager_double_click', 'pk3_sound_in_media_and_timeline',
           'sound_is_inner_window', 'import_queued_while_decoding',

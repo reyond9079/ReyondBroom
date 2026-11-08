@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "botanical_shapes.h"
 // Included after the generator-1 implementation. The old generator stays intact
 // so existing editable sources reproduce their original geometry on opening.
 namespace ftebroom::plant {
@@ -52,21 +53,43 @@ struct Botanical : Generator {
     if(material==Needle||material==NeedleLight||material==NeedleMature){
       b.leaf(origin,direction,up,size,std::max(.65,width),6,lod==2?3:1,material,part,p.leafCurl*.35,p.leafTwist*.2,{.05,.85,1.,.80,.1});
     }else if(shape==4&&mode<2){
-      int lobes=std::clamp(p.leaflets,3,9),n=lobes*(lod?3:5);
+      int lobes=std::clamp(p.leaflets,3,9),n=lobes*4+2;
       if(!b.room(n))return;b.organ++;
       V right=unit(cross(direction,up)),normal=unit(cross(right,direction));
-      V center=add(origin,mul(direction,size*.46));
-      unsigned pivot=b.vertex(center,normal,.5,.5,material,.4);
+      V center=add(origin,mul(direction,size*.40));
+      unsigned pivot=b.vertex(center,normal,.5,.40,material,.4);
       for(int i=0;i<=n;i++){
-        double a=2*pi*i/n,rad=.5*(.65+.35*std::cos(lobes*a));
-        double u=std::sin(a)*rad,v=std::cos(a)*rad;
-        auto q=add(center,add(mul(right,u*size*width),mul(direction,v*size)));
-        q=add(q,mul(normal,size*p.leafCurl*v*v));
-        b.vertex(q,normal,u+.5,v+.5,material,.8);
+        auto uv=botanicalPalmatePoint(i,lobes);double u=uv[0]-.5,v=uv[1];
+        auto q=add(origin,add(mul(right,u*size*width),mul(direction,v*size)));
+        q=add(q,mul(normal,size*(p.leafCurl*.28*v*v+.045*std::abs(u))));
+        b.vertex(q,normal,uv[0],uv[1],material,v);
       }
       for(int i=0;i<n;i++)b.face(pivot,pivot+i+2,pivot+i+1,material,part);
-    }else b.leaf(origin,direction,up,size,width,shape,mode,material,part,
-                 p.leafCurl+r.range(-.06,.06)*p.irregularity,p.leafTwist*r.range(-.6,.6),p.leafProfile);
+    }else if(mode>=2){
+      b.leaf(origin,direction,up,size,width,shape,mode,material,part,p.leafCurl*.45,p.leafTwist*r.range(-.6,.6),p.leafProfile);
+    }else {
+      int steps=lod==1?3:mode==1?4:8,columns=mode==1?1:2;
+      if(!b.room(steps*columns*2))return;b.organ++;
+      auto first=b.mesh.vertices.size();V right=unit(cross(direction,up)),normal=unit(cross(right,direction));
+      double curl=(p.leafCurl+r.range(-.06,.06)*p.irregularity)*.48,twist=p.leafTwist*r.range(-.6,.6),asym=r.range(-.055,.055)*p.irregularity;
+      for(int i=0;i<=steps;i++){
+        double t=double(i)/steps,profile=botanicalLeafWidth(shape,t,p.leafProfile,p.serration);
+        // A loose contour follows the selected morphology without clipping
+        // the finer lobes/teeth between compact ribbon rows.
+        double w=mode==1?.80+.20*std::clamp(profile,0.,1.):std::max(.005,profile);
+        auto center=add(origin,add(mul(direction,size*t),mul(normal,size*curl*t*t)));
+        center=add(center,mul(right,size*asym*std::sin(pi*t)));
+        for(int k=0;k<=columns;k++){
+          double j=2.*k/columns-1;
+          double lateral=size*width*.5*w*j*(1+(j<0?-.035:.035)*p.irregularity);
+          auto q=add(center,add(mul(right,lateral),mul(normal,-std::abs(lateral)*.11+twist*lateral*t)));
+          // A central fold and gently rolled margin give the lamina volume.
+          auto n=unit(add(sub(normal,mul(direction,2*curl*t)),mul(right,j*.11-twist*t)));
+          b.vertex(q,n,(j*w+1)*.5,t,material,t);
+        }
+      }
+      for(int i=0;i<steps;i++)for(int j=0;j<columns;j++){unsigned a=first+i*(columns+1)+j,c=a+columns+1;b.quad(a,a+1,c+1,c,material,part);}
+    }
     // Keep geometric normals in the same hemisphere. Mild canopy smoothing
     // avoids black paper-like undersides without painting fake vertex shadows.
     for(size_t i=first;i<b.mesh.vertices.size();i++){
@@ -104,8 +127,8 @@ struct Botanical : Generator {
     }
   }
   size_t leafCost() const {
-    size_t cost=lod==2?4:lod==1||p.foliageMode==1?8:p.foliageMode>=2?4:16;
-    if(p.leafShape==4&&p.foliageMode<2&&lod!=2)cost=std::clamp(p.leaflets,3,9)*(lod?3:5);
+    size_t cost=lod==2?4:p.foliageMode>=2?4:lod==1?6:p.foliageMode==1?8:32;
+    if(p.leafShape==4&&p.foliageMode<2&&lod!=2)cost=std::clamp(p.leaflets,3,9)*4+2;
     if(p.leafShape==7)cost=cost*p.leaflets*(doc.family==Family::Broadleaf&&p.organ==3?4:1)+24;
     return cost;
   }
@@ -168,7 +191,7 @@ struct Botanical : Generator {
     std::stable_sort(foliage.begin(),foliage.end(),[](auto& a,auto& b){return mix(a.id,13)<mix(b.id,13);});
     auto capacity=(b.budget-b.mesh.faces.size())/std::max<size_t>(1,needles?8:leafCost()+2);
     size_t survivors=std::min(capacity,foliage.size()),count=size_t(survivors*std::min(1.,phenology()));
-    double compensation=lod&&survivors?std::clamp(std::sqrt(double(foliage.size())/survivors)/(lod==2?1.85:1.18),1.,1.65):1.;
+    double compensation=survivors?std::clamp(std::sqrt(double(foliage.size())/survivors)/(lod==2?1.85:lod==1?1.18:1.),1.,lod?1.65:1.35):1.;
     for(size_t i=0;i<count;i++){
       auto& s=foliage[i*foliage.size()/count];double size=p.leafSize*(.5+.5*p.age)*s.size*(needles?1.:1.20)*compensation;
       if(needles){Rng r(mix(s.id,doc.seed));V tilt=unit({r.range(-.65,.65),r.range(-.65,.65),1});lamina(s.p,s.aim,tilt,size,p.leafWidth,s.id,5,foliageMaterial(s.id,true));continue;}

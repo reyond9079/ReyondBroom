@@ -156,9 +156,11 @@ int(int modelidx, int brushid, int face) brushface_deselect =
     if(face<1 || face>64) {fb_face_limit();return FALSE;}
     int selected=brush_isselected(modelidx,brushid);
     if(!selected) return FALSE;
+    if(!selbrush_face(&selectedbrushes[selected-1],face-1))return TRUE;
     selbrush_set_face(&selectedbrushes[selected-1],face-1,FALSE);
     int *words=(int*)&selectedbrushes[selected-1].facemask;
     if(words[0]==0 && words[1]==0) brush_deselect(modelidx,brushid);
+    else fb_selection_epoch++;
     return TRUE;
 };
 void() brush_deselectall =
@@ -184,6 +186,9 @@ void(int modelidx, int brushid) brush_select =
 		selectedbrushcount++;
         brush_selection_index[sprintf("%i:%i",modelidx,brushid)]=itos(selectedbrushcount);
 		brush_selected(modelidx, brushid, -1, TRUE);
+		// The ID index was updated in place; only selection-dependent caches
+		// need invalidation. Rebuilding the index per added brush is quadratic.
+		fb_selection_epoch++;
 	}
 	selectedbrushmodel = modelidx;
 };
@@ -207,6 +212,8 @@ void(int modelidx, int brushid, int faceid) brushface_select =
 		brush_selected(modelidx, brushid, -1, TRUE);
 		i = selectedbrushcount;
 	}
+	int changed=!selbrush_face(&selectedbrushes[i-1],faceid) || selbrush_whole(&selectedbrushes[i-1]);
 	selbrush_set_face(&selectedbrushes[i-1],faceid,TRUE);
+	if(changed)fb_selection_epoch++;
 	selectedbrushmodel = modelidx;
 };

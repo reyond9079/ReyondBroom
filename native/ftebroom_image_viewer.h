@@ -2,11 +2,7 @@
 #include <future>
 #include "ftebroom_lmp.h"
 #include "ftebroom_legacy_images.h"
-#define STB_IMAGE_STATIC
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_NO_STDIO
-#define STBI_MAX_DIMENSIONS 16384
-#include "third_party/stb_image.h"
+#include "ftebroom_stb_image.h"
 // Decode loose files and archive members, then upload bounded images to FTE.
 struct FileImage { qhandle_t handle=0; int slot=0,frame=-1; unsigned long long used=0; std::string error; };
 static std::map<std::pair<std::filesystem::path,bool>,FileImage> fileImages;

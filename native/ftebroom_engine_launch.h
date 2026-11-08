@@ -53,19 +53,11 @@ inline EngineLaunch engineLaunchPlan(const RunEngineProfile& e,nlohmann::json va
   out.arguments=profile::interpolate(e.parameters,vars);
   auto args=profile::parseArguments(out.arguments);
   if(e.mapFile.empty())return out; // Imported/custom engines keep their exact command.
-  out.source=enginePath(profile::interpolate(e.mapFile,vars),base);
-  if(out.source.extension()!=".bsp"||!std::filesystem::is_regular_file(out.source))
-    throw std::runtime_error("Compiled Quake map not found (expected .bsp): "+out.source.u8string());
-  std::ifstream input(out.source,std::ios::binary);unsigned char header[124]{};
-  input.read(reinterpret_cast<char*>(header),sizeof header);
-  if(!input)throw std::runtime_error("Compiled map has a truncated BSP header: "+out.source.u8string());
-  auto word=[&](int at){return uint32_t(header[at])|uint32_t(header[at+1])<<8|uint32_t(header[at+2])<<16|uint32_t(header[at+3])<<24;};
-  const auto magic=word(0);
-  if(magic!=29&&magic!=0x32505342&&magic!=0x42535032)
-    throw std::runtime_error("VKQuake/Ironwail require a Quake 1 BSP (29/BSP2), not this map format.");
-  const auto size=std::filesystem::file_size(out.source);
-  for(int i=0;i<15;i++){auto offset=word(4+i*8),length=word(8+i*8);
-    if(uint64_t(offset)+length>size)throw std::runtime_error("Compiled map contains an invalid BSP lump.");}
+  // A relative compilation working directory is relative to the editor's
+  // process cwd, just like QProcess/posix_spawn compiler tasks. The application
+  // and engine directories may be elsewhere. Keep the variable itself literal;
+  // only resolve the compiled map's disk path before validation/staging.
+  out.source=enginePath(profile::interpolate(e.mapFile,vars),std::filesystem::current_path());
   std::string root,mod="id1",map;
   for(size_t i=0;i<args.size();i++){
     if(args[i]=="-basedir"||args[i]=="-game"||args[i]=="+map"){
@@ -92,6 +84,29 @@ inline EngineLaunch engineLaunchPlan(const RunEngineProfile& e,nlohmann::json va
   if(!std::filesystem::is_directory(gameRoot/"id1"))throw std::runtime_error("Quake base directory must contain id1 game data: "+gameRoot.u8string());
   if(!std::filesystem::is_directory(gameRoot/mod))throw std::runtime_error("Quake mod directory not found: "+(gameRoot/mod).u8string());
   out.target=gameRoot/mod/"maps"/std::filesystem::u8path(map+".bsp");
+  if(out.source.extension()!=".bsp")
+    throw std::runtime_error("Compiled Quake map not found (expected .bsp): "+out.source.u8string());
+  // TrenchBroom profiles commonly copy the BSP into the active game's maps
+  // directory and then delete the build output. Launch that exact deployed
+  // map when the configured build output is absent; an existing bad output
+  // must still fail rather than silently launch an older deployed map.
+  if(!std::filesystem::exists(out.source)){
+    if(!std::filesystem::is_regular_file(out.target))
+      throw std::runtime_error("Compiled Quake map not found: "+out.source.u8string()+" (deployed map also missing: "+out.target.u8string()+")");
+    out.source=out.target;
+  }
+  if(!std::filesystem::is_regular_file(out.source))
+    throw std::runtime_error("Compiled Quake map not found (expected .bsp): "+out.source.u8string());
+  std::ifstream input(out.source,std::ios::binary);unsigned char header[124]{};
+  input.read(reinterpret_cast<char*>(header),sizeof header);
+  if(!input)throw std::runtime_error("Compiled map has a truncated BSP header: "+out.source.u8string());
+  auto word=[&](int at){return uint32_t(header[at])|uint32_t(header[at+1])<<8|uint32_t(header[at+2])<<16|uint32_t(header[at+3])<<24;};
+  const auto magic=word(0);
+  if(magic!=29&&magic!=0x32505342&&magic!=0x42535032)
+    throw std::runtime_error("VKQuake/Ironwail require a Quake 1 BSP (29/BSP2), not this map format.");
+  const auto size=std::filesystem::file_size(out.source);
+  for(int i=0;i<15;i++){auto offset=word(4+i*8),length=word(8+i*8);
+    if(uint64_t(offset)+length>size)throw std::runtime_error("Compiled map contains an invalid BSP lump.");}
   return out;
 }
 inline void stageEngineMap(const EngineLaunch& plan) {

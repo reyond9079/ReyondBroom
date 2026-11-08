@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "ftebroom_browser_navigation.h"
 #include "ftebroom_entity_defs.h"
 static std::string entityLower(std::string value)
 {
@@ -382,7 +383,7 @@ static void entityPanel()
       static char filter[256]{};
       if(cvars->GetFloat("ftebroom_skip_setup")){char testFilter[256]={};cvars->GetString("ftebroom_test_entity_filter",testFilter,sizeof testFilter);if(*testFilter)std::snprintf(filter,sizeof filter,"%s",testFilter);}
       static bool used = false, grouped = true;
-      static int kind = 0, sort = 0;
+      static int sort = 0;
       static float position[3] = {0, 0, 64};
       float searchWidth=ImGui::GetContentRegionAvail().x-ImGui::GetFrameHeight()-ImGui::GetStyle().ItemSpacing.x;
       ImGui::SetNextItemWidth(std::max(30.f,searchWidth));
@@ -402,7 +403,7 @@ static void entityPanel()
         ImGui::SameLine();
       ImGui::Checkbox("Group by prefix", &grouped);
       if(ImGui::BeginTable("Entity filters",2,ImGuiTableFlags_SizingStretchSame)){
-        ImGui::TableNextColumn();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Type");ImGui::SameLine();ImGui::SetNextItemWidth(-1);ImGui::Combo("##entityType",&kind,"All\0Point\0Brush\0");
+        ImGui::TableNextColumn();ImGui::AlignTextToFramePadding();ImGui::TextDisabled("Point entities");
         ImGui::TableNextColumn();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Sort");ImGui::SameLine();ImGui::SetNextItemWidth(-1);ImGui::Combo("##entitySort",&sort,"Name\0Usage\0");ImGui::EndTable();
       }
       }
@@ -414,12 +415,12 @@ static void entityPanel()
       {
         const auto& d = item.second;
         if (
-          d.name == "worldspawn" || (used && !entityUsage[d.name])
-          || (kind == 1 && d.brush) || (kind == 2 && !d.brush)
+          d.name == "worldspawn" || d.brush || (used && !entityUsage[d.name])
           || entityLower(d.name).find(query) == std::string::npos)
           continue;
         classes.push_back(&d);
       }
+      if(browserQaEnabled){browserQaEntityClasses.clear();for(const auto* d:classes)browserQaEntityClasses.push_back(d->name);}
       std::stable_sort(classes.begin(), classes.end(), [&](auto a, auto b) {
         if (sort && entityUsage[a->name] != entityUsage[b->name])
           return entityUsage[a->name] > entityUsage[b->name];
@@ -428,7 +429,8 @@ static void entityPanel()
       ImGui::BeginChild(
         "Classes",
         {0, std::max(24.f,ImGui::GetContentRegionAvail().y-ImGui::GetFrameHeight()-ImGui::GetStyle().ItemSpacing.y*2)},
-        ImGuiChildFlags_Borders);
+        ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollWithMouse);
+      browserQaWindow("entities/grid");browserHoverZoom(entityThumbnailSize,48,160);
       entityVisiblePreviewCount=0;entityPreviewMarginsValid=true;
       std::string group;
       int column=0;

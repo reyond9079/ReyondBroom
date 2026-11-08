@@ -71,6 +71,8 @@ def export(name):
  target=data/'maps'/(name+'.map');target.unlink(missing_ok=True);ui.console('mod_terrain_save "" '+name);wait(lambda:target.exists() and target.stat().st_size>50);return target.read_text(errors='replace')
 try:
  start('editor')
+ # This is a grid colour/layering check; RB-10 independently tests the fresh plane-off default.
+ ui.console('set ftebroom_grid_plane 1')
  ui.console('ftebroom_deselect');ui.console('set ftebroom_grid_alpha 1');ui.console('set ftebroom_color_brush_edges "1 0 1"')
  ui.console('set ftebroom_grid_color "1 1 1"');white=shot('grid-white')
  metrics['white_grid_2d']=count(white,'2d',lambda c:min(c)>235)

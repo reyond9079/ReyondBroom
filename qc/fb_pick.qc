@@ -35,6 +35,8 @@ int fb_render_allowed(int node,int flags);
 int fb_transform_replaces(int model,int id);
 int fb_visibility_get(int model,int id);
 int fb_filter_allowed(int node);
+int fb_filter_selected(int node);
+int fb_filter_face_visible(int node,int faceIndex,brushface_t *face,int contents);
 void fb_filter_prepare();
 #include "fb_label_visibility.qc"
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -59,6 +61,7 @@ void fb_pick_handle(int id,vector point,float radius,int node)
 }
 int fb_pick_allowed(int node,int flags)
 {
+    int selected=fb_filter_selected(node);
     if(node>=0 && node<fb_node_count && fb_nodes[node].kind<0)return FALSE;
     if(!(flags&FB_PICK_LOCKED) && fb_open_group) {
         int inside=FALSE;
@@ -68,7 +71,7 @@ int fb_pick_allowed(int node,int flags)
     }
     for(int steps=0;node>=0 && node<fb_node_count && steps<fb_node_count;steps++) {
         int state=fb_nodes[node].flags;
-        if(!(flags&FB_PICK_HIDDEN) && !fb_filter_allowed(node))return FALSE;
+        if(!selected && !(flags&FB_PICK_HIDDEN) && !fb_filter_allowed(node))return FALSE;
         if(!(flags&FB_PICK_HIDDEN) && fb_visibility_get(fb_nodes[node].model,fb_nodes[node].id)) return FALSE;
         if(!(flags&FB_PICK_HIDDEN) && (state&FB_NODE_HIDDEN)) return FALSE;
         if(!(flags&FB_PICK_LOCKED) && (state&FB_NODE_LOCKED)) return FALSE;
@@ -119,7 +122,7 @@ void fb_pick_brush(int node,vector start,vector direction,float length)
     int count=brush_get(item.model,item.id,__NULL__,0,__NULL__);
     if(count<4) return;
     brushface_t *faces=memalloc(sizeof(brushface_t)*count);
-    brush_get(item.model,item.id,faces,count,__NULL__);
+    int contents;brush_get(item.model,item.id,faces,count,&contents);
     float enter=-1,leave=length;
     int front=-1,back=-1,valid=TRUE;
     for(int i=0;i<count;i++) {
@@ -135,7 +138,7 @@ void fb_pick_brush(int node,vector start,vector direction,float length)
         }
     }
     if(enter<0) {enter=leave;front=back;}
-    if(valid && front>=0 && enter>=0 && enter<=length) {
+    if(valid && front>=0 && enter>=0 && enter<=length)if(fb_filter_face_visible(node,front,&faces[front],contents)) {
         fb_hit_t hit={0};
         hit.kind=FB_HIT_BRUSH;hit.model=item.model;hit.id=item.id;hit.node=node;
         hit.face=front+1;hit.distance=enter;hit.point=start+direction*enter;

@@ -1,5 +1,6 @@
 int(string path) editor_gpu_snapshot = #0:editor_gpu_snapshot;
 var float autocvar_ftebroom_grid_fade_start=512,autocvar_ftebroom_grid_fade_end=1024;
+var float autocvar_ftebroom_grid_plane=0;
 int *fb_static_access;int fb_static_access_count,fb_static_preview_supported;
 void fb_static_preview_prepare();
 void fb_texture_align(string operation,int direction,int fraction);
@@ -407,7 +408,9 @@ int fb_grid_append_brush(int b,int vertexOffset)
             memcpy(face.points,facepoints,sizeof(vector)*n);
             face.normal=gridPlanes[f-1].planenormal;
             face.sky=(gridPlanes[f-1].surfaceflags&4)!=0 || fb_sky_material(gridPlanes[f-1].shadername);
-            face.occluder=fb_face_occluder(&gridPlanes[f-1],gridContents,b,model);
+            // Bit 4 is QC's hidden-fill marker; native occlusion uses bits 1/2
+            // and retained-edit invalidation uses bit 8. Keep the wire edges.
+            face.occluder=fb_filter_face_visible(b,f-1,&gridPlanes[f-1],gridContents)?fb_face_occluder(&gridPlanes[f-1],gridContents,b,model):4;
             face.u=0;face.v=1;
             if(fabs(face.normal[0])>fabs(face.normal[1]) && fabs(face.normal[0])>fabs(face.normal[2])) {face.u=1;face.v=2;}
             else if(fabs(face.normal[1])>fabs(face.normal[2])) {face.u=0;face.v=2;}
@@ -419,19 +422,26 @@ int fb_grid_append_brush(int b,int vertexOffset)
 
     return vertexOffset;
 }
+void fb_grid_filter_alpha(fb_grid_face_t *faces,int count)
+{
+    if(!cvar("ftebroom_hidden_tags"))return;
+    for(int f=0;f<count;f++)if(faces[f].occluder&4)
+        for(int v=0;v<faces[f].count;v++)faces[f].vertices[v].rgba[3]=0;
+}
 void fb_surfacegrid(int geometryOnly)
 {
     static int epoch,valid,materialEpoch;
     static vector lastEye,lastAngles,lastSize,lastMin,lastFov;
     static float lastGrid,lastAlpha,lastRotation;
-    static int lastFilters,lastVisibility,lastSky,wasPreview;
+    static int lastFilters,lastVisibility,lastSky,wasPreview,lastTagMask,lastTagSelection;
     vector eye=getproperty(VF_ORIGIN),angles=getproperty(VF_ANGLES),size=getproperty(VF_SIZE);
     vector viewport=getproperty(VF_MIN),fov=getproperty(VF_FOV);
     float grid=fb_grid(),alpha=bound(0,cvar("ftebroom_grid_alpha"),1);
-    int currentMaterials=cvar("ftebroom_material_tag_epoch");int rebuild=!valid || epoch!=fb_grid_geometry_epoch || materialEpoch!=currentMaterials;
+    int tagMask=cvar("ftebroom_hidden_tags"),tagSelection=tagMask?fb_selection_epoch:0;
+    int currentMaterials=cvar("ftebroom_material_tag_epoch");int rebuild=!valid || epoch!=fb_grid_geometry_epoch || materialEpoch!=currentMaterials || lastTagMask!=tagMask || lastTagSelection!=tagSelection;
     float grid81Time=gettime(1);
     if(rebuild) {
-        epoch=fb_grid_geometry_epoch;valid=TRUE;materialEpoch=currentMaterials;
+        epoch=fb_grid_geometry_epoch;valid=TRUE;materialEpoch=currentMaterials;lastTagMask=tagMask;lastTagSelection=tagSelection;
         // Four contiguous allocations replace four allocations per face. The
         // QC heap otherwise spends seconds walking hundreds of thousands of blocks.
         int required=0,vertexOffset=0;
@@ -487,6 +497,9 @@ void fb_surfacegrid(int geometryOnly)
             vector gridPoint=fb_grid_local(face.points[j]);face.vertices[j].st[0]=gridPoint[face.u]/grid;face.vertices[j].st[1]=gridPoint[face.v]/grid;
         }
     }
+    // The native builder resets every fill alpha on grid/opacity changes.
+    // Reapply the filter after either builder, keeping edge alpha untouched.
+    fb_grid_filter_alpha(fb_grid_faces,fb_grid_face_count);
     }
     lastAlpha=alpha;lastRotation=autocvar_ftebroom_grid_rotation;
     int preview=fb_active;
@@ -594,19 +607,22 @@ void ftebroom_frame()
     }
     if(!cvar("ca_brush_view"))if(cvar("ftebroom_grid_visible") || cvar("ftebroom_show_edges"))fb_surfacegrid(FALSE);
     fb_frame_profile[2]+=gettime(1)-profileTime;profileTime=gettime(1);
-    if (cvar("ftebroom_grid_visible") && !cvar("ca_brush_view")) {
-        shaderforname("ftebroom/worldgrid","{\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
+    if (autocvar_ftebroom_grid_plane && cvar("ftebroom_grid_visible") && !cvar("ca_brush_view")) {
+        shaderforname("ftebroom/worldgrid","{\ncull none\nprogram ftebroom_grid\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
         // Keep the construction plane just behind a coincident brush surface.
         float z=cvar("ftebroom_plane")-0.05;
-        float g=fb_grid_display_step([0,0,z],'0 0 1');
-        for (int i=-32;i<=32;i++) {
-            R_BeginPolygon("ftebroom/worldgrid");
-            R_PolygonVertex(fb_grid_world([i*g,-32*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1));
-            R_PolygonVertex(fb_grid_world([i*g,32*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
-            R_BeginPolygon("ftebroom/worldgrid");
-            R_PolygonVertex(fb_grid_world([-32*g,i*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1));
-            R_PolygonVertex(fb_grid_world([32*g,i*g,z]),'0 0',autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1)); R_EndPolygon();
+        // The old 32-cell extent shrank with the selected grid. A single
+        // analytic quad keeps its range in world units and its CPU cost fixed.
+        // Its shader coarsens subpixel lines without changing snapping.
+        float g=fb_grid(),extent=autocvar_ftebroom_grid_fade_end>0?max(64,autocvar_ftebroom_grid_fade_end)+64:65536;
+        vector center=fb_grid_local(getproperty(VF_ORIGIN));
+        center_x=floor(center_x/64)*64;center_y=floor(center_y/64)*64;
+        R_BeginPolygon("ftebroom/worldgrid");
+        for(int corner=0;corner<4;corner++) {
+            vector point=[center_x+((corner==0||corner==3)?-extent:extent),center_y+(corner<2?-extent:extent),z];
+            R_PolygonVertex(fb_grid_world(point),[point_x/g,point_y/g,0],autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1));
         }
+        R_EndPolygon();
     }
     fb_tool_draw();
     fb_tool_panel_state();

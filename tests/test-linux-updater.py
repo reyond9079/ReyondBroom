@@ -14,6 +14,27 @@ from unittest.mock import patch
 script=Path(__file__).resolve().parents[1]/'runtime/update-ftebroom.py'
 spec=importlib.util.spec_from_file_location('updater',script)
 updater=importlib.util.module_from_spec(spec);spec.loader.exec_module(updater)
+game_defaults={'reyondbroom-legacy-games.txt':b'"" "" "" "" "" 0\n',
+               'ftebroom/reyondbroom-legacy-games.txt':b'"" "" "" "" "" 0\n',
+               'ftebroom/reyondbroom-quake2-build-options.txt':b'1 1 1 "" "" ""\n',
+               'ftebroom/reyondbroom-halflife-build-options.txt':b'1 1 1 "" "" "" ""\n',
+               'ftebroom/compilation-profiles.json':b'{"version":1,"games":{}}\n'}
+
+def custom_game_settings(root):
+    q2=root/'Quake II custom'/'rogue мод';hl=root/'Half-Life custom'/'cstrike'
+    q2defs=q2/'mapping/custom quake2.fgd';hldefs=hl/'mapping/custom halflife.fgd';wad=hl/'textures/custom.wad'
+    for path in (q2defs,hldefs,wad):path.parent.mkdir(parents=True,exist_ok=True)
+    for path in (q2defs,hldefs):path.write_bytes(b'@PointClass = info_custom : "User entity" []\n')
+    wad.write_bytes(b'WAD3\0\0\0\0\x0c\0\0\0')
+    fields=[q2.as_posix(),hl.as_posix(),wad.as_posix(),hldefs.as_posix(),q2defs.as_posix()]
+    legacy=(' '.join(json.dumps(value,ensure_ascii=False) for value in fields)+' 1\r\n').encode('utf-8')
+    workspace={'version':1,'games':{'quake2':{'gameRoot':q2.parent.as_posix(),'baseMod':'baseq2',
+        'enabledMods':[q2.name],'modsConfigured':True,'profiles':[],'engines':[],'variables':{'q2bsp':'custom q2bsp'}}}}
+    return {'reyondbroom-legacy-games.txt':legacy,
+            'ftebroom/reyondbroom-legacy-games.txt':legacy,
+            'ftebroom/reyondbroom-quake2-build-options.txt':b'1 0 1 "-q2bsp -threads 3" "-fast" "-bounce 2"\r\n',
+            'ftebroom/reyondbroom-halflife-build-options.txt':b'1 1 1 "-cliptype precise" "-full" "-extra" "-texdata 16384"\r\n',
+            'ftebroom/compilation-profiles.json':(json.dumps(workspace,ensure_ascii=False,indent=2)+'\r\n').encode('utf-8')}
 
 class UpdateTests(unittest.TestCase):
     def test_cleanup_keeps_latest_backup_and_user_files(self):
@@ -52,6 +73,7 @@ class UpdateTests(unittest.TestCase):
         files={'fteqw-gl64':b'new engine','fteplug_ftebroom_amd64.so':b'plugin','Launch-ReyondBroom.sh':b'launcher',
                'ftebroom/appearance.cfg':b'0 0 0 0','ftebroom/ftebroom-quake1.txt':b'new defaults',
                'ftebroom/maps/custom.map':b'package map','ftebroom/custom.cfg':b'factory'}
+        files.update(game_defaults)
         files['distribution-manifest.json']=json.dumps({k:hashlib.sha256(v).hexdigest() for k,v in files.items()}).encode()
         path=folder/'package.tar.gz'
         with tarfile.open(path,'w:gz') as tar:
@@ -66,6 +88,11 @@ class UpdateTests(unittest.TestCase):
             (root/'ftebroom/maps').mkdir(parents=True)
             custom={'appearance.cfg':'4 0 2 1','ftebroom-quake1.txt':'my mod','maps/custom.map':'my geometry','custom.cfg':'my binding'}
             for name,value in custom.items():(root/'ftebroom'/name).write_text(value)
+            games=custom_game_settings(root)
+            for name,value in games.items():(root/name).write_bytes(value)
+            # Ownership must survive even if a previous release accidentally
+            # shipped the same settings bytes as its defaults.
+            (root/'distribution-manifest.json').write_text(json.dumps({name:hashlib.sha256(value).hexdigest() for name,value in games.items()}))
             package=self.make_package(root)
             parent=subprocess.Popen(['/bin/sleep','3'])
             worker=subprocess.Popen([sys.executable,str(script),'--root',str(root),'--current-version','0.5.0-alpha.40','--parent-id',str(parent.pid),'--local-package',str(package)])
@@ -75,11 +102,21 @@ class UpdateTests(unittest.TestCase):
                 parent.wait();self.assertEqual(worker.wait(timeout=15),0)
                 self.assertEqual((root/'fteqw-gl64').read_text(),'new engine')
                 for name,value in custom.items():self.assertEqual((root/'ftebroom'/name).read_text(),value)
+                for name,value in games.items():self.assertEqual((root/name).read_bytes(),value,name)
                 self.assertTrue((root/'Launch-ReyondBroom.sh').stat().st_mode&0o111)
                 self.assertTrue(list((root/'updates').glob('backup-*/fteqw-gl64')))
             finally:
                 if parent.poll() is None:parent.kill();parent.wait()
                 if worker.poll() is None:worker.kill();worker.wait()
+
+    def test_fresh_game_settings_receive_packaged_defaults(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp);root=folder/'root';stage=folder/'stage';backup=folder/'backup'
+            for path in (root,stage,backup):path.mkdir()
+            for name,value in game_defaults.items():
+                path=stage/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(value)
+            updater.install(root,stage,backup)
+            for name,value in game_defaults.items():self.assertEqual((root/name).read_bytes(),value,name)
 
     def test_reject_links_and_traversal(self):
         for name,kind in [('ReyondBroom-Linux-x64/../escape',tarfile.REGTYPE),('ReyondBroom-Linux-x64/link',tarfile.SYMTYPE)]:

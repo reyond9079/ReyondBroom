@@ -223,6 +223,9 @@ jobs:
       - name: Validate packaged viewport fixes on Windows
         if: inputs.viewport_checks
         shell: pwsh
+        env:
+          RB_QA_RENDERER: gl rb_qa_opengl.dll
+          GALLIUM_DRIVER: llvmpipe
         run: |
           python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
           if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
@@ -246,5 +249,7 @@ jobs:
           path: |
             qa/audio-archive/**
             qa/viewport-create-*/**
+            qa/appearance-*/**
+            qa/engine-viewport/**
             audio-deps/ffmpeg-8.0.1/ffbuild/config.log
             audio-deps/lame-source/config.log

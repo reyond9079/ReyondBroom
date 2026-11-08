@@ -32,6 +32,7 @@ windows = os.name == 'nt'
 platform = 'Windows-x64' if windows else 'Linux-SDL2-x64' if (a.runtime/'linux-sdl2-build').exists() else 'Linux-x64'
 module = 'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so'
 api = 'https://api.github.com/repos/reyond9079/ReyondBroom/releases'
+http_errors = []
 
 
 def sha(path):
@@ -60,6 +61,16 @@ def public_read(urls, limit):
                 return result
             except urllib.error.HTTPError as error:
                 last = error
+                try:
+                    body = error.read(4096).decode('utf-8', errors='replace')
+                except (OSError, http.client.HTTPException) as read_error:
+                    body = 'Cannot read HTTP error body: '+str(read_error)
+                failure = {'url': fresh, 'status': error.code, 'attempt': attempt+1,
+                           'retry_after': error.headers.get('Retry-After'), 'body': body}
+                http_errors.append(failure)
+                (a.output/'public-http-errors.json').write_text(json.dumps(http_errors, indent=2))
+                print('Public HTTP error: '+json.dumps(failure), file=sys.stderr, flush=True)
+                error.close()
                 if error.code not in (408, 429, 500, 502, 503, 504):
                     if error.code in (403, 404) and route+1 < len(urls):
                         break
@@ -71,10 +82,12 @@ def public_read(urls, limit):
     raise last
 
 
-releases = json.loads(public_read([api+'?per_page=100'], 8*1024*1024))
 assert version(a.current_version), 'Invalid baseline version'
 if a.target_version:
     assert version(a.target_version), 'Invalid requested public version'
+    releases = [json.loads(public_read([api+'/tags/v'+a.target_version.removeprefix('v')], 1024*1024))]
+else:
+    releases = json.loads(public_read([api+'?per_page=20'], 8*1024*1024))
 candidates = []
 for release in releases:
     tag = release.get('tag_name', '')

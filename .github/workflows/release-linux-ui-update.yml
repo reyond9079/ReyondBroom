@@ -136,6 +136,16 @@ jobs:
           python -m pip install Pillow pywinauto
           python scripts/test-engine-viewport.py out/release/ReyondBroom-Windows-x64 qa/engine-viewport --probe deps/profile-core/compilation-profile-probe.exe
           if ($LASTEXITCODE) { throw 'Windows engine/viewport acceptance failed' }
+      - name: Validate Space in every pane and all onboarding stages before the full UI matrix
+        shell: pwsh
+        env:
+          RB_QA_RENDERER: gl rb_qa_opengl.dll
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          python tests/make-linux-build-fixture.py out/release/ReyondBroom-Windows-x64
+          if ($LASTEXITCODE) { throw 'Input fixture failed' }
+          python scripts/test-editor133-input.py out/release/ReyondBroom-Windows-x64 qa/early-editor133-input
+          if ($LASTEXITCODE) { throw 'Actual Space/onboarding input failed' }
       - name: Validate packaged viewport fixes on Windows
         if: inputs.viewport_checks
         shell: pwsh

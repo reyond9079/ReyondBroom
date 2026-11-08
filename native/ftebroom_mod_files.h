@@ -312,7 +312,10 @@ static void modFilesPanel() {
         if(col)ImGui::SameLine();ImGui::PushID(i);auto p=ImGui::GetCursorScreenPos();
         if(ImGui::Selectable("##file",false,ImGuiSelectableFlags_AllowDoubleClick,{modFilesGrid?tileSize+8:ImGui::GetContentRegionAvail().x,rowHeight-ImGui::GetStyle().ItemSpacing.y})&&directory)navigate=path;
         browserQaItem("files/item/"+label);
-        if(cvars->GetFloat("ftebroom_skip_setup")&&soundFile(path)) {auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();modFilesTestItems[path.generic_u8string()]={(a.x+b.x)*.5f,(a.y+b.y)*.5f};}
+        if(cvars->GetFloat("ftebroom_skip_setup")&&soundFile(path)) {
+          ImRect visible(ImGui::GetItemRectMin(),ImGui::GetItemRectMax());visible.ClipWith(ImGui::GetCurrentWindow()->ClipRect);
+          if(visible.GetWidth()>0&&visible.GetHeight()>0)modFilesTestItems[path.generic_u8string()]=visible.GetCenter();
+        }
         if(ImGui::IsItemHovered()&&ImGui::IsMouseDoubleClicked(0)&&!directory) {
           if(entityLower(path.extension().u8string())==".lmp")lmpShow(path);else if(modelViewableFile(path))modelEditorShow(modFileModelPath(path));else if(soundFile(path))soundOpen(path);else if(imageFile(path))imageViewerShow(path);else if(entityLower(path.extension().u8string())==".map")modFileOpenMap(path);else if(modFileText(path))modFilesEdit(path);
         }

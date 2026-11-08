@@ -8,7 +8,14 @@ static bool browserQaEnabled=false;
 static std::map<std::string,BrowserQaRect> browserQaWidgets;
 static int browserQaMaterialSize=64;
 static std::vector<std::string> browserQaEntityClasses;
-static void browserQaItem(const std::string& name){if(browserQaEnabled)browserQaWidgets[name]={ImGui::GetItemRectMin(),ImGui::GetItemRectMax(),ImGui::IsItemVisible(),ImGui::IsItemActive()};}
+static void browserQaItem(const std::string& name){
+  if(!browserQaEnabled)return;
+  const auto min=ImGui::GetItemRectMin(),max=ImGui::GetItemRectMax();
+  auto hit=ImRect(min,max);hit.ClipWithFull(ImGui::GetCurrentWindow()->ClipRect);
+  const bool visible=ImGui::IsItemVisible()&&hit.GetWidth()>0&&hit.GetHeight()>0;
+  // QA clicks the visible portion of a partially clipped tile, as a user does.
+  browserQaWidgets[name]={visible?hit.Min:min,visible?hit.Max:max,visible,ImGui::IsItemActive()};
+}
 static void browserQaWindow(const std::string& name){if(browserQaEnabled){auto p=ImGui::GetWindowPos(),s=ImGui::GetWindowSize();browserQaWidgets[name]={p,{p.x+s.x,p.y+s.y},true,false};}}
 static bool browserNavigationButton(bool up) {
   const float height=ImGui::GetFrameHeight(),size=height*.64f;

@@ -53,7 +53,11 @@ inline EngineLaunch engineLaunchPlan(const RunEngineProfile& e,nlohmann::json va
   out.arguments=profile::interpolate(e.parameters,vars);
   auto args=profile::parseArguments(out.arguments);
   if(e.mapFile.empty())return out; // Imported/custom engines keep their exact command.
-  out.source=enginePath(profile::interpolate(e.mapFile,vars),base);
+  // A relative compilation working directory is relative to the editor's
+  // process cwd, just like QProcess/posix_spawn compiler tasks. The application
+  // and engine directories may be elsewhere. Keep the variable itself literal;
+  // only resolve the compiled map's disk path before validation/staging.
+  out.source=enginePath(profile::interpolate(e.mapFile,vars),std::filesystem::current_path());
   std::string root,mod="id1",map;
   for(size_t i=0;i<args.size();i++){
     if(args[i]=="-basedir"||args[i]=="-game"||args[i]=="+map"){

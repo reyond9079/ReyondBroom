@@ -139,24 +139,39 @@ instead of an editor-local writable path. Compilation and engine launch require
 a saved map, as in TrenchBroom, instead of treating an untitled map's empty
 directory as the editor process directory. Saved profiles retain explicitly
 empty or relative working directories without rewriting them.
+Relative build paths used for automatic engine staging resolve from the editor
+process's current directory, matching compiler tasks even when the application,
+engine and launch directories are different. A regression case also removes
+that relative build BSP after deployment and verifies the deployed-map fallback.
 
-`prepare-rb10.yml` runs when the PR is marked ready. It requires exact-head
-`compilation-profile-checks.yml` success for `windows`, `linux (Linux-x64)` and
-`linux (Linux-SDL2-x64)`. It reserves draft `v0.5.0-alpha.132`, verifies an immutable
+An additional smoke check loaded a free LibreQuake test map in actual Ironwail
+0.8.2 and VKQuake 1.37.0, each with a spaced game path and the engine directory
+as cwd. Both reported the expected map and exited successfully in dedicated
+mode. The editor integration checks use process/argv probes; this additional
+check verifies real engine map loading without exercising a graphics window.
+
+`prepare-rb10.yml` runs when the PR is marked ready. It requires an exact-head
+`compilation-profile-checks.yml` run with `windows`, `linux (Linux-x64)` and
+`linux (Linux-SDL2-x64)` present and either pending, running or successful. It
+prepares draft `v0.5.0-alpha.132`, verifies an immutable
 `rb-10-package-<full-head-SHA>` source ref and dispatches packaging against it.
 All runtime/dependency bases are verified `v0.5.0-alpha.131` assets.
 
-An empty unpublished draft can be retried after test, workflow or QA-documentation
-repairs. The previous pinned source must be an ancestor and its package runs
-must finish or be cancelled before the draft changes. Successful platform CI for
-an ancestor with identical production files allows draft packaging to overlap
-the new revision's CI. Each retry
-gets a new immutable source ref; earlier source refs remain unchanged. The final
-publication gate still requires successful CI and packaging for the exact final
-PR head, identical merged trees and all twelve verified assets.
-Release updates explicitly retain their versioned tag name. Recovery of the
-known empty RB-10 draft cancels an older active packaging run before retargeting;
-unrelated drafts and immutable package source refs remain untouched.
+Private draft packaging may run alongside the exact new head's CI; failed,
+cancelled, missing or unknown CI/job states block draft replacement. The workflow
+pins and rechecks that same CI run before deleting assets and retargeting.
+It verifies the owned
+draft ID, canonical tag/name, old source pin and exact old package run. It waits
+for that run to finish or cancel, then removes only the twelve allowlisted
+alpha.132 asset names from this unpublished draft. It checks the draft, run and
+current PR again before deletion and retargeting. Unknown assets or concurrent
+package runs block replacement. Earlier immutable source refs remain unchanged;
+unrelated drafts are untouched. Release updates explicitly retain the versioned
+tag/name. A dispatch error after retargeting requires inspecting the actual runs
+and assets before resuming. The final publication gate requires successful CI
+and packaging for the exact final PR head, identical merged trees and all twelve
+verified assets. Merge also waits for both complete sets of successful checks;
+private packages built while CI is running are not yet accepted release output.
 
 `release-linux-ui-update.yml` runs with `capture_catalog`, `viewport_checks` and
 `rb10_checks` enabled. It compiles the actual source, packages complete matching

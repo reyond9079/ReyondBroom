@@ -51,6 +51,43 @@ static void checkBarkMappingAndWinding(const std::string& palette){
       "wood normals face outward while Quake triangles are clockwise, including the closed ends");
   }
 }
+static void checkWoodJunction() {
+  const WoodJunction joint{{0.,0.,0.},{0.,0.,1.},6.};
+  std::vector<V> path{{0.,0.,0.},{24.,0.,0.},{48.,0.,0.}};
+  addJunctionRing(path,joint);
+  require(path.size()==4&&path[1]==V{6.,0.,0.},"junction ring is placed on the parent surface");
+  Builder straight(200),collar(200);
+  require(straight.tube(path,2.,.15,8,Bark,Part::Primary),"plain branch fixture fits");
+  require(collar.tube(path,2.,.15,8,Bark,Part::Primary,0.,0.,0.,0,&joint),"branch collar fixture fits");
+  validate(collar.mesh);
+  bool differentPosition=false,differentNormal=false;
+  for(size_t i=9;i<18;i++){
+    differentPosition|=straight.mesh.vertices[i].p!=collar.mesh.vertices[i].p;
+    differentNormal|=straight.mesh.vertices[i].n!=collar.mesh.vertices[i].n;
+  }
+  require(differentPosition&&differentNormal,"collar modifies the shape and blends normals near the parent surface");
+  require(straight.mesh.vertices[18].p==collar.mesh.vertices[18].p,"the branch beyond the collar stays unchanged");
+}
+static void checkWoodMaterials() {
+  Builder tree(300);
+  tree.repeatBark=true;tree.barkURepeats=2;tree.barkVUnits=32.;tree.separateWoodCut=true;
+  require(tree.tube({{0.,0.,0.},{0.,0.,96.}},4.,2.,8,Bark,Part::Trunk),"tiled wood and caps fit budget");
+  require(tree.mesh.vertices[0].uv==atlasUV(Bark,0.,0.)&&tree.mesh.vertices[4].uv==atlasUV(Bark,1.,0.)&&
+    tree.mesh.vertices[8].uv==atlasUV(Bark,0.,0.)&&tree.mesh.vertices[9].uv==atlasUV(Bark,0.,1.),
+    "bark repeats correctly across the circumference and every 32 world units");
+  require(std::count_if(tree.mesh.faces.begin(),tree.mesh.faces.end(),[](const Face& face){return face.material==Wood;})==16,
+    "the end caps use the cut wood tile");
+  auto p=presets().front();p.texture="leaf.png";p.barkTexture="bark.png";p.cutTexture="cut.png";p.barkURepeats=2;p.barkVUnits=32.;
+  require(serialize(deserialize(serialize(p)))==serialize(p),"separate materials and bark scale persist");
+  const Image leaf{1,1,{20,30,40,140}},bark{1,1,{50,60,70,80}},cut{1,1,{90,100,110,120}};
+  auto maps=textureMaps(p,&leaf,nullptr,16,nullptr,&bark,&cut);
+  auto center=[&](int material){
+    const auto at=((material/4*16+8)*maps.albedo.width+(material%4*16+8))*4;
+    return std::vector<unsigned char>(maps.albedo.rgba.begin()+at,maps.albedo.rgba.begin()+at+4);
+  };
+  require(center(Leaf)==leaf.rgba&&center(Bark)==std::vector<unsigned char>{50,60,70,255}&&
+    center(Wood)==std::vector<unsigned char>{90,100,110,255},"custom materials stay independent and only foliage uses imported alpha");
+}
 static void checkTreeGroup(const Project& preset,const std::string& palette,const Textures& maps,
                            const std::filesystem::path& folder) {
   auto project=preset;
@@ -81,10 +118,36 @@ static void checkTreeGroup(const Project& preset,const std::string& palette,cons
   write(folder/name,encoded);
   write(folder/(name+"_0.png"),png({int(replacement.width),int(replacement.height),std::move(replacement.rgba)}));
 }
+static void checkBranchEdits(Project project) {
+  const auto source=generate(project);
+  std::set<uint64_t> keys;
+  for(const auto& face:source.faces)if(face.part==Part::Primary&&face.branch)keys.insert(face.branch);
+  require(keys.size()>2,"branches have independent IDs "+project.preset);
+  const auto id=*keys.begin(),other=*std::next(keys.begin());
+  const auto points=[](const Mesh& mesh,uint64_t key){
+    std::vector<V> positions;
+    for(const auto& face:mesh.faces)if(face.branch==key)
+      for(auto index:face.i)positions.push_back(mesh.vertices[index].p);
+    return positions;
+  };
+  project.branchEdits[id]={1.25,10.,1.2,false};
+  const auto edited=generate(deserialize(serialize(project)));
+  require(!points(edited,id).empty()&&points(source,id)!=points(edited,id),"branch transform survives save "+project.preset);
+  require(points(source,other)==points(edited,other),"unselected branch geometry is preserved "+project.preset);
+  project.branchEdits[id].removed=true;
+  const auto pruned=generate(project);
+  require(points(pruned,id).empty()&&!points(pruned,other).empty(),"remove only selected branch "+project.preset);
+  project.seed++;
+  const auto nextSeed=generate(project);
+  require(std::none_of(nextSeed.faces.begin(),nextSeed.faces.end(),[&](const Face& face){return face.branch==id;}),
+    "branch edits are scoped to the original seed");
+}
 int main(int argc,char** argv)try{
   auto folder=argc>1?std::filesystem::u8path(argv[1]):std::filesystem::path("plant-target-results");std::filesystem::create_directories(folder);
   auto q1Palette=ftebroom::defaultQuakePalette(),q2Palette=q1Palette;
   checkBarkMappingAndWinding(q1Palette);
+  checkWoodJunction();
+  checkWoodMaterials();
   // CI may supply the active game's palette; both encoders must retain it.
   if(argc>2){std::ifstream in(argv[2],std::ios::binary);std::string pcx((std::istreambuf_iterator<char>(in)),{});q2Palette=ftebroom::legacy::pcx(pcx).palette;}
   Json rows=Json::array();int cases=0;
@@ -155,8 +218,10 @@ int main(int argc,char** argv)try{
   std::ifstream details("runtime/plants/builtin/photographic-details.rgba.z",std::ios::binary);
   std::string detailBytes((std::istreambuf_iterator<char>(details)),{});
   photos.loadDetails(detailBytes.data(),detailBytes.size());
-  for(auto& preset:presets())if(preset.preset=="oak"||preset.preset=="pine")
+  for(auto& preset:presets())if(preset.preset=="oak"||preset.preset=="pine"){
     checkTreeGroup(preset,q1Palette,textureMaps(preset,nullptr,nullptr,64,&photos),folder);
+    checkBranchEdits(preset);
+  }
   for(int layer=int(Photo::Oak);layer<int(Photo::None);layer++){
     unsigned visible=0,empty=0;
     for(int y=0;y<PhotoAtlas::side;y++)for(int x=0;x<PhotoAtlas::side;x++){

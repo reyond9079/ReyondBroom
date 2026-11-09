@@ -57,9 +57,24 @@ try:
  view=live()['views'][0];ui.click(view['x']+view['width']*.46,view['y']+view['height']*.52,button=3)
  hover('context/create');hover('context/model');click('context/new-plant');wait(lambda:live()['plantOpen'] and live()['plantReady'])
  check(live()['plant']['active'] and live()['plant']['id']==live()['context']['id'],'cold viewport Create opens Plant Editor and retains captured scene click')
- ui.console('ftebroom_plant qa dark');wait(lambda:'plant/open' in live()['widgets']);click('plant/open');wait(lambda:'plant/file-path' in live()['widgets']);r=live()['widgets']['plant/file-path'];ui.click(r['x']+r['width']*.35,r['y']+r['height']*.5);ui.key('a',('ctrl',));ui.text(str(project));ui.key('enter');click('plant/file-choose');wait(lambda:live()['plantReady'] and live()['plantPath']==str(project))
- check(not live()['plant']['active'],'ordinary tall source open has no pending context insertion')
+ ui.console('ftebroom_plant qa dark');wait(lambda:'plant/open' in live()['widgets'])
  plant_state=data/'plant-ui-live.json'
+ def plant_live():return read_ui_json(plant_state)
+ click('plant/lod');click('plant/lod/0')
+ probes=wait(lambda:plant_live().get('branchProbes'))
+ for x,y,expected in probes:
+  ui.click(x,y);ui.settle()
+  if plant_live().get('selectedBranch')==expected:break
+ else:raise AssertionError('No visible branch could be selected with a viewport click')
+ click('plant/remove-branch')
+ wait(lambda:plant_live()['project'].get('branchEdits') and plant_live()['project']['branchEdits'][0]['removed'])
+ check(plant_live()['project']['branchEdits'][0]['id']==expected,'viewport pick and remove affect the selected branch ID')
+ click('plant/undo')
+ wait(lambda:plant_live()['ready'] and not plant_live()['project'].get('branchEdits'))
+ check(True,'Plant Editor Undo restores the removed branch')
+ click('plant/lod');click('plant/game-preview')
+ click('plant/open');wait(lambda:'plant/file-path' in live()['widgets']);r=live()['widgets']['plant/file-path'];ui.click(r['x']+r['width']*.35,r['y']+r['height']*.5);ui.key('a',('ctrl',));ui.text(str(project));ui.key('enter');click('plant/file-choose');wait(lambda:live()['plantReady'] and live()['plantPath']==str(project))
+ check(not live()['plant']['active'],'ordinary tall source open has no pending context insertion')
  def game_preview():
   state=read_ui_json(plant_state)
   preview=state.get('gamePreview',{})

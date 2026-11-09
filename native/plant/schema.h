@@ -62,17 +62,32 @@ struct Params {
   std::array<double,5> leafProfile{0,.75,1,.65,0};
   std::array<V,4> controls{{{0,0,0},{0,0,.33},{0,0,.67},{0,0,1}}};
 };
+struct BranchEdit {
+  double length=1.,angle=0.,thickness=1.;
+  bool removed=false;
+};
 struct Project {
   int version=1, generator=4;
+  bool smoothJunctions=false,stableLods=false,runtimeWind=false;
   std::string name="English oak", preset="oak", species="oak";
   Family family=Family::Broadleaf;
   uint32_t seed=137;
   Params p;
   std::vector<Component> nodes;
+  std::map<uint64_t,BranchEdit> branchEdits;
   std::vector<uint32_t> variations;
   std::string texture;
+  std::string barkTexture,cutTexture;
+  int barkURepeats=1;
+  double barkVUnits=64.;
   std::vector<std::string> tags;
 };
+inline Json serializeBranchEdits(const Project& d) {
+  Json edits=Json::array();
+  for(const auto& [id,edit]:d.branchEdits)
+    edits.push_back({{"id",id},{"length",edit.length},{"angle",edit.angle},{"thickness",edit.thickness},{"removed",edit.removed}});
+  return edits;
+}
 inline std::vector<Component> defaultNodes() {
   std::vector<Component> out;
   const char* ids[]={"roots","trunk","primary","secondary","twigs","leaves","flowers","surface"};
@@ -127,11 +142,21 @@ inline Json serialize(const Project& d) {
     {"preset",d.preset},{"species",d.species},{"family",int(d.family)},{"seed",d.seed},{"parameters",params},
     {"hierarchy",nodes},{"variations",d.variations},{"texture",d.texture}};
   if(d.generator>=2)out["tags"]=d.tags;
+  if(d.smoothJunctions)out["smoothJunctions"]=true;
+  if(d.stableLods)out["stableLods"]=true;
+  if(d.runtimeWind)out["runtimeWind"]=true;
+  if(!d.barkTexture.empty())out["barkTexture"]=d.barkTexture;
+  if(!d.cutTexture.empty())out["cutTexture"]=d.cutTexture;
+  if(d.barkURepeats!=1)out["barkURepeats"]=d.barkURepeats;
+  if(d.barkVUnits!=64.)out["barkVUnits"]=d.barkVUnits;
+  if(!d.branchEdits.empty())out["branchEdits"]=serializeBranchEdits(d);
   return out;
 }
 inline void validate(const Project& d) {
   if(d.version!=1||(d.generator<1||d.generator>4))throw std::runtime_error("Unsupported plant project / generator version");
   if(int(d.family)<0||int(d.family)>(d.generator==1?11:12)||d.name.size()>256||d.species.size()>80||d.tags.size()>16)throw std::runtime_error("Invalid plant identity");
+  if(d.barkURepeats<1||d.barkURepeats>4||!std::isfinite(d.barkVUnits)||d.barkVUnits<16.||d.barkVUnits>512.)
+    throw std::runtime_error("Invalid plant bark scale");
   for(auto& tag:d.tags)if(tag.size()>80)throw std::runtime_error("Plant tag exceeds 80 bytes");
   const auto values=parameters(d.p);
   for(auto& item:values.items()) {
@@ -157,6 +182,11 @@ inline void validate(const Project& d) {
     p.leafSize<.01||p.leafSize>160||p.flowerSize<.01||p.flowerSize>240||p.windStrength<0||p.windStrength>4)
     throw std::runtime_error("Plant parameters exceed safe generation bounds");
   if(d.nodes.size()>64||d.variations.size()>64)throw std::runtime_error("Plant hierarchy / variations exceed 64 entries");
+  if(d.branchEdits.size()>4096)throw std::runtime_error("Plant branch edits exceed 4096 entries");
+  for(const auto& [id,edit]:d.branchEdits)
+    if(!id||!std::isfinite(edit.length)||!std::isfinite(edit.angle)||!std::isfinite(edit.thickness)||
+       edit.length<.1||edit.length>3||edit.angle< -80||edit.angle>80||edit.thickness<.1||edit.thickness>3)
+      throw std::runtime_error("Invalid plant branch edit");
   std::set<std::string> ids;
   for(auto& n:d.nodes) {
     if(n.id.empty()||n.id.size()>80||!ids.insert(n.id).second||int(n.kind)<0||int(n.kind)>7)throw std::runtime_error("Invalid plant component ID");
@@ -176,6 +206,11 @@ inline void validate(const Project& d) {
 inline Project deserialize(const Json& j) {
   if(j.value("format","")!="ReyondBroomPlant")throw std::runtime_error("Not a ReyondBroom plant project");
   Project d;d.version=j.at("version");d.generator=j.at("generatorVersion");d.name=j.at("name");d.preset=j.at("preset");
+  d.smoothJunctions=j.value("smoothJunctions",false);
+  d.stableLods=j.value("stableLods",false);
+  d.runtimeWind=j.value("runtimeWind",false);
+  d.barkTexture=j.value("barkTexture",std::string{});d.cutTexture=j.value("cutTexture",std::string{});
+  d.barkURepeats=j.value("barkURepeats",1);d.barkVUnits=j.value("barkVUnits",64.);
   d.species=j.at("species");d.family=Family(j.at("family").get<int>());d.seed=j.at("seed");auto& p=d.p;auto& a=j.at("parameters");
 #define RB_PLANT_FIELD(n) if(a.contains(#n))a.at(#n).get_to(p.n)
   RB_PLANT_FIELD(crown);RB_PLANT_FIELD(phyllotaxy);RB_PLANT_FIELD(organ);RB_PLANT_FIELD(barkPattern);RB_PLANT_FIELD(needleForm);RB_PLANT_FIELD(evergreen);
@@ -190,6 +225,15 @@ inline Project deserialize(const Json& j) {
   RB_PLANT_FIELD(bark);RB_PLANT_FIELD(leaf);RB_PLANT_FIELD(flower);RB_PLANT_FIELD(roughness);RB_PLANT_FIELD(ao);RB_PLANT_FIELD(variation);RB_PLANT_FIELD(growth);RB_PLANT_FIELD(leafProfile);RB_PLANT_FIELD(controls);
 #undef RB_PLANT_FIELD
   for(auto& n:j.at("hierarchy"))d.nodes.push_back({n.at("id"),n.at("name"),n.at("parent"),Part(n.at("kind").get<int>()),n.at("visible"),n.at("offset").get<V>(),n.at("scale").get<V>(),n.at("rotation")});
+  if(j.contains("branchEdits")){
+    const auto& edits=j.at("branchEdits");
+    if(!edits.is_array()||edits.size()>4096)throw std::runtime_error("Invalid plant branch edits");
+    for(const auto& edit:edits){
+      auto [entry,added]=d.branchEdits.emplace(edit.at("id").get<uint64_t>(),
+        BranchEdit{edit.at("length"),edit.at("angle"),edit.at("thickness"),edit.at("removed")});
+      if(!added)throw std::runtime_error("Duplicate plant branch edit");
+    }
+  }
   d.variations=j.value("variations",std::vector<uint32_t>{});d.texture=j.value("texture",std::string{});d.tags=j.value("tags",std::vector<std::string>{});validate(d);return d;
 }
 }

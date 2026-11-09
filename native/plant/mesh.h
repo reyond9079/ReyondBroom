@@ -27,7 +27,7 @@ inline Photo foliagePhoto(const Project& d) {
   return Photo::None;
 }
 struct Vertex {V p,n;std::array<double,2> uv;double wind=0,phase=0;};
-struct Face {std::array<unsigned,3> i;int material;Part part;unsigned organ;};
+struct Face {std::array<unsigned,3> i;int material;Part part;unsigned organ;uint64_t branch=0;};
 struct Mesh {
   std::vector<Vertex> vertices;
   std::vector<Face> faces;
@@ -46,21 +46,40 @@ inline std::array<double,2> atlasUV(int material,double u,double v) {
 // Keep each longitudinal repeat inside one atlas tile. A mirrored seam can
 // share a ring without blending UVs across another material or splitting normals.
 inline constexpr double barkRepeatLength=64.;
-inline double barkRepeatV(double distance) {
-  return 1.-std::abs(1.-std::fmod(distance/barkRepeatLength,2.));
+inline double barkRepeatV(double distance,double units=barkRepeatLength) {
+  return 1.-std::abs(1.-std::fmod(distance/units,2.));
 }
 struct TubeStation {
   size_t segment;
   double blend,distance;
 };
-inline std::vector<TubeStation> barkStations(const std::vector<V>& path) {
+struct WoodJunction {
+  V center{},tangent{0,0,1};
+  double radius=0.;
+  V radial(V point) const {
+    auto delta=sub(point,center);
+    return sub(delta,mul(tangent,dot(delta,tangent)));
+  }
+};
+inline void addJunctionRing(std::vector<V>& path,const WoodJunction& joint) {
+  const double edge=joint.radius;
+  for(size_t i=1;i<path.size();i++){
+    const double before=length(joint.radial(path[i-1])),after=length(joint.radial(path[i]));
+    if(before>=edge||after<edge)continue;
+    const double fraction=(edge-before)/(after-before);
+    if(fraction>.04&&fraction<.96)
+      path.insert(path.begin()+i,add(path[i-1],mul(sub(path[i],path[i-1]),fraction)));
+    break;
+  }
+}
+inline std::vector<TubeStation> barkStations(const std::vector<V>& path,double units=barkRepeatLength) {
   std::vector<TubeStation> stations{{0,0.,0.}};
-  double distance=0.,nextRepeat=barkRepeatLength;
+  double distance=0.,nextRepeat=units;
   for(size_t i=0;i+1<path.size();i++){
     const double segment=length(sub(path[i+1],path[i])),end=distance+segment;
-    for(;nextRepeat<end-1e-6;nextRepeat+=barkRepeatLength)
+    for(;nextRepeat<end-1e-6;nextRepeat+=units)
       stations.push_back({i,(nextRepeat-distance)/segment,nextRepeat});
-    if(nextRepeat<=end+1e-6)nextRepeat+=barkRepeatLength;
+    if(nextRepeat<=end+1e-6)nextRepeat+=units;
     stations.push_back({i,1.,end});
     distance=end;
   }
@@ -72,6 +91,9 @@ struct Builder {
   const std::atomic<bool>* cancel;
   unsigned organ=0;
   bool repeatBark=false;
+  bool separateWoodCut=false;
+  int barkURepeats=1;
+  double barkVUnits=barkRepeatLength;
   explicit Builder(size_t b,const std::atomic<bool>* c=nullptr):budget(b),cancel(c){}
   void check() const {if(cancel&&cancel->load())throw std::runtime_error("Plant generation cancelled");}
   bool room(size_t faces) {check();if(mesh.faces.size()+faces>budget){mesh.budgetLimited=true;return false;}return true;}
@@ -84,9 +106,11 @@ struct Builder {
     if(length(n)>1e-9)mesh.faces.push_back({{a,b,c},mat,part,organ});
   }
   void quad(unsigned a,unsigned b,unsigned c,unsigned d,int mat,Part part) {face(a,b,c,mat,part);face(a,c,d,mat,part);}
-  bool tube(const std::vector<V>& path,double radius,double tip,int sides,int mat,Part part,double ribs=0,double hold=0,double wood=0,uint64_t seed=0) {
+  bool tube(const std::vector<V>& path,double radius,double tip,int sides,int mat,Part part,double ribs=0,double hold=0,double wood=0,uint64_t seed=0,const WoodJunction* joint=nullptr) {
     if(path.size()<2)return false;
-    const auto stations=repeatBark&&mat==Bark?barkStations(path):std::vector<TubeStation>{};
+    const bool tiled=repeatBark&&mat==Bark;
+    if(tiled)sides=(sides+barkURepeats-1)/barkURepeats*barkURepeats;
+    const auto stations=tiled?barkStations(path,barkVUnits):std::vector<TubeStation>{};
     const size_t rings=stations.empty()?path.size():stations.size();
     if(!room((rings-1)*sides*2+sides*2))return false;
     organ++;unsigned first=mesh.vertices.size();V frame{1,0,0};
@@ -107,9 +131,14 @@ struct Builder {
       frame=sub(frame,mul(tangent,dot(frame,tangent)));
       if(length(frame)<1e-5)frame=cross(tangent,std::abs(tangent[2])<.9?V{0,0,1}:V{0,1,0});
       frame=unit(frame);V binormal=unit(cross(tangent,frame));double t=(a+station.blend)/(path.size()-1);
-      const double textureV=stations.empty()?t:barkRepeatV(station.distance);
+      const double textureV=stations.empty()?t:barkRepeatV(station.distance,barkVUnits);
       double u=std::clamp((t-hold)/std::max(.01,1-hold),0.,1.);
       double r=std::max(.002,radius*std::pow(1-u,1.1)+tip*u);
+      if(joint){
+        const double at=length(joint->radial(center));
+        const double collar=std::clamp(1.-std::abs(at-joint->radius)/std::max(radius*2.5,.01),0.,1.);
+        r*=1.+.46*collar*collar;
+      }
       for(int j=0;j<=sides;j++) {
         double angle=2*pi*j/sides;V radial=add(mul(frame,std::cos(angle)),mul(binormal,std::sin(angle)));
         double ridge=ribs>0?1+.10*std::cos(angle*ribs):1;
@@ -119,7 +148,17 @@ struct Builder {
           ridge*=1+wood*(.10*std::cos(2*angle-phase)+(.075+.16*flare)*ribs+.15*flare);
         }
         V normal=unit(add(radial,mul(tangent,(radius-tip)/std::max(.01,length(sub(path.back(),path.front()))))));
-        vertex(add(center,mul(radial,r*ridge)),normal,double(j)/sides,textureV,mat,t);
+        const auto point=add(center,mul(radial,r*ridge));
+        if(joint){
+          const auto parent=joint->radial(point);
+          const double distance=length(parent),reach=std::max(radius*2.,.01);
+          const double blend=.7*std::clamp(1.-std::abs(distance-joint->radius)/reach,0.,1.);
+          if(distance>1e-6&&dot(mul(parent,1./distance),normal)>-.55)
+            normal=unit(add(mul(normal,1.-blend),mul(parent,blend/distance)));
+        }
+        const double across=double(j)/sides;
+        const double textureU=tiled&&barkURepeats>1?barkRepeatV(across*barkURepeats,1.):across;
+        vertex(point,normal,textureU,textureV,mat,t);
       }
     }
     for(unsigned i=0;i+1<rings;i++)for(int j=0;j<sides;j++) {
@@ -127,6 +166,25 @@ struct Builder {
       quad(a,b,c,d,mat,part);
     }
     V startNormal=unit(sub(path.front(),path[1])),endNormal=unit(sub(path.back(),path[path.size()-2]));
+    if(mat==Bark&&separateWoodCut){
+      const unsigned start=vertex(path.front(),startNormal,.5,.5,Wood);
+      const unsigned end=vertex(path.back(),endNormal,.5,.5,Wood,1);
+      const unsigned last=first+(rings-1)*(sides+1);
+      auto rim=[&](unsigned index,V normal,int j,double wind){
+        const double angle=2*pi*j/sides;
+        return vertex(mesh.vertices[index+j].p,normal,.5+.5*std::cos(angle),.5+.5*std::sin(angle),Wood,wind);
+      };
+      const auto baseRim=mesh.vertices.size();
+      for(int j=0;j<sides;j++)rim(first,startNormal,j,0.);
+      const auto topRim=mesh.vertices.size();
+      for(int j=0;j<sides;j++)rim(last,endNormal,j,1.);
+      for(int j=0;j<sides;j++){
+        const auto next=(j+1)%sides;
+        face(start,baseRim+next,baseRim+j,Wood,part);
+        face(end,topRim+j,topRim+next,Wood,part);
+      }
+      return true;
+    }
     unsigned start=vertex(path.front(),startNormal,.5,.5,mat),end=vertex(path.back(),endNormal,.5,.5,mat,1);
     for(int j=0;j<sides;j++){face(start,first+j+1,first+j,mat,part);unsigned a=first+(rings-1)*(sides+1)+j;face(end,a,a+1,mat,part);}return true;
   }

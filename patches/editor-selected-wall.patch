@@ -1,16 +1,75 @@
 --- a/engine/gl/gl_shader.c
 +++ b/engine/gl/gl_shader.c
-@@ -2300,6 +2300,13 @@
- 
- program_t *Shader_FindGeneric(char *name, int qrtype)
+@@ -2332,6 +2332,24 @@
+ 	g->prog.refs++;
+ 	return &g->prog;
+ }
++// Editor wall overrides belong to editable materials. Compiled BSP models
++// have their own shader registrations and must keep the game's lighting.
++static program_t *Shader_FindMaterialProgram(const shader_t *shader, char *name, int qrtype)
++{
++	char editorname[1024];
++	if ((!shader->model || shader->model->type != mod_brush) &&
++	    !strncmp(name, "defaultwall", 11) && (!name[11] || name[11]=='#'))
++	{
++		cvar_t *editorwall = Cvar_Get("ftebroom_wall_override", "0", CVAR_NOTFROMSERVER|CVAR_NOSAVE, "FTEBroom");
++		if (editorwall->ival)
++		{
++			Q_snprintfz(editorname, sizeof(editorname), "ftebroom_selected_wall%s", name+11);
++			name = editorname;
++		}
++	}
++	return Shader_FindGeneric(name, qrtype);
++}
++
+ static void Shader_ReloadGenerics(void)
  {
-+    char editorname[1024];
-+    cvar_t *editorwall = Cvar_Get("ftebroom_wall_override", "0", CVAR_NOTFROMSERVER|CVAR_NOSAVE, "FTEBroom");
-+    if (editorwall->ival && !strncmp(name, "defaultwall", 11) && (!name[11] || name[11]=='#'))
-+    {
-+        Q_snprintfz(editorname, sizeof(editorname), "ftebroom_selected_wall%s", name+11);
-+        name = editorname;
-+    }
  	sgeneric_t *g;
+@@ -2558,10 +2576,10 @@
+ 			//pass the # postfixes from the shader name onto the generic glsl to use
+ 			char newname[512];
+ 			Q_snprintfz(newname, sizeof(newname), "%s%s", Shader_ParseExactString(ptr), hash);
+-			newprog = Shader_FindGeneric(newname, qrtype);
++			newprog = Shader_FindMaterialProgram(shader, newname, qrtype);
+ 		}
+ 		else
+-			newprog = Shader_FindGeneric(Shader_ParseExactString(ptr), qrtype);
++			newprog = Shader_FindMaterialProgram(shader, Shader_ParseExactString(ptr), qrtype);
+ 	}
  
- 	for (g = sgenerics; g; g = g->next)
+ 	if (pass)
+@@ -2701,10 +2719,10 @@
+ 		//pass the # postfixes from the shader name onto the generic glsl to use
+ 		char newname[512];
+ 		Q_snprintfz(newname, sizeof(newname), "%s%s", progname, hash);
+-		ps->pass->prog = Shader_FindGeneric(newname, qrenderer);
++		ps->pass->prog = Shader_FindMaterialProgram(ps->s, newname, qrenderer);
+ 	}
+ 	else
+-		ps->pass->prog = Shader_FindGeneric(progname, qrenderer);
++		ps->pass->prog = Shader_FindMaterialProgram(ps->s, progname, qrenderer);
+ 
+ 	token = Shader_ParseSensString(ptr);
+ 	if (*token && strcmp(token, "-"))
+@@ -3575,10 +3593,10 @@
+ 		//pass the # postfixes from the shader name onto the generic glsl to use
+ 		char newname[512];
+ 		Q_snprintfz(newname, sizeof(newname), "%s%s", Shader_ParseExactString(ptr), hash);
+-		pass->prog = Shader_FindGeneric(newname, qrtype);
++		pass->prog = Shader_FindMaterialProgram(shader, newname, qrtype);
+ 	}
+ 	else
+-		pass->prog = Shader_FindGeneric(Shader_ParseExactString(ptr), qrtype);
++		pass->prog = Shader_FindMaterialProgram(shader, Shader_ParseExactString(ptr), qrtype);
+ }
+ static void Shaderpass_ProgramName (parsestate_t *ps, const char **ptr)
+ {
+@@ -5487,7 +5505,7 @@
+ 
+ 	mask = Shader_AlphaMaskProgArgs(s);
+ 
+-	s->prog = Shader_FindGeneric(va("%s%s%s", prog, mask, args), qrenderer);
++	s->prog = Shader_FindMaterialProgram(s, va("%s%s%s", prog, mask, args), qrenderer);
+ 	if (s->prog)
+ 	{
+ 		s->numpasses = 0;

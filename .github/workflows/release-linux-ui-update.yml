@@ -42,6 +42,10 @@ jobs:
           if ($LASTEXITCODE) { throw 'Probe metadata download failed' }
           gh api repos/reyond9079/ReyondBroom/actions/artifacts/13652832603/zip > reused-probe.zip
           if ($LASTEXITCODE) { throw 'Probe archive download failed' }
+          gh api repos/reyond9079/ReyondBroom/commits/19dd73b877eac2832d627e0468d6f49771b98129 > diagnostics/prepared-probe-source-commit.json
+          if ($LASTEXITCODE) { throw 'Prepared probe source commit lookup failed' }
+          gh api repos/reyond9079/ReyondBroom/commits/4443a11fb4bd6ddb4d0c6be6a1687b0fdc2150ad > diagnostics/canonical-source-commit.json
+          if ($LASTEXITCODE) { throw 'Canonical source commit lookup failed' }
           python scripts/reuse-input-diagnostic-binaries.py
           if ($LASTEXITCODE) { throw 'Authenticated binary checks failed' }
       - name: Install verified renderer and desktop

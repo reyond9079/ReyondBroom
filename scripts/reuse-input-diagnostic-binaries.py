@@ -21,7 +21,11 @@ for kind,id,size,digest,run,head in artifacts:
             names=[x for x in z.namelist() if Path(x).name=='compilation-profile-probe.exe'];assert len(names)==1
             data=z.read(names[0]);assert hashlib.sha256(data).hexdigest()=='6276bcf8811bd2fb748af054cebc4ae681b01f17844cf12df3d28035c4db9154';(out/'compilation-profile-probe.exe').write_bytes(data)
             revisions=[x for x in z.namelist() if Path(x).name=='compilation-editor-revision.txt'];assert len(revisions)==1
-            assert z.read(revisions[0]).decode().strip()==head
+            revision=z.read(revisions[0]).decode().strip();assert revision=='19dd73b877eac2832d627e0468d6f49771b98129'
+            merge=json.loads((out/'prepared-probe-source-commit.json').read_text());canonical=json.loads((out/'canonical-source-commit.json').read_text())
+            assert merge['sha']==revision and canonical['sha']==head and any(parent['sha']==head for parent in merge['parents'])
+            assert merge['commit']['tree']['sha']==canonical['commit']['tree']['sha']=='f009dd27ad640f6982cc48e94fd4fd3b3501639f'
+            proof[kind]['actual_editor_revision_label']=revision;proof[kind]['same_source_tree']=merge['commit']['tree']['sha']
             proof[kind]['binary_sha256']=hashlib.sha256(data).hexdigest();proof[kind]['entry']=names[0]
 (out/'reused-binary-proof.json').write_text(json.dumps(proof,indent=2)+'\n')
 print('PASS exact authenticated logger engine and canonical source444 probe',json.dumps({k:v['binary_sha256'] for k,v in proof.items()}))

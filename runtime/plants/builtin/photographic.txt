@@ -1,0 +1,4 @@
+Photographic botanical textures for ReyondBroom Plant Generator 3.
+The bark and foliage plates were generated for this project using OpenAI image generation.
+The zlib stream contains nine 192 × 192 RGBA tiles in the order declared by Photo in native/plant/mesh.h.
+Foliage tile rows run from the base to the tip. Transparent pixels retain nearby edge colors for filtering.

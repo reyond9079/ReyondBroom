@@ -11,11 +11,12 @@ inline std::vector<Project> presets() {
   static const auto library=[](){
     std::vector<Project> out;
     for(const auto& entry:catalogManifest().at("presets")) {
-      Project d;d.preset=d.species=entry.at("id").get<std::string>();
+      Project d;d.generator=catalogManifest().at("generatorVersion");d.preset=d.species=entry.at("id").get<std::string>();
       d.name=entry.at("name");d.family=Family(entry.at("family").get<int>());
       d.tags=entry.at("tags").get<std::vector<std::string>>();d.nodes=defaultNodes();
       if(d.family==Family::Flower||d.family==Family::Vine||d.family==Family::Fern||d.family==Family::Riparian)d.p.bark={.20,.34,.10};
       if(d.family==Family::Mushroom)d.p.bark={.82,.77,.65};
+      if(d.generator>=3)d.p.budget=12000;
       auto full=serialize(d);full["parameters"].update(entry.at("parameters"));
       out.push_back(deserialize(full));
     }return out;
@@ -26,9 +27,9 @@ inline std::vector<Project> presets() {
 inline Project upgradeGenerator(Project d) {
   auto library=presets();auto it=std::find_if(library.begin(),library.end(),[&](auto& p){return p.preset==d.preset;});
   auto defaults=parameters(it==library.end()?Params{}:it->p),values=serialize(d);
-  for(auto key:{"crown","phyllotaxy","organ","barkPattern","needleForm","evergreen","leaflets","clusterLeaves","crownBase","crownAspect","crownFill","petiole","serration"})values["parameters"][key]=defaults.at(key);
-  values["generatorVersion"]=2;
-  if(it!=library.end())values["tags"]=it->tags;
+  if(d.generator==1)for(auto key:{"crown","phyllotaxy","organ","barkPattern","needleForm","evergreen","leaflets","clusterLeaves","crownBase","crownAspect","crownFill","petiole","serration"})values["parameters"][key]=defaults.at(key);
+  values["generatorVersion"]=3;
+  if(d.generator==1&&it!=library.end())values["tags"]=it->tags;
   return deserialize(values);
 }
 }

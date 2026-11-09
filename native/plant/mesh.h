@@ -5,7 +5,21 @@
 #include <map>
 namespace ftebroom::plant {
 enum Material { Bark, Leaf, Needle, Petal, Center, Cap, Gills, CactusSkin, Grass, Wood,
-                LeafLight, LeafMature, LeafYoung, NeedleLight, NeedleMature, Count };
+                LeafLight, LeafMature, LeafYoung, NeedleLight, NeedleMature, PhotoFoliage, Count };
+enum class Photo { Bark, Oak, Spruce, Fern, Grass, Maple, Birch, Pine, Ivy, None };
+inline Photo foliagePhoto(const Project& d) {
+  if(d.generator<3||d.p.quality==3||d.p.foliageMode>=2||!d.texture.empty())return Photo::None;
+  const auto& species=d.species;
+  if(d.family==Family::Broadleaf&&d.p.leafShape==3&&species=="oak")return Photo::Oak;
+  if(d.family==Family::Broadleaf&&d.p.leafShape==4&&species=="maple")return Photo::Maple;
+  if(d.family==Family::Broadleaf&&(species=="birch"||species=="paper-birch"))return Photo::Birch;
+  if(d.family==Family::Conifer&&(species=="pine"||species=="maritime-pine"||species=="stone-pine"))return Photo::Pine;
+  if(d.family==Family::Vine&&d.p.organ==0&&species=="ivy")return Photo::Ivy;
+  if(d.family==Family::Conifer&&(species=="spruce"||species=="blue-spruce"||species=="fir"))return Photo::Spruce;
+  if(d.family==Family::Fern&&(d.p.organ<=3||d.p.organ==7))return Photo::Fern;
+  if(d.family==Family::Grass&&species=="meadow-grass")return Photo::Grass;
+  return Photo::None;
+}
 struct Vertex {V p,n;std::array<double,2> uv;double wind=0,phase=0;};
 struct Face {std::array<unsigned,3> i;int material;Part part;unsigned organ;};
 struct Mesh {
@@ -64,6 +78,22 @@ struct Builder {
     V startNormal=unit(sub(path.front(),path[1])),endNormal=unit(sub(path.back(),path[path.size()-2]));
     unsigned start=vertex(path.front(),startNormal,.5,.5,mat),end=vertex(path.back(),endNormal,.5,.5,mat,1);
     for(int j=0;j<sides;j++){face(start,first+j+1,first+j,mat,part);unsigned a=first+(path.size()-1)*(sides+1)+j;face(end,a,a+1,mat,part);}return true;
+  }
+  void foliageCard(V origin,V direction,V up,double size,double width,double bend,int segments,double twist) {
+    if(!room(segments*2))return;
+    direction=unit(direction);V right=unit(cross(direction,up));
+    if(length(right)<.01)right=unit(cross(direction,V{1,0,0}));
+    V normal=unit(cross(right,direction));
+    unsigned first=mesh.vertices.size();organ++;
+    for(int i=0;i<=segments;i++) {
+      double t=double(i)/segments;
+      V center=add(origin,add(mul(direction,t*size),mul(normal,bend*size*t*t)));
+      V across=add(right,mul(normal,twist*t));
+      V n=unit(sub(sub(normal,mul(direction,2*bend*t)),mul(right,twist*t)));
+      vertex(sub(center,mul(across,width*.5)),n,0,t,PhotoFoliage,t);
+      vertex(add(center,mul(across,width*.5)),n,1,t,PhotoFoliage,t);
+    }
+    for(int i=0;i<segments;i++){unsigned a=first+i*2;quad(a,a+1,a+3,a+2,PhotoFoliage,Part::Leaves);}
   }
   void leaf(V origin,V direction,V up,double size,double width,int shape,int mode,int mat,Part part,double curl,double twist,
             const std::array<double,5>& profile) {

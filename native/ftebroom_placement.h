@@ -34,7 +34,7 @@ static void placementPublish(const std::map<std::string,std::string>& bundle){
     command("fs_flush\n");
   }catch(...){for(auto i=lists.rbegin();i!=lists.rend();++i){try{if(std::get<1>(*i))bb::atomicWrite(std::get<0>(*i),std::get<2>(*i));else{std::error_code ec;std::filesystem::remove(std::get<0>(*i),ec);}}catch(...){}}for(auto& path:added){std::error_code ec;std::filesystem::remove(path,ec);}throw;}
 }
-static void placementSend(AssetPlacement& p,const std::string& model,const std::string& source,plants::V low,plants::V high,double scale,bool optin){
+static void placementSend(AssetPlacement& p,const std::string& model,const std::string& source,plants::V low,plants::V high,double scale,bool optin,const char* classname="func_model"){
   placementValid(p);if(!p.active)return;
   auto origin=p.point;double support=0;for(int i=0;i<3;i++)support+=p.normal[i]*(p.normal[i]>=0?low[i]:high[i]);
   for(int i=0;i<3;i++)origin[i]-=p.normal[i]*support;
@@ -42,8 +42,8 @@ static void placementSend(AssetPlacement& p,const std::string& model,const std::
   auto correction=plants::dot(p.point,p.normal)-plants::dot(origin,p.normal)-support;
   origin=plants::add(origin,plants::mul(p.normal,correction));
   p.request=p.id+"-"+std::to_string(++placementSerial);
-  std::string q="ftebroom_authoring_save "+organizationQuote(p.request)+" "+std::to_string(p.epoch)+" "+organizationQuote(p.id)+" "+organizationQuote(model)+" "+organizationQuote(source)+" "+(p.created?"0":"1")+" "+organizationQuote(placementVector(origin))+" "+std::to_string(p.layer)+" "+(optin?"1":"0")+" "+std::to_string(scale)+"\n";
-  p.created=true;p.awaiting=true;p.runtimeSupported=p.profile==0||p.profile==1||(p.profile==2&&optin);command(q.c_str());
+  std::string q="ftebroom_authoring_save "+organizationQuote(p.request)+" "+std::to_string(p.epoch)+" "+organizationQuote(p.id)+" "+organizationQuote(model)+" "+organizationQuote(source)+" "+(p.created?"0":"1")+" "+organizationQuote(placementVector(origin))+" "+std::to_string(p.layer)+" "+(optin?"1":"0")+" "+std::to_string(scale)+" "+organizationQuote(classname)+"\n";
+  p.created=true;p.awaiting=true;p.runtimeSupported=p.profile==0||p.profile==1||std::string(classname)=="cycler"||(p.profile==2&&optin);command(q.c_str());
 }
 static bool placementSnapshotPath(const std::filesystem::path& file){
   auto name=file.filename().u8string();std::string stem;
@@ -120,7 +120,7 @@ static void placementPlantSaved(){
   if(!plantReady()){placementPlantRevision=s.revision;placementPlantPending=true;return;}
   auto asset=plantBakeRuntime();placementPublish(asset.bundle);
   if(!asset.shader.empty()){s.pendingShaders[asset.id]={asset.material,asset.shader.substr(asset.shader.find('{'))};command(("ftebroom_plant shader "+asset.id+"\n").c_str());}
-  placementSend(p,asset.model,asset.source,asset.low,asset.high,asset.scale,s.allowFteQ1);s.lastModel=documentPath(asset.model);s.message="Project and target-format runtime assets saved; updating linked func_model.";
+  placementSend(p,asset.model,asset.source,asset.low,asset.high,asset.scale,s.allowFteQ1,plants::targetClass(gameProfile));s.lastModel=documentPath(asset.model);s.message="Project and target-format runtime assets saved; updating the linked plant entity.";
 }
 static void placementAfterPlantSave(std::function<void()> next){
   if(!next)return;if(placementPlantPending||plantPlacement.awaiting){placementPlantNext=std::move(next);return;}next();
@@ -152,7 +152,7 @@ static void placementTick(){
     if(!p->awaiting)continue;char ack[200]{},status[64]{};cvars->GetString("ftebroom_placement_ack",ack,sizeof ack);
     if(p->request!=ack)continue;cvars->GetString("ftebroom_placement_status",status,sizeof status);p->awaiting=false;
     auto& message=p==&plantPlacement?plantState.message:bbMessage;
-    if(std::string(status)=="ok"){message="Saved linked func_model. Undo/Redo restores its previous model and assets.";if(!p->runtimeSupported)message+=" Authoring only: this runtime requires a compatible model/mod, or the explicit Quake 1 FTE extension. Compilation will report the unsupported entity.";}
+    if(std::string(status)=="ok"){message="Saved linked entity. Undo/Redo restores its previous model and assets.";if(!p->runtimeSupported)message+=" Runtime visibility requires a mod that supports this model entity or the Quake 1 FTE static-model extension.";}
     else{p->active=false;message=std::string(status)=="ambiguous"?"Source saved. Placement cancelled: multiple entities share the source link; no entity was changed.":std::string(status)=="missing"?"Source saved. Linked entity was deleted or undone; placement cancelled.":"Source saved. Placement cancelled: map, layer or position is no longer valid.";}
     auto& after=p==&plantPlacement?placementPlantNext:placementModelNext;
     if(std::string(status)=="ok"&&after){auto next=std::move(after);after={};try{next();}catch(const std::exception& e){message=e.what();}}else if(std::string(status)!="ok")after={};

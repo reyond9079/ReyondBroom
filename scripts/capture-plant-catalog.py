@@ -113,7 +113,7 @@ try:
    for seed in [137,138,424242]:
     edit('Seed',seed);ready()
     for label,yaw,pitch in [('front',0,0),('side',90,0),('top-oblique-85',0,85)]:orbit(yaw,pitch);record(key+'-'+str(seed)+'-'+label)
-   if live()['project']['generatorVersion']==2:
+   if live()['project']['generatorVersion']>=2:
     edit('Seed',137);ready();orbit(135,18)
     for lod in [0,1,2]:click('lod');click('lod/'+str(lod));record(key+'-lod'+str(lod))
     click('lod');click('lod/0');click('display');click('display/1');record(key+'-untextured');click('display');click('display/0')

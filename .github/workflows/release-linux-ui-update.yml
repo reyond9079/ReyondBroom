@@ -34,7 +34,11 @@ jobs:
           if ($LASTEXITCODE) { throw 'Draft download failed' }
       - name: Validate payload and pin all unchanged product components
         shell: pwsh
-        run: python scripts/run-windows-input-diagnostic.py prepare baseline diagnostics
+        run: |
+          git fetch --no-tags --depth=1 origin 4443a11fb4bd6ddb4d0c6be6a1687b0fdc2150ad
+          if ($LASTEXITCODE) { throw 'Cannot verify exact original test source commit' }
+          python scripts/run-windows-input-diagnostic.py prepare baseline diagnostics
+          if ($LASTEXITCODE) { throw 'Exact runtime/test verification failed' }
       - name: Rebuild only an ephemeral instrumented Windows engine
         shell: msys2 {0}
         run: |

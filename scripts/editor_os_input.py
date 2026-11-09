@@ -113,7 +113,7 @@ class NativeInput:
   info=self.GuiThreadInfo();info.cbSize=ctypes.sizeof(info)
   thread=self.user.GetWindowThreadProcessId(self.hwnd,None)
   assert self.user.GetGUIThreadInfo(thread,ctypes.byref(info)), 'Cannot read editor thread focus'
-  return {'foreground':self.user.GetForegroundWindow(),'active':info.hwndActive,'focus':info.hwndFocus}
+  return {'foreground':self.user.GetForegroundWindow(),'active':info.hwndActive,'focus':info.hwndFocus,'capture':info.hwndCapture,'flags':info.flags,'async_left':int(self.user.GetAsyncKeyState(1)),'async_right':int(self.user.GetAsyncKeyState(2))}
 
  def windows_focused(self):
   state=self.windows_focus()
@@ -184,8 +184,11 @@ class NativeInput:
     # Observe fresh UI frames with the button down before releasing it. A
     # fixed hold can otherwise fit entirely between slow software-rendered
     # frames, losing the click. This never retries the action.
-    try:time.sleep(.10 if hold is None else hold);self.settle()
-    finally:self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
+    self.windows_receipt('after-down',button=button)
+    try:time.sleep(.10 if hold is None else hold);self.settle();self.windows_receipt('held',button=button)
+    finally:
+     self.user.mouse_event(4 if button==1 else 16 if button==3 else 64,0,0,0,0)
+     self.windows_receipt('after-up',button=button)
    else:
     self.xtest.fake_input(self.d,self.X.ButtonPress,button);self.d.sync()
     try:time.sleep(.08 if hold is None else hold);self.settle()

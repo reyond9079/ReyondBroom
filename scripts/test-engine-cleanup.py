@@ -117,6 +117,22 @@ try:
  wait(lambda:'deployed map also missing' in live()['error'])
  check(not markers[0].exists(),'missing_build_and_deployed_map_prevent_launch')
  check(inventory(original)==original_hashes,'source_runtime_remains_byte_identical')
+except Exception:
+ (out/'original-failure-state.json').write_text(json.dumps(live(),indent=2))
+ if windows and process is not None and process.poll() is None and 'ui' in globals():
+  try:
+   ui.position();ui.windows_receipt('diagnostic-before-F24')
+   ui.user.keybd_event(135,ui.user.MapVirtualKeyW(135,0),0,0)
+   ui.settle()
+   ui.user.keybd_event(135,ui.user.MapVirtualKeyW(135,0),2,0)
+   ui.settle();ui.windows_receipt('diagnostic-after-F24')
+   (out/'after-F24-state.json').write_text(json.dumps(live(),indent=2))
+  except Exception as error:(out/'F24-error.txt').write_text(type(error).__name__+': '+str(error))
+  try:
+   ui.console('echo RB134_INPUT_DIAGNOSTIC; in_rawinput; in_rawinput_keyboard; in_dinput; in_windowed_mouse')
+   (out/'after-console-state.json').write_text(json.dumps(live(),indent=2))
+  except Exception as error:(out/'console-diagnostic-error.txt').write_text(type(error).__name__+': '+str(error))
+ raise
 finally:
  if process is not None and process.poll() is None:process.kill();process.wait(timeout=15)
  stream.close()

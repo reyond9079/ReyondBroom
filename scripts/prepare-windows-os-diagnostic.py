@@ -13,11 +13,24 @@ root=pathlib.Path('bundle/ReyondBroom-Windows-x64')
 manifest=json.loads((root/'distribution-manifest.json').read_text());actual={p.relative_to(root).as_posix():sha(p) for p in root.rglob('*') if p.is_file() and p.name!='distribution-manifest.json'}
 assert actual==manifest,'Runtime manifest mismatch'
 info=(root/'build-info.txt').read_text();assert head in info,info
-subprocess.run(['git','archive',head,'-o','git-product.zip'],check=True)
-with zipfile.ZipFile(sources) as z,zipfile.ZipFile('git-product.zip') as g:
- expected={p.filename:hashlib.sha256(g.read(p)).hexdigest() for p in g.infolist() if not p.is_dir()}
+tree=subprocess.check_output(['git','ls-tree','-rz','-r',head])
+blobs=[]
+for record in tree.split(bytes([0])):
+ if not record:continue
+ meta,path=record.split(b'\t',1);mode,kind,oid=meta.split()
+ assert kind==b'blob'
+ blobs.append((oid,path.decode('utf-8')))
+raw=subprocess.check_output(['git','cat-file','--batch'],input=b'\n'.join(oid for oid,path in blobs)+b'\n')
+expected={};position=0
+for oid,path in blobs:
+ end=raw.index(b'\n',position);parts=raw[position:end].split();assert parts[0]==oid and parts[1]==b'blob'
+ size=int(parts[2]);position=end+1;expected[path]=hashlib.sha256(raw[position:position+size]).hexdigest();position+=size+1
+with zipfile.ZipFile(sources) as z:
  received={p.filename[len('sources/ftebroom/'):]:hashlib.sha256(z.read(p)).hexdigest() for p in z.infolist() if not p.is_dir() and p.filename.startswith('sources/ftebroom/')}
- assert received==expected,'Corresponding product source mismatch'
+ mismatches={'missing':sorted(set(expected)-set(received)),'extra':sorted(set(received)-set(expected)),
+  'different':{name:{'git':expected[name],'archive':received[name]} for name in set(expected)&set(received) if expected[name]!=received[name]}}
+ (out/'source-comparison.json').write_text(json.dumps(mismatches,indent=2))
+ assert received==expected,'Corresponding product source mismatch: '+str(mismatches)[:1200]
  assert z.read('RELEASE-BUILD.txt').decode().replace('\r\n','\n').startswith(info.replace('\r\n','\n'))
 class NoRedirect(urllib.request.HTTPRedirectHandler):
  def redirect_request(self,*args,**kwargs):return None
@@ -44,5 +57,5 @@ assert 'rb_qa_opengl.dll' in overlays
 components=['fteplug_ftebroom_x64.dll','ftebroom/csaddon.dat','bin/fteqw64.exe']
 assert all(sha(root/name)==actual[name] for name in components),'Product component changed'
 (out/'provenance.json').write_text(json.dumps({'product_head':head,'runtime_sha256':sha(runtime),'sources_sha256':sha(sources),'source_files':len(expected),'manifest_files':len(actual),'components':{name:sha(root/name) for name in components},'probe_sha256':sha(probe),'probe_artifact':13652833158,'renderer_diagnostic_overlays':overlays,'method':'Authentic staged runtime and complete source archives verified before renderer-only overlay. No product binary or assertion patched.'},indent=2))
-(out/'diagnostic-source.diff').write_bytes(subprocess.check_output(['git','diff',head,'HEAD','--','scripts','.github/workflows']))
+(out/'diagnostic-source-diff.txt').write_bytes(subprocess.check_output(['git','diff',head,'HEAD','--','scripts','.github/workflows']))
 print('Verified authentic staged product, full source/manifest and original process probe',len(actual),len(expected))

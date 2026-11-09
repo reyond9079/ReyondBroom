@@ -59,10 +59,33 @@ int main(int argc,char** argv)try{
     }
     require(serialize(source)==saved,"target baking preserves editable source");
   }
-  auto oak=presets().front();auto maps=textureMaps(oak,nullptr,nullptr,64);auto mips=coverageMips(maps.albedo);
+  auto oak=presets().front();
+  std::ifstream input("runtime/plants/builtin/photographic.rgba.z",std::ios::binary);
+  std::string compressed((std::istreambuf_iterator<char>(input)),{});
+  auto photos=PhotoAtlas::decode(compressed.data(),compressed.size());
+  for(int layer=int(Photo::Oak);layer<int(Photo::None);layer++){
+    unsigned visible=0,empty=0;
+    for(int y=0;y<PhotoAtlas::side;y++)for(int x=0;x<PhotoAtlas::side;x++){
+      auto a=photos.sample(Photo(layer),x/double(PhotoAtlas::side-1),y/double(PhotoAtlas::side-1))[3];
+      visible+=a>=.5;empty+=a<.05;
+    }
+    require(visible>PhotoAtlas::side*PhotoAtlas::side/10&&empty>PhotoAtlas::side*PhotoAtlas::side/10,
+      "photographic foliage has a real cutout silhouette");
+  }
+  const std::array<std::string,5> classes={"misc_model","func_model","misc_model","misc_model","cycler"};
+  for(int profile=0;profile<5;profile++)require(targetClass(profile)==classes[profile],"runtime classname for every profile");
+  auto oakMesh=generate(oak);auto gold=targetModel(targetGeometry(oak,oakMesh,4),"plant",4);
+  auto maps=textureMaps(oak,nullptr,nullptr,64,&photos);
+  auto oldOak=oak;oldOak.generator=2;auto oldMesh=generate(oldOak);
+  require(oakMesh.faces.size()*3<oldMesh.faces.size(),"photographic oak uses less than a third of the former geometry");
+  auto studio=ftebroom::studioExport::bake(gold,{aliasSkin(maps.albedo)},1);
+  require(studio.substr(0,4)=="IDST"&&ftebroom::legacyModels::studio(studio,{}).at(0).triangles.size()==gold.surfaces[0].triangles.size(),"GoldSrc plant uses the native importer");
+  write(folder/"oak-goldsrc.mdl",studio);
+  require(std::any_of(oakMesh.faces.begin(),oakMesh.faces.end(),[](auto& f){return f.material==PhotoFoliage;}),"generated oak uses the photographic tile");
+  auto mips=coverageMips(maps.albedo);
   Json mipRows=Json::array();for(auto& mip:mips){
     int tiles=mip.width>=4&&mip.height>=4?4:1;
-    for(int material:{Leaf,LeafLight,LeafMature,LeafYoung,Needle,NeedleLight,NeedleMature}){
+    for(int material:{Leaf,LeafLight,LeafMature,LeafYoung,Needle,NeedleLight,NeedleMature,PhotoFoliage}){
       int tx=tiles==4?material%4:0,ty=tiles==4?material/4:0;size_t coverage=0;
       for(int y=ty*mip.height/tiles;y<(ty+1)*mip.height/tiles;y++)for(int x=tx*mip.width/tiles;x<(tx+1)*mip.width/tiles;x++)coverage+=mip.rgba[(y*mip.width+x)*4+3]>=128;
       require(coverage>0,"foliage survives every distance mip down to 1x1");
@@ -79,6 +102,10 @@ int main(int argc,char** argv)try{
   auto q3Bytes=ftebroom::modelExport::md3(q3);auto q3Imported=ftebroom::readMd3(q3Bytes);require(q3Imported.size()==q3.surfaces.size(),"dense Q3 runtime LOD uses actual MD3 decoder");
   std::string entity="{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \"func_model\"\n\"model\" \"models/reyond-plugins/oak.mdl\"\n\"_reyondbroom_authoring\" \"1\"\n}\n";
   for(int profile:{2,3}){size_t changed=0;bool stopped=false;try{ftebroom::prepareStaticModels(entity,profile,changed);}catch(std::runtime_error&){stopped=true;}require(stopped,"base game without arbitrary-model game code cannot silently compile broken func_model");}
+  auto direct=entity;direct.replace(direct.find("func_model"),10,"misc_model");
+  size_t directChanged=0;auto directQ1=ftebroom::prepareStaticModels(direct,2,directChanged);
+  require(directChanged==1&&directQ1.find("misc_model")!=directQ1.npos,"Quake mod can compile an explicitly placed misc_model");
+  require(ftebroom::prepareStaticModels(direct,3,directChanged)==direct&&directChanged==0,"Quake II keeps the target mod entity");
   auto fte=entity;fte.insert(fte.find("\"model\""),"\"_reyondbroom_fte_q1\" \"1\"\n");size_t changed=0;auto adapted=ftebroom::prepareStaticModels(fte,2,changed);require(changed==1&&adapted.find("misc_model")!=adapted.npos&&adapted.find("oak.mdl")!=adapted.npos,"explicit FTE Q1 fallback retains native MDL");
   write(folder/"results.json",Json{{"targetCases",cases},{"targets",rows},{"coverageMips",mipRows},{"vanillaCompileGate",true},{"explicitFteQ1",true}}.dump(2));
   std::cout<<"PASS "<<cases<<" native plant MDL/MD2 importer roundtrips; all mip distances retain foliage; compile capabilities checked\n";

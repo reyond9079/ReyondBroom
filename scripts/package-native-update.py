@@ -21,6 +21,7 @@ p.add_argument('--base-sources', type=Path, required=True)
 p.add_argument('--module', type=Path, required=True)
 p.add_argument('--engine', type=Path)
 p.add_argument('--engine-source', type=Path)
+p.add_argument('--imgui-source', type=Path)
 p.add_argument('--audio-dir', type=Path)
 p.add_argument('--csprogs', type=Path, required=True)
 p.add_argument('--version', required=True)
@@ -53,6 +54,12 @@ for name, digest in manifest.items():
 sources = out / 'corresponding-sources'
 with zipfile.ZipFile(a.base_sources) as archive:
     archive.extractall(sources)
+if a.imgui_source:
+    tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=a.imgui_source).decode().split('\0')
+    with zipfile.ZipFile(sources / 'sources/imgui-source.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+        for name in sorted(tracked):
+            if name and (a.imgui_source / name).is_file():
+                archive.write(a.imgui_source / name, name)
 shutil.rmtree(sources / 'sources/ftebroom')
 (sources / 'sources/ftebroom').mkdir()
 checkout = subprocess.check_output(['git', 'archive', 'HEAD'], cwd=src)

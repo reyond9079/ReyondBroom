@@ -19,17 +19,18 @@ inline bool generatedAuthoringPath(const std::string& name){
  for(auto& part:std::filesystem::u8path(name))if(part==".."||part==".")return false;
  return true;
 }
-// Authoring entities stay func_model in the document. Only disposable build
-// copies use q3map2's misc_model or the explicitly requested FTE Q1 fallback.
+// Recognize older linked func_model entities as well as plants placed directly
+// with the target profile's classname. All compiler adaptation is disposable.
 inline std::string prepareStaticModels(const std::string& bytes,int profile,size_t& changed){
  changed=0;auto entities=rawPreviewEntities(bytes);
  for(auto& e:entities){
-  if(!e.geometry.empty()||e.get("classname")!="func_model")continue;
+  auto classname=e.get("classname");
+  if(!e.geometry.empty()||(classname!="func_model"&&classname!="misc_model"))continue;
   bool marked=e.get("_reyondbroom_authoring")=="1"&&generatedAuthoringPath(e.get("model"));
   bool legacy=generatedIvyPath(e.get("model"));
   if(!marked&&!legacy)continue;
-  if(marked&&(profile==3||profile==4))throw std::runtime_error("The map contains a linked authoring func_model. Quake II plant assets are native MD2, but the base game has no arbitrary-model spawner. Use a compatible mod entity with that model before compiling. GoldSrc also requires studio MDL conversion.");
-  if(marked&&profile==2&&e.get("_reyondbroom_fte_q1")!="1")throw std::runtime_error("Quake plant assets are native MDL, but vanilla game code cannot spawn func_model. Enable the explicit FTE static-model extension in Plant Editor and Save, or use the MDL with a compatible mod entity before compiling.");
+  if(marked&&classname=="func_model"&&(profile==3||profile==4))throw std::runtime_error("The map contains a linked authoring func_model. Quake II plant assets are native MD2, but the base game has no arbitrary-model spawner. Use a compatible mod entity with that model before compiling. GoldSrc also requires studio MDL conversion.");
+  if(marked&&profile==2&&classname=="func_model"&&e.get("_reyondbroom_fte_q1")!="1")throw std::runtime_error("Quake plant assets are native MDL, but vanilla game code cannot spawn func_model. Enable the explicit FTE static-model extension in Plant Editor and Save, or use the MDL with a compatible mod entity before compiling.");
   if(marked&&profile==2){
    double scale=1;auto value=e.get("scale");if(value.empty())value=e.get("modelscale");
    if(!value.empty()){std::istringstream in(value);in.imbue(std::locale::classic());if(!(in>>scale)||!std::isfinite(scale))throw std::runtime_error("Invalid authoring model scale in Quake 1 build copy.");}

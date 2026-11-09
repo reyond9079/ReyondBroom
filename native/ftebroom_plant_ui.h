@@ -22,7 +22,7 @@ static void plantProperties() {
   bool leafy=f==plants::Family::Riparian||tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Bamboo||f==plants::Family::Vine||f==plants::Family::Flower;
   if(ImGui::CollapsingHeader("General",ImGuiTreeNodeFlags_DefaultOpen)) {
     plantText("Plant name",s.doc.name);
-    if(s.doc.generator==1){ImGui::TextWrapped("Legacy generator 1: original geometry is preserved.");if(plantButton("Upgrade to botanical generator 2","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
+    if(s.doc.generator<3){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade to photographic foliage","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
     else ImGui::TextDisabled("Botanical generator 2");ImGui::TextDisabled("%s",plants::familyName(f));
     plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
@@ -108,8 +108,8 @@ static void plantProperties() {
     if(gameProfile==2)ImGui::TextWrapped("Quake: MDL, at most 1024 vertices / 2048 triangles; opaque, double-sided geometric foliage and a paletted skin. The full editable plant is retained.");
     if(gameProfile==3)ImGui::TextWrapped("Quake II: MD2 + PCX, at most 2048 vertices / 4096 triangles; opaque, double-sided geometric foliage. The full editable plant is retained.");
     if(gameProfile==2)ImGui::Checkbox("Use FTE static models for Quake 1",&s.allowFteQ1);
-    if(gameProfile==2||gameProfile==3)ImGui::TextWrapped("The editor keeps a linked func_model. The base game has no arbitrary-model spawner: use compatible mod game code, or the explicit FTE extension for Quake. Unsupported compilation stops with a diagnostic.");
-    if(gameProfile==4)ImGui::TextWrapped("GoldSrc requires studio MDL conversion in Model Editor before placement.");
+    if(gameProfile==2||gameProfile==3)ImGui::TextWrapped("Plants are placed as misc_model. Use game code that supports this class, or the FTE static-model option for Quake.");
+    if(gameProfile==4)ImGui::TextWrapped("Half-Life: plants are placed as cycler with a native GoldSrc studio MDL and an embedded skin.");
   }
 }
 static void plantStructureNode(size_t index) {

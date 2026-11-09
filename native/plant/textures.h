@@ -7,6 +7,29 @@
 namespace ftebroom::plant {
 struct Image {int width=0,height=0;std::vector<unsigned char> rgba;};
 struct Textures {Image albedo,normal,orm;};
+struct PhotoAtlas {
+  static constexpr int side=192, layers=int(Photo::None);
+  std::vector<unsigned char> rgba;
+  static PhotoAtlas decode(const char* bytes,size_t size) {
+    PhotoAtlas atlas;
+    atlas.rgba.resize(side*side*layers*4);uLongf length=atlas.rgba.size();
+    if(uncompress(atlas.rgba.data(),&length,reinterpret_cast<const Bytef*>(bytes),size)!=Z_OK||length!=atlas.rgba.size())
+      throw std::runtime_error("Invalid photographic plant textures");
+    return atlas;
+  }
+  std::array<double,4> sample(Photo layer,double u,double v) const {
+    double x=u*(side-1),y=v*(side-1);int ix=int(x),iy=int(y);
+    int nx=std::min(ix+1,side-1),ny=std::min(iy+1,side-1);
+    auto texel=[&](int sx,int sy,int c){return rgba[((int(layer)*side+sy)*side+sx)*4+c];};
+    std::array<double,4> result{};
+    for(int c=0;c<4;c++){
+      double top=texel(ix,iy,c)*(1-x+ix)+texel(nx,iy,c)*(x-ix);
+      double bottom=texel(ix,ny,c)*(1-x+ix)+texel(nx,ny,c)*(x-ix);
+      result[c]=(top*(1-y+iy)+bottom*(y-iy))/255.;
+    }
+    return result;
+  }
+};
 inline double noise(int x,int y,uint64_t seed) {
   return double(mix(mix(seed,uint32_t(x)),uint32_t(y))>>11)*(1./9007199254740992.);
 }
@@ -214,18 +237,45 @@ inline Texel texel(const Project& d,int material,double u,double v) {
   for(auto& c:sample.color){c=std::clamp(c,0.,1.);if(p.quality==3)c=std::min(1.,std::round(c*5)/5.+.04);}
   return sample;
 }
-inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const std::atomic<bool>* cancel=nullptr,int tile=256) {
+inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const std::atomic<bool>* cancel=nullptr,int tile=256,const PhotoAtlas* photos=nullptr) {
   if(tile<16||tile>256)throw std::runtime_error("Invalid plant atlas resolution");
   Textures out;const int size=tile*4;
   for(auto image:{&out.albedo,&out.normal,&out.orm}){image->width=image->height=size;image->rgba.assign(size_t(size)*size*4,0);}
   std::vector<double> heights(size_t(tile)*tile);
-  for(int mat=0;mat<(d.generator==1?10:Count);mat++) {
+  auto foliage=foliagePhoto(d);
+  bool roughBark=photos&&d.generator>=3&&d.p.quality!=3&&
+    (d.family==Family::Broadleaf||d.family==Family::Conifer||d.family==Family::Bush)&&
+    (d.p.barkPattern==0||d.p.barkPattern==3||d.p.barkPattern==4||d.p.barkPattern==6);
+  int materialCount=d.generator==1?10:foliage==Photo::None?int(PhotoFoliage):int(Count);
+  for(int mat=0;mat<materialCount;mat++) {
     for(int y=0;y<tile;y++) {
       if(cancel&&cancel->load())throw std::runtime_error("Plant generation cancelled");
       for(int x=0;x<tile;x++) {
         // Clamp the gutter to the edge of the actual tile contents.
         double u=std::clamp((x-tile*4./256)/(tile*248./256),0.,1.),v=std::clamp((y-tile*4./256)/(tile*248./256),0.,1.);
-        auto sample=texel(d,mat,u,v);size_t at=((mat/4*tile+y)*size+mat%4*tile+x)*4;
+        auto sample=texel(d,mat==PhotoFoliage?int(Leaf):mat,u,v);
+        if(photos&&mat==PhotoFoliage){
+          auto pixel=photos->sample(foliage,u,v);
+          double light=.25*pixel[0]+.65*pixel[1]+.10*pixel[2];
+          double dry=std::clamp(d.p.dryness*.75+(d.p.season==2&&d.p.evergreen!=1?.58:0.),0.,1.);
+          V original{pixel[0],pixel[1],pixel[2]};
+          V tint=mul(d.p.leaf,std::clamp(.55+light*1.55,.60,1.65));
+          auto color=blend(original,tint,.52);
+          sample.color=blend(color,mul({.52,.32,.13},.65+light),dry);
+          sample.alpha=pixel[3];sample.height=.25+light*.32;
+        }else if(roughBark&&mat==Bark){
+          // The generated bark runs along the branch axis. Vary its placement
+          // per seed while keeping the U seam continuous.
+          double phase=double(d.seed%71)/71.;
+          auto wrap=[](double t){return t-std::floor(t);};
+          double x=wrap(u+phase),y=wrap(v*1.5+phase);
+          auto pixel=photos->sample(Photo::Bark,x,y);
+          double light=.25*pixel[0]+.65*pixel[1]+.10*pixel[2];
+          sample.color=blend(sample.color,mul(d.p.bark,.47+light*1.35),.74);
+          sample.height=sample.height*.38+light*.62;
+        }
+        for(auto& c:sample.color)c=std::clamp(c,0.,1.);
+        size_t at=((mat/4*tile+y)*size+mat%4*tile+x)*4;
         for(int a=0;a<3;a++)out.albedo.rgba[at+a]=unsigned(std::round(sample.color[a]*255));
         out.albedo.rgba[at+3]=unsigned(sample.alpha*255);heights[y*tile+x]=sample.height;
         if(imported&&(mat==Leaf||mat==Needle||mat==Grass||mat>=LeafLight)&&imported->width>0&&imported->height>0&&imported->rgba.size()==size_t(imported->width)*imported->height*4) {

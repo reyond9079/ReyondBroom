@@ -2,8 +2,7 @@
 #pragma once
 #include "textures.h"
 namespace ftebroom::plant {
-// Actual orthographic mesh rendering for library thumbnails. No prepainted
-// plant pictures or external assets: positions, UVs, normals and alpha are used.
+// Render the generated geometry, material atlas and alpha silhouette in each thumbnail.
 inline Image thumbnail(const Mesh& mesh,const Textures& maps,int width=96,int height=96) {
   Image out{width,height,std::vector<unsigned char>(size_t(width)*height*4,0)};
   std::vector<double> depth(size_t(width)*height,1e30);

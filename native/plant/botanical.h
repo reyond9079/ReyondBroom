@@ -10,6 +10,7 @@ struct Botanical : Generator {
   std::vector<Span> skeleton;
   std::vector<Shoot> foliage;
   Botanical(const Project& d,int l,const std::atomic<bool>* c):Generator(d,l,c){}
+  bool compact() const {return doc.generator>=3&&p.quality!=3;}
   double leafAngle(int i) const {
     if(p.phyllotaxy==1)return (i%2)*pi+(i/2)*.27;
     if(p.phyllotaxy==2)return (i%p.clusterLeaves)*2*pi/p.clusterLeaves+(i/p.clusterLeaves)*.19;
@@ -52,7 +53,7 @@ struct Botanical : Generator {
     auto first=b.mesh.vertices.size();
     if(material==Needle||material==NeedleLight||material==NeedleMature){
       b.leaf(origin,direction,up,size,std::max(.65,width),6,lod==2?3:1,material,part,p.leafCurl*.35,p.leafTwist*.2,{.05,.85,1.,.80,.1});
-    }else if(shape==4&&mode<2){
+    }else if(shape==4&&mode<2&&!compact()){
       int lobes=std::clamp(p.leaflets,3,9),n=lobes*4+2;
       if(!b.room(n))return;b.organ++;
       V right=unit(cross(direction,up)),normal=unit(cross(right,direction));
@@ -68,7 +69,7 @@ struct Botanical : Generator {
     }else if(mode>=2){
       b.leaf(origin,direction,up,size,width,shape,mode,material,part,p.leafCurl*.45,p.leafTwist*r.range(-.6,.6),p.leafProfile);
     }else {
-      int steps=lod==1?3:mode==1?4:8,columns=mode==1?1:2;
+      int steps=compact()?(lod?3:4):lod==1?3:mode==1?4:8,columns=compact()||mode==1?1:2;
       if(!b.room(steps*columns*2))return;b.organ++;
       auto first=b.mesh.vertices.size();V right=unit(cross(direction,up)),normal=unit(cross(right,direction));
       double curl=(p.leafCurl+r.range(-.06,.06)*p.irregularity)*.48,twist=p.leafTwist*r.range(-.6,.6),asym=r.range(-.055,.055)*p.irregularity;
@@ -76,7 +77,7 @@ struct Botanical : Generator {
         double t=double(i)/steps,profile=botanicalLeafWidth(shape,t,p.leafProfile,p.serration);
         // A loose contour follows the selected morphology without clipping
         // the finer lobes/teeth between compact ribbon rows.
-        double w=mode==1?.80+.20*std::clamp(profile,0.,1.):std::max(.005,profile);
+        double w=(compact()||mode==1)?.80+.20*std::clamp(profile,0.,1.):std::max(.005,profile);
         auto center=add(origin,add(mul(direction,size*t),mul(normal,size*curl*t*t)));
         center=add(center,mul(right,size*asym*std::sin(pi*t)));
         for(int k=0;k<=columns;k++){
@@ -128,7 +129,8 @@ struct Botanical : Generator {
   }
   size_t leafCost() const {
     size_t cost=lod==2?4:p.foliageMode>=2?4:lod==1?6:p.foliageMode==1?8:32;
-    if(p.leafShape==4&&p.foliageMode<2&&lod!=2)cost=std::clamp(p.leaflets,3,9)*4+2;
+    if(compact())cost=lod==2?4:lod==1?6:8;
+    else if(p.leafShape==4&&p.foliageMode<2&&lod!=2)cost=std::clamp(p.leaflets,3,9)*4+2;
     if(p.leafShape==7)cost=cost*p.leaflets*(doc.family==Family::Broadleaf&&p.organ==3?4:1)+24;
     return cost;
   }
@@ -173,10 +175,20 @@ struct Botanical : Generator {
     size_t allowance=std::max<size_t>(100,b.budget*.31);
     auto rings=[&](Part part){return std::max(3,int(radial*(part==Part::Twigs?.35:part==Part::Secondary?.5:part==Part::Primary?.72:1.)));};
     auto steps=[&](Part part){return std::max(1,int(segments*(part==Part::Twigs?.27:part==Part::Secondary?.45:part==Part::Primary?.65:1.)));};
-    auto estimate=[&](){size_t sum=0;for(auto& span:skeleton){if(span.part==Part::Twigs&&lod>0)sum+=doc.family==Family::Conifer&&lod==2?0:2;else sum+=size_t(std::min<int>(steps(span.part),span.path.size()-1)+1)*rings(span.part)*2;}return sum;};
+    auto estimate=[&](){size_t sum=0;for(auto& span:skeleton){if(span.part==Part::Twigs&&(lod>0||compact()))sum+=doc.family==Family::Conifer&&lod==2?0:2;else sum+=size_t(std::min<int>(steps(span.part),span.path.size()-1)+1)*rings(span.part)*2;}return sum;};
     while(estimate()>allowance&&(segments>1||radial>3)){if(segments>2)--segments;else if(radial>3)--radial;else --segments;}
+    const auto fullBudget=b.budget;
+    if(compact()){
+      // Keep structural branches ahead of ribbons and leave space for foliage,
+      // including when a small distant LOD exhausts its skeleton allowance.
+      std::stable_sort(skeleton.begin(),skeleton.end(),[](const Span& a,const Span& c){
+        auto rank=[](Part part){return part==Part::Trunk?0:part==Part::Roots?1:int(part);};
+        return rank(a.part)<rank(c.part);
+      });
+      b.budget=std::max<size_t>(fullBudget/2,b.mesh.faces.size());
+    }
     for(auto& span:skeleton){
-      if(span.part==Part::Twigs&&lod>0){
+      if(span.part==Part::Twigs&&(lod>0||compact())){
         if(doc.family==Family::Conifer&&lod==2)continue; // needle cards carry their shoot axis
         auto from=span.path.front(),to=span.path.back(),axis=unit(sub(to,from));V side=unit(cross(axis,V{0,0,1}));if(length(side)<.01)side={1,0,0};side=mul(side,std::max(.02,span.radius));auto normal=unit(cross(side,axis));
         if(b.room(2)){b.organ++;auto a=b.vertex(sub(from,side),normal,0,0,Bark),c=b.vertex(add(from,side),normal,1,0,Bark),d=b.vertex(add(to,mul(side,.12)),normal,1,1,Bark),e=b.vertex(sub(to,mul(side,.12)),normal,0,1,Bark);b.quad(a,c,d,e,Bark,Part::Twigs);}continue;
@@ -185,10 +197,26 @@ struct Botanical : Generator {
       for(int i=0;i<=n;i++)path.push_back(span.path[size_t(double(i)*(span.path.size()-1)/n)]);
       b.tube(path,span.radius,span.tip,rings(span.part),Bark,span.part);
     }
+    b.budget=fullBudget;
   }
   void emitFoliage(bool needles=false) {
     // Stable spatial sampling covers the whole planned crown at all LODs.
     std::stable_sort(foliage.begin(),foliage.end(),[](auto& a,auto& b){return mix(a.id,13)<mix(b.id,13);});
+    auto photo=foliagePhoto(doc);
+    if(photo==Photo::Oak||photo==Photo::Spruce||photo==Photo::Maple||photo==Photo::Birch||photo==Photo::Pine){
+      int strips=lod?1:2;
+      size_t groups=(foliage.size()+(lod?5:3))/(lod?6:4);
+      size_t count=std::min((b.budget-b.mesh.faces.size())/(strips*2),size_t(groups*phenology()));
+      for(size_t i=0;i<count;i++){
+        auto& shoot=foliage[i*foliage.size()/count];
+        Rng rng(mix(shoot.id,doc.seed));
+        V up=unit({rng.range(-.85,.85),rng.range(-.85,.85),rng.range(.5,1.)});
+        double size=p.leafSize*(.5+.5*p.age)*shoot.size*(needles?1.65:2.15)*(lod==2?1.30:1.);
+        double width=size*(needles?.70:.74)*std::clamp(std::sqrt(p.leafWidth/.45),.60,1.50);
+        b.foliageCard(shoot.p,shoot.aim,up,size,width,p.leafCurl*.45,strips,p.leafTwist*rng.range(-.65,.65));
+      }
+      return;
+    }
     auto capacity=(b.budget-b.mesh.faces.size())/std::max<size_t>(1,needles?8:leafCost()+2);
     size_t survivors=std::min(capacity,foliage.size()),count=size_t(survivors*std::min(1.,phenology()));
     double compensation=survivors?std::clamp(std::sqrt(double(foliage.size())/survivors)/(lod==2?1.85:lod==1?1.18:1.),1.,lod?1.65:1.35):1.;

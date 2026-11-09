@@ -24,8 +24,8 @@ static void RB_InputLog(const char *stage,const char *format,...)
         file=(HANDLE)InterlockedCompareExchangePointer(&storedhandle,created,NULL);
         if(file)CloseHandle(created);else file=created;
     }
-    va_start(args,format);vsnprintf(payload,sizeof(payload),format,args);va_end(args);
-    bytes=snprintf(line,sizeof(line),"%llu tid=%lu %s %s\r\n",(unsigned long long)GetTickCount64(),(unsigned long)GetCurrentThreadId(),stage,payload);
+    va_start(args,format);_vsnprintf(payload,sizeof(payload),format,args);va_end(args);payload[sizeof(payload)-1]=0;
+    bytes=_snprintf(line,sizeof(line),"%llu tid=%lu %s %s\r\n",(unsigned long long)GetTickCount64(),(unsigned long)GetCurrentThreadId(),stage,payload);
     if(bytes>0){DWORD written;WriteFile(file,line,(DWORD)(bytes<(int)sizeof(line)?bytes:(int)sizeof(line)-1),&written,NULL);}
 }
 #endif

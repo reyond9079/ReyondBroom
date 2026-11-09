@@ -70,8 +70,8 @@ Right-click a 3D or orthographic scene view and choose **Create > Model >
 active layer, map instance and profile belong to that request. Camera movement
 after opening the editor does not move the eventual object.
 
-The first **Save** writes the editable source and its MD3/material dependencies,
-then creates exactly one authoring **func_model**. Later Save / Save As update
+The first **Save** writes the editable source, the runtime model for the active
+profile and its material dependencies, then creates one authoring entity. Later Save / Save As update
 that entity and preserve its transforms and layer. Opening a versioned source snapshot starts an editable copy and requires Save As, preserving the original history asset. Runtime bundles are immutable
 and content-addressed, so map Undo/Redo restores the previous geometry. Deleting
 or undoing the inserted entity cancels its binding; another Save does not revive
@@ -88,14 +88,13 @@ Shader lists keep existing entries. Build snapshots include their dependencies.
 
 | Target | Authoring document and runtime |
 | --- | --- |
-| Quake III | `func_model` in source; only the disposable q3map2 copy uses `misc_model` |
-| FTE Custom | `func_model`, rendered by the existing compiled-preview model pipeline; external game launch requires a custom mod that implements this class |
+| Quake III | MD3 with up to 32 surfaces of 999 vertices and 1,999 triangles each. q3map2 bakes the `misc_model` into the map. |
+| FTE Custom | Full-detail IQM with no total MD3 surface or triangle cap. `func_model` renders in the compiled preview. An external game needs a mod that implements this class. |
 | Quake 1 with FTE | Explicit **Use FTE static models for Quake 1** opt-in; the disposable copy uses FTE `misc_model` and effective uniform scale. Bake nonuniform scale into the source geometry or use a compatible custom mod; otherwise the build stops with a diagnostic. |
 | Vanilla Quake / Quake II / GoldSrc | Authoring is allowed; an explicit build diagnostic requires conversion / a compatible mod entity |
 
-Quake III baked plants use vertex lighting; FTE/Quake 1 extension models use
-normal-based entity lighting because MD3 has no vertex color channel. Both
-materials take cutout transparency only from the atlas. Profile-specific asset
+Quake III baked plants use vertex lighting. FTE uses normal-based entity
+lighting. Both materials take cutout transparency from the atlas. Profile-specific asset
 keys prevent shader conflicts when the same project is placed in both targets.
 
 The inserted entity participates in ordinary selection, position/rotation/scale,
@@ -125,7 +124,7 @@ photogrammetry library.
 Generation and thumbnails run off the UI thread. Edits debounce, cancel old
 work and discard stale results. Material-only edits reuse geometry; hierarchy
 edits reuse the botanical base mesh. Budgets may reduce canopy density; a visible
-notice reports that limit. Automatic Save normalizes large MD3 coordinates and compensates through modelscale. Direct exports exceeding MD3 surface/coordinate limits require a lower LOD or a portable export. Projects allow up to 64 components and
+notice reports that limit. Automatic Save normalizes large Quake III MD3 coordinates and compensates through modelscale. FTE IQM keeps full-precision positions at the authored size. Direct MD3 exports exceeding its limits require a lower LOD or a portable export. Projects allow up to 64 components and
 64 saved variations, with bounded generation and document history.
 
 ## Verification

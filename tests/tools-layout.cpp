@@ -7,6 +7,8 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "../native/ftebroom_tools_layout.h"
+// Standalone fixtures use the untranslated labels for ImGui IDs.
+void FteBroomTranslate(const char*&,const char*&){}
 static ImGuiID dock;
 static void frame(int rows,bool reset=false,bool horizontal=true){
  auto& io=ImGui::GetIO();io.DisplaySize={900,700};io.DeltaTime=1.f/60;

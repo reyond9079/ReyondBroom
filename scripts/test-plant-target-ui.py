@@ -7,11 +7,11 @@ from editor_os_input import NativeInput,read_ui_json
 
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'placement-ui-live.json';state.unlink(missing_ok=True)
-# Earlier profile tests may leave FTE Custom active. Pin the profile to this
-# disposable map so the MD3 assertions exercise the intended target.
-fixture=data/'maps/qa_clip.map'
-previous_fixture=fixture.read_bytes()
-fixture.write_bytes(b'// ReyondBroom profile=quake3 format=quake3\n'+previous_fixture)
+# The fixture opens via mapedit, so pin the startup profile before launching
+# the editor even if an earlier test left FTE Custom active.
+profile_file=root/'ftebroom-game-profile.txt'
+previous_profile=profile_file.read_bytes() if profile_file.is_file() else None
+profile_file.write_text('0 0 "" "" "" "" 1 0 "" 1 1\n')
 # No plant QA/open command here: first ever viewport Create must open its own
 # editor before any hidden unsaved-document confirmation can be drawn.
 (data/'plant-target-ui.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 11 echo RB_PLANT_FIXTURE_READY\n')
@@ -55,6 +55,7 @@ try:
  # already has an epoch; clicking it would correctly cancel the captured
  # binding when the delayed map arrives while the plant is generating.
  wait(lambda:live()['views'] and live()['epoch']>=2 and live()['mapPath'].replace('\\','/').endswith('/maps/qa_clip.map'));ui.position()
+ check(live()['profile']==0,'placement fixture starts in Quake III profile')
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
  # qa-clip schedules its camera/view setup after map load. Wait for that
  # fixture to finish and fresh UI frames before the first cold context click.
@@ -116,4 +117,5 @@ except Exception:
 finally:
  if process.poll() is None:process.kill();process.wait(timeout=15)
  log.close()
- fixture.write_bytes(previous_fixture)
+ if previous_profile is None:profile_file.unlink(missing_ok=True)
+ else:profile_file.write_bytes(previous_profile)

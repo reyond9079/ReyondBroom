@@ -18,12 +18,12 @@ static void plantProperties() {
   auto& s=plantState;auto& p=s.doc.p;auto f=s.doc.family;
   bool tree=f==plants::Family::Broadleaf||f==plants::Family::Bush||f==plants::Family::Custom;
   bool flowering=f==plants::Family::Flower||(f==plants::Family::Cactus&&(s.doc.generator==1||p.organ==1))||s.doc.species=="flowering-shrub";
-  bool pads=f==plants::Family::Cactus&&s.doc.generator==2&&p.organ==2;
+  bool pads=f==plants::Family::Cactus&&s.doc.generator>=2&&p.organ==2;
   bool leafy=f==plants::Family::Riparian||tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Bamboo||f==plants::Family::Vine||f==plants::Family::Flower;
   if(ImGui::CollapsingHeader("General",ImGuiTreeNodeFlags_DefaultOpen)) {
     plantText("Plant name",s.doc.name);
     if(s.doc.generator<3){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade to photographic foliage","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
-    else ImGui::TextDisabled("Botanical generator 2");ImGui::TextDisabled("%s",plants::familyName(f));
+    else ImGui::TextDisabled("Photographic generator %d",s.doc.generator);ImGui::TextDisabled("%s",plants::familyName(f));
     plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
     if(f!=plants::Family::Mushroom)plantCombo("Season",p.season,"Spring\0Summer\0Autumn\0Winter\0");
@@ -33,7 +33,7 @@ static void plantProperties() {
   if(s.advanced&&ImGui::CollapsingHeader("Shape / growth")) {
     if(tree||f==plants::Family::Conifer||f==plants::Family::Cactus||f==plants::Family::Mushroom)plantSlider("Crown / cap spread",p.spread,.1,1.5);
     if(f!=plants::Family::Mushroom&&s.doc.species!="barrel-cactus")plantSlider("Curvature",p.curvature,0,1.5);
-    if(s.doc.generator==2&&(tree||f==plants::Family::Conifer)){
+    if(s.doc.generator>=2&&(tree||f==plants::Family::Conifer)){
       plantCombo("Crown architecture",p.crown,"Spreading\0Oval\0Columnar\0Weeping\0Umbrella\0Pyramidal\0Vase\0Multiple leaders\0Layered\0");
       plantSlider("Crown start",p.crownBase,.05,.85);plantSlider("Crown aspect",p.crownAspect,.2,1.5);plantSlider("Crown fill",p.crownFill,.1,1.8);
     }
@@ -59,7 +59,7 @@ static void plantProperties() {
     if(f!=plants::Family::Grass)plantSlider("Leaf / leaflet size",p.leafSize,.5,60,"%.1f units");
     plantSlider("Leaf / blade width",p.leafWidth,.015,1.5);
     if(s.advanced) {
-      if(s.doc.generator==2){
+      if(s.doc.generator>=2){
         if(f!=plants::Family::Grass){plantCombo("Leaf arrangement",p.phyllotaxy,"Alternate spiral\0Opposite\0Whorled\0");if(p.phyllotaxy==2)plantInt("Leaves in whorl",p.clusterLeaves,1,12);}
         if(p.leafShape==7||p.leafShape==4)plantInt("Leaflets / lobes",p.leaflets,3,21);
         if(tree||f==plants::Family::Vine)plantSlider("Petiole ratio",p.petiole,0,.6);if(f!=plants::Family::Conifer)plantSlider("Edge serration",p.serration,0,1);
@@ -82,7 +82,7 @@ static void plantProperties() {
     if(f!=plants::Family::Mushroom)plantColor("Foliage color",p.leaf);
     if(f==plants::Family::Mushroom||flowering)plantColor("Flower / cap color",p.flower);
     if(s.advanced) {
-      if(s.doc.generator==2)plantCombo("Bark pattern",p.barkPattern,"Fissured\0Smooth\0Papery\0Scaly\0Fibrous\0Rings\0Cork\0Mottled\0");
+      if(s.doc.generator>=2)plantCombo("Bark pattern",p.barkPattern,"Fissured\0Smooth\0Papery\0Scaly\0Fibrous\0Rings\0Cork\0Mottled\0");
       plantSlider("Surface roughness",p.roughness,.05,1);plantSlider("Ambient occlusion",p.ao,0,1);plantSlider("Color variation",p.variation,0,.6);
       if(f!=plants::Family::Mushroom)plantSlider("Dryness",p.dryness,0,1);
       if(leafy||f==plants::Family::Conifer||f==plants::Family::Grass)if(plantButton("Import leaf albedo...","import-texture"))runUiChoose(s.doc.texture,[](const std::string& path){auto before=plants::serialize(plantState.doc);plantState.doc.texture=path;plantChanged(before);});

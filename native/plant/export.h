@@ -76,6 +76,11 @@ inline modelExport::Mesh aliasMesh(const Mesh& mesh,const std::string& material)
 }
 inline bool opaquePlantTarget(int profile){return profile>=2&&profile<=4;}
 inline const char* targetClass(int profile){return profile==4?"cycler":profile==1?"func_model":"misc_model";}
+inline size_t plantTrunkCount(const Mesh& mesh) {
+  std::set<unsigned> trunks;
+  for(auto& face:mesh.faces)if(face.part==Part::Trunk)trunks.insert(face.organ);
+  return trunks.size();
+}
 inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile,bool maskedQuake=false) {
   if(!opaquePlantTarget(profile)){
     if(modelMesh(full,"").surfaces.size()<=32)return full;
@@ -83,6 +88,9 @@ inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile,bo
   }
   const size_t maxVertices=profile==2?1024:2048,maxTriangles=profile==2?2048:4096;
   const bool foliage=std::any_of(full.faces.begin(),full.faces.end(),[](auto& f){return f.part==Part::Leaves;});
+  const bool treeGroup=source.generator>=4&&source.p.quality!=3&&source.p.clumps>1&&
+    (source.family==Family::Broadleaf||source.family==Family::Conifer);
+  const size_t requiredTrunks=treeGroup&&plantTrunkCount(full)?size_t(source.p.clumps):0;
   auto d=source;
   if(d.generator<4)d.generator=std::min(2,d.generator);
   d.p.quality=2;d.p.foliageMode=0;d.p.sides=maskedQuake?6:3;d.p.segments=maskedQuake?6:3;
@@ -91,17 +99,25 @@ inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile,bo
   for(int detail=0;detail<5;detail++){
     d.p.depth=std::min(source.p.depth,detail?1:2);
     d.p.branches=std::max(source.family==Family::Cactus?0:1,std::min(source.p.branches/(detail+1),profile==2?8:12));
-    d.p.clumps=std::max(1,source.p.clumps/(1<<detail));
+    if(treeGroup){
+      // Keep the branching plan spread over the original crown. The grouped
+      // generator reduces tessellation and samples that plan within the cap.
+      d.p.depth=std::min(source.p.depth,2);
+      d.p.branches=std::min(source.p.branches,16);
+      d.p.sides=std::max(3,(maskedQuake?6:4)-detail);
+    }else d.p.clumps=std::max(1,source.p.clumps/(1<<detail));
     d.p.leaflets=std::max(3,source.p.leaflets/(detail+1));
     d.p.petals=std::max(3,source.p.petals/(detail+1));d.p.flowerLayers=std::max(1,source.p.flowerLayers/(detail+1));
     for(int budget:{profile==2?1500:3000,profile==2?1000:2000,profile==2?700:1400,500,350,256}){
       d.p.budget=std::min(source.p.budget,budget);
-      auto mesh=generate(d,0,nullptr,d.generator>=4&&!maskedQuake);if(mesh.faces.empty())continue;
+      auto mesh=generate(d,0,nullptr,d.generator>=4&&!maskedQuake,treeGroup);if(mesh.faces.empty())continue;
+      if(requiredTrunks&&plantTrunkCount(mesh)!=requiredTrunks)continue;
       auto encoded=aliasMesh(mesh,"plant");auto& s=encoded.surfaces.front();
       bool hasLeaves=std::any_of(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves;});
       if(s.frames[0].size()<=maxVertices&&s.triangles.size()<=maxTriangles&&(!foliage||hasLeaves))return mesh;
     }
   }
+  if(treeGroup)throw std::runtime_error("The target model cannot retain every tree within its format limits. Place the trees as separate models or use smaller groups. The editable source is preserved.");
   throw std::runtime_error(std::string(profile==2?"Quake MDL":profile==3?"Quake II MD2":"GoldSrc MDL")+" plant LOD cannot retain the visible plant within its vertex/triangle limits. Reduce stems, branches or component copies; the editable source is preserved.");
 }
 inline modelExport::Mesh targetModel(const Mesh& mesh,const std::string& material,int profile){return opaquePlantTarget(profile)?aliasMesh(mesh,material):modelMesh(mesh,material);}
@@ -189,12 +205,13 @@ inline std::string glb(const Mesh& mesh,const Textures& maps) {
 }
 // RBB1 is the existing engine's validated dynamic mesh ABI. It supports
 // depth-tested alpha cutout and two-sided drawing, with baked vertex lighting.
-inline std::string preview(const Mesh& mesh,const Project& doc,int display,double time,bool wind,double lightAngle) {
+inline std::string preview(const Mesh& mesh,const Project& doc,int display,double time,bool wind,double lightAngle,
+                           const char* atlas="bbtex/plant-atlas.tga") {
   modelExport::Binary out;out.bytes="RBB1";out.u32((mesh.faces.size()+9999)/10000);
   const double a=lightAngle*pi/180;V light=unit({std::cos(a)*.6,std::sin(a)*.6,.8});
   for(size_t first=0;first<mesh.faces.size();first+=10000) {
     size_t count=std::min<size_t>(10000,mesh.faces.size()-first);out.u32(count*3);out.u32(count*3);
-    out.text(display==0?"bbtex/plant-atlas.tga":display==3?"bbtex/plant-uv.tga":"$whiteimage",128);
+    out.text(display==0?atlas:display==3?"bbtex/plant-uv.tga":"$whiteimage",128);
     for(size_t i=first;i<first+count;i++)for(unsigned n:mesh.faces[i].i) {
       auto& v=mesh.vertices[n];V position=wind?windPosition(v,doc.p,time,doc.p.height):v.p;
       double diffuse=.36+.64*std::max(0.,dot(v.n,light));double ambient=1-doc.p.ao*.16*(1-std::clamp(v.p[2]/doc.p.height,0.,1.));

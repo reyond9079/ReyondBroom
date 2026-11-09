@@ -308,7 +308,8 @@ inline void applyMaterialPhoto(Texel& texel,const Project& d,int mat,PhotoDetail
   }
   texel.height=texel.height*.55+light*.45;
 }
-inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const std::atomic<bool>* cancel=nullptr,int tile=256,const PhotoAtlas* photos=nullptr) {
+inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const std::atomic<bool>* cancel=nullptr,int tile=256,const PhotoAtlas* photos=nullptr,
+                            const Image* bark=nullptr,const Image* cut=nullptr) {
   if(tile<16||tile>256)throw std::runtime_error("Invalid plant atlas resolution");
   Textures out;const int size=tile*4;
   for(auto image:{&out.albedo,&out.normal,&out.orm}){image->width=image->height=size;image->rgba.assign(size_t(size)*size*4,0);}
@@ -320,6 +321,9 @@ inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const
   int materialCount=d.generator==1?10:foliage==Photo::None?int(PhotoFoliage):int(Count);
   for(int mat=0;mat<materialCount;mat++) {
     auto detail=photos&&!photos->details.empty()?materialPhoto(d,mat):PhotoDetail::None;
+    const bool foliageTile=mat==Leaf||mat==Needle||mat==Grass||mat>=LeafLight;
+    const auto* override=mat==Bark?bark:mat==Wood?cut:foliageTile?imported:nullptr;
+    const bool custom=override&&override->width>0&&override->height>0&&override->rgba.size()==size_t(override->width)*override->height*4;
     for(int y=0;y<tile;y++) {
       if(cancel&&cancel->load())throw std::runtime_error("Plant generation cancelled");
       for(int x=0;x<tile;x++) {
@@ -353,9 +357,12 @@ inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const
         size_t at=((mat/4*tile+y)*size+mat%4*tile+x)*4;
         for(int a=0;a<3;a++)out.albedo.rgba[at+a]=unsigned(std::round(sample.color[a]*255));
         out.albedo.rgba[at+3]=unsigned(sample.alpha*255);heights[y*tile+x]=sample.height;
-        if(imported&&(mat==Leaf||mat==Needle||mat==Grass||mat>=LeafLight)&&imported->width>0&&imported->height>0&&imported->rgba.size()==size_t(imported->width)*imported->height*4) {
-          int sx=std::clamp(int(u*(imported->width-1)),0,imported->width-1),sy=std::clamp(int(v*(imported->height-1)),0,imported->height-1);
-          for(int a=0;a<4;a++)out.albedo.rgba[at+a]=imported->rgba[(sy*imported->width+sx)*4+a];
+        if(custom) {
+          const int sx=int(u*(override->width-1)),sy=int(v*(override->height-1));
+          const auto* pixel=override->rgba.data()+(size_t(sy)*override->width+sx)*4;
+          for(int a=0;a<3;a++)out.albedo.rgba[at+a]=pixel[a];
+          out.albedo.rgba[at+3]=foliageTile?pixel[3]:255;
+          if(!foliageTile)heights[y*tile+x]=(.21*pixel[0]+.72*pixel[1]+.07*pixel[2])/255.;
         }
         out.orm.rgba[at]=unsigned((1-d.p.ao*(1-sample.height)*.65)*255);
         out.orm.rgba[at+1]=unsigned(std::clamp(d.p.roughness+(sample.height-.5)*.12,0.,1.)*255);

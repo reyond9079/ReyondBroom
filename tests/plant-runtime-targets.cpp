@@ -12,9 +12,49 @@
 using namespace ftebroom::plant;
 static void require(bool value,const std::string& message){if(!value)throw std::runtime_error(message);}
 static void write(const std::filesystem::path& path,const std::string& bytes){std::ofstream out(path,std::ios::binary);out.write(bytes.data(),bytes.size());require(bool(out),"write artifact");}
+static void checkBarkMappingAndWinding(const std::string& palette){
+  const int sides=8;
+  Builder tube(150);
+  tube.repeatBark=true;
+  require(tube.tube({{0,0,0},{0,0,200}},10,8,sides,Bark,Part::Trunk),"tall tiled trunk fits geometry budget");
+  const double repeat=barkRepeatLength;
+  for(int ring=0;ring<4;ring++){
+    const auto& v=tube.mesh.vertices.at(ring*(sides+1));
+    require(std::abs(v.p[2]-ring*repeat)<1e-6&&std::abs(v.uv[1]-atlasUV(Bark,0,ring%2)[1])<1e-6,
+      "long trunk has a real UV repeat boundary every 64 units");
+  }
+  auto turn=barkStations({{0,0,0},{48,0,0},{48,80,0}});
+  require(turn.size()==4&&turn[2].segment==1&&std::abs(turn[2].blend-.20)<1e-6&&turn.back().distance==128.,
+    "branch repeats use distance along its bends without duplicate boundary rings");
+
+  auto alias=aliasMesh(tube.mesh,"plant");
+  ftebroom::modelExport::Skin solid{16,16,std::vector<unsigned char>(16*16*4,255)};
+  auto mdl=ftebroom::readMdl(ftebroom::modelExport::mdl(alias,{solid},palette));
+  require(mdl.triangles.size()==tube.mesh.faces.size(),"opaque wood is not duplicated as a two-sided leaf");
+  auto orientation=[&](size_t i,const auto& positions){
+    const auto& face=tube.mesh.faces[i];
+    auto expected=add(add(tube.mesh.vertices[face.i[0]].n,tube.mesh.vertices[face.i[1]].n),tube.mesh.vertices[face.i[2]].n);
+    return dot(cross(sub(positions[1],positions[0]),sub(positions[2],positions[0])),expected);
+  };
+  auto md3=modelMesh(tube.mesh,"plant");
+  const auto& md3Surface=md3.surfaces.at(0);
+  for(size_t i=0;i<tube.mesh.faces.size();i++){
+    std::array<V,3> generated{},decoded{},exported{};
+    for(int j=0;j<3;j++){
+      generated[j]=tube.mesh.vertices[tube.mesh.faces[i].i[j]].p;
+      auto& point=mdl.triangles[i][j].point;
+      auto& md3Point=md3Surface.frames[0][md3Surface.triangles[i][j]].position;
+      decoded[j]={point[0],point[1],point[2]};
+      exported[j]={md3Point[0],md3Point[1],md3Point[2]};
+    }
+    require(orientation(i,generated)>0&&orientation(i,decoded)<0&&orientation(i,exported)<0,
+      "wood normals face outward while Quake triangles are clockwise, including the closed ends");
+  }
+}
 int main(int argc,char** argv)try{
   auto folder=argc>1?std::filesystem::u8path(argv[1]):std::filesystem::path("plant-target-results");std::filesystem::create_directories(folder);
   auto q1Palette=ftebroom::defaultQuakePalette(),q2Palette=q1Palette;
+  checkBarkMappingAndWinding(q1Palette);
   // CI may supply the active game's palette; both encoders must retain it.
   if(argc>2){std::ifstream in(argv[2],std::ios::binary);std::string pcx((std::istreambuf_iterator<char>(in)),{});q2Palette=ftebroom::legacy::pcx(pcx).palette;}
   Json rows=Json::array();int cases=0;

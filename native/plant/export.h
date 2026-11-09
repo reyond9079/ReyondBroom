@@ -9,7 +9,7 @@
 #include <deque>
 namespace ftebroom::plant {
 inline uint64_t hash(const std::string& s) {uint64_t h=1469598103934665603ULL;for(unsigned char c:s){h^=c;h*=1099511628211ULL;}return h;}
-inline std::string assetId(const Project& d,int lod) {std::ostringstream s;s<<"plant-"<<std::hex<<hash("plant-export-v3:"+serialize(d).dump()+std::to_string(lod));return s.str();}
+inline std::string assetId(const Project& d,int lod) {std::ostringstream s;s<<"plant-"<<std::hex<<hash((d.generator>=4?"plant-export-v4:":"plant-export-v3:")+serialize(d).dump()+std::to_string(lod));return s.str();}
 // Match the original Quake III renderer's per-surface tessellation limits.
 inline constexpr size_t md3PlantVertices=999,md3PlantTriangles=1200;
 inline modelExport::Mesh modelMesh(const Mesh& mesh,const std::string& material) {
@@ -34,6 +34,9 @@ inline modelExport::Mesh modelMesh(const Mesh& mesh,const std::string& material)
         }
         triangle[corner]=local[index];
       }
+      // Quake model formats use clockwise front faces. Internal geometry,
+      // OBJ and glTF use outward counterclockwise winding.
+      std::swap(triangle[1],triangle[2]);
       surface.triangles.push_back(triangle);
     }
     for(auto index:used)local[index]=-1;
@@ -62,6 +65,7 @@ inline modelExport::Mesh aliasMesh(const Mesh& mesh,const std::string& material)
       if(added)surface.frames[0].push_back({{key[0],key[1],key[2]},{key[3],key[4],key[5]},{key[6],key[7]}});
       triangle[a]=it->second;
     }
+    std::swap(triangle[1],triangle[2]); // clockwise in MDL / MD2 / GoldSrc
     surface.triangles.push_back(triangle);
     // Quake MDL and Quake II MD2 cull backfaces. A leaf must still be visible
     // from below, without depending on an engine-specific cull-none shader.

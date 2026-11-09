@@ -14,7 +14,7 @@ struct PlantBrushBake {
   std::string error;
 };
 static struct PlantBrushState {
-  bool open=false,focus=false,erase=false,filtered=false,published=false,failed=false;
+  bool open=false,focus=false,erase=false,filtered=false,published=false,failed=false,revealCurrent=false;
   float radius=96;
   int category=-1,epoch=-1,profile=-1,geometry=-1,resourceRevision=-1;
   std::string root,selection,error;
@@ -69,6 +69,7 @@ static void plantBrushFromEditor()
   auto& s=plantBrush;
   s.custom=plantState.doc;
   s.erase=false;
+  s.search.fill(0);s.category=-1;s.revealCurrent=true;
   plantBrushSelect(*s.custom,"@current");
   plantState.hidden=true;
   plantReleasePreview();
@@ -310,6 +311,10 @@ static void plantBrushPanel()
       }
     }
     float footer=2*(ImGui::GetFrameHeightWithSpacing());
+    if(s.revealCurrent){
+      ImGui::SetNextWindowScroll({0,0});
+      s.revealCurrent=false;
+    }
     if(ImGui::BeginChild("Plant brush catalogue",{0,-footer},ImGuiChildFlags_Borders)){
       if(s.erase){
         if(s.scene.empty())ImGui::TextDisabled("No plants on this map.");

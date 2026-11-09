@@ -177,7 +177,13 @@ try:
     check(not live()['plantBrush']['active'],'create new plant opens Plant Editor and releases scene input')
     click('plant/to-brush')
     wait(lambda: (b:=live()['plantBrush'])['active'] and b['ready'] and not b['editorVisible'])
-    check(live()['plantBrush']['selection']=='@current','Plant Editor sends the current draft back to the brush')
+    current = wait(lambda: live()['widgets'].get('plant-brush/current',{}).get('visible'))
+    check(current and live()['plantBrush']['selection']=='@current',
+          'Plant Editor reveals and selects the current draft in the brush catalogue')
+    ui.click(x+view['width']*.18,y)
+    plants, _ = snapshot('paint-draft')
+    check(any(json.loads((data/item['_reyondbroom_source']).read_text())['name']=='Untitled oak' for item in plants),
+          'the transferred draft can be painted without saving it as a preset first')
     ImageGrab.grab().save(out/'plant-brush.png')
 except Exception:
     ImageGrab.grab().save(out/'failure.png')

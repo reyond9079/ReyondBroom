@@ -119,6 +119,7 @@ try:
  check(inventory(original)==original_hashes,'source_runtime_remains_byte_identical')
 except Exception:
  (out/'original-failure-state.json').write_text(json.dumps(live(),indent=2))
+ ImageGrab.grab().save(out/'original-failure.png')
  if windows and process is not None and process.poll() is None and 'ui' in globals():
   try:
    ui.position();ui.windows_receipt('diagnostic-before-F24')
@@ -129,7 +130,7 @@ except Exception:
    (out/'after-F24-state.json').write_text(json.dumps(live(),indent=2))
   except Exception as error:(out/'F24-error.txt').write_text(type(error).__name__+': '+str(error))
   try:
-   ui.console('echo RB134_INPUT_DIAGNOSTIC; in_rawinput; in_rawinput_keyboard; in_dinput; in_windowed_mouse')
+   ui.console('echo RB134_INPUT_DIAGNOSTIC; in_rawinput; in_rawinput_keyboard; in_dinput; in_windowed_mouse; ftebroom_mouse_x; ftebroom_mouse_y; ftebroom_camera_captured')
    (out/'after-console-state.json').write_text(json.dumps(live(),indent=2))
   except Exception as error:(out/'console-diagnostic-error.txt').write_text(type(error).__name__+': '+str(error))
  raise

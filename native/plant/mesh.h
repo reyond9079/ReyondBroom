@@ -79,7 +79,7 @@ struct Builder {
     unsigned start=vertex(path.front(),startNormal,.5,.5,mat),end=vertex(path.back(),endNormal,.5,.5,mat,1);
     for(int j=0;j<sides;j++){face(start,first+j+1,first+j,mat,part);unsigned a=first+(path.size()-1)*(sides+1)+j;face(end,a,a+1,mat,part);}return true;
   }
-  void foliageCard(V origin,V direction,V up,double size,double width,double bend,int segments) {
+  void foliageCard(V origin,V direction,V up,double size,double width,double bend,int segments,double twist) {
     if(!room(segments*2))return;
     direction=unit(direction);V right=unit(cross(direction,up));
     if(length(right)<.01)right=unit(cross(direction,V{1,0,0}));
@@ -88,9 +88,10 @@ struct Builder {
     for(int i=0;i<=segments;i++) {
       double t=double(i)/segments;
       V center=add(origin,add(mul(direction,t*size),mul(normal,bend*size*t*t)));
-      V n=unit(sub(normal,mul(direction,2*bend*t)));
-      vertex(sub(center,mul(right,width*.5)),n,0,t,PhotoFoliage,t);
-      vertex(add(center,mul(right,width*.5)),n,1,t,PhotoFoliage,t);
+      V across=add(right,mul(normal,twist*t));
+      V n=unit(sub(sub(normal,mul(direction,2*bend*t)),mul(right,twist*t)));
+      vertex(sub(center,mul(across,width*.5)),n,0,t,PhotoFoliage,t);
+      vertex(add(center,mul(across,width*.5)),n,1,t,PhotoFoliage,t);
     }
     for(int i=0;i<segments;i++){unsigned a=first+i*2;quad(a,a+1,a+3,a+2,PhotoFoliage,Part::Leaves);}
   }

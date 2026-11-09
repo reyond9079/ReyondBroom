@@ -46,7 +46,7 @@ inline void Botanical::herbs() {
       Rng r(mix(doc.seed,i+1000));double a=i*2.399963,spread=height*.17*std::sqrt(r.real());
       V base{std::cos(a)*spread,std::sin(a)*spread,0},aim{std::cos(a)*.13,std::sin(a)*.13,1};
       double size=height*r.range(.68,1.05);
-      b.foliageCard(base,aim,{std::cos(a),std::sin(a),0},size,size*.72,p.leafCurl*.30,lod?1:2);
+      b.foliageCard(base,aim,{std::cos(a),std::sin(a),0},size,size*.72,p.leafCurl*.30,lod?1:2,p.leafTwist*r.range(-.45,.45));
     }
     return;
   }
@@ -88,7 +88,9 @@ inline void Botanical::ferns() {
     auto tip=add(base,{std::cos(a)*length*(p.organ==1?.4:.75),std::sin(a)*length*(p.organ==1?.4:.75),length*(p.organ==1?.95:p.organ==5?1.1:.65)});
     if(photo){
       V aim=sub(tip,base);
-      b.foliageCard(base,aim,{0,0,1},ftebroom::plant::length(aim),length*.53,-.24*p.gravity,lod?1:2);
+      auto stipe=add(base,mul(aim,.18));
+      b.tube({base,stipe},tree?.6:p.radius*.18,.025,std::max(3,sides()-2),Bark,Part::Twigs);
+      b.foliageCard(base,aim,{0,0,1},ftebroom::plant::length(aim),length*.53,-.24*p.gravity,lod?1:2,p.leafTwist*r.range(-.40,.40));
       continue;
     }
     auto path=arc(base,tip,p.gravity,std::max(5,count(p.segments+4,4)),mix(doc.seed,i));
@@ -412,7 +414,7 @@ inline void Botanical::climbers() {
     auto base=stem[size_t(double(i)*steps/nodes)],tip=add(base,mul(dir,p.leafSize*p.petiole));
     if(ivy){
       auto aim=unit(add(mul(dir,.42),{0,0,-.92}));
-      b.foliageCard(base,aim,{0,0,1},p.leafSize*2.15,p.leafSize*1.42,-.12,lod?1:2);
+      b.foliageCard(base,aim,{0,0,1},p.leafSize*2.15,p.leafSize*1.42,-.12,lod?1:2,p.leafTwist*.5);
       continue;
     }
     b.tube({base,tip},p.radius*.25,.025,3,Bark,Part::Twigs);blade(tip,dir,p.leafSize,mix(doc.seed,i));

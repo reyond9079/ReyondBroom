@@ -241,20 +241,35 @@ static void plantViewport() {
   if(s.owner&&(bbActive||modelViewerOpen)) {s.owner=false;cvars->SetFloat("ftebroom_plant_active",0);}
   if(!s.owner){ImGui::TextWrapped("Model Editor is using the shared 3D preview.");if(plantButton("Resume plant preview"))plantResumePreview();return;}
   const char* lodNames[]={"LOD0 high","LOD1 medium","LOD2 low"};
-  ImGui::SetNextItemWidth(120);bool lodOpen=ImGui::BeginCombo("##plant-lod",lodNames[s.lod]);plantRect("lod");
-  if(lodOpen){for(int i=0;i<3;i++){if(ImGui::Selectable(lodNames[i],s.lod==i)){s.lod=i;s.dirtyRender=true;}plantRect("lod/"+std::to_string(i));}ImGui::EndCombo();}ImGui::SameLine();
+  ImGui::SetNextItemWidth(135);bool lodOpen=ImGui::BeginCombo("##plant-lod",s.gamePreview?"Game Preview":lodNames[s.lod]);plantRect("lod");
+  if(lodOpen){
+    for(int i=0;i<3;i++){
+      if(ImGui::Selectable(lodNames[i],!s.gamePreview&&s.lod==i)){s.lod=i;s.gamePreview=false;s.dirtyRender=true;}
+      plantRect("lod/"+std::to_string(i));
+    }
+    if(ImGui::Selectable("Game Preview",s.gamePreview)){s.gamePreview=true;s.dirtyRender=true;}
+    plantRect("game-preview");ImGui::EndCombo();
+  }
+  ImGui::SameLine();
   const char* displays[]={"Textured","Solid","Wireframe","Normals","UV debug"};
   ImGui::SetNextItemWidth(140);bool displayOpen=ImGui::BeginCombo("##plant-display",displays[s.display]);plantRect("display");
   if(displayOpen){for(int i=0;i<5;i++){if(ImGui::Selectable(displays[i],s.display==i)){s.display=i;s.dirtyRender=true;}plantRect("display/"+std::to_string(i));}ImGui::EndCombo();}ImGui::SameLine();
-  if(plantButton("Frame","frame")){s.framePending=true;if(s.result){s.cameraLow=s.result->lods[s.lod].low;s.cameraHigh=s.result->lods[s.lod].high;s.zoom=1;s.framePending=false;}}
+  const auto* mesh=s.gamePreview?(plantGameCurrent()&&s.gameResult.error.empty()?&s.gameResult.mesh:nullptr):(s.result?&s.result->lods[s.lod]:nullptr);
+  if(plantButton("Frame","frame")){s.framePending=!s.gamePreview;if(mesh){s.cameraLow=mesh->low;s.cameraHigh=mesh->high;s.zoom=1;s.framePending=false;}}
   ImGui::Checkbox("Ortho",&s.ortho);ImGui::SameLine();ImGui::Checkbox("Grid",&s.floor);ImGui::SameLine();ImGui::Checkbox("Axes",&s.axes);
-  auto size=ImGui::GetContentRegionAvail();size.x=std::max(64.f,size.x);size.y=std::max(64.f,size.y-45*uiScale());
+  if(s.gamePreview&&!mesh){
+    const auto& error=s.gameResult.error;
+    if(plantGameCurrent()&&!error.empty())ImGui::TextWrapped("%s",error.c_str());
+    else ImGui::TextUnformatted("Preparing the game model...");
+    return;
+  }
+  auto size=ImGui::GetContentRegionAvail();size.x=std::max(64.f,size.x);size.y=std::max(64.f,size.y-(s.gamePreview?66:45)*uiScale());
   auto pos=ImGui::GetCursorScreenPos();s.viewportMin=pos;s.viewportSize=size;
   if(!modelViewerImage)modelViewerImage=draw->LoadImageShader("ftebroom/modelviewer-image","{ program default2d { map $rt:ftebroom_modelviewer rgbgen vertex alphagen vertex } }");
   auto dl=ImGui::GetWindowDrawList();dl->AddImage((ImTextureID)modelViewerImage,pos,{pos.x+size.x,pos.y+size.y});
   ImGui::InvisibleButton("plant-viewport",size,ImGuiButtonFlags_MouseButtonLeft|ImGuiButtonFlags_MouseButtonRight|ImGuiButtonFlags_MouseButtonMiddle);plantRect("viewport");
   bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();bool handleHovered=false;
-  if(s.handles&&s.advanced)for(int i=1;i<4;i++) {
+  if(!s.gamePreview&&s.handles&&s.advanced)for(int i=1;i<4;i++) {
     auto point=plants::mul(s.doc.p.controls[i],s.doc.p.height);ImVec2 screen;if(!plantProjectPoint(point,screen))continue;
     dl->AddCircleFilled(screen,6*uiScale(),IM_COL32(245,181,58,255));
     if(std::hypot(io.MousePos.x-screen.x,io.MousePos.y-screen.y)<12*uiScale())handleHovered=true;
@@ -266,19 +281,34 @@ static void plantViewport() {
     if(ImGui::IsMouseDragging(0,2)){s.yaw-=io.MouseDelta.x*.4;s.pitch=std::clamp(s.pitch-io.MouseDelta.y*.4,-85.,85.);}
     if(ImGui::IsMouseDragging(1,0)||ImGui::IsMouseDragging(2,0)){auto c=plantCamera();double scale=c.distance/std::max(1.,c.focal);auto delta=plants::add(plants::mul(c.right,-io.MouseDelta.x*scale),plants::mul(c.up,io.MouseDelta.y*scale));s.cameraLow=plants::add(s.cameraLow,delta);s.cameraHigh=plants::add(s.cameraHigh,delta);}
   }
-  if(hovered&&ImGui::IsMouseReleased(0)&&ImGui::GetMouseDragDelta(0).x*ImGui::GetMouseDragDelta(0).x+ImGui::GetMouseDragDelta(0).y*ImGui::GetMouseDragDelta(0).y<4&&!handleHovered)plantPick();
+  if(!s.gamePreview&&hovered&&ImGui::IsMouseReleased(0)&&ImGui::GetMouseDragDelta(0).x*ImGui::GetMouseDragDelta(0).x+ImGui::GetMouseDragDelta(0).y*ImGui::GetMouseDragDelta(0).y<4&&!handleHovered)plantPick();
   if(hovered&&io.MouseWheel){ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);s.zoom=std::clamp(s.zoom*std::pow(1.12,-io.MouseWheel),.05,20.);}
-  if(s.result) {
-    auto& mesh=s.result->lods[s.lod];ImGui::Text("%zu triangles  |  %zu vertices  |  seed %u",mesh.faces.size(),mesh.vertices.size(),s.doc.seed);
-    if(mesh.budgetLimited)ImGui::TextColored({1,.72f,.3f,1},"Budget reached; reduce density or raise the budget.");
-    double now=ImGui::GetTime();if(s.dirtyRender||(s.wind&&now-s.lastUpload>1./30)) {
+  if(mesh) {
+    if(s.gamePreview){
+      const auto& game=s.gameResult;
+      ImGui::Text("%s  |  %s",gameProfileName(),plants::targetExtension(gameProfile));
+      if(game.trees>1&&(s.doc.family==plants::Family::Broadleaf||s.doc.family==plants::Family::Conifer))
+        ImGui::Text("%zu triangles  |  %zu vertices  |  %zu trees",game.triangles,game.vertices,game.trees);
+      else ImGui::Text("%zu triangles  |  %zu vertices",game.triangles,game.vertices);
+      if(game.simplified)ImGui::TextDisabled("Geometry adapted to the target format");
+    }else{
+      ImGui::Text("%zu triangles  |  %zu vertices  |  seed %u",mesh->faces.size(),mesh->vertices.size(),s.doc.seed);
+      if(mesh->budgetLimited)ImGui::TextColored({1,.72f,.3f,1},"Budget reached; reduce density or raise the budget.");
+    }
+    const bool wind=!s.gamePreview&&s.wind;
+    double now=ImGui::GetTime();if(s.dirtyRender||(wind&&now-s.lastUpload>1./30)) {
       auto api=bbAPI();auto images=bbImageAPI();if(!api||!images){s.error="This engine lacks the existing dynamic-mesh preview interfaces";return;}
       if(s.dirtyRender) {
-        plantUploadMaps();
+        if(s.gamePreview&&!s.gameAtlasUploaded){
+          const auto& map=*s.gameResult.albedo;
+          images->upload("bbtex/plant-game-atlas.tga",map.rgba.data(),map.width,map.height);
+          s.gameAtlasUploaded=true;
+        }else if(!s.gamePreview)plantUploadMaps();
         if(s.display==4&&!s.checkerUploaded){std::vector<unsigned char> checker(64*64*4,255);for(int y=0;y<64;y++)for(int x=0;x<64;x++)for(int a=0;a<3;a++)checker[(y*64+x)*4+a]=((x/4+y/4)%2)?80:210;
           images->upload("bbtex/plant-uv.tga",checker.data(),64,64);s.checkerUploaded=true;}
       }
-      auto buffer=plants::preview(mesh,s.doc,s.display==3?2:s.display==4?3:s.display==1||s.display==2?1:0,now,s.wind,s.sun);
+      auto buffer=plants::preview(*mesh,s.doc,s.display==3?2:s.display==4?3:s.display==1||s.display==2?1:0,now,wind,s.sun,
+                                  s.gamePreview?"bbtex/plant-game-atlas.tga":"bbtex/plant-atlas.tga");
       if(!api->upload(buffer.data(),buffer.size()))s.error="Engine rejected plant preview mesh";s.dirtyRender=false;s.lastUpload=now;
     }
   }else ImGui::TextUnformatted("Generating the first mesh...");
@@ -382,13 +412,14 @@ static void plantWriteQa() {
   auto j=plants::Json{{"frame_stats",plantQaPerf()},{"generation_ms",s.result?s.result->milliseconds:0.},{"frame_ms",ImGui::GetIO().DeltaTime*1000},{"mesh_cache_bytes",meshBytes},{"texture_bytes",textureBytes},{"open",s.open},{"busy",plantBusy()},{"ready",plantReady()},{"widgets",s.widgets},{"project",plants::serialize(s.doc)},
     {"lods",counts},{"selected",s.selected},{"error",s.error},{"message",s.message},{"path",s.file.u8string()},{"model",s.lastModel.u8string()},
     {"camera",{s.yaw,s.pitch,s.zoom}},{"cameraLow",s.cameraLow},{"cameraHigh",s.cameraHigh},{"undo",s.undo.size()},{"redo",s.redo.size()},
+    {"gamePreview",{{"active",s.gamePreview},{"current",plantGameCurrent()},{"triangles",s.gameResult.triangles},{"vertices",s.gameResult.vertices},{"trees",s.gameResult.trees},{"error",s.gameResult.error}}},
     {"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"theme",uiTheme},{"profile",gameProfile},{"settingsDir",settingsPath().parent_path().u8string()},
     {"assetSource",std::string(baseq3)},{"assetRuntime",gameRuntime()}};
   plantAction([&](){bb::atomicWrite(documentPath("plant-ui-live.json"),j.dump());});
 }
 static void plantPanel() {
   PlantQaMainScope qaMainScope;
-  auto& s=plantState;plantQaFrame();plantAction(plantTick);if(!s.open){plantWriteQa();return;}
+  auto& s=plantState;plantQaFrame();plantAction(plantTick);plantAction(plantGameTick);if(!s.open){plantWriteQa();return;}
   s.widgets=plants::Json::object();auto before=plants::serialize(s.doc);auto revision=s.revision;
   auto display=ImGui::GetIO().DisplaySize;float u=uiScale();
   ImGui::SetNextWindowSize({std::min(1640*u,display.x-28),std::min(980*u,display.y-54)},ImGuiCond_FirstUseEver);

@@ -59,6 +59,19 @@ try:
  check(live()['plant']['active'] and live()['plant']['id']==live()['context']['id'],'cold viewport Create opens Plant Editor and retains captured scene click')
  ui.console('ftebroom_plant qa dark');wait(lambda:'plant/open' in live()['widgets']);click('plant/open');wait(lambda:'plant/file-path' in live()['widgets']);r=live()['widgets']['plant/file-path'];ui.click(r['x']+r['width']*.35,r['y']+r['height']*.5);ui.key('a',('ctrl',));ui.text(str(project));ui.key('enter');click('plant/file-choose');wait(lambda:live()['plantReady'] and live()['plantPath']==str(project))
  check(not live()['plant']['active'],'ordinary tall source open has no pending context insertion')
+ plant_state=data/'plant-ui-live.json'
+ def game_preview():
+  state=read_ui_json(plant_state)
+  preview=state.get('gamePreview',{})
+  return preview if preview.get('active') and preview.get('current') and not preview.get('error') else None
+ wait(game_preview)
+ check(True,'newly opened Plant Editor defaults to the active profile model')
+ original_camera=read_ui_json(plant_state)['camera']
+ click('plant/lod');click('plant/lod/0')
+ wait(lambda:not read_ui_json(plant_state)['gamePreview']['active'])
+ click('plant/lod');click('plant/game-preview')
+ game=wait(game_preview)
+ check(read_ui_json(plant_state)['camera']==original_camera,'switching to Game Preview preserves the camera')
  click('plant/add-map');wait(lambda:bool(live()['plantMessage']) and not live()['plantError']);placed=wait(lambda:map_entities('tall'))
  check(len(placed)==1 and placed[0]['classname']=='misc_model','direct Add to Map creates one Quake III misc_model')
  entity=placed[0];scale=float(entity.get('modelscale','1'));normalization=float(entity.get('_reyondbroom_normalization','1'))
@@ -66,6 +79,8 @@ try:
  check(entity['_reyondbroom_source'].endswith('.plant.json'),'direct Add to Map retains immutable editable source')
  model=data/entity['model'];encoded=model.read_bytes();check(encoded[:4]==b'IDP3','FTE/Quake III target is an actual native MD3')
  metadata=json.loads((data/(entity['model']+'.reyond.json')).read_text());_,_,zmin=struct.unpack_from('<3f',encoded,108);_,_,zmax=struct.unpack_from('<3f',encoded,120)
+ check(all(game[field]==metadata['target'][field] for field in ('vertices','triangles')),
+       'Game Preview reports the same geometry counts as the placed MD3')
  check(abs((zmax-zmin)*scale-(metadata['high'][2]-metadata['low'][2]))<.2,'saved model retains tall source height after MD3 coordinate normalization')
  ui.console('ftebroom_test_desktop rb10q1optin')
  wait(lambda:'FTEBROOM_DESKTOP_PASS rb10_q1_scene_optin_does_not_mutate_immutable_assets' in current_run_log())

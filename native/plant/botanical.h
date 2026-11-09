@@ -10,7 +10,9 @@ struct Botanical : Generator {
   std::vector<Span> skeleton;
   std::vector<Shoot> foliage;
   bool opaque;
-  Botanical(const Project& d,int l,const std::atomic<bool>* c,bool solid=false):Generator(d,l,c),opaque(solid){
+  bool compactTreeGroup;
+  Botanical(const Project& d,int l,const std::atomic<bool>* c,bool solid=false,bool compactGroup=false):
+    Generator(d,l,c),opaque(solid),compactTreeGroup(compactGroup){
     b.repeatBark=d.generator>=4&&(d.family==Family::Broadleaf||d.family==Family::Conifer||
       d.family==Family::Bush||d.family==Family::Palm||d.family==Family::Custom);
   }
@@ -195,6 +197,11 @@ struct Botanical : Generator {
           if(lod==2||span.radius<.24)continue;
           sidesForSpan=3;stepsForSpan=lod==0?2:1;break;
       }
+      if(compactTreeGroup){
+        if(span.part==Part::Trunk){sidesForSpan=p.sides;stepsForSpan=2;}
+        else if(span.part==Part::Primary){sidesForSpan=3;stepsForSpan=1;}
+        else continue;
+      }
       int n=std::min<int>(stepsForSpan,span.path.size()-1);
       std::vector<V> path;
       for(int i=0;i<=n;i++) {
@@ -252,11 +259,15 @@ struct Botanical : Generator {
       int strips=lod||(realistic()&&p.quality==2)?1:2;
       size_t groups=(foliage.size()+(lod?5:3))/(lod?6:4);
       size_t count=std::min((b.budget-b.mesh.faces.size())/(strips*2),size_t(groups*phenology()));
+      // A sampled card stands in for several smaller shoots in an alias group.
+      // Grow it across the branch rather than leaving isolated leaves.
+      const double cover=compactTreeGroup&&count?
+        std::clamp(std::sqrt(double(groups)*phenology()/count),1.15,1.85):1.;
       for(size_t i=0;i<count;i++){
         auto& shoot=foliage[i*foliage.size()/count];
         Rng rng(mix(shoot.id,doc.seed));
         V up=unit({rng.range(-.85,.85),rng.range(-.85,.85),rng.range(.5,1.)});
-        double size=p.leafSize*(.5+.5*p.age)*shoot.size*(needles?1.65:2.15)*(lod==2?1.30:realistic()&&p.quality==2?1.20:1.);
+        double size=p.leafSize*(.5+.5*p.age)*shoot.size*(needles?1.65:2.15)*(lod==2?1.30:realistic()&&p.quality==2?1.20:1.)*cover;
         double width=size*(needles?.70:.74)*std::clamp(std::sqrt(p.leafWidth/.45),.60,1.50);
         b.foliageCard(shoot.p,shoot.aim,up,size,width,p.leafCurl*.45,strips,p.leafTwist*rng.range(-.65,.65));
       }

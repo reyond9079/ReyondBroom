@@ -310,11 +310,11 @@ struct Generator {
 #include "botanical.h"
 #include "botanical_organs.h"
 namespace ftebroom::plant {
-inline Mesh generateBase(const Project& d,int lod=0,const std::atomic<bool>* cancel=nullptr,bool opaque=false) {
-  validate(d);if(lod<0||lod>2)throw std::runtime_error("Invalid plant LOD");return d.generator==1?Generator(d,lod,cancel).runBase():Botanical(d,lod,cancel,opaque).run();
+inline Mesh generateBase(const Project& d,int lod=0,const std::atomic<bool>* cancel=nullptr,bool opaque=false,bool compactTreeGroup=false) {
+  validate(d);if(lod<0||lod>2)throw std::runtime_error("Invalid plant LOD");return d.generator==1?Generator(d,lod,cancel).runBase():Botanical(d,lod,cancel,opaque,compactTreeGroup).run();
 }
-inline Mesh generate(const Project& d,int lod=0,const std::atomic<bool>* cancel=nullptr,bool opaque=false) {
-  auto result=hierarchy(generateBase(d,lod,cancel,opaque),d,lod);
+inline Mesh generate(const Project& d,int lod=0,const std::atomic<bool>* cancel=nullptr,bool opaque=false,bool compactTreeGroup=false) {
+  auto result=hierarchy(generateBase(d,lod,cancel,opaque,compactTreeGroup),d,lod);
   if(result.faces.empty()){result.low=result.high={0,0,0};return result;}
   validate(result);return result;
 }

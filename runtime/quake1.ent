@@ -2,6 +2,8 @@
 Derived from https://github.com/id-Software/Quake-Tools/tree/master/qcc/v101qc
 Editor model hints and structured properties: FTEBroom contributors. See FTE-LICENSE.txt. -->
 <classes>
+  <group name="func_group" color="0 .5 .8">Group brushes for editing. QBSP merges the grouped brushes into the world.</group>
+  <group name="func_detail" color=".5 .5 .5">Detail brushwork. QBSP merges it into the world without using it to seal the map or block visibility.</group>
   <point name="path_corner" color="0.5 0.3 0" box="-8 -8 -8 8 8 8">Monsters will continue walking towards the next target corner.<string key="target" name="target"/><string key="targetname" name="targetname"/><string key="angle" name="angle"/><flag bit="8" name="Not on easy"/><flag bit="9" name="Not on normal"/><flag bit="10" name="Not on hard"/><flag bit="11" name="Not in deathmatch"/></point>
   <group name="test_teleport" color="0 .5 .8">Teleporter testing<string key="target" name="target"/><string key="targetname" name="targetname"/><string key="angle" name="angle"/><flag bit="8" name="Not on easy"/><flag bit="9" name="Not on normal"/><flag bit="10" name="Not on hard"/><flag bit="11" name="Not in deathmatch"/></group>
   <group name="test_fodder" color="0 .5 .8">beating guy<string key="target" name="target"/><string key="targetname" name="targetname"/><string key="angle" name="angle"/><flag bit="8" name="Not on easy"/><flag bit="9" name="Not on normal"/><flag bit="10" name="Not on hard"/><flag bit="11" name="Not in deathmatch"/></group>

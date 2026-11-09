@@ -22,6 +22,8 @@ int fb_export_map();
 void fb_compile_mods(string replacement);
 int fb_export_selected_bsp();
 float fb_context_command();
+float fb_plant_brush_command();
+int fb_plant_brush_cancel();
 void fb_entity_drop_preview();
 void fb_filter_prepare();
 void fb_filter_draw();
@@ -110,6 +112,7 @@ void fb_cancel()
     fb_polygon_cancel_drag();
     fb_bend_cancel_drag();
     fb_sculpt_finish(FALSE);
+    fb_plant_brush_cancel();
     fb_uv_finish(FALSE);
     fb_sweep_cancel();
     fb_moveface_cancel();
@@ -683,6 +686,7 @@ float() ftebroom_command =
     if(argv(0)=="ftebroom_visibility") {fb_visibility_command(argv(1));return TRUE;}
     if(fb_entity_command()) return TRUE;
     if(fb_context_command())return TRUE;
+    if(fb_plant_brush_command())return TRUE;
     if(argv(0)=="ftebroom_tag") {fb_filter_tag(argv(1),stoi(argv(2)));return TRUE;}
     if(argv(0)=="ftebroom_export_selected_bsp") {fb_export_selected_bsp();return TRUE;}
     if(argv(0)=="ftebroom_gpu_snapshot") {cvar_set("ftebroom_gpu_snapshot_status",itos(editor_gpu_snapshot(argv(1))));cvar_set("ftebroom_gpu_snapshot_path",argv(1));return TRUE;}

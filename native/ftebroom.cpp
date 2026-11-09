@@ -198,7 +198,7 @@ static const char* modalNames[] = {
   "Vertex",
   "Edge",
   "Face",
-  "Control Point", "Sculpt", "Bezier Bend", "Polygon Cut", "Polygon Spawn", "Spin", "Rotate Grid"};
+  "Control Point", "Sculpt", "Bezier Bend", "Polygon Cut", "Polygon Spawn", "Spin", "Rotate Grid", "Plant Brush"};
 static int pointerView = 0;
 static quintptr_t selectionClickTime;
 static float selectionClickX, selectionClickY, selectionDownX, selectionDownY;
@@ -274,6 +274,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_plugins.h"
 #include "ftebroom_plant_editor.h"
 #include "ftebroom_placement.h"
+#include "ftebroom_plant_brush.h"
 #include "ftebroom_texture_folders.h"
 #include "ftebroom_prefabs.h"
 #include "ftebroom_entity_list.h"
@@ -893,6 +894,10 @@ static void panel(float w, float h)
     ImGui::TextWrapped("A large flat face has no vertices in its middle. Increase Radius to reach its corners, or select it and subdivide it first.");
     if(ImGui::Button("Subdivide selected brushes...")){generatorWindow=6;generatorPreview=false;}
   }
+  else if(currentTool==plantBrushTool)
+  {
+    if(placementButton("Plant Brush","plant-brush/tools"))plantBrushShow();
+  }
   else if(currentTool==4)
   {
     bool rebuild=false;
@@ -984,6 +989,8 @@ static void panel(float w, float h)
   if (uiSoftPanelBegin("Face",nullptr,uiPanelFlags()))
     materialBrowser();
   ImGui::End();
+  placementWidgets=nlohmann::json::object();
+  plantBrushPanel();
   selectMapTab = selectMaterialTab = false;
   fixedPanel("##status",statusY,statusHeight);
   char selectionStatus[192] = {};
@@ -991,9 +998,10 @@ static void panel(float w, float h)
   if (!selectionStatus[0])
     ImGui::Text(
       "%s | Grid %g | Selected: %g | %s",
-      modalNames[std::clamp((int)cvars->GetFloat("ftebroom_tool"), 0, 16)],
+      modalNames[std::clamp(currentTool,0,plantBrushTool)],
       cvars->GetFloat("ca_grid"),
       cvars->GetFloat("ftebroom_selection_count"),
+      currentTool==plantBrushTool?uiTr("Drag on a surface in the 3D view."):
       sceneDrag ? (altHeld ? "Z constraint | Esc cancels" : "XY constraint | Esc cancels")
                 : (currentTool == 2
                      ? "Place 2 or 3 points | Enter applies | Ctrl+Enter changes side | "
@@ -1030,7 +1038,6 @@ static void panel(float w, float h)
   buildLeakDialog();
   modControlsPanel();
   ImGui::BeginDisabled(modEmbedded);
-  placementWidgets=nlohmann::json::object();
   placementTick();
   sceneContextPanel();
   documentFileBrowser();
@@ -1151,6 +1158,7 @@ static void panel(float w, float h)
   shaderPackPanel();
   modFilesPanel();
   modelViewerPanel();bbBenchTick();plantPanel();
+  plantBrushHover();
   softLightGalleryPanel();
   pluginsPanel();pluginPreviewDraw();
   symmetryPanel();generatorPanel();arrayPanel();settlePanel();spawnMasterPanel();unityPanel();textureFolderPanel();prefabPanel();entityListPanel();
@@ -1361,6 +1369,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         }
       if (down && inScene && !sceneLook)
       {
+        if(plantBrushActive()&&(viewRects[hit].type!=0||!plantBrushBeforeStroke()))return qtrue;
         const auto now = core->GetMilliseconds();
         unsigned interval = 500;
 #ifdef _WIN32

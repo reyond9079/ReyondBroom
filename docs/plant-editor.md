@@ -65,8 +65,20 @@ opened/saved source file.
 
 ## Place on a map
 
+In the 3D viewport, right-click and choose **Create > Model > Plant** to
+open **Plant Brush** beside the inspector. Choose a plant in the catalogue
+and drag across a surface to paint it. The radius is measured in map units.
+The circle follows the surface and the brush shows pending locations until
+you release the mouse. Each stroke is one map Undo step.
+
+**Erase** lists the plants used on the current map. Select one or more rows
+to erase only those plants, or enable **Erase all plants** to clear every
+plant under the brush. The brush respects hidden and locked geometry.
+**+ Create new plant…** opens Plant Editor. **Go to Plant Brush** brings the
+current design into the brush, including edits still open in Plant Editor.
+
 Right-click a 3D or orthographic scene view and choose **Create > Model >
-3d model** or **plants/trees/grass**. The initial hit, normal, workplane, grid,
+3d model** or **New plant model…** to create an individual model. The initial hit, normal, workplane, grid,
 active layer, map instance and profile belong to that request. Camera movement
 after opening the editor does not move the eventual object.
 

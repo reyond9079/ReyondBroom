@@ -80,6 +80,7 @@ fb_convert_brushes.qc
 fb_spin.qc
 fb_rock.qc
 fb_sculpt.qc
+fb_plant_brush.qc
 fb_generators.qc
 fb_plugin_batch.qc
 fb_spin_tool.qc

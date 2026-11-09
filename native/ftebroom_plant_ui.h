@@ -487,7 +487,8 @@ static void plantWriteQa() {
 }
 static void plantPanel() {
   PlantQaMainScope qaMainScope;
-  auto& s=plantState;plantQaFrame();plantAction(plantTick);plantAction(plantGameTick);if(!s.open){plantWriteQa();return;}
+  auto& s=plantState;plantQaFrame();plantAction(plantTick);plantAction(plantGameTick);
+  if(!s.open||(s.hidden&&!s.closeRequest)){plantWriteQa();return;}
   s.widgets=plants::Json::object();auto before=plants::serialize(s.doc);auto revision=s.revision;
   auto display=ImGui::GetIO().DisplaySize;float u=uiScale();
   ImGui::SetNextWindowSize({std::min(1640*u,display.x-28),std::min(980*u,display.y-54)},ImGuiCond_FirstUseEver);
@@ -508,6 +509,9 @@ static void plantPanel() {
     ImGui::BeginDisabled(s.undo.empty());if(plantButton("Undo","undo"))plantUndo();ImGui::EndDisabled();ImGui::SameLine();
     ImGui::BeginDisabled(s.redo.empty());if(plantButton("Redo","redo"))plantUndo(true);ImGui::EndDisabled();ImGui::SameLine();
     if(ImGui::Checkbox("Advanced",&s.advanced))plantLibrarySave();plantRect("advanced");
+    if(ImGui::GetContentRegionAvail().x>=900*u)ImGui::SameLine();
+    if(plantButton("Go to Plant Brush","to-brush"))plantBrushFromEditor();
+    placementRect("plant/to-brush");
     ImGui::Separator();ImGui::PopItemWidth();
     float bottom=155*u;
     ImGui::BeginChild("Plant workspace",{0,std::max(160.f,ImGui::GetContentRegionAvail().y-bottom)});

@@ -1,5 +1,5 @@
 name: Extract authenticated Windows cleanup diagnostics
-run-name: Windows cleanup diagnostics from run 42567427945 @ ${{ github.sha }}
+run-name: Windows cleanup diagnostics from run 42570281480 @ ${{ github.sha }}
 on:
   workflow_dispatch:
 permissions:
@@ -15,23 +15,23 @@ jobs:
       - name: Download the exact original Actions artifact
         run: |
           mkdir diagnostics
-          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13651364828 > diagnostics/original-artifact-metadata.json
-          gh api repos/reyond9079/ReyondBroom/actions/runs/42567427945 > diagnostics/original-run-metadata.json
-          gh api repos/reyond9079/ReyondBroom/actions/jobs/128996894946 > diagnostics/original-job-metadata.json
+          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13652833158 > diagnostics/original-artifact-metadata.json
+          gh api repos/reyond9079/ReyondBroom/actions/runs/42570281480 > diagnostics/original-run-metadata.json
+          gh api repos/reyond9079/ReyondBroom/actions/jobs/129005841274 > diagnostics/original-job-metadata.json
           python - <<'PY'
           import json
           from pathlib import Path
           metadata=json.loads(Path('diagnostics/original-artifact-metadata.json').read_text())
-          assert metadata['id']==13651364828
-          assert metadata['size_in_bytes']==976846098
-          assert metadata['digest']=='sha256:4c3e3652a6a9d7343fd8713868389a07c5a64cb0609e5b725e0b82653480c3bb'
+          assert metadata['id']==13652833158
+          assert metadata['size_in_bytes']==976844089
+          assert metadata['digest']=='sha256:d03437686ed388a581e572383ab2f32ad0cd327346f334d36e8b2b4b8b9b2c2f'
           assert not metadata['expired']
-          assert metadata['workflow_run']['id']==42567427945
-          assert metadata['workflow_run']['head_sha']=='24202b4c2542de6969bfcf6709eb68b72b9deef6'
+          assert metadata['workflow_run']['id']==42570281480
+          assert metadata['workflow_run']['head_sha']=='4443a11fb4bd6ddb4d0c6be6a1687b0fdc2150ad'
           PY
-          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13651364828/zip > original-artifact.zip
-          echo '4c3e3652a6a9d7343fd8713868389a07c5a64cb0609e5b725e0b82653480c3bb  original-artifact.zip' | sha256sum -c -
-          test "$(stat -c %s original-artifact.zip)" = 976846098
+          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13652833158/zip > original-artifact.zip
+          echo 'd03437686ed388a581e572383ab2f32ad0cd327346f334d36e8b2b4b8b9b2c2f  original-artifact.zip' | sha256sum -c -
+          test "$(stat -c %s original-artifact.zip)" = 976844089
       - name: Extract only diagnostic data without executing artifact code
         run: python scripts/extract-engine-cleanup-diagnostics.py original-artifact.zip diagnostics
       - uses: actions/upload-artifact@v4

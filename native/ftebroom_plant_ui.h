@@ -22,7 +22,7 @@ static void plantProperties() {
   bool leafy=f==plants::Family::Riparian||tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Bamboo||f==plants::Family::Vine||f==plants::Family::Flower;
   if(ImGui::CollapsingHeader("General",ImGuiTreeNodeFlags_DefaultOpen)) {
     plantText("Plant name",s.doc.name);
-    if(s.doc.generator<3){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade to photographic foliage","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
+    if(s.doc.generator<int(plants::catalogManifest().at("generatorVersion"))){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade to photographic foliage","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
     else ImGui::TextDisabled("Photographic generator %d",s.doc.generator);ImGui::TextDisabled("%s",plants::familyName(f));
     plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
@@ -54,6 +54,7 @@ static void plantProperties() {
     if(tree||f==plants::Family::Conifer||f==plants::Family::Palm||f==plants::Family::Fern||(f==plants::Family::Cactus&&s.doc.species!="barrel-cactus")||f==plants::Family::Bamboo||f==plants::Family::Grass)plantInt("Branches / fronds",p.branches,f==plants::Family::Cactus?0:3,f==plants::Family::Cactus?6:40);
     if(tree){plantInt("Branching depth",p.depth,1,f==plants::Family::Bush?2:4);plantSlider("Branch angle",p.branchAngle,15,110,"%.0f degrees");plantSlider("Branch length ratio",p.branchLength,.2,1.3);plantSlider("Branch thickness ratio",p.branchTaper,.2,.9);plantSlider("Dead twig fraction",p.dead,0,.8);}
     if(f==plants::Family::Bush||f==plants::Family::Flower||f==plants::Family::Mushroom||f==plants::Family::Bamboo||f==plants::Family::Grass)plantInt("Clump / stem count",p.clumps,1,20);
+    if(s.doc.generator>=4&&(f==plants::Family::Broadleaf||f==plants::Family::Conifer))plantInt("Trees in group",p.clumps,1,8);
   }
   if(leafy||f==plants::Family::Conifer||f==plants::Family::Grass)if(ImGui::CollapsingHeader("Leaves / needles",ImGuiTreeNodeFlags_DefaultOpen)) {
     if(f!=plants::Family::Grass)plantSlider("Leaf / leaflet size",p.leafSize,.5,60,"%.1f units");
@@ -105,7 +106,9 @@ static void plantProperties() {
     ImGui::TextWrapped("OBJ + PNG / GLB retain portable full-detail geometry. Export also accepts .mdl (Quake) and .md2 (Quake II). Add to Map / Save use the active game's native model format.");
     if(gameProfile==0)ImGui::TextWrapped("Quake III: MD3 with alpha-cutout material, baked by q3map2 when compiling.");
     if(gameProfile==1)ImGui::TextWrapped("FTE: MD3 with alpha-coverage mipmaps, so distant foliage stays visible.");
-    if(gameProfile==2)ImGui::TextWrapped("Quake: MDL, at most 1024 vertices / 2048 triangles; opaque, double-sided geometric foliage and a paletted skin. The full editable plant is retained.");
+    if(gameProfile==2)ImGui::TextWrapped(q1UseLibre
+      ?"LibreQuake: native MDL with a masked skin for supported photographic foliage in the bundled FTE preview."
+      :"Quake: MDL, at most 1024 vertices / 2048 triangles, with double-sided geometric foliage and a paletted skin.");
     if(gameProfile==3)ImGui::TextWrapped("Quake II: MD2 + PCX, at most 2048 vertices / 4096 triangles; opaque, double-sided geometric foliage. The full editable plant is retained.");
     if(gameProfile==2)ImGui::Checkbox("Use FTE static models for Quake 1",&s.allowFteQ1);
     if(gameProfile==2||gameProfile==3)ImGui::TextWrapped("Plants are placed as misc_model. Use game code that supports this class, or the FTE static-model option for Quake.");

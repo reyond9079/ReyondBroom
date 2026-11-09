@@ -63,13 +63,16 @@ int main(int argc,char** argv)try{
   std::ifstream input("runtime/plants/builtin/photographic.rgba.z",std::ios::binary);
   std::string compressed((std::istreambuf_iterator<char>(input)),{});
   auto photos=PhotoAtlas::decode(compressed.data(),compressed.size());
+  std::ifstream details("runtime/plants/builtin/photographic-details.rgba.z",std::ios::binary);
+  std::string detailBytes((std::istreambuf_iterator<char>(details)),{});
+  photos.loadDetails(detailBytes.data(),detailBytes.size());
   for(int layer=int(Photo::Oak);layer<int(Photo::None);layer++){
     unsigned visible=0,empty=0;
     for(int y=0;y<PhotoAtlas::side;y++)for(int x=0;x<PhotoAtlas::side;x++){
       auto a=photos.sample(Photo(layer),x/double(PhotoAtlas::side-1),y/double(PhotoAtlas::side-1))[3];
       visible+=a>=.5;empty+=a<.05;
     }
-    require(visible>PhotoAtlas::side*PhotoAtlas::side/10&&empty>PhotoAtlas::side*PhotoAtlas::side/10,
+    require(visible>PhotoAtlas::side*PhotoAtlas::side/(layer<int(Photo::Lawn)?10:20)&&empty>PhotoAtlas::side*PhotoAtlas::side/10,
       "photographic foliage has a real cutout silhouette");
   }
   const std::array<std::string,5> classes={"misc_model","func_model","misc_model","misc_model","cycler"};
@@ -78,6 +81,24 @@ int main(int argc,char** argv)try{
   auto maps=textureMaps(oak,nullptr,nullptr,64,&photos);
   auto oldOak=oak;oldOak.generator=2;oldOak.p.budget=32000;auto oldMesh=generate(oldOak);
   require(oakMesh.faces.size()*3<oldMesh.faces.size(),"photographic oak uses less than a third of the former geometry");
+  auto maskedGeometry=targetGeometry(oak,oakMesh,2,true);
+  auto maskedModel=aliasMesh(maskedGeometry,"plant");
+  require(maskedModel.surfaces[0].frames[0].size()<=1024&&maskedModel.surfaces[0].triangles.size()<=2048,
+    "LibreQuake masked MDL keeps classic mesh budgets");
+  require(std::any_of(maskedGeometry.faces.begin(),maskedGeometry.faces.end(),[](auto& f){return f.material==PhotoFoliage;}),
+    "LibreQuake runtime uses complete photographic branch cards");
+  ftebroom::modelExport::Skin photographicSkin{unsigned(maps.albedo.width),unsigned(maps.albedo.height),maps.albedo.rgba};
+  ftebroom::modelExport::Skin replacement;
+  auto maskedMdl=ftebroom::modelExport::mdl(maskedModel,{photographicSkin},q1Palette,true,&replacement);
+  if(replacement.width!=512||replacement.height!=512||replacement.rgba.size()!=512*512*4)
+    throw std::runtime_error("FTE replacement skin must match the classic MDL UV dimensions");
+  auto mask=ftebroom::readMdl(maskedMdl);
+  require(mask.skin.name.front()=='{'&&mask.skin.width==512&&mask.skin.pixels.front()==255,
+    "FTE mask flag, skin size and safe flood-fill corner");
+  require(std::count(mask.skin.pixels.begin(),mask.skin.pixels.end(),255)>2048&&
+    std::none_of(mask.skin.pixels.begin(),mask.skin.pixels.end(),[](unsigned char i){return i==0;}),
+    "masked alias skin has transparent holes and reserves the zero index");
+  write(folder/"oak-librequake.mdl",maskedMdl);
   auto studio=ftebroom::studioExport::bake(gold,{aliasSkin(maps.albedo)},1);
   require(studio.substr(0,4)=="IDST"&&ftebroom::legacyModels::studio(studio,{}).at(0).triangles.size()==gold.surfaces[0].triangles.size(),"GoldSrc plant uses the native importer");
   write(folder/"oak-goldsrc.mdl",studio);

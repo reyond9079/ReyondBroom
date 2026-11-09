@@ -250,6 +250,9 @@ try:
         return bsp[offset:offset+length]
     check(b'"classname" "light"' in lump(0) and b'"_color" "1 0.2 0.1"' in lump(0),
           'strict_export_preserves_light_entity_and_color_in_real_bsp')
+    check(lump(0).count(b'"classname" "info_player_start"') == 1 and
+          b'"classname" "info_player_deathmatch"' not in lump(0),
+          'single_player_fixture_keeps_info_player_start_without_deathmatch_replacement')
     lighting = lump(8)
     check(len(lighting) > 100 and min(lighting) < max(lighting) and max(lighting) > 0,
           'real_bsp_contains_nonuniform_baked_light_data')
@@ -277,6 +280,7 @@ try:
     click_compile('launch-engine/0')
     click_compile('engine-launch')
     record = wait(lambda:read_ui_json(receipt))
+    wait(lambda:'Engine exited with code 0' in live()['log'])
     check(not live()['error'] and Path(record['cwd']) == launchdir,
           'imported_engine_uses_its_executable_working_directory')
     check(record['argv'][3:] == ['-game','AD19b5','+map','customer_lighting','-noambient',

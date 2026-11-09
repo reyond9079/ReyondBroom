@@ -99,10 +99,16 @@ try:
  check(not bsp.exists() and not lit.exists() and target.read_bytes()==valid and targetlit.read_bytes()==lighting,'customer_profile_copy_cleanup_deploys_bsp_lit')
  wait(lambda:markers[0].is_file())
  check(not live()['error'],'copy_cleanup_compile_launch_starts_process_probe')
- validate_record(markers[0],'compile_launch');shot('copy-cleanup-launch.png')
+ validate_record(markers[0],'compile_launch')
+ # A console process can write its receipt before its console closes and
+ # changes foreground ownership. Observe termination before the next OS click.
+ wait(lambda:'Engine exited with code 0' in live()['log'])
+ shot('copy-cleanup-launch.png')
+ previous_exits=live()['log'].count('Engine exited with code 0')
  click('launch');click('launch-engine/1');click('engine-launch');wait(lambda:markers[1].is_file())
  check(not live()['error'],'standalone_launch_starts_process_probe')
  validate_record(markers[1],'standalone_launch')
+ wait(lambda:live()['log'].count('Engine exited with code 0')>previous_exits)
  check(targetlit.read_bytes()==lighting and not bsp.exists(),'deployed_lighting_survives_launch_without_build_output')
  click('launch-close');markers[0].unlink();bsp.write_bytes(b'bad newer output')
  click('launch');click('launch-engine/0');click('engine-launch');wait(lambda:'truncated BSP header' in live()['error'])

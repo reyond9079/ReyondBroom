@@ -282,6 +282,12 @@ jobs:
         run: |
           python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --engine deps/editor-engine/engine/release-editor/fteglqw64.exe --engine-source deps/editor-engine --audio-dir tools/audio --version "$VERSION" --output out/release
           (cd out/release && sha256sum -c ./*.sha256)
+      - name: Stage checksummed Windows packages in the draft before validation
+        shell: pwsh
+        run: |
+          if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
+          gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
       - name: Validate PK3 import and the inner audio window in the packaged editor
         shell: pwsh
         run: |
@@ -360,12 +366,6 @@ jobs:
               if ($LASTEXITCODE) { throw "View Options/Tools acceptance failed: $theme / $width" }
             }
           }
-      - name: Upload validated packages to the draft release
-        shell: pwsh
-        run: |
-          if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
-          gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
-          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
       - name: Collect compact release evidence
         if: always()
         shell: pwsh

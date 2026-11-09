@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 static void bspModelShow();
+static void plantBrushShow();
 static bool sceneContextPending = false, sceneContextCandidate = false;
 static int sceneContextSerial = 0,sceneContextEpoch=0;
 static quintptr_t sceneContextTime, sceneContextDuration;
@@ -46,7 +47,8 @@ static void sceneContextPanel()
     if(gameProfile==1 && ImGui::MenuItem("Create FTE Engine terrain here...")){terrainCreateWindow=true;command(("ftebroom_terrain_position "+std::to_string(sceneContextX)+" "+std::to_string(sceneContextY)+"\n").c_str());}
     bool create=ImGui::BeginMenu("Create");placementRect("context/create");if(create){bool model=ImGui::BeginMenu("Model");placementRect("context/model");if(model){
       if(ImGui::MenuItem("3d model"))placementCreate(false);placementRect("context/new-model");
-      if(ImGui::MenuItem("plants/trees/grass"))placementCreate(true);placementRect("context/new-plant");
+      if(ImGui::MenuItem("Plant",nullptr,false,viewTypes[viewFocus]==0))plantBrushShow();placementRect("context/plant-brush");
+      if(ImGui::MenuItem("New plant model..."))placementCreate(true);placementRect("context/new-plant");
       ImGui::EndMenu();}ImGui::EndMenu();}
     bool selected = cvars->GetFloat("ftebroom_selection_count")
                     || cvars->GetFloat("ftebroom_entity_selection_count");

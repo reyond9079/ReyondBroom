@@ -7,6 +7,11 @@ from editor_os_input import NativeInput,read_ui_json
 
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'placement-ui-live.json';state.unlink(missing_ok=True)
+# Earlier profile tests may leave FTE Custom active. Pin the profile to this
+# disposable map so the MD3 assertions exercise the intended target.
+fixture=data/'maps/qa_clip.map'
+previous_fixture=fixture.read_bytes()
+fixture.write_bytes(b'// ReyondBroom profile=quake3 format=quake3\n'+previous_fixture)
 # No plant QA/open command here: first ever viewport Create must open its own
 # editor before any hidden unsaved-document confirmation can be drawn.
 (data/'plant-target-ui.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 11 echo RB_PLANT_FIXTURE_READY\n')
@@ -111,3 +116,4 @@ except Exception:
 finally:
  if process.poll() is None:process.kill();process.wait(timeout=15)
  log.close()
+ fixture.write_bytes(previous_fixture)

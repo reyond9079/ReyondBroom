@@ -51,6 +51,36 @@ static void checkBarkMappingAndWinding(const std::string& palette){
       "wood normals face outward while Quake triangles are clockwise, including the closed ends");
   }
 }
+static void checkTreeGroup(const Project& preset,const std::string& palette,const Textures& maps,
+                           const std::filesystem::path& folder) {
+  auto project=preset;
+  project.seed=137;
+  project.p.clumps=8;
+  const auto source=generate(project);
+  const auto runtime=targetGeometry(project,source,2,true);
+  require(plantTrunkCount(source)==8&&plantTrunkCount(runtime)==8,preset.preset+" keeps eight trunks");
+  Botanical layout(project,0,nullptr);
+  for(int i=0;i<project.p.clumps;i++){
+    const auto base=layout.treeTrunk(0.,layout.treeMember(i,project.p.clumps));
+    const auto hasBase=[&](const Mesh& mesh){
+      return std::any_of(mesh.vertices.begin(),mesh.vertices.end(),[&](const Vertex& vertex){
+        return length(sub(vertex.p,base))<1e-6;
+      });
+    };
+    require(hasBase(source)&&hasBase(runtime),preset.preset+" retains tree base "+std::to_string(i));
+  }
+  auto model=aliasMesh(runtime,"plant");
+  require(model.surfaces[0].frames[0].size()<=1024&&model.surfaces[0].triangles.size()<=2048,
+    preset.preset+" group respects MDL budgets");
+  ftebroom::modelExport::Skin skin{unsigned(maps.albedo.width),unsigned(maps.albedo.height),maps.albedo.rgba};
+  ftebroom::modelExport::Skin replacement;
+  auto encoded=ftebroom::modelExport::mdl(model,{skin},palette,true,&replacement);
+  require(ftebroom::readMdl(encoded).triangles.size()==model.surfaces[0].triangles.size(),
+    preset.preset+" group round-trips through the MDL decoder");
+  auto name=preset.preset+"-group.mdl";
+  write(folder/name,encoded);
+  write(folder/(name+"_0.png"),png({int(replacement.width),int(replacement.height),std::move(replacement.rgba)}));
+}
 int main(int argc,char** argv)try{
   auto folder=argc>1?std::filesystem::u8path(argv[1]):std::filesystem::path("plant-target-results");std::filesystem::create_directories(folder);
   auto q1Palette=ftebroom::defaultQuakePalette(),q2Palette=q1Palette;
@@ -60,6 +90,25 @@ int main(int argc,char** argv)try{
   Json rows=Json::array();int cases=0;
   for(auto source:presets()){
     auto saved=serialize(source);auto full=generate(source,0);auto maps=textureMaps(source,nullptr,nullptr,16);
+    for(int profile:{0,1,4}){
+      auto geometry=targetGeometry(source,full,profile);
+      auto model=targetModel(geometry,"plant",profile);
+      require(!model.surfaces.empty(),"default preset produces a game model "+source.preset);
+      if(profile==4){
+        const auto& surface=model.surfaces.front();
+        require(surface.frames[0].size()<=2048&&surface.triangles.size()<=4096,"GoldSrc budget "+source.preset);
+        require(ftebroom::studioExport::bake(model,{aliasSkin(maps.albedo)},1).substr(0,4)=="IDST","GoldSrc preset encodes "+source.preset);
+      }else{
+        require(model.surfaces.size()<=32,"MD3 surface budget "+source.preset);
+        for(const auto& surface:model.surfaces)
+          require(surface.frames[0].size()<=md3PlantVertices&&surface.triangles.size()<=md3PlantTriangles,"MD3 preset budgets "+source.preset);
+      }
+    }
+    if(foliagePhoto(source)!=Photo::None){
+      auto model=aliasMesh(targetGeometry(source,full,2,true),"plant");
+      const auto& surface=model.surfaces.front();
+      require(surface.frames[0].size()<=1024&&surface.triangles.size()<=2048,"LibreQuake preset budget "+source.preset);
+    }
     for(int profile:{2,3}){
       auto geometry=targetGeometry(source,full,profile);validate(geometry);auto model=aliasMesh(geometry,"plant");auto& surface=model.surfaces.at(0);
       require(model.surfaces.size()==1&&model.frames==1,"one vanilla alias frame / material");
@@ -106,6 +155,8 @@ int main(int argc,char** argv)try{
   std::ifstream details("runtime/plants/builtin/photographic-details.rgba.z",std::ios::binary);
   std::string detailBytes((std::istreambuf_iterator<char>(details)),{});
   photos.loadDetails(detailBytes.data(),detailBytes.size());
+  for(auto& preset:presets())if(preset.preset=="oak"||preset.preset=="pine")
+    checkTreeGroup(preset,q1Palette,textureMaps(preset,nullptr,nullptr,64,&photos),folder);
   for(int layer=int(Photo::Oak);layer<int(Photo::None);layer++){
     unsigned visible=0,empty=0;
     for(int y=0;y<PhotoAtlas::side;y++)for(int x=0;x<PhotoAtlas::side;x++){

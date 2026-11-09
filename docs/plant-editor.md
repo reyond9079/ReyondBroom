@@ -21,7 +21,11 @@ Plant Undo/Redo is separate from map Undo/Redo.
 
 Drag the preview with the left button to orbit, the middle/right button to pan,
 and the wheel to zoom. **Frame** fits the current geometry; regeneration retains
-the camera. Choose perspective/orthographic, textured, solid, normals, UV or
+the camera. The viewport opens in **Game Preview**, using the active profile's
+model limits and the same geometry preparation as **Add to Map**. It shows the
+target format and final mesh counts. Choose **LOD0–LOD2** from the same menu to
+inspect the editable source. Preview lighting is independent of map lighting.
+Choose perspective/orthographic, textured, solid, normals, UV or
 wireframe display and inspect each of the three actual LOD meshes. Panes resize;
 small windows switch to tabs. Both Modern Light and Modern Dark use the normal
 editor appearance settings.

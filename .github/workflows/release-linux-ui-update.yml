@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: read
 jobs:
   diagnose:
     runs-on: windows-2022
@@ -39,15 +40,31 @@ jobs:
           if ($LASTEXITCODE) { throw 'Cannot verify exact original test source commit' }
           python scripts/run-windows-input-diagnostic.py prepare baseline diagnostics
           if ($LASTEXITCODE) { throw 'Exact runtime/test verification failed' }
-      - name: Rebuild only an ephemeral instrumented Windows engine
+      - name: Reuse the exact authenticated diagnostic engine and build the console probe
         shell: msys2 {0}
         run: |
-          git -c core.autocrlf=false clone --filter=blob:none --no-checkout https://github.com/fte-team/fteqw.git engine-diagnostic
-          git -c core.autocrlf=false -C engine-diagnostic checkout --detach f937b9d88f71fc4429db5fe56c6a98d922711b2e
-          python scripts/apply-engine-patches.py engine-diagnostic
-          python scripts/instrument-windows-input.py engine-diagnostic diagnostics
-          mingw32-make -C engine-diagnostic/engine -j4 CPUOPTIMIZATIONS=-O3 DEPCC= DEPCXX= BASE_DIR=. RELEASE_DIR=release-diagnostic FTE_TARGET=win64 FTE_CONFIG_EXTRA='-DNO_SPEEX -DNO_OPUS -DNO_VORBISFILE -DNO_OGG' LINK_FREETYPE=0 gl-rel > diagnostics/engine-build.log 2>&1
-          g++ -std=c++17 -O2 tests/compilation-profile-probe.cpp -o diagnostics/compilation-profile-probe.exe
+          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13654118230 > diagnostics/reused-engine-artifact-metadata.json
+          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13654118230/zip > reused-engine.zip
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,shutil,zipfile
+          expected='e318d80764e563d114e33f072ca5cd753d6bec2d2139cb34fbcdc2a3506b3ffa'
+          meta=json.loads(Path('diagnostics/reused-engine-artifact-metadata.json').read_text())
+          assert meta['id']==13654118230 and meta['size_in_bytes']==4029100
+          assert meta['digest']=='sha256:'+expected
+          assert meta['workflow_run']['id']==42573529300
+          assert meta['workflow_run']['head_sha']=='5b8fd0f95c9bc4beca852c8ce8c94df278182a99'
+          archive=Path('reused-engine.zip');assert archive.stat().st_size==4029100
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()==expected
+          selected=['engine-build.log','engine-source-diff.patch','instrumentation-hashes.json','instrumentation-header.h','instrumented-fteglqw64.exe']
+          with zipfile.ZipFile(archive) as z:
+              for name in selected:Path('diagnostics',name).write_bytes(z.read(name))
+          exe=Path('diagnostics/instrumented-fteglqw64.exe')
+          assert hashlib.sha256(exe.read_bytes()).hexdigest()=='7c6fa083d6664c2ffe0f65d38f0e7e0878d86605d9cb5ba93a4a9b204d5df693'
+          target=Path('engine-diagnostic/engine/release-diagnostic/fteglqw64.exe');target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(exe,target)
+          Path('diagnostics/reused-engine-proof.json').write_text(json.dumps({'artifact_id':13654118230,'artifact_bytes':4029100,'artifact_sha256':expected,'engine_sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'original_build_run':42573529300,'original_build_head':'5b8fd0f95c9bc4beca852c8ce8c94df278182a99','reason':'Previous diagnostic job built the engine successfully then failed linking its standalone wmain probe; preserve that exact engine and source evidence without rebuilding.'},indent=2))
+          PY
+          g++ -std=c++17 -O2 -static -municode tests/compilation-profile-probe.cpp -o diagnostics/compilation-profile-probe.exe
       - name: Install verified renderer and desktop
         shell: pwsh
         run: |

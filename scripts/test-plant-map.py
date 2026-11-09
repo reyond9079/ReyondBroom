@@ -13,20 +13,17 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime',type=Path);p.add_argument('artifacts',type=Path);a=p.parse_args()
 root=a.runtime.resolve();out=a.artifacts.resolve();source=out/'build-snapshot'
 base=out/'q3-compile';game=base/'baseq3';shutil.copytree(source,game,dirs_exist_ok=True)
-# The compilation regression can leave the FTE profile selected. Its func_model
-# must remain a runtime entity in that profile. Validate that class, then make
-# an explicit Quake III compilation copy using the same installed MD3 assets.
+# FTE keeps the IQM as a runtime entity. Quake III bakes the MD3 geometry
+# into the BSP. Test the real build copy from either profile.
 state=json.loads((out/'final-state.json').read_text());profile=state['profile'];assert profile in (0,1)
-text=(game/'plant.map').read_text();converted=0
-def target_entity(match):
- global converted
- entity=match.group(0);expected='misc_model' if profile==0 else 'func_model'
+text=(game/'plant.map').read_text()
+entities=re.findall(r'\{[^{}]*"_reyondbroom_authoring"\s+"1"[^{}]*\}',text)
+assert entities,'No generated plant in the build copy'
+expected='misc_model' if profile==0 else 'func_model'
+models=[]
+for entity in entities:
  assert re.search(r'"classname"\s+"'+expected+r'"',entity),'Placement class does not match the active profile'
- if profile==1:
-  entity=re.sub(r'("classname"\s+)"func_model"',r'\1"misc_model"',entity);converted+=1
- return entity
-text=re.sub(r'\{[^{}]*"_reyondbroom_authoring"\s+"1"[^{}]*\}',target_entity,text)
-(game/'plant.map').write_text(text)
+ models.append(re.search(r'"model"\s+"([^"]+)"',entity).group(1))
 compiler=root/'tools/q3map2'/('q3map2.exe' if os.name=='nt' else 'q3map2')
 command=[str(compiler),'-game','quake3','-fs_basepath',str(base),'-fs_homepath',str(base),'-meta',str(game/'plant.map')]
 result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=120)
@@ -38,14 +35,18 @@ def lump(n):
  return bsp[offset:offset+size]
 shaders=lump(1);names=[shaders[n:n+64].split(b'\0')[0].decode() for n in range(0,len(shaders),72)]
 plants={i for i,name in enumerate(names) if name.startswith('textures/reyond-plugins/plant-')}
-assert plants,'Compiled BSP omitted the generated plant material'
 surfaces=lump(13);triangles=0
 for at in range(0,len(surfaces),104):
  shader=struct.unpack_from('<i',surfaces,at)[0]
  if shader in plants:triangles+=struct.unpack_from('<i',surfaces,at+24)[0]//3
-assert triangles>1000,'Compiled BSP omitted the generated plant geometry'
-text=result.stdout.decode(errors='replace')
-assert any('entering scripts/'+name+'.shader' in text for name in (game/'scripts/shaderlist.txt').read_text().split() if name.startswith('plant-')),'Compiler did not read the plant cutout shader'
-report={'compiler':str(compiler),'source_profile':profile,'q3_copy_class_adaptations':converted,'bsp_version':46,'plant_triangles':triangles,'plant_shaders':[names[i] for i in plants]}
+if profile==1:
+ for model in models:
+  assert model.endswith('.iqm') and (game/model).read_bytes().startswith(b'INTERQUAKEMODEL\0'),'FTE IQM missing from build assets'
+  assert model.encode() in lump(0),'Compiled FTE BSP omitted the runtime model entity'
+else:
+ assert plants and triangles>1000,'Compiled BSP omitted the generated plant material or geometry'
+ text=result.stdout.decode(errors='replace')
+ assert any('entering scripts/'+name+'.shader' in text for name in (game/'scripts/shaderlist.txt').read_text().split() if name.startswith('plant-')),'Compiler did not read the plant cutout shader'
+report={'compiler':str(compiler),'source_profile':profile,'bsp_version':46,'plant_triangles':triangles,'plant_shaders':[names[i] for i in plants],'runtime_models':models if profile==1 else []}
 (out/'q3-compile-results.json').write_text(json.dumps(report,indent=2))
-print('PASS real q3map2 BSP compilation:',triangles,'plant triangles; cutout shader loaded',flush=True)
+print('PASS real q3map2 BSP compilation:',('FTE runtime IQM retained' if profile==1 else f'{triangles} plant triangles; cutout shader loaded'),flush=True)

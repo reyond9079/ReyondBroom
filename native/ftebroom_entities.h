@@ -289,12 +289,66 @@ static void testQCBridge()
   const int epoch=entitySelectionEpoch;entitySelectionLoad();passed=passed && epoch==entitySelectionEpoch;
   core->Print((std::string("RB_QC_BRIDGE88 ")+(passed?"PASS":"FAIL")+" entities="+std::to_string(entityProperties.size())+" header="+header+"\n").c_str());
 }
+static std::string entitySoundPath(std::string value)
+{
+  auto first=value.find_first_not_of(" \t\r\n");
+  if(first==value.npos)return {};
+  value=value.substr(first,value.find_last_not_of(" \t\r\n")-first+1);
+  std::replace(value.begin(),value.end(),'\\','/');
+  while(value.rfind("./",0)==0)value.erase(0,2);
+  if(value.empty()||value.size()>240||value.front()=='/'||
+      value.find_first_of(":\r\n\"")!=value.npos)return {};
+  for(auto& part:std::filesystem::u8path(value))
+    if(part==".."||part==".")return {};
+  return value;
+}
+static std::string entitySoundResource(const std::string& value)
+{
+  const auto path=entitySoundPath(value);
+  if(path.empty())return {};
+  auto exists=[](const std::string& name){
+    qhandle_t handle;
+    const auto length=files->Open(name.c_str(),&handle,1);
+    if(length<0)return false;
+    files->Close(handle);
+    return length>0;
+  };
+  const auto extension=std::filesystem::u8path(path).extension().u8string();
+  for(const auto& prefix:{"sound/",""}){
+    if(*prefix&&entityLower(path).rfind("sound/",0)==0)continue;
+    const std::string name=prefix+path;
+    if(!extension.empty()){
+      if(exists(name))return name;
+    }else for(const char* suffix:{".wav",".ogg",".opus",".flac",".mp3"}){
+      if(exists(name+suffix))return name+suffix;
+    }
+  }
+  return {};
+}
 static void entitySoundPreview()
 {
   if(!uiInspectorFold("Sound preview",0))return;
-  static char manual[1024]={};std::string candidate;
+  static char manual[1024]={};
+  static std::string error;
+  std::string candidate;
+  bool music=false;
   for(const auto& entity:entityProperties) {
-    for(const char* key:{"noise","sound","soundfile","noise1"}) {auto it=entity.second.find(key);if(it!=entity.second.end()&&!it->second.empty()){candidate=it->second;break;}}
+    auto findSound=[&](std::initializer_list<const char*> keys){
+      for(const char* key:keys){
+        auto it=entity.second.find(key);
+        if(it==entity.second.end())continue;
+        auto path=entitySoundPath(it->second);
+        if(path.empty())continue;
+        if(path.find_first_not_of("+-0123456789.eE \t")==path.npos)
+          continue; // numeric ambient light, track or sound preset
+        candidate=std::move(path);
+        music=std::string_view(key)=="music";
+        return;
+      }
+    };
+    if(entity.first==0)
+      findSound({"ambient_sound","_ambient_sound","ambient","_ambient","ambience","music","sounds"});
+    if(candidate.empty())findSound({"noise","sound","soundfile","noise1"});
     auto classname=entity.second.find("classname");
     if(candidate.empty()&&classname!=entity.second.end()) {
       static const std::map<std::string,std::string> ambient={{"ambient_suck_wind","ambience/suck1.wav"},{"ambient_drone","ambience/drone6.wav"},{"ambient_flouro_buzz","ambience/buzz1.wav"},{"ambient_drip","ambience/drip1.wav"},{"ambient_comp_hum","ambience/comp1.wav"},{"ambient_thunder","ambience/thunder1.wav"},{"ambient_light_buzz","ambience/fl_hum1.wav"},{"ambient_swamp1","ambience/swamp1.wav"},{"ambient_swamp2","ambience/swamp2.wav"}};
@@ -303,13 +357,30 @@ static void entitySoundPreview()
     if(!candidate.empty())break;
   }
   if(!candidate.empty())ImGui::TextWrapped("Entity sound: %s",candidate.c_str());
-  ImGui::InputTextWithHint("Sound override","Relative path, e.g. ambience/wind.wav",manual,sizeof manual);
+  if(ImGui::InputTextWithHint("Sound override","Relative path, e.g. ambience/wind.wav",manual,sizeof manual))error.clear();
   static float volume=.7f;ImGui::SliderFloat("Preview volume",&volume,0,1);
   if(ImGui::Button("Play sound")) {
-    auto path=*manual?std::string(manual):candidate;if(path.rfind("sound/",0)==0)path.erase(0,6);
-    if(!path.empty()&&path.find("..") == path.npos&&path.front()!='/')draw->LocalSound(path.c_str(),257,volume);
+    const auto requested=*manual?std::string(manual):candidate;
+    auto path=entitySoundResource(requested);
+    if(path.empty()&&!*manual&&music){
+      // Quake III music may specify an intro and a loop. Prefer an exact
+      // match first, so a single path containing spaces also works.
+      std::istringstream paths(requested);
+      std::string intro,loop;
+      if(paths>>std::quoted(intro)>>std::quoted(loop))path=entitySoundResource(intro);
+    }
+    if(requested.empty())error="No sound path is set.";
+    else if(path.empty())error="Sound file not found in mounted game resources.";
+    else if(cvars->GetFloat("nosound")!=0)error="Sound is disabled.";
+    else {
+      error.clear();
+      // The FTE sound API uses this prefix to address the exact virtual
+      // filesystem path without prepending another sound/ directory.
+      draw->LocalSound(("../"+path).c_str(),257,volume);
+    }
   }
   ImGui::SameLine();if(ImGui::Button("Stop sound"))command("stopsound\n");
+  if(!error.empty())ImGui::TextWrapped("%s",uiTr(error.c_str()));
   ImGui::TextWrapped("Uses mounted mod resources. Custom progs.dat may choose sounds dynamically; enter that relative sound path above.");
 }
 static void entityProperty(

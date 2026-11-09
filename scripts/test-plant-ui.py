@@ -111,7 +111,10 @@ try:
  before=live()['lods'][0]['triangles'];click('node-visible/leaves');ready();expect(live()['lods'][0]['triangles']<before,'hiding Leaves removes actual geometry')
  click('undo');ready();expect(live()['lods'][0]['triangles']==before,'hierarchy visibility participates in Undo')
  # This profile is Quake III or FTE in the disposable fixture.
- click('add-map');wait(lambda:live()['model']);model=Path(live()['model']);expect(model.is_file() and model.read_bytes()[:4]==b'IDP3','Add to Map writes a native MD3 asset')
+ profile=live()['profile']
+ click('add-map');wait(lambda:live()['model']);model=Path(live()['model'])
+ magic=b'INTERQUAKEMODEL\0' if profile==1 else b'IDP3'
+ expect(model.is_file() and model.read_bytes().startswith(magic),'Add to Map writes a native asset for the active profile')
  manifest=json.loads(Path(str(model)+'.reyond.json').read_text());expect(any(s.endswith('.shader') for s in manifest['dependencies']),'placed asset retains its alpha-cutout shader dependency')
  if live()['profile']==1:
   asset_source=Path(live()['assetSource']);expect((asset_source/model.relative_to(data)).read_bytes()==model.read_bytes(),'FTE authoring source directory receives the exact generated model')
@@ -127,7 +130,7 @@ try:
  compile_map=data/'data/export-map.map';compile_map.unlink(missing_ok=True);console('ftebroom_export_map');wait(lambda:compile_map.exists())
  console('ftebroom_plant qa-assets');asset_report=data/'plant-asset-qa.json';wait(lambda:asset_report.exists());assets=json.loads(asset_report.read_text());staged=Path(assets['staged'])
  expect(assets['q1_migrated']==1,'Quake 1 build copy adapts the authoring entity to the FTE static-model fallback')
- expect((staged/relative).read_bytes()==model.read_bytes(),'build snapshot stages the exact MD3 bytes')
+ expect((staged/relative).read_bytes()==model.read_bytes(),'build snapshot stages the exact model bytes')
  for dep in manifest['dependencies']:expect((staged/dep).read_bytes()==(data/dep).read_bytes(),'build snapshot dependency '+dep)
  expect(model.stem in (staged/'scripts/shaderlist.txt').read_text(),'Quake III shader list includes the generated cutout material')
  shutil.copytree(staged,out/'build-snapshot',dirs_exist_ok=True);shutil.copy2(asset_report,out/asset_report.name)

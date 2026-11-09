@@ -5,9 +5,17 @@
 #include <cstdint>
 namespace ftebroom::modelExport {
 struct Skin {unsigned width=0,height=0;std::vector<unsigned char> rgba;};
+struct MdlSkinRegion {
+  float u0,v0,du,dv;
+  unsigned x,y,tile;
+  std::array<int,2> pixel(float u,float v) const {
+    return {int(x+1+std::round((u-u0)/du*(tile-3))),
+            int(y+1+std::round((v-v0)/dv*(tile-3)))};
+  }
+};
 // Preserve the source coordinate system. MDL quantization uses one bounding box
 // across all animation frames, rather than recentering or rescaling each frame.
-inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std::string& palette,bool masked=false,Skin* replacement=nullptr) {
+inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std::string& palette,bool masked=false,Skin* replacement=nullptr,std::vector<MdlSkinRegion>* regions=nullptr) {
   if(mesh.surfaces.empty()||!mesh.frames||mesh.frames>1024||skins.size()!=mesh.surfaces.size()||palette.size()!=768)
     throw std::runtime_error("MDL needs a model, all surface textures and the active Quake palette.");
   unsigned nv=0,nt=0;std::array<float,3> low{1e30f,1e30f,1e30f},high{-1e30f,-1e30f,-1e30f},scale{};
@@ -16,6 +24,7 @@ inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std
   if(nv>2048||nt>4096||mesh.surfaces.size()>16)throw std::runtime_error("Quake MDL export limit: 2048 vertices, 4096 triangles and 16 materials. Simplify the source explicitly; automatic resizing/decimation is disabled.");
   const unsigned tile=masked?512:256,columns=unsigned(std::ceil(std::sqrt(double(skins.size())))),rows=(skins.size()+columns-1)/columns,w=columns*tile,h=rows*tile;
   if(replacement)*replacement={w,h,std::vector<unsigned char>(size_t(w)*h*4)};
+  if(regions)regions->clear();
   std::vector<unsigned char> pixels(w*h,0);std::vector<std::array<int,2>> uv;
   ftebroom::PaletteQuantizer quantizer(palette,224);
   for(size_t i=0;i<skins.size();i++){
@@ -23,7 +32,9 @@ inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std
     float u0=1e30f,v0=1e30f,u1=-1e30f,v1=-1e30f;
     for(const auto& v:mesh.surfaces[i].frames[0]){u0=std::min(u0,v.uv[0]);u1=std::max(u1,v.uv[0]);v0=std::min(v0,v.uv[1]);v1=std::max(v1,v.uv[1]);}
     float du=std::max(u1-u0,.000001f),dv=std::max(v1-v0,.000001f);unsigned ox=(i%columns)*tile,oy=(i/columns)*tile;
-    for(const auto& v:mesh.surfaces[i].frames[0])uv.push_back({int(ox+1+std::round((v.uv[0]-u0)/du*(tile-3))),int(oy+1+std::round((v.uv[1]-v0)/dv*(tile-3)))});
+    MdlSkinRegion region{u0,v0,du,dv,ox,oy,tile};
+    if(regions)regions->push_back(region);
+    for(const auto& v:mesh.surfaces[i].frames[0])uv.push_back(region.pixel(v.uv[0],v.uv[1]));
     // Each surface gets a padded tile. Repeated/out-of-range UVs are baked into
     // that tile, so wrapping cannot sample a neighbouring material.
     for(unsigned y=0;y<tile;y++)for(unsigned x=0;x<tile;x++){

@@ -171,39 +171,11 @@ struct Botanical : Generator {
       }
     }
   }
-  void emitGroundRoot(const Span& span,int steps) {
-    const int columns=lod==0?4:lod==1?3:2;
-    if(!b.room(size_t(steps)*columns*2))return;
-    const unsigned first=b.mesh.vertices.size();
-    const double ground=span.path.back()[2];
-    b.organ++;
-    for(int i=0;i<=steps;i++){
-      const double t=double(i)/steps,at=t*(span.path.size()-1);
-      const size_t segment=std::min(span.path.size()-2,size_t(at));
-      auto tangent=sub(span.path[segment+1],span.path[segment]);
-      const V across=unit(V{-tangent[1],tangent[0],0.});
-      const V center=add(span.path[segment],mul(tangent,at-segment));
-      const double rise=std::max(.004,center[2]-ground);
-      const double width=std::max(.01,span.radius*std::pow(1.-t,.74));
-      for(int j=0;j<=columns;j++){
-        const double angle=pi*double(j)/columns;
-        const double dome=std::sin(angle);
-        V point=add(V{center[0],center[1],ground+rise*dome},mul(across,width*std::cos(angle)));
-        V normal=unit(add(mul(across,std::cos(angle)),V{0.,0.,dome}));
-        b.vertex(point,normal,double(j)/columns,t,Bark,t);
-      }
-    }
-    for(int i=0;i<steps;i++)for(int j=0;j<columns;j++){
-      unsigned a=first+i*(columns+1)+j,c=a+columns+1;
-      b.quad(a,a+1,c+1,c,Bark,Part::Roots);
-    }
-  }
   void emitNaturalSkeleton() {
     // Allocate rings by branch size. A crowded crown should never turn a
     // close trunk into a prism or remove its curves to pay for small twigs.
     std::stable_sort(skeleton.begin(),skeleton.end(),[](const Span& a,const Span& c){
-      auto rank=[](Part part){return part==Part::Trunk?0:part==Part::Roots?1:int(part);};
-      if(rank(a.part)!=rank(c.part))return rank(a.part)<rank(c.part);
+      if(a.part!=c.part)return a.part<c.part;
       return a.radius>c.radius;
     });
     size_t budget=b.budget;b.budget=std::max(b.mesh.faces.size(),budget/2);
@@ -212,7 +184,6 @@ struct Botanical : Generator {
       int sidesForSpan=0,stepsForSpan=0;
       switch(span.part){
         case Part::Trunk:sidesForSpan=std::max(lod==0?8:lod==1?6:5,sides());stepsForSpan=std::max(3,count(p.segments,1));break;
-        case Part::Roots:emitGroundRoot(span,lod==0&&p.quality!=2?4:2);continue;
         case Part::Primary:
           if(p.quality==2){sidesForSpan=4;stepsForSpan=2;break;}
           sidesForSpan=lod==0?std::max(5,sides()*2/3):lod==1?4:3;stepsForSpan=lod==0?5:lod==1?3:2;break;
@@ -343,28 +314,11 @@ struct Botanical : Generator {
       for(int j=0;j<=p.segments;j++)path.push_back(treeTrunk(double(j)/p.segments,member));
       double radius=p.radius*member.girth;
       skeleton.push_back({path,radius*(1+p.rootFlare*.20),radius*(1-p.taper)*.35,Part::Trunk,mix(doc.seed,stem)});
-      for(int k=0;k<5;k++){
-        double az=2*pi*k/5+a+member.yaw;
-        if(realistic()){
-          Rng root(mix(doc.seed,stem*31+k+811));
-          az+=root.range(-.30,.30);
-          V outward{std::cos(az),std::sin(az),0.},side{-outward[1],outward[0],0.};
-          double reach=radius*(1.38+p.rootFlare*.46)*root.range(.70,1.30);
-          double rise=radius*root.range(.36,.72);
-          double bend=reach*root.range(-.20,.20);
-          std::vector<V> rootPath;
-          for(int i=0;i<=5;i++){
-            double t=double(i)/5;
-            auto point=add(origin,add(mul(outward,.40*radius+reach*t),mul(side,bend*t*t)));
-            point[2]+=rise*(1.-t)*(1.-t);
-            rootPath.push_back(point);
-          }
-          skeleton.push_back({std::move(rootPath),radius*root.range(.26,.55),.01,Part::Roots,mix(stem,k+19)});
-        }else{
-          auto from=add(origin,{std::cos(az)*radius*.3,std::sin(az)*radius*.3,radius*1.4});
-          auto to=add(origin,{std::cos(az)*radius*(1.5+p.rootFlare),std::sin(az)*radius*(1.5+p.rootFlare),0});
-          skeleton.push_back({arc(from,to,0,3,mix(stem,k)),radius*.38,.025,Part::Roots,mix(stem,k+19)});
-        }
+      if(doc.generator<4)for(int k=0;k<5;k++){
+        double az=2*pi*k/5+a;
+        auto from=add(origin,{std::cos(az)*radius*.3,std::sin(az)*radius*.3,radius*1.4});
+        auto to=add(origin,{std::cos(az)*radius*(1.5+p.rootFlare),std::sin(az)*radius*(1.5+p.rootFlare),0});
+        skeleton.push_back({arc(from,to,0,3,mix(stem,k)),radius*.38,.025,Part::Roots,mix(stem,k+19)});
       }
       for(int i=0;i<primaries;i++){
         b.check();Rng r(mix(doc.seed,stem*71+i+13));double u=(i+.5)/primaries;

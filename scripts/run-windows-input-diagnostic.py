@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive isolated diagnostics; preserve failed test exits rather than claiming QA success."""
 from pathlib import Path
-import argparse,hashlib,json,os,shutil,subprocess,sys,zipfile
+import argparse,hashlib,json,os,shutil,subprocess,sys,time,zipfile
 p=argparse.ArgumentParser();p.add_argument('mode',choices=['prepare','run-cleanup','run-viewport','collect']);p.add_argument('baseline',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
 a.baseline=a.baseline.resolve();a.output=a.output.resolve();a.output.mkdir(parents=True,exist_ok=True)
 root=a.baseline/'ReyondBroom-Windows-x64';info=a.output/'baseline-proof.json'
@@ -33,9 +33,22 @@ elif a.mode.startswith('run-'):
     assert not out.exists();log=a.output/(case+'-engine-input.log');env={**os.environ,'RB_INPUT_DIAGNOSTIC':str(log)}
     if case=='viewport':subprocess.run([sys.executable,'tests/make-linux-build-fixture.py',str(root)],check=True,env=env)
     cmd=[sys.executable,'scripts/test-engine-cleanup.py' if case=='cleanup' else 'scripts/test-engine-viewport.py',str(root),str(out),'--probe',str((a.output/'compilation-profile-probe.exe').resolve())]
+    from PIL import ImageGrab
     with (a.output/(case+'-driver.log')).open('wb') as stream:
-        try:result=subprocess.run(cmd,stdout=stream,stderr=subprocess.STDOUT,env=env,timeout=260);exitcode=result.returncode;timedout=False
-        except subprocess.TimeoutExpired:exitcode=None;timedout=True
+        process=subprocess.Popen(cmd,stdout=stream,stderr=subprocess.STDOUT,env=env)
+        deadline=time.monotonic()+260;frame=0;timedout=False
+        while process.poll() is None and time.monotonic()<deadline:
+            # Read-only external capture ring: retain real frames from the UI
+            # timeout before the unchanged test's finally block kills its editor.
+            try:
+                image=a.output/(case+'-frame-'+str(frame%5)+'.png')
+                ImageGrab.grab().save(image)
+                write(a.output/(case+'-frame-'+str(frame%5)+'.json'),{'time_ns':time.time_ns(),'test_pid':process.pid,'frame':frame,'sha256':sha(image)})
+            except Exception as error:
+                write(a.output/(case+'-capture-error.json'),{'type':type(error).__name__})
+            frame+=1;time.sleep(2)
+        if process.poll() is None:process.kill();timedout=True
+        exitcode=process.wait()
     write(a.output/(case+'-test-exit.json'),{'command':cmd,'exit_code':exitcode,'timed_out':timedout,'test_passed':exitcode==0,'diagnostic_execution_only':True})
     print(case,'actual test exit',exitcode,'timeout',timedout)
 else:

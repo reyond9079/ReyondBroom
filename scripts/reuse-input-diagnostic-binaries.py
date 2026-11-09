@@ -19,7 +19,7 @@ for kind,id,size,digest,run,head in artifacts:
             proof[kind]['binary_sha256']=hashlib.sha256(exe.read_bytes()).hexdigest()
         else:
             names=[x for x in z.namelist() if Path(x).name=='compilation-profile-probe.exe'];assert len(names)==1
-            data=z.read(names[0]);(out/'compilation-profile-probe.exe').write_bytes(data)
+            data=z.read(names[0]);assert hashlib.sha256(data).hexdigest()=='6276bcf8811bd2fb748af054cebc4ae681b01f17844cf12df3d28035c4db9154';(out/'compilation-profile-probe.exe').write_bytes(data)
             revisions=[x for x in z.namelist() if Path(x).name=='compilation-editor-revision.txt'];assert len(revisions)==1
             assert z.read(revisions[0]).decode().strip()==head
             proof[kind]['binary_sha256']=hashlib.sha256(data).hexdigest();proof[kind]['entry']=names[0]

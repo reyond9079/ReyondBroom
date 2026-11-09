@@ -202,7 +202,7 @@ static bool mapModHasResources(const std::filesystem::path& path)
   }
   return false;
 }
-static void mapModsPanel()
+static void mapModsLegacyPanel()
 {
   if(!uiInspectorFold("Mods",ImGuiTreeNodeFlags_DefaultOpen))return;
   namespace fs=std::filesystem;
@@ -293,6 +293,63 @@ static void mapModsPanel()
     ImGui::EndTable();
   }
   if(!message.empty())ImGui::TextWrapped("%s",message.c_str());
+}
+
+
+static void mapModsPanel()
+{
+  if(gameProfile!=2){mapModsLegacyPanel();return;}
+  const bool open=uiInspectorFold("Mods",ImGuiTreeNodeFlags_DefaultOpen);fileBrowserTestItem("map_mod_header");if(!open)return;
+  namespace fs=std::filesystem;runLoad();
+  const auto root=mapModsRoot();
+  static std::string available,enabled,message;static char query[128]{};
+  std::vector<std::string> mods;
+  try{mods=mapModsForDocument();}catch(const std::exception& error){message=error.what();}
+  static fs::path scanRoot;static std::vector<std::string> candidates;
+  if(scanRoot!=root||ImGui::IsWindowAppearing()){
+    scanRoot=root;candidates.clear();std::error_code error;
+    if(!root.empty())for(fs::directory_iterator it(root,error),end;!error&&it!=end;it.increment(error)){
+      std::error_code status;if(it->is_directory(status)&&mapModHasResources(it->path()))candidates.push_back(it->path().filename().u8string());
+    }
+    std::sort(candidates.begin(),candidates.end());
+  }
+  const bool canSwitch=gameClassic()&&!gameProfileLocked&&!assetsLoading&&!savingDocument&&!runActive&&!modEmbedded;
+  const float height=std::max(78*uiScale(),ImGui::GetContentRegionAvail().y-3.6f*ImGui::GetFrameHeightWithSpacing());
+  auto row=[&](const std::string& name,std::string& selected,const char* group){
+    ImGui::PushID(group);ImGui::PushID(name.c_str());
+    if(ImGui::Selectable(name.c_str(),selected==name))selected=name;
+    fileBrowserTestItem(std::string("map_mod_")+group+"/"+name);
+    if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",(root/fs::u8path(name)).u8string().c_str());
+    ImGui::PopID();ImGui::PopID();
+  };
+  auto apply=[&](std::vector<std::string> next){if(mapModsSet(next))message.clear();else message=gameMapModsError;};
+  if(ImGui::BeginTable("Mod columns",2,ImGuiTableFlags_SizingStretchSame)){
+    ImGui::TableNextColumn();ImGui::TextUnformatted("Available");
+    if(ImGui::BeginChild("Available mods",{0,height},ImGuiChildFlags_Borders)){
+      for(const auto& name:candidates)if(std::find_if(mods.begin(),mods.end(),[&](const auto& value){return ftebroom::mapModSame(value,name);})==mods.end()&&entityLower(name).find(entityLower(query))!=std::string::npos)row(name,available,"available");
+      if(candidates.empty())ImGui::TextDisabled("No mod folders found");
+    }
+    ImGui::EndChild();ImGui::SetNextItemWidth(-FLT_MIN);uiBrowserSearch("##mod-search","Search mods",query,sizeof query);
+    ImGui::TableNextColumn();ImGui::TextUnformatted("Enabled");
+    if(ImGui::BeginChild("Enabled mods",{0,height},ImGuiChildFlags_Borders))for(const auto& name:mods)row(name,enabled,"enabled");
+    ImGui::EndChild();
+    ImGui::BeginDisabled(!canSwitch||available.empty()||std::find_if(mods.begin(),mods.end(),[&](const auto& value){return ftebroom::mapModSame(value,available);})!=mods.end());
+    if(inspectorIcon("##enable-mod","Enable selected mod",'+')){auto next=mods;next.push_back(available);apply(std::move(next));}
+    fileBrowserTestItem("map_mod_add");ImGui::EndDisabled();ImGui::SameLine();
+    auto selected=std::find(mods.begin(),mods.end(),enabled);const bool hasSelection=selected!=mods.end();
+    ImGui::BeginDisabled(!canSwitch||!hasSelection);
+    if(inspectorIcon("##disable-mod","Disable selected mod",'-')){auto next=mods;next.erase(next.begin()+(selected-mods.begin()));apply(std::move(next));}
+    fileBrowserTestItem("map_mod_remove");ImGui::EndDisabled();ImGui::SameLine();
+    ImGui::BeginDisabled(!canSwitch||!hasSelection||selected==mods.begin());
+    if(ImGui::SmallButton("Up##mod-up")){auto next=mods;auto index=selected-mods.begin();std::swap(next[index-1],next[index]);apply(std::move(next));}
+    fileBrowserTestItem("map_mod_up");ImGui::EndDisabled();ImGui::SameLine();
+    ImGui::BeginDisabled(!canSwitch||!hasSelection||(hasSelection&&std::next(selected)==mods.end()));
+    if(ImGui::SmallButton("Down##mod-down")){auto next=mods;auto index=selected-mods.begin();std::swap(next[index+1],next[index]);apply(std::move(next));}
+    fileBrowserTestItem("map_mod_down");ImGui::EndDisabled();ImGui::EndTable();
+  }
+  ImGui::TextDisabled("Base resources: %s (inherited)",runBaseMod.c_str());
+  if(!message.empty())ImGui::TextWrapped("%s",message.c_str());
+  if(!gameMapModsError.empty()&&gameMapModsError!=message)ImGui::TextWrapped("%s",gameMapModsError.c_str());
 }
 
 static void mapInspector()

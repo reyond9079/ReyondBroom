@@ -4,6 +4,13 @@
 #include "ftebroom_resource_directory.h"
 #include "ftebroom_wall_file.h"
 #include "ftebroom_mod_definitions.h"
+#include "ftebroom_map_mods.h"
+// Explicit per-map resource stack, synchronized with worldspawn _tb_mod.
+static bool gameMapModsKnown=false;
+static std::vector<std::string> gameMapMods;
+static std::vector<std::filesystem::path> gameMapResourcePaths;
+static std::filesystem::path gameMapResourceRoot;
+static std::string gameMapModsError;
 static void runOpenSettings();
 static int gameProfile;
 static int gameWallMode=5;
@@ -138,7 +145,9 @@ static std::string gameDefinitionPath()
     return !found.empty()?found:gameProfile==3?"quake2.fgd":hlRuntime?"counterstrike.fgd":"halflife.fgd";
   }if(gameProfile==2){
     if(*q1Definitions)return q1Definitions;
-    auto detected=ftebroom::discoverModDefinitions(std::filesystem::u8path(q1Authoring()));
+    std::string detected;
+    if(gameMapModsKnown)for(auto path=gameMapResourcePaths.rbegin();path!=gameMapResourcePaths.rend()&&detected.empty();++path)detected=ftebroom::discoverModDefinitions(*path);
+    if(detected.empty())detected=ftebroom::discoverModDefinitions(std::filesystem::u8path(q1Authoring()));
     return !detected.empty()?detected:q1UseLibre?"librequake.def":"quake1.ent";
   }if(gameProfile!=1)return {};
   if(*gameDefinitions)return gameDefinitions;

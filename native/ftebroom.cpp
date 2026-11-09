@@ -1579,7 +1579,13 @@ static void mapReady()
   openPanel();
   core->Print("ReyondBroom: permanent workspace restored for map.\n");
 }
-static void profileStartMap(){if(!pendingDocumentFile.empty())return;gameProfileLoad();command(gameClassic()?"mapedit maps/start-quake1.map\n":"mapedit maps/start.map\n");}
+static void profileStartMap(){
+  if(!pendingDocumentFile.empty())return;gameProfileLoad();
+  if(gameClassic()){
+    try{auto scene=mapModsPrepareScene(q1Read(documentPath("maps/start-quake1.map")));std::ofstream(documentPath("maps/_ftebroom_profile_start.map"),std::ios::binary)<<documentMetadata(scene);command("mapedit maps/_ftebroom_profile_start.map\n");}
+    catch(const std::exception& error){documentError=error.what();}
+  }else command("mapedit maps/start.map\n");
+}
 // Read-only, opt-in input QA must keep advancing while the console owns focus.
 // The normal ImGui snapshots pause there and cannot acknowledge console input.
 static void inputQaTick()
@@ -1606,7 +1612,7 @@ static void QDECL actionFocusTick(int)
   clipboardPump();
   documentTick();
   // Compiler jobs must advance even while the UI is occluded or another menu owns focus.
-  if(ready){runTick();buildTick();modPreviewTick();pluginsTick();bbImportTick();}
+  if(ready){mapModsTick();mapModsQaTick();runTick();buildTick();modPreviewTick();pluginsTick();bbImportTick();}
   if (!ready || input->HasMenuFocus())
     return;
   modelEditorCameraEnd(false);

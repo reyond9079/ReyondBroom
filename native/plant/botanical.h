@@ -5,7 +5,7 @@
 // so existing editable sources reproduce their original geometry on opening.
 namespace ftebroom::plant {
 struct Botanical : Generator {
-  struct Span {std::vector<V> path;double radius,tip;Part part;uint64_t id;};
+  struct Span {std::vector<V> path;double radius,tip;Part part;uint64_t id;uint64_t editId=0;WoodJunction joint{};};
   struct Shoot {V p,aim;uint64_t id;double size;};
   std::vector<Span> skeleton;
   std::vector<Shoot> foliage;
@@ -15,10 +15,28 @@ struct Botanical : Generator {
     Generator(d,l,c),opaque(solid),compactTreeGroup(compactGroup){
     b.repeatBark=d.generator>=4&&(d.family==Family::Broadleaf||d.family==Family::Conifer||
       d.family==Family::Bush||d.family==Family::Palm||d.family==Family::Custom);
+    b.barkURepeats=d.barkURepeats;b.barkVUnits=d.barkVUnits;b.separateWoodCut=!d.cutTexture.empty();
   }
   bool realistic() const {return doc.generator>=4&&p.quality!=3;}
   Photo photo() const {return opaque?Photo::None:foliagePhoto(doc);}
   bool compact() const {return doc.generator>=3&&p.quality!=3;}
+  uint64_t branchKey(uint64_t id) const {
+    return mix(mix(doc.seed,uint64_t(doc.family)),id)|1;
+  }
+  bool applyBranchEdit(uint64_t id,V start,V& end,double& radius) const {
+    auto found=doc.branchEdits.find(id);
+    if(found==doc.branchEdits.end())return true;
+    const auto& edit=found->second;
+    if(edit.removed)return false;
+    auto delta=sub(end,start);
+    if(edit.angle!=0.){
+      const double azimuth=std::atan2(delta[1],delta[0]),span=length(delta);
+      const double elevation=std::clamp(std::atan2(delta[2],std::hypot(delta[0],delta[1]))+edit.angle*pi/180.,-pi*.49,pi*.49);
+      delta={span*std::cos(elevation)*std::cos(azimuth),span*std::cos(elevation)*std::sin(azimuth),span*std::sin(elevation)};
+    }
+    end=add(start,mul(delta,edit.length));radius*=edit.thickness;
+    return true;
+  }
   double leafAngle(int i) const {
     if(p.phyllotaxy==1)return (i%2)*pi+(i/2)*.27;
     if(p.phyllotaxy==2)return (i%p.clusterLeaves)*2*pi/p.clusterLeaves+(i/p.clusterLeaves)*.19;
@@ -142,11 +160,14 @@ struct Botanical : Generator {
     if(p.leafShape==7)cost=cost*p.leaflets*(doc.family==Family::Broadleaf&&p.organ==3?4:1)+24;
     return cost;
   }
-  void planBranch(V origin,V end,double radius,int order,uint64_t id) {
+  void planBranch(V origin,V end,double radius,int order,uint64_t id,WoodJunction joint={}) {
     b.check();if(skeleton.size()>16384||foliage.size()>262144)throw std::runtime_error("Botanical plan exceeds the preview limit; reduce stems, branching depth or leaves per shoot");Rng r(mix(id,doc.seed));
+    const auto editId=realistic()?branchKey(id):0;
+    if(editId&&!applyBranchEdit(editId,origin,end,radius))return;
     double droop=p.gravity*(p.crown==3?1.1:.50);
     auto path=arc(origin,end,droop,std::max(4,p.segments),id);
-    skeleton.push_back({path,radius,std::max(.015,radius*(1-p.taper)*.45),order==0?Part::Primary:order==1?Part::Secondary:Part::Twigs,id});
+    const double tipRadius=std::max(.015,radius*(1-p.taper)*.45);
+    skeleton.push_back({path,radius,tipRadius,order==0?Part::Primary:order==1?Part::Secondary:Part::Twigs,id,editId,joint});
     double span=length(sub(end,origin));int depth=doc.family==Family::Bush?std::min(3,p.depth):p.depth;
     if(order+1<depth){
       int children=order==0?4:3;
@@ -159,7 +180,12 @@ struct Botanical : Generator {
         auto aim=unit(add(mul(axis,std::cos(angle)),mul(add(mul(right,std::cos(a)),mul(up,std::sin(a))),std::sin(angle))));
         aim[2]+=p.light*.12;if(p.crown==3)aim[2]-=.25*(order+1);
         auto target=add(anchor,mul(unit(aim),span*p.branchLength*r.range(.55,.83)));
-        planBranch(anchor,target,radius*p.branchTaper*.72,order+1,mix(id,i+11));
+        WoodJunction attachment;
+        if(doc.smoothJunctions&&order==0){
+          const double fraction=double(at)/(path.size()-1);
+          attachment={anchor,unit(sub(path[at+1],path[at?at-1:0])),radius*std::pow(1.-fraction,1.1)+tipRadius*fraction};
+        }
+        planBranch(anchor,target,radius*p.branchTaper*.72,order+1,mix(id,i+11),attachment);
       }
     }else if(r.real()>=p.dead){
       int leaves=std::max(4,int(p.leaves*p.density*p.crownFill*(p.crown==3?1.6:1.)));
@@ -210,8 +236,12 @@ struct Botanical : Generator {
         path.push_back(add(span.path[index],mul(sub(span.path[index+1],span.path[index]),at-index)));
       }
       const size_t first=b.mesh.vertices.size();
+      const size_t firstFace=b.mesh.faces.size();
+      const auto* joint=doc.smoothJunctions&&!compactTreeGroup&&span.joint.radius>0.?&span.joint:nullptr;
+      if(joint)addJunctionRing(path,*joint);
       b.tube(path,span.radius,span.tip,sidesForSpan,Bark,span.part,0,0,
-        (.55+.45*p.irregularity)*(span.part==Part::Trunk?1.:.60),span.id);
+        (.55+.45*p.irregularity)*(span.part==Part::Trunk?1.:.60),span.id,joint);
+      for(size_t i=firstFace;i<b.mesh.faces.size();i++)b.mesh.faces[i].branch=span.editId;
       if(span.part==Part::Trunk)for(size_t i=first;i<b.mesh.vertices.size();i++){
         auto& z=b.mesh.vertices[i].p[2];
         z=std::max(z,path.front()[2]);
@@ -261,10 +291,15 @@ struct Botanical : Generator {
       size_t count=std::min((b.budget-b.mesh.faces.size())/(strips*2),size_t(groups*phenology()));
       // A sampled card stands in for several smaller shoots in an alias group.
       // Grow it across the branch rather than leaving isolated leaves.
+      const bool nested=doc.stableLods&&!compactTreeGroup&&lod==1;
+      const size_t nearCards=size_t(((foliage.size()+3)/4)*phenology());
       const double cover=compactTreeGroup&&count?
-        std::clamp(std::sqrt(double(groups)*phenology()/count),1.15,1.85):1.;
+        std::clamp(std::sqrt(double(groups)*phenology()/count),1.15,1.85):
+        nested&&count?std::clamp(std::sqrt(double(nearCards)/count),1.,1.35):1.;
       for(size_t i=0;i<count;i++){
-        auto& shoot=foliage[i*foliage.size()/count];
+        // Keep the near LOD's card locations at medium distance. At the
+        // smallest budget, sample the entire crown to keep its outline.
+        auto& shoot=foliage[i*foliage.size()/(nested?std::max(nearCards,count):count)];
         Rng rng(mix(shoot.id,doc.seed));
         V up=unit({rng.range(-.85,.85),rng.range(-.85,.85),rng.range(.5,1.)});
         double size=p.leafSize*(.5+.5*p.age)*shoot.size*(needles?1.65:2.15)*(lod==2?1.30:realistic()&&p.quality==2?1.20:1.)*cover;
@@ -315,7 +350,12 @@ struct Botanical : Generator {
     }
     return add(point,member.offset);
   }
-  void woody(bool shrub=false) {
+  WoodJunction trunkJunction(double t,const TreeMember& member,double radius,double tip) const {
+    if(!doc.smoothJunctions)return {};
+    return {treeTrunk(t,member),unit(sub(treeTrunk(std::min(1.,t+.005),member),treeTrunk(std::max(0.,t-.005),member))),
+      radius*std::pow(1.-t,1.1)+tip*t};
+  }
+  void planWoody(bool shrub=false) {
     int stems=std::max(1,p.clumps),primaries=std::max(3,p.branches);
     if(realistic()&&stems>1)primaries=std::max(3,int(primaries/std::sqrt(double(stems))));
     for(int stem=0;stem<stems;stem++){
@@ -327,7 +367,8 @@ struct Botanical : Generator {
       std::vector<V> path;
       for(int j=0;j<=p.segments;j++)path.push_back(treeTrunk(double(j)/p.segments,member));
       double radius=p.radius*member.girth;
-      skeleton.push_back({path,radius*(1+p.rootFlare*.20),radius*(1-p.taper)*.35,Part::Trunk,mix(doc.seed,stem)});
+      const double trunkRadius=radius*(1+p.rootFlare*.20),trunkTip=radius*(1-p.taper)*.35;
+      skeleton.push_back({path,trunkRadius,trunkTip,Part::Trunk,mix(doc.seed,stem)});
       if(doc.generator<4)for(int k=0;k<5;k++){
         double az=2*pi*k/5+a;
         auto from=add(origin,{std::cos(az)*radius*.3,std::sin(az)*radius*.3,radius*1.4});
@@ -346,13 +387,16 @@ struct Botanical : Generator {
           std::sin(az)*reach*std::sin(angle)*member.crownY,0.});
         end[2]=height*member.stature*(p.crownBase+(top-p.crownBase)*p.crownAspect)+member.offset[2];
         end=add(end,mul(member.lean,t*t*.66));
-        planBranch(treeTrunk(t,member),end,radius*.38*(1-t*.65),0,mix(stem+7,i+100));
+        planBranch(treeTrunk(t,member),end,radius*.38*(1-t*.65),0,mix(stem+7,i+100),trunkJunction(t,member,trunkRadius,trunkTip));
       }
     }
+  }
+  void woody(bool shrub=false) {
+    planWoody(shrub);
     emitSkeleton();auto total=b.budget;if(shrub&&p.organ>=4)b.budget=size_t(total*.88);emitFoliage();b.budget=total;
     if(shrub&&p.organ>=4&&p.organ<=10)inflorescences();
   }
-  void evergreenTree() {
+  void planEvergreenTree() {
     int stems=realistic()?std::max(1,p.clumps):1;
     for(int stem=0;stem<stems;stem++){
       auto member=treeMember(stem,stems);
@@ -367,8 +411,11 @@ struct Botanical : Generator {
         double span=height*p.spread*profile*r.range(.82,1.08)*member.stature;
         double az=j*2*pi/per+level*1.73+member.yaw+r.range(-.16,.16)*p.irregularity;
         V base=treeTrunk(t,member),end=add(base,{std::cos(az)*span*member.crownX,std::sin(az)*span*member.crownY,span*(p.needleForm==0?.30:.12)});
+        const auto editId=realistic()?branchKey(mix(mix(stem,level),j)):0;
+        double radius=p.radius*member.girth*.25*(1-u*.8);
+        if(editId&&!applyBranchEdit(editId,base,end,radius))continue;
         auto path=arc(base,end,p.gravity,std::max(4,p.segments),id);
-        skeleton.push_back({path,p.radius*member.girth*.25*(1-u*.8),.025,Part::Primary,id});
+        skeleton.push_back({path,radius,.025,Part::Primary,id,editId,trunkJunction(t,member,p.radius*member.girth,.035)});
         int shoots=std::max(4,p.leaves/2);
         for(int k=0;k<shoots;k++)for(int side:{-1,1}){
           double v=.16+.80*(k+.5)/shoots;auto node=path[std::min(path.size()-1,size_t(v*(path.size()-1)))];
@@ -384,7 +431,14 @@ struct Botanical : Generator {
         }
       }
     }
-    emitSkeleton();emitFoliage(true);
+  }
+  void evergreenTree() {
+    planEvergreenTree();emitSkeleton();emitFoliage(true);
+  }
+  Mesh renderTreePlan(const Botanical& plan) {
+    skeleton=plan.skeleton;foliage=plan.foliage;
+    emitSkeleton();emitFoliage(doc.family==Family::Conifer);
+    return finish();
   }
   // Family-specific organ generators are defined below, independently of IDs.
   void inflorescences();
@@ -399,6 +453,9 @@ struct Botanical : Generator {
       case Family::Mushroom:fungi();break;case Family::Cactus:succulents();break;
       case Family::Bamboo:case Family::Riparian:reedsAndBamboo();break;case Family::Vine:climbers();break;
     }
+    return finish();
+  }
+  Mesh finish() {
     // All generators use the same outward-normal convention, including organ
     // profiles that fold back on themselves (trumpets, funnels and fleshy leaves).
     for(auto& face:b.mesh.faces){auto& a=b.mesh.vertices[face.i[0]];auto& c=b.mesh.vertices[face.i[1]];auto& d=b.mesh.vertices[face.i[2]];

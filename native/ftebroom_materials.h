@@ -508,7 +508,7 @@ static void materialBrowser()
   ImGui::BeginChild(
     "material_tiles",
     {0, std::max(55.f*scale,ImGui::GetContentRegionAvail().y-footerHeight-ImGui::GetStyle().ItemSpacing.y)},
-    ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollWithMouse);
+    ImGuiChildFlags_Borders,ImGuiWindowFlags_None);
   browserQaWindow("materials/grid");browserHoverZoom(size,48,128);if(browserQaEnabled)browserQaMaterialSize=size;
   const int columns=std::max(1,int(ImGui::GetContentRegionAvail().x-8)/(size+12));
   struct MaterialRow{size_t first,last;std::string heading;};

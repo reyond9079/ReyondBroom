@@ -429,7 +429,7 @@ static void entityPanel()
       ImGui::BeginChild(
         "Classes",
         {0, std::max(24.f,ImGui::GetContentRegionAvail().y-ImGui::GetFrameHeight()-ImGui::GetStyle().ItemSpacing.y*2)},
-        ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollWithMouse);
+        ImGuiChildFlags_Borders,ImGuiWindowFlags_None);
       browserQaWindow("entities/grid");browserHoverZoom(entityThumbnailSize,48,160);
       entityVisiblePreviewCount=0;entityPreviewMarginsValid=true;
       std::string group;

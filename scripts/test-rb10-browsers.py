@@ -57,7 +57,12 @@ def create(name,item=None):
   r=rect('files/grid');ui.click(r['x']+r['width']*.72,r['y']+r['height']*.86,button=3)
  click('files/context-create');edit('files/create-name',name);click('files/create-confirm');wait(lambda:(folder/name).is_file())
 def wheel(grid,key):
- r=rect(grid);old=live()[key];ui.move(r['x']+r['width']*.65,r['y']+r['height']*.52);ui.scroll(1);wait(lambda:live()[key]>old);check(True,grid+' hover wheel increases thumbnail size')
+ r=rect(grid);old=live()[key];ui.move(r['x']+r['width']*.65,r['y']+r['height']*.52)
+ ui.scroll(-1);ui.settle();check(live()[key]==old,grid+' plain wheel preserves thumbnail size')
+ ui.mod('ctrl',True)
+ try:ui.scroll(1);wait(lambda:live()[key]>old)
+ finally:ui.mod('ctrl',False)
+ check(True,grid+' Ctrl+wheel increases thumbnail size')
 def sample_frames(seconds=3):
  rows=[];deadline=time.monotonic()+seconds;last=-1
  while time.monotonic()<deadline:
@@ -75,7 +80,11 @@ try:
   navigate(folder/'subfolder'/'deeper');check(Path(live()['folder'])==folder/'subfolder'/'deeper','trailing blank opens editable path and Enter navigates')
  navigate(folder);wheel('files/grid','thumbnail');ImageGrab.grab().save(out/'mod-file-manager.png')
  navigate(folder/'empty');baseline=sample_frames();navigate(models);wait(lambda:live()['readyModels']>=4 and not live()['previewBusy'],120);ui.settle();warm_start=live();warm=sample_frames();warm_end=live();ImageGrab.grab().save(out/'model-heavy-folder.png')
- check(warm_end['modelQuads']>0,'model-heavy folder shows cached image previews');check(warm_start['modelReads']==warm_end['modelReads'] and warm_start['modelBuilds']==warm_end['modelBuilds'],'warm model folder performs no resource reads or preview rebuilds')
+ check(warm_end['modelQuads']>0,'model-heavy folder shows cached image previews');
+ r=rect('files/grid');old_size=live()['thumbnail'];old_scroll=r['scrollY'];assert r['scrollMax']>0
+ ui.move(r['x']+r['width']*.65,r['y']+r['height']*.52);ui.scroll(-3)
+ wait(lambda:live()['widgets']['files/grid']['scrollY']>old_scroll)
+ check(live()['thumbnail']==old_size,'plain wheel scrolls an overflowing file grid without resizing thumbnails');check(warm_start['modelReads']==warm_end['modelReads'] and warm_start['modelBuilds']==warm_end['modelBuilds'],'warm model folder performs no resource reads or preview rebuilds')
  metrics={'baseline_frame_ms':baseline,'warm_frame_ms':warm,'baseline_median_ms':statistics.median(baseline),'warm_median_ms':statistics.median(warm),'entries':live()['entries'],'cachedModels':live()['cachedModels'],'modelQuads':live()['modelQuads'],'source_triangles_per_model':count,'warm_triangles_per_model':2};(out/'performance.json').write_text(json.dumps(metrics,indent=2));check(metrics['warm_median_ms']<=metrics['baseline_median_ms']*1.35+3,'warm model folder does not significantly reduce frame rate')
  if not a.perf_only:
   click('tab/Entity');wait(lambda:'entities/grid' in live()['widgets'] and live()['entityClasses']);check('browser132_point' in live()['entityClasses'] and 'browser132_brush' not in live()['entityClasses'],'entity browser includes point entities and excludes brush entities');wheel('entities/grid','entityThumbnail');ImageGrab.grab().save(out/'entity-browser.png')

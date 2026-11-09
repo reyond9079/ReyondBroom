@@ -299,7 +299,7 @@ static void modFilesPanel() {
         }
       } else {if(ImGui::Selectable("Mod root",modFilesFolder==root))navigate=root;modFilesTree(root,navigate,0,treeBudget);}
       if(treeBudget<=0)ImGui::TextDisabled("Collapse branches to display more entries.");
-      ImGui::EndChild();ImGui::SameLine();ImGui::BeginChild("Folder contents",{0,contentsHeight},ImGuiChildFlags_None,ImGuiWindowFlags_AlwaysVerticalScrollbar|(modFilesGrid?ImGuiWindowFlags_NoScrollWithMouse:0));
+      ImGui::EndChild();ImGui::SameLine();ImGui::BeginChild("Folder contents",{0,contentsHeight},ImGuiChildFlags_None,ImGuiWindowFlags_AlwaysVerticalScrollbar|ImGuiWindowFlags_None);
       browserQaWindow("files/grid");
       if(modFilesGrid)browserHoverZoom(modFilesThumbnailSize,48,180);
       const float tileSize=float(modFilesThumbnailSize);

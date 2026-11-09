@@ -2,14 +2,15 @@ from pathlib import Path
 import sys
 r=Path(sys.argv[1]);log=(r/'qconsole.log').read_text(errors='replace')
 assert 'FTEBROOM_LAYOUT_FAIL' not in log and 'FTEBROOM_VIEW_FAIL' not in log,log[-12000:]
-names=[f'rectangles_{i}' for i in range(1,5)]+['cycle_single_xy','cycle_single_wrap','cycle_two','cycle_three','cycle_four_noop','maximize','restore','hover_focus','drag_focus_locked','divider_drag']
+names=[f'rectangles_{i}' for i in range(1,5)]+['cycle_single_xy','cycle_single_wrap','maximize','restore','hover_focus','drag_focus_locked','divider_drag']
+names += [f'cycle_{prefix}_{count}_pane_{pane}' for prefix in ('layout','wrap') for count in (2,3,4) for pane in range(count)]
 for name in names: assert 'FTEBROOM_LAYOUT_PASS '+name in log,name
 for name in [f'{kind}_{i}' for i in range(1,4) for kind in ['viewport_projection','linked_pan']]+['reset_2d_zoom']:
     assert 'FTEBROOM_VIEW_PASS '+name in log,name
 def faces(name): return sorted(x for x in (r/'maps'/f'layout_{name}.map').read_text().splitlines() if x.startswith('( '))
 assert faces('before')==faces('after')
 for name in ['four','two','three']: assert (r/f'layouts-{name}.png').exists()
-print('PASS: 21 layout/projection/focus assertions and unchanged MAP geometry.')
+print(f'PASS: {len(names)+7} layout/projection/focus assertions and unchanged MAP geometry.')
 
 # A passing projection test is insufficient: verify visible geometry in the cached panes.
 from PIL import Image

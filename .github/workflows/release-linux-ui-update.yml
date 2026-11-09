@@ -135,6 +135,7 @@ jobs:
         run: |
           bundle="$PWD/out/release/ReyondBroom-Linux-x64"
           python tests/make-linux-build-fixture.py "$bundle"
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-editor133-input.py "$bundle" qa/rb10/editor133-input
           python tests/test-welcome-updater.py --platform "$PLATFORM" --output qa/rb10/updater --runtime "$bundle"
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-runtime.py "$bundle" qa/rb10/runtime
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-rb10-browsers.py "$bundle" qa/rb10/browsers
@@ -175,15 +176,16 @@ jobs:
         run: |
           test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
           gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 --clobber
+      - name: Collect compact release evidence
+        if: always()
+        run: python scripts/collect-release-qa.py --qa qa --release out/release --output qa-artifact
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qa-${{ matrix.platform }}
-          path: |
-            qa/**/*.log
-            qa/**/*.png
-            qa/**/*.json
-            qa/**/*.map
+          path: qa-artifact/
+          if-no-files-found: error
+
   windows:
     runs-on: windows-2022
     env:
@@ -306,6 +308,8 @@ jobs:
           $bundle = (Resolve-Path out/release/ReyondBroom-Windows-x64).Path
           python tests/make-linux-build-fixture.py $bundle
           if ($LASTEXITCODE) { throw 'RB-10 fixture failed' }
+          python scripts/test-editor133-input.py $bundle qa/rb10/editor133-input
+          if ($LASTEXITCODE) { throw 'Viewport input / clean onboarding acceptance failed' }
           python tests/test-welcome-updater.py --platform Windows-x64 --output qa/rb10/updater --runtime $bundle
           if ($LASTEXITCODE) { throw 'Windows PowerShell updater protocol failed' }
           python scripts/test-rb10-runtime.py $bundle qa/rb10/runtime
@@ -335,15 +339,15 @@ jobs:
           if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
           gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
+      - name: Collect compact release evidence
+        if: always()
+        shell: pwsh
+        run: |
+          python scripts/collect-release-qa.py --qa qa --release out/release --output qa-artifact
+          if ($LASTEXITCODE) { throw 'Collecting release evidence failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qa-Windows-x64
-          path: |
-            qa/audio-archive/**
-            qa/viewport-create-*/**
-            qa/appearance-*/**
-            qa/engine-viewport/**
-            qa/rb10/**
-            audio-deps/ffmpeg-8.0.1/ffbuild/config.log
-            audio-deps/lame-source/config.log
+          path: qa-artifact/
+          if-no-files-found: error

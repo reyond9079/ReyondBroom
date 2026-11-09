@@ -181,6 +181,10 @@ def capture(label, source, selected=0, directory=None, cwd=None):
     expected_work = '' if selected == 2 else str(build if selected == 1 else directory)
     expected_cwd = cwd or (root if selected == 2 else Path(expected_work))
     expect(same_path(state['document'], source), label+': original document path is retained')
+    ui.position()
+    caption=lambda:ui.Desktop(backend='win32').window(handle=ui.hwnd).window_text() if os.name=='nt' else ui.window.get_wm_name()
+    wait(lambda:caption()=='ReyondBroom: '+source.stem+'.map')
+    expect(True,label+': OS window title uses the original map name')
     expect(same_path(fields['MAP_DIR_PATH'], directory) and fields['MAP_BASE_NAME'] == source.stem and
            fields['MAP_FULL_NAME'] == source.name, label+': MAP variables describe the real source')
     expect((fields['WORK_DIR_PATH'] == '' if selected == 2 else same_path(fields['WORK_DIR_PATH'], expected_work)) and

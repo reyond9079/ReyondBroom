@@ -19,8 +19,11 @@ static void viewSave()
 static void viewActivate(int index)
 {
   viewFocus = std::clamp(index, 0, viewLayout - 1);
+  pointerView=viewFocus; // Queued gesture cancellation must target this same pane.
   cvars->SetFloat("ftebroom_view_active", viewFocus);
   int type = viewTypes[viewFocus];
+  char typeKey[64];std::snprintf(typeKey,sizeof typeKey,"ftebroom_view%d_type",viewFocus);
+  cvars->SetFloat(typeKey,type);
   cvars->SetFloat("ca_brush_view", type);
   cvars->SetFloat(
     "ftebroom_ctx_view", type == 3 ? 1 : (type == 2 ? 2 : (type == 1 ? 3 : 0)));
@@ -48,17 +51,11 @@ static void viewAction(const std::string& name)
     viewMax = viewMax < 0 ? viewFocus : -1;
   if (name == "cycle")
   {
-    int index = viewLayout == 1 ? 0 : (viewLayout == 2 ? 1 : 2);
-    if (viewLayout < 4)
-    {
-      int& type = viewTypes[index];
-      if (viewLayout == 3)
-        type = type == 2 ? 1 : 2;
-      else
-        type =
-          type == 0 ? 3 : (type == 3 ? 2 : (type == 2 ? 1 : (viewLayout == 1 ? 0 : 3)));
-      viewActivate(viewFocus);
-    }
+    // Cycle the focused pane in every layout, leaving the other panes alone.
+    int index=std::clamp(viewFocus,0,viewLayout-1);
+    int& type=viewTypes[index];
+    type=type==0?3:type==3?2:type==2?1:0;
+    viewActivate(index);
   }
 }
 static void viewCompute(float w, float h)

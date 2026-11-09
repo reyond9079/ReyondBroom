@@ -11,6 +11,11 @@ from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--width',type=int,default=1920);p.add_argument('--height',type=int,default=1080);p.add_argument('--theme',default='dark');a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';path=data/'placement-ui-live.json';path.unlink(missing_ok=True)
+# This test asserts the Quake III placement class. Packaged mod tests may
+# leave FTE Custom or Quake selected in the shared disposable runtime.
+profile=root/'ftebroom-game-profile.txt'
+previous_profile=profile.read_bytes() if profile.is_file() else None
+profile.write_text('0 0 "" "" "" "" 1 0 "" 1 1\n')
 (data/'placement-interaction.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_plant qa '+a.theme+'\n')
 for f in (data/'maps').glob('creation-qa-*.map'):f.unlink()
 (data/'maps/creation-qa-switch.map').write_bytes((data/'maps/qa_clip.map').read_bytes())
@@ -69,6 +74,7 @@ def snapshot(name):
 def entities(text):return [dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"',x)) for x in re.findall(r'\{([^{}]*)\}',text) if '"_reyondbroom_placement"' in x]
 try:
  wait(lambda:live()['plantReady']);ui.position()
+ check(live()['profile']==0,'placement fixture starts in Quake III profile')
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
  if a.theme=='dark' and a.width==1920:
   # Reproduce the input driver's slow-frame hazard before exercising Save.
@@ -129,6 +135,8 @@ except Exception:
 finally:
  if process.poll() is None:process.kill();process.wait(timeout=15)
  stream.close()
+ if previous_profile is None:profile.unlink(missing_ok=True)
+ else:profile.write_bytes(previous_profile)
  for log in root.rglob('qconsole.log'):
   try:
    import shutil

@@ -4,6 +4,7 @@
 #include "textures.h"
 #include "../ftebroom_model_export.h"
 #include "../ftebroom_model_md2_export.h"
+#include "../ftebroom_model_static_export.h"
 #include "../ftebroom_model_studio_export.h"
 #include <locale>
 #include <deque>
@@ -11,17 +12,22 @@ namespace ftebroom::plant {
 inline uint64_t hash(const std::string& s) {uint64_t h=1469598103934665603ULL;for(unsigned char c:s){h^=c;h*=1099511628211ULL;}return h;}
 inline std::string assetId(const Project& d,int lod) {std::ostringstream s;s<<"plant-"<<std::hex<<hash((d.generator>=4?"plant-export-v4:":"plant-export-v3:")+serialize(d).dump()+std::to_string(lod));return s.str();}
 // Match the original Quake III renderer's per-surface tessellation limits.
-inline constexpr size_t md3PlantVertices=999,md3PlantTriangles=1200;
-inline modelExport::Mesh modelMesh(const Mesh& mesh,const std::string& material) {
+inline constexpr size_t md3PlantVertices=999,md3PlantTriangles=1999,md3PlantSurfaces=32;
+// IQM uses mesh-local indices in FTE. Keep each mesh addressable even on
+// FTE renderers built with 16-bit indices; there is no MD3-style model cap.
+inline constexpr size_t iqmPlantVertices=65536;
+inline modelExport::Mesh modelMesh(const Mesh& mesh,const std::string& material,bool iqm=false) {
   modelExport::Mesh out;out.frames=1;out.frameNames={"plant"};
+  const size_t vertexLimit=iqm?iqmPlantVertices:md3PlantVertices;
+  const size_t triangleLimit=iqm?mesh.faces.size():md3PlantTriangles;
   std::vector<int> local(mesh.vertices.size(),-1);
   for(size_t i=0;i<mesh.faces.size();) {
     modelExport::Surface surface;surface.material=material;surface.frames.resize(1);
     std::vector<unsigned> used;
-    for(;i<mesh.faces.size()&&surface.triangles.size()<md3PlantTriangles;i++) {
+    for(;i<mesh.faces.size()&&surface.triangles.size()<triangleLimit;i++) {
       auto& face=mesh.faces[i];
       size_t missing=0;for(auto index:face.i)missing+=local[index]<0;
-      if(used.size()+missing>md3PlantVertices)break;
+      if(used.size()+missing>vertexLimit)break;
       std::array<unsigned,3> triangle{};
       for(size_t corner=0;corner<3;corner++){
         auto index=face.i[corner];
@@ -46,7 +52,7 @@ inline modelExport::Mesh modelMesh(const Mesh& mesh,const std::string& material)
 }
 inline std::string md3(const Mesh& mesh,const std::string& material) {
   auto out=modelMesh(mesh,material);
-  if(out.surfaces.size()>32)throw std::runtime_error("MD3 exceeds 32 surfaces. Export a lower LOD or a smaller triangle budget.");
+  if(out.surfaces.size()>md3PlantSurfaces)throw std::runtime_error("MD3 exceeds 32 surfaces. Export a lower LOD or a smaller triangle budget.");
   return modelExport::md3(out);
 }
 // Vanilla alias renderers do not support alpha-cutout skins. Generate shaped
@@ -75,6 +81,8 @@ inline modelExport::Mesh aliasMesh(const Mesh& mesh,const std::string& material)
   out.surfaces.push_back(std::move(surface));return out;
 }
 inline bool opaquePlantTarget(int profile){return profile>=2&&profile<=4;}
+inline size_t aliasPlantVertices(int profile){return profile==2?1024:2048;}
+inline size_t aliasPlantTriangles(int profile){return profile==2?2048:profile==4?20000:4096;}
 inline const char* targetClass(int profile){return profile==4?"cycler":profile==1?"func_model":"misc_model";}
 inline size_t plantTrunkCount(const Mesh& mesh) {
   std::set<unsigned> trunks;
@@ -82,21 +90,59 @@ inline size_t plantTrunkCount(const Mesh& mesh) {
   return trunks.size();
 }
 inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile,bool maskedQuake=false) {
+  if(profile==1)return full;
   if(!opaquePlantTarget(profile)){
-    if(modelMesh(full,"").surfaces.size()<=32)return full;
-    auto d=source;d.p.budget=32*(md3PlantVertices/3);return generate(d,0);
+    auto surfaces=modelMesh(full,"").surfaces.size();
+    if(surfaces<=md3PlantSurfaces)return full;
+    auto d=source;
+    // Search using the actual surface count: shared vertices can fit many
+    // more triangles than the worst case of three new vertices per face.
+    Mesh best;
+    for(int low=256,high=source.p.budget-1;low<=high;){
+      d.p.budget=low+(high-low)/2;
+      auto candidate=generate(d);
+      if(modelMesh(candidate,"").surfaces.size()<=md3PlantSurfaces){
+        if(candidate.faces.size()>best.faces.size())best=std::move(candidate);
+        low=d.p.budget+1;
+      }else high=d.p.budget-1;
+    }
+    if(!best.faces.empty())return best;
+    throw std::runtime_error("The plant cannot fit in 32 Quake III MD3 surfaces.");
   }
-  const size_t maxVertices=profile==2?1024:2048,maxTriangles=profile==2?2048:4096;
+  const size_t maxVertices=aliasPlantVertices(profile),maxTriangles=aliasPlantTriangles(profile);
   const bool foliage=std::any_of(full.faces.begin(),full.faces.end(),[](auto& f){return f.part==Part::Leaves;});
   const bool treeGroup=source.generator>=4&&source.p.quality!=3&&source.p.clumps>1&&
     (source.family==Family::Broadleaf||source.family==Family::Conifer);
   const size_t requiredTrunks=treeGroup&&plantTrunkCount(full)?size_t(source.p.clumps):0;
+  auto fits=[&](const Mesh& mesh){
+    if(mesh.faces.empty()||(requiredTrunks&&plantTrunkCount(mesh)!=requiredTrunks))return false;
+    if(foliage&&std::none_of(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves;}))return false;
+    const auto model=aliasMesh(mesh,"plant");
+    const auto& surface=model.surfaces.front();
+    return surface.frames[0].size()<=maxVertices&&surface.triangles.size()<=maxTriangles;
+  };
+  // The full mesh is already suitable for opaque skins when it does not use
+  // foliage cards. Keep the authored topology if it fits the target format.
+  const bool opaque=source.generator>=4&&!maskedQuake;
+  if((maskedQuake||(!foliage&&foliagePhoto(source)==Photo::None))&&fits(full))return full;
   auto d=source;
+  if(opaque){
+    d.p.foliageMode=0;
+    auto candidate=generate(d,0,nullptr,true);
+    if(fits(candidate))return candidate;
+  }
+  // Try the original branch and stem settings with the game triangle cap
+  // before changing the topology. Encoded vertex counts include UV seams.
+  d.p.budget=std::min(source.p.budget,int(maxTriangles));
+  auto candidate=generate(d,0,nullptr,opaque,treeGroup);
+  if(fits(candidate))return candidate;
   if(d.generator<4)d.generator=std::min(2,d.generator);
-  d.p.quality=2;d.p.foliageMode=0;d.p.sides=maskedQuake?6:3;d.p.segments=maskedQuake?6:3;
+  d.p.quality=2;d.p.foliageMode=0;
   // Spend a fixed budget over the whole crown. Repeatedly regenerate complete
   // geometry, never truncate triangle indices or drop late canopy triangles.
   for(int detail=0;detail<5;detail++){
+    d.p.sides=std::max(3,source.p.sides/(detail+2));
+    d.p.segments=std::max(3,source.p.segments/(detail+2));
     d.p.depth=std::min(source.p.depth,detail?1:2);
     d.p.branches=std::max(source.family==Family::Cactus?0:1,std::min(source.p.branches/(detail+1),profile==2?8:12));
     if(treeGroup){
@@ -104,24 +150,33 @@ inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile,bo
       // generator reduces tessellation and samples that plan within the cap.
       d.p.depth=std::min(source.p.depth,2);
       d.p.branches=std::min(source.p.branches,16);
-      d.p.sides=std::max(3,(maskedQuake?6:4)-detail);
+      d.p.sides=std::max(3,std::min(d.p.sides,6-detail));
     }else d.p.clumps=std::max(1,source.p.clumps/(1<<detail));
     d.p.leaflets=std::max(3,source.p.leaflets/(detail+1));
     d.p.petals=std::max(3,source.p.petals/(detail+1));d.p.flowerLayers=std::max(1,source.p.flowerLayers/(detail+1));
-    for(int budget:{profile==2?1500:3000,profile==2?1000:2000,profile==2?700:1400,500,350,256}){
-      d.p.budget=std::min(source.p.budget,budget);
-      auto mesh=generate(d,0,nullptr,d.generator>=4&&!maskedQuake,treeGroup);if(mesh.faces.empty())continue;
-      if(requiredTrunks&&plantTrunkCount(mesh)!=requiredTrunks)continue;
-      auto encoded=aliasMesh(mesh,"plant");auto& s=encoded.surfaces.front();
-      bool hasLeaves=std::any_of(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves;});
-      if(s.frames[0].size()<=maxVertices&&s.triangles.size()<=maxTriangles&&(!foliage||hasLeaves))return mesh;
+    int ceiling=std::min(source.p.budget,int(maxTriangles));
+    Mesh best;
+    for(int low=256,high=ceiling;low<=high;){
+      d.p.budget=low+(high-low+1)/2;
+      auto mesh=generate(d,0,nullptr,opaque,treeGroup);
+      if(fits(mesh)){
+        if(mesh.faces.size()>best.faces.size())best=std::move(mesh);
+        low=d.p.budget+1;
+      }else high=d.p.budget-1;
     }
+    if(!best.faces.empty())return best;
   }
   if(treeGroup)throw std::runtime_error("The target model cannot retain every tree within its format limits. Place the trees as separate models or use smaller groups. The editable source is preserved.");
   throw std::runtime_error(std::string(profile==2?"Quake MDL":profile==3?"Quake II MD2":"GoldSrc MDL")+" plant LOD cannot retain the visible plant within its vertex/triangle limits. Reduce stems, branches or component copies; the editable source is preserved.");
 }
-inline modelExport::Mesh targetModel(const Mesh& mesh,const std::string& material,int profile){return opaquePlantTarget(profile)?aliasMesh(mesh,material):modelMesh(mesh,material);}
-inline const char* targetExtension(int profile){return profile==2||profile==4?".mdl":profile==3?".md2":".md3";}
+inline modelExport::Mesh targetModel(const Mesh& mesh,const std::string& material,int profile){return opaquePlantTarget(profile)?aliasMesh(mesh,material):modelMesh(mesh,material,profile==1);}
+inline const char* targetExtension(int profile){return profile==2||profile==4?".mdl":profile==3?".md2":profile==1?".iqm":".md3";}
+inline void remapMdlPreview(Mesh& mesh,const modelExport::MdlSkinRegion& region,const modelExport::Skin& skin){
+  for(auto& vertex:mesh.vertices){
+    const auto uv=region.pixel(float(vertex.uv[0]),float(vertex.uv[1]));
+    vertex.uv={(uv[0]+.5)/skin.width,(uv[1]+.5)/skin.height};
+  }
+}
 // Fill transparent texels from the nearest coloured texel of their own tile.
 // Opaque legacy skins then colour the shaped geometry without black fringes.
 inline modelExport::Skin aliasSkin(const Image& atlas){
@@ -172,7 +227,7 @@ inline std::string obj(const Mesh& mesh,const std::string& materialFile) {
   for(auto& f:mesh.faces){out<<"f";for(unsigned i:f.i){i++;out<<' '<<i<<'/'<<i<<'/'<<i;}out<<'\n';}return out.str();
 }
 // q3map2 bakes misc_model lighting into world vertices. FTE func_model stays
-// an MD3 entity: it has normals but no vertex RGBA, so use model lighting.
+// a runtime model entity: it has normals but no baked vertex lighting.
 inline const char* windProgramSource() {
   return R"GLSL(!!ver 100 150
 !!permu FOG

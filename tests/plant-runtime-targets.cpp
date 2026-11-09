@@ -12,6 +12,30 @@
 using namespace ftebroom::plant;
 static void require(bool value,const std::string& message){if(!value)throw std::runtime_error(message);}
 static void write(const std::filesystem::path& path,const std::string& bytes){std::ofstream out(path,std::ios::binary);out.write(bytes.data(),bytes.size());require(bool(out),"write artifact");}
+static void checkMushroomPreview(const Project& source,const Mesh& full,const Textures& maps,const std::string& palette){
+  auto runtime=targetGeometry(source,full,2);
+  auto model=aliasMesh(runtime,"plant");
+  ftebroom::modelExport::Skin replacement;
+  std::vector<ftebroom::modelExport::MdlSkinRegion> regions;
+  const auto encoded=ftebroom::modelExport::mdl(model,{aliasSkin(maps.albedo)},palette,false,&replacement,&regions);
+  auto preview=runtime;
+  remapMdlPreview(preview,regions.at(0),replacement);
+  // Verify both cap and gills against the UV integers written to the MDL.
+  const size_t texcoords=88+replacement.width*replacement.height;
+  std::set<std::pair<int,int>> encodedPixels;
+  for(size_t i=0;i<model.surfaces[0].frames[0].size();i++){
+    encodedPixels.emplace(ftebroom::quake1::word(encoded,texcoords+i*12+4),
+                          ftebroom::quake1::word(encoded,texcoords+i*12+8));
+  }
+  bool remapped=false;
+  for(const auto& face:preview.faces)for(auto i:face.i){
+    const auto& uv=preview.vertices[i].uv;
+    require(encodedPixels.count({int(uv[0]*replacement.width),int(uv[1]*replacement.height)})==1,
+      "mushroom preview uses the UVs written into the MDL "+source.preset);
+    remapped|=uv!=runtime.vertices[i].uv;
+  }
+  require(remapped,"mushroom atlas occupies a different UV rectangle after MDL packing "+source.preset);
+}
 static void checkBarkMappingAndWinding(const std::string& palette){
   const int sides=8;
   Builder tube(150);
@@ -159,14 +183,19 @@ int main(int argc,char** argv)try{
       require(!model.surfaces.empty(),"default preset produces a game model "+source.preset);
       if(profile==4){
         const auto& surface=model.surfaces.front();
-        require(surface.frames[0].size()<=2048&&surface.triangles.size()<=4096,"GoldSrc budget "+source.preset);
+        require(surface.frames[0].size()<=2048&&surface.triangles.size()<=20000,"GoldSrc budget "+source.preset);
         require(ftebroom::studioExport::bake(model,{aliasSkin(maps.albedo)},1).substr(0,4)=="IDST","GoldSrc preset encodes "+source.preset);
+      }else if(profile==1){
+        const auto bytes=ftebroom::modelExport::iqm(model);
+        require(bytes.substr(0,15)=="INTERQUAKEMODEL"&&ftebroom::quake1::word(bytes,56)==full.faces.size(),
+          "FTE IQM keeps every authored triangle "+source.preset);
       }else{
         require(model.surfaces.size()<=32,"MD3 surface budget "+source.preset);
         for(const auto& surface:model.surfaces)
           require(surface.frames[0].size()<=md3PlantVertices&&surface.triangles.size()<=md3PlantTriangles,"MD3 preset budgets "+source.preset);
       }
     }
+    if(source.family==Family::Mushroom)checkMushroomPreview(source,full,maps,q1Palette);
     if(foliagePhoto(source)!=Photo::None){
       auto model=aliasMesh(targetGeometry(source,full,2,true),"plant");
       const auto& surface=model.surfaces.front();
@@ -277,6 +306,19 @@ int main(int argc,char** argv)try{
   auto fullDense=generate(dense);auto q3=targetModel(targetGeometry(dense,fullDense,0),"textures/reyond-plugins/oak",0);
   require(q3.surfaces.size()<=32,"Quake III runtime LOD respects 32 MD3 surfaces");
   auto q3Bytes=ftebroom::modelExport::md3(q3);auto q3Imported=ftebroom::readMd3(q3Bytes);require(q3Imported.size()==q3.surfaces.size(),"dense Q3 runtime LOD uses actual MD3 decoder");
+  Mesh large;
+  large.vertices.resize(90000);
+  for(unsigned i=0;i<large.vertices.size();i+=3){
+    for(unsigned v=i;v<i+3;v++){
+      large.vertices[v].p={double(v),double(v%3),double(v%2)};
+      large.vertices[v].n={0,0,1};
+    }
+    Face face{};face.i={i,i+1,i+2};large.faces.push_back(face);
+  }
+  auto fteLarge=targetModel(targetGeometry(dense,large,1),"plant",1);
+  auto iqmBytes=ftebroom::modelExport::iqm(fteLarge);
+  require(fteLarge.surfaces.size()==2&&ftebroom::quake1::word(iqmBytes,48)==large.vertices.size()&&
+    ftebroom::quake1::word(iqmBytes,56)==large.faces.size(),"FTE IQM preserves meshes beyond 16-bit indices");
   std::string entity="{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \"func_model\"\n\"model\" \"models/reyond-plugins/oak.mdl\"\n\"_reyondbroom_authoring\" \"1\"\n}\n";
   for(int profile:{2,3}){size_t changed=0;bool stopped=false;try{ftebroom::prepareStaticModels(entity,profile,changed);}catch(std::runtime_error&){stopped=true;}require(stopped,"base game without arbitrary-model game code cannot silently compile broken func_model");}
   auto direct=entity;direct.replace(direct.find("func_model"),10,"misc_model");

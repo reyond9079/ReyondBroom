@@ -28,21 +28,32 @@ void main() {
     float distanceToEye = length(viewdir);
     if (fadeEnd > 0.0 && distanceToEye >= fadeEnd) discard;
     float distanceFade = fadeEnd > 0.0 ? 1.0-smoothstep(fadeStart, fadeEnd, distanceToEye) : 1.0;
-    float spacing = exp2(clamp(ceil(log2(4.0 * max(derivative.x, derivative.y))), 0.0, 18.0));
-    vec2 coordinate = tc / spacing;
-    vec2 width = derivative / spacing;
-    vec2 distanceToLine = abs(fract(coordinate + 0.5) - 0.5) / width;
     float feather = clamp(cvar_ftebroom_grid_aa, 0.05, 2.0);
-    float coarse = 1.0 - smoothstep(max(0.0, 0.75-feather*0.5), 0.75+feather*0.5, min(distanceToLine.x, distanceToLine.y));
-    float coverage=coarse;
-    if(spacing>1.0){
-        // Preserve the selected grid below the old 4-pixel coarsening threshold.
-        // Only subpixel lines fade; each projected axis is filtered separately.
+    float edgeStart = max(0.0, 0.75-feather*0.5), edgeEnd = 0.75+feather*0.5;
+    float density = max(derivative.x, derivative.y);
+    float coverage;
+    if(density<=0.5){
+        // Resolved selected-grid lines dominate every coarser level. Keep this
+        // common close-surface path to one AA evaluation and no LOD/parity math.
+        vec2 distanceToLine = abs(fract(tc + 0.5) - 0.5) / derivative;
+        coverage = 1.0-smoothstep(edgeStart,edgeEnd,min(distanceToLine.x,distanceToLine.y));
+    }else{
+        // Blend adjacent levels continuously without reducing coarse-grid
+        // density. A parity-only fade would clip AA fringes at cell boundaries.
+        float level = clamp(log2(4.0*density),0.0,18.0);
+        float spacing = exp2(floor(level));
+        vec2 coordinate = tc/spacing, width = derivative/spacing;
+        vec2 distanceToLine = abs(fract(coordinate+0.5)-0.5)/width;
+        vec2 nextDistance = abs(fract(coordinate*0.5+0.5)-0.5)/(width*0.5);
+        float coarse = 1.0-smoothstep(edgeStart,edgeEnd,min(distanceToLine.x,distanceToLine.y));
+        float nextCoarse = 1.0-smoothstep(edgeStart,edgeEnd,min(nextDistance.x,nextDistance.y));
+        coverage = mix(coarse,nextCoarse,smoothstep(0.0,1.0,fract(level)));
         if(min(derivative.x,derivative.y)<1.0){
-            vec2 fineDistance=abs(fract(tc+0.5)-0.5)/derivative;
-            vec2 fine=vec2(1.0)-smoothstep(vec2(max(0.0,0.75-feather*0.5)),vec2(0.75+feather*0.5),fineDistance);
-            fine*=vec2(1.0)-smoothstep(vec2(0.5),vec2(1.0),derivative);
-            coverage=max(max(fine.x,fine.y),coverage);
+            // Preserve alpha.133's selected fine grid until it is subpixel.
+            vec2 fineDistance = abs(fract(tc+0.5)-0.5)/derivative;
+            vec2 fine = vec2(1.0)-smoothstep(vec2(edgeStart),vec2(edgeEnd),fineDistance);
+            fine *= vec2(1.0)-smoothstep(vec2(0.5),vec2(1.0),derivative);
+            coverage = max(max(fine.x,fine.y),coverage);
         }
     }
     gl_FragColor = vec4(clamp(cvar_ftebroom_grid_color,0.0,1.0), vc.a * coverage * distanceFade);

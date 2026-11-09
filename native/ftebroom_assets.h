@@ -39,6 +39,7 @@ static std::filesystem::path settingsPath()
   return std::filesystem::u8path(path);
 }
 static void documentRequest(const std::string& next);
+static bool mapModsChooseResources();
 static void welcomeQaItem(const char* id);
 static void welcomeQaWindow(const char* id);
 #include "ftebroom_game_profile.h"
@@ -257,6 +258,9 @@ static bool mountAssets()
     if(gameProfile==3){base=ftebroom::quake2FallbackDirectory(path).generic_u8string();if(!base.empty())core->Print(("ReyondBroom: Quake II fallback resources: "+base+" (selected directory has priority)\n").c_str());}
     cvars->SetString("ftebroom_assetpath", base.empty()?normalized.c_str():base.c_str());
     cvars->SetString("ftebroom_modassetpath",gameProfile==1?gameRuntime().c_str():!base.empty()?normalized.c_str():"");
+    std::string mapPaths;
+    if(gameProfile==2&&gameMapModsKnown)for(const auto& directory:gameMapResourcePaths){if(!mapPaths.empty())mapPaths+=';';mapPaths+=directory.generic_u8string();}
+    cvars->SetString("ftebroom_mapassetpaths",mapPaths.c_str());
     std::ofstream settings(settingsPath(), std::ios::binary);
     settings << normalized;
     settings.close();
@@ -285,7 +289,7 @@ static void loadProjectCommand()
   // picker. mountAssets normalizes each game's own directory field.
   if(gameProfile>=3)std::snprintf(gameProfile==3?q2Mod:hlMod,1024,"%s",baseq3);
   else if(gameProfile==2){q1UseLibre=false;setupModChoice=1;std::snprintf(q1Mod,sizeof q1Mod,"%s",baseq3);}
-  if (!mountAssets())
+  if (!(gameClassic()?mapModsChooseResources():mountAssets()))
     core->Print(("ReyondBroom: " + assetError + "\n").c_str());
 }
 static void projectResourceFields()
@@ -324,7 +328,7 @@ static bool projectLoadRequested(bool clicked)
     }
     q1UseLibre=setupModChoice==0;
   }
-  return gameProfileSave()&&mountAssets();
+  return gameProfileSave()&&(gameClassic()?mapModsChooseResources():mountAssets());
 }
 static ImVec2 setupFinishCenter,setupLoadCenter;
 static void projectSetup()

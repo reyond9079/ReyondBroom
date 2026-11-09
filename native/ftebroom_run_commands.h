@@ -15,7 +15,7 @@ static nlohmann::json runUiState(){
 static void runLaunchConfiguredEngine(const RunEngineProfile& engine){
  if(documentFile.empty())throw std::runtime_error("Save the map before launching an engine.");
  auto oldStrict=runStrict;runStrict=true;
- try{auto vars=runWorkdirVariables();
+ try{if(gameProfile==2&&!gameMapModsError.empty())throw std::runtime_error(gameMapModsError);auto vars=runWorkdirVariables();
   if(runSelected>=0&&runSelected<int(runProfiles.size()))vars["WORK_DIR_PATH"]=ftebroom::profile::interpolate(runProfiles[runSelected].work,vars);
   else vars["WORK_DIR_PATH"]=vars["MAP_DIR_PATH"];
   auto plan=ftebroom::engineLaunchPlan(engine,vars,runApplicationDirectory());
@@ -34,14 +34,21 @@ static nlohmann::json runUiExecute(const nlohmann::json& q){
   }else if(action=="select"){auto n=q.at("selected").get<int>();runSelected=n>=0&&n<int(runProfiles.size())?n:-1;}
   else if(action=="settings"){
    auto nextMods=q.at("enabledMods").get<std::vector<std::string>>();
-   std::string joined;for(const auto& mod:nextMods){if(mod.find_first_of(";\r\n")!=std::string::npos)throw std::runtime_error("A mod name must not contain a separator or newline.");if(!joined.empty())joined+=';';joined+=mod;}
+   const auto joined=ftebroom::mapModString(nextMods);
    std::vector<RunEngineProfile> nextEngines;std::set<std::string> ids;
    for(const auto& e:q.at("engines")){auto p=runEngineFromJson(e);if(p.id.empty()||!ids.insert(p.id).second)throw std::runtime_error("Engine profile IDs must be unique.");nextEngines.push_back(std::move(p));}
    auto nextRoot=q.at("gameRoot").get<std::string>(),nextBase=q.at("baseMod").get<std::string>();auto nextVariables=q.at("variables").get<std::map<std::string,std::string>>();
    auto old=runWorkspaceJson();auto previousMods=runCommonVariables().at("MODS");if(!previousMods.empty())previousMods.erase(previousMods.begin());
    runGameRoot=std::move(nextRoot);runBaseMod=std::move(nextBase);runEnabledMods=std::move(nextMods);runModsConfigured=true;runVariables=std::move(nextVariables);runEngines=std::move(nextEngines);
-   if(!runSaveProfiles()){runReadWorkspace(old);throw std::runtime_error(runError);}
-   if(previousMods!=nlohmann::json(runEnabledMods)){runPendingMods=joined;runPendingModsMap=documentFile.u8string();runModsPending=true;command(("ftebroom_compile_mods "+organizationQuote(joined)+"\n").c_str());}
+   try {
+    if(gameProfile==2)mapModsMount(runEnabledMods);
+    if(!runSaveProfiles())throw std::runtime_error(runError);
+   }catch(const std::exception& error){
+    const auto message=std::string(error.what());runReadWorkspace(old);runSaveProfiles();
+    if(gameProfile==2)try{mapModsMount(previousMods.get<std::vector<std::string>>());}catch(...){}
+    throw std::runtime_error(message);
+   }
+   if(previousMods!=nlohmann::json(runEnabledMods)){if(!mapModsSet(runEnabledMods))throw std::runtime_error(gameMapModsError);}else mapModsTick();
   }else if(action=="run"||action=="test"){
    int n=q.at("selected");if(n<0||n>=int(runProfiles.size()))throw std::runtime_error("Select a compilation profile.");
    if(runActive||runExclusive)throw std::runtime_error("A compilation is already running.");

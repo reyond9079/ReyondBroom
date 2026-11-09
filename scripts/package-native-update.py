@@ -1,6 +1,7 @@
 """Rebuild a native editor distribution from a verified compatible base runtime.
 
-Plugins/game compilers stay pinned to the base distribution. SDL2 supplies a rebuilt engine and its sources. Current CSQC is rebuilt. Windows
+Plugins/game compilers stay pinned to the base distribution. A rebuilt engine
+and its sources can be supplied for each platform; SDL2 requires them. Current CSQC is rebuilt. Windows
 must supply the rebuilt audio helper used by the current multitrack editor.
 """
 from pathlib import Path
@@ -68,9 +69,14 @@ if a.engine:
     if not windows:
         shutil.copy2(a.engine, root/'tools/runtimes/fteqw-preview64')
     # Use the actual patched source files; exclude Git metadata and build output.
-    tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=a.engine_source).decode().split('\0')
+    tracked = set(subprocess.check_output(['git', 'ls-files', '-z'], cwd=a.engine_source).decode().split('\0'))
+    # Engine patches may add source files that are absent from the pinned Git
+    # tree. Include these exact build inputs without sweeping in build output.
+    for patch in (src/'patches').glob('*.patch'):
+        tracked.update(line[6:].split('\t')[0] for line in patch.read_text(encoding='utf-8').splitlines()
+                       if line.startswith('+++ b/'))
     with zipfile.ZipFile(sources/'sources/fteqw-source.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
-        for name in tracked:
+        for name in sorted(tracked):
             if name and (a.engine_source/name).is_file():
                 archive.write(a.engine_source/name, name)
 subprocess.run(['strip', str(root / module_name)], check=True)
@@ -97,7 +103,7 @@ revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=src, text=T
 compiler = subprocess.check_output(['g++', '--version'], text=True).splitlines()[0]
 info = (f'ReyondBroom {a.version}\nPlatform: {a.platform}\nEditor revision: {revision}\n'
         f'Editor compiler: {compiler}\nModule SHA256: {sha(root / module_name)}\n'
-        + ('SDL2 engine rebuilt from pinned FTE sources with the current editor patch stack.\n' if a.engine else 'Engine retained from the verified base runtime.\n')+
+        + ('Engine rebuilt from pinned FTE sources with the current editor patch stack.\n' if a.engine else 'Engine retained from the verified base runtime.\n')+
         'Plugins and game compilers retained from the verified base runtime.\n'
         + ('Windows audio helper rebuilt from pinned sources.\n' if windows else 'System FFmpeg is used through the bundled wrapper.\n'))
 (root / 'build-info.txt').write_text(info)

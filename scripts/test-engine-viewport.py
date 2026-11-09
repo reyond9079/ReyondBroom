@@ -72,6 +72,7 @@ def start(label):
  globals()['wait']=wait
  wait(lambda:live()['game']=='quake1' and len(live()['views'])==4)
  ui=NativeInput(process,statepath,live,wait,out,focus_required=True);ui.position()
+ ui.assert_windows_mouse_activation('initial-'+label)
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
  ui.move(600,300);ui.settle()
 def stop():
@@ -121,6 +122,7 @@ try:
  for i,name in enumerate(names):
   # Select each persisted profile, then press its actual Compile button.
   click('profile/'+str(i))
+  wait(lambda:live()['selected']==i)
   click('compile')
   wait(lambda:live()['running'] or live()['error'] or 'Completed successfully.' in live()['log']);wait(lambda:not live()['running'],90)
   expect(not live()['error'],name+'_pipeline_no_error: '+live()['error'])
@@ -130,6 +132,10 @@ try:
    # Poll a complete parsed record, just as we poll the live editor state.
    receipt=out/f'receipt-{i}.json';observed=wait(lambda:json.loads(receipt.read_text()))
    expect(observed['cwd'].replace('\\','/')==launchdir.as_posix() and observed['argv'][3:]==['-basedir',game.as_posix(),'-game',mod,'+map',mapname],name+'_actual_argv_and_working_directory')
+   # Receipt creation precedes process/console teardown. Do not race that
+   # teardown with the next profile click; real engines intentionally stay up.
+   wait(lambda:'Engine exited with code 0' in live()['log'])
+   ui.assert_windows_mouse_activation('after-engine-'+str(i))
   shot('compiled-engine-'+str(i))
  saved=read_ui_json(store)['games']['quake1']['engines']
  expect(saved==engines,'engine_path_arguments_workdir_map_survive_restart')

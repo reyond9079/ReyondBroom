@@ -33,6 +33,20 @@ class NativeInput:
    self.user.ClientToScreen.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.POINT)]
    self.user.GetClientRect.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.RECT)]
    self.user.GetWindowThreadProcessId.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.DWORD)];self.user.GetWindowThreadProcessId.restype=wintypes.DWORD
+   class GuiThreadInfo(ctypes.Structure):
+    _fields_=[('cbSize',wintypes.DWORD),('flags',wintypes.DWORD),
+              ('hwndActive',wintypes.HWND),('hwndFocus',wintypes.HWND),
+              ('hwndCapture',wintypes.HWND),('hwndMenuOwner',wintypes.HWND),
+              ('hwndMoveSize',wintypes.HWND),('hwndCaret',wintypes.HWND),('rcCaret',wintypes.RECT)]
+   self.GuiThreadInfo=GuiThreadInfo
+   self.user.GetGUIThreadInfo.argtypes=[wintypes.DWORD,ctypes.POINTER(GuiThreadInfo)]
+   self.user.GetGUIThreadInfo.restype=wintypes.BOOL
+   self.user.GetForegroundWindow.restype=wintypes.HWND
+   self.user.IsChild.argtypes=[wintypes.HWND,wintypes.HWND];self.user.IsChild.restype=wintypes.BOOL
+   self.user.GetCursorPos.argtypes=[ctypes.POINTER(wintypes.POINT)];self.user.GetCursorPos.restype=wintypes.BOOL
+   self.user.WindowFromPoint.argtypes=[wintypes.POINT];self.user.WindowFromPoint.restype=wintypes.HWND
+   self.user.SendMessageTimeoutW.argtypes=[wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM,wintypes.UINT,wintypes.UINT,ctypes.POINTER(ctypes.c_size_t)]
+   self.user.SendMessageTimeoutW.restype=ctypes.c_ssize_t
    self.user.AttachThreadInput.argtypes=[wintypes.DWORD,wintypes.DWORD,wintypes.BOOL]
    self.user.VkKeyScanW.argtypes=[wintypes.WCHAR];self.user.VkKeyScanW.restype=ctypes.c_short
   else:
@@ -73,6 +87,21 @@ class NativeInput:
     return True
    u.EnumWindows(enum,0);assert self.hwnd,'Editor window missing'
    self.Desktop(backend='win32').window(handle=self.hwnd).set_focus()
+   self.wait(self.windows_focused)
+   # FTE queues WM_SETFOCUS to its engine thread. An inactive-window click
+   # returns MA_ACTIVATEANDEAT and loses its DOWN edge. Foreground ownership,
+   # a responsive window thread, then fresh engine ticks acknowledge activation
+   # before we issue any input; observing UI redraws alone cannot do this.
+   result=ctypes.c_size_t()
+   assert u.SendMessageTimeoutW(self.hwnd,0,0,0,2,5000,ctypes.byref(result)), 'Editor window thread is unresponsive'
+   focus=self.focus_state()
+   if focus is not None:
+    for _ in range(2):
+     sequence=focus['sequence']
+     focus=self.wait(lambda:(s if (s:=self.read_focus()) and s['sequence']!=sequence else None))
+   else:self.settle()
+   self.wait(self.windows_focused)
+   self.windows_receipt('activated')
    point=t.POINT();u.ClientToScreen(self.hwnd,ctypes.byref(point));rect=t.RECT();u.GetClientRect(self.hwnd,ctypes.byref(rect))
    size=self.live()['display'];self.scale=(rect.right/size[0],rect.bottom/size[1]);return point.x,point.y
   for w in self.d.screen().root.query_tree().children:
@@ -80,7 +109,43 @@ class NativeInput:
     self.window=w;point=self.d.screen().root.translate_coords(w,0,0);return point.x,point.y
   raise AssertionError('Editor window missing')
 
+ def windows_focus(self):
+  info=self.GuiThreadInfo();info.cbSize=ctypes.sizeof(info)
+  thread=self.user.GetWindowThreadProcessId(self.hwnd,None)
+  assert self.user.GetGUIThreadInfo(thread,ctypes.byref(info)), 'Cannot read editor thread focus'
+  return {'foreground':self.user.GetForegroundWindow(),'active':info.hwndActive,'focus':info.hwndFocus}
+
+ def windows_focused(self):
+  state=self.windows_focus()
+  belongs=lambda window:window==self.hwnd or (window and self.user.IsChild(self.hwnd,window))
+  return state['foreground']==self.hwnd and belongs(state['active']) and belongs(state['focus'])
+
+ def windows_receipt(self,stage,**extra):
+  point=self.types.POINT();assert self.user.GetCursorPos(ctypes.byref(point))
+  state={'stage':stage,'time_ns':time.time_ns(),'editor':self.hwnd,**self.windows_focus(),
+         'cursor':[point.x,point.y],'under_cursor':self.user.WindowFromPoint(point),**extra}
+  with (self.output/'windows-input-receipts.jsonl').open('a') as stream:stream.write(json.dumps(state)+'\n')
+  return state
+
+ def assert_windows_mouse_activation(self,stage):
+  if os.name!='nt':return
+  self.position()
+  # Check the real engine WndProc policy without injecting a button event or
+  # invoking an editor callback. Windows must not eat a DOWN addressed to an
+  # already active editor, including after an external console process exits.
+  result=ctypes.c_size_t()
+  assert self.user.SendMessageTimeoutW(self.hwnd,0x21,self.hwnd,1|(0x201<<16),2,5000,ctypes.byref(result)), 'Mouse activation query timed out'
+  report={'stage':stage,'time_ns':time.time_ns(),'editor':self.hwnd,
+          **self.windows_focus(),'message':'WM_MOUSEACTIVATE','hit_test':'HTCLIENT',
+          'button_message':'WM_LBUTTONDOWN','result':result.value}
+  path=self.output/'windows-mouse-activation.json'
+  rows=json.loads(path.read_text()) if path.exists() else []
+  rows.append(report);path.write_text(json.dumps(rows,indent=2)+'\n')
+  assert result.value==1, ('Active editor must return MA_ACTIVATE, without eating the click',report)
+
  def strokes(self,text):
+  self.position()
+  self.windows_receipt('before-keys',length=len(text))
   u=self.user;target=u.GetWindowThreadProcessId(self.hwnd,None);current=ctypes.windll.kernel32.GetCurrentThreadId()
   assert u.AttachThreadInput(current,target,True)
   state=(ctypes.c_ubyte*256)();assert u.GetKeyboardState(state);initial=bytes(state);stack=[]
@@ -126,6 +191,11 @@ class NativeInput:
   for mod in mods:self.mod(mod,True)
   try:
    if os.name=='nt':
+    self.wait(self.windows_focused)
+    receipt=self.windows_receipt('before-click',button=button)
+    target=receipt['under_cursor']
+    assert receipt['foreground']==self.hwnd, 'Editor lost OS foreground ownership before click'
+    assert target==self.hwnd or (target and self.user.IsChild(self.hwnd,target)), 'Click target is covered by another OS window'
     self.user.mouse_event(2 if button==1 else 8 if button==3 else 32,0,0,0,0)
     # Observe fresh UI frames with the button down before releasing it. A
     # fixed hold can otherwise fit entirely between slow software-rendered

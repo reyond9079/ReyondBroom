@@ -8,7 +8,7 @@ p.add_argument('--qa',type=Path,required=True)
 p.add_argument('--release',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
 a=p.parse_args();assert not a.output.exists();a.output.mkdir(parents=True)
-allowed={'.json','.png','.log','.map','.cfg','.txt','.sha256'}
+allowed={'.json','.jsonl','.png','.log','.map','.cfg','.txt','.sha256'}
 entries={};total=0
 for root,prefix in [(a.qa,'qa'),(a.release,'release-sidecars')]:
  if not root.exists():continue

@@ -26,6 +26,7 @@ static void q1FindWads(bool strict=false){
   char builtin[4096]={};if(gameWad()&&files->NativePath(gameProfile==4?"halflife-editor.wad":"quake1-editor.wad",(fs_relative)5,builtin,sizeof builtin))sources.push_back(std::filesystem::u8path(builtin));
   std::vector<std::string> roots={q1Authoring(),gameRuntime()};if(roots[0]==roots[1])roots.pop_back();
   auto base=q1BaseDirectory();if(!base.empty())roots.insert(roots.begin(),base);
+  if(gameMapModsKnown&&!gameMapResourcePaths.empty()){roots.clear();for(const auto& path:gameMapResourcePaths)roots.push_back(path.u8string());}
   for(const auto& root:roots){if(root.empty())continue;std::vector<std::filesystem::path> archives,loose;
     for(std::filesystem::recursive_directory_iterator it(std::filesystem::u8path(root),std::filesystem::directory_options::skip_permission_denied),end;it!=end;++it){
       const auto& e=*it;auto leaf=e.path().filename().u8string();

@@ -80,23 +80,17 @@ static void runLoad(){
  }
 }
 static bool runSaveProfiles(){runLoad();return runStoreInitialized&&runWriteStore();}
+#include "ftebroom_map_mod_state.h"
 static nlohmann::json runCommonVariables(){
  using J=nlohmann::json;J vars=runVariables;
  auto runtime=gameRuntime();if(runtime.empty())runtime=baseq3;
  auto mod=std::filesystem::u8path(runtime).lexically_normal();if(!mod.empty()&&mod.filename().empty())mod=mod.parent_path();
- auto root=runGameRoot.empty()?(gameProfile==0&&!q3Root.empty()?q3Root:mod.parent_path().u8string()):runGameRoot;
- auto mods=J::array();mods.push_back(runBaseMod);
- std::string serialized,version,mapMods;
- bool live=false;if(qcQuery(7,0,serialized)){std::istringstream stream(serialized);live=bool(stream>>version>>std::quoted(mapMods))&&version=="RBMODS1";}
- if(runModsPending&&runPendingModsMap==documentFile.u8string()){
-  if(live&&mapMods==runPendingMods)runModsPending=false;else{live=true;mapMods=runPendingMods;}
- }
- if(live){for(const auto& name:ftebroom::profile::splitMods(mapMods))mods.push_back(name);}
- else if(!runModsConfigured){if(!mod.filename().empty()&&mod.filename().u8string()!=runBaseMod)mods.push_back(mod.filename().u8string());}
- else for(const auto& name:runEnabledMods)mods.push_back(name);
+ auto root=runGameRoot.empty()?(gameProfile==2?mapModsRoot().u8string():gameProfile==0&&!q3Root.empty()?q3Root:mod.parent_path().u8string()):runGameRoot;
+ auto mods=J::array();mods.push_back(runBaseMod);for(const auto& name:mapModsForDocument())mods.push_back(name);
  vars["MAP_BASE_NAME"]=documentFile.stem().u8string();vars["GAME_DIR_PATH"]=root;vars["MODS"]=mods;
  return vars;
 }
+
 static std::filesystem::path runApplicationDirectory(){
 #ifdef _WIN32
  std::vector<wchar_t> path(32768);auto n=GetModuleFileNameW(nullptr,path.data(),DWORD(path.size()));if(n&&n<path.size())return std::filesystem::path(std::wstring(path.data(),n)).parent_path();

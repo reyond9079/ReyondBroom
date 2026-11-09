@@ -249,6 +249,7 @@ static void runBegin(const RunProfile& profile,bool test=false)
   if(documentFile.empty() && !profile.launch && profile.name!="Export selected BSP model"){runError="Save the map before running a profile.";return;}
   try
   {
+    if(gameProfile==2&&!gameMapModsError.empty())throw std::runtime_error(gameMapModsError);
     runningProfile=lastRunProfile=profile;runStrict=profile.trenchBroom;runTesting=test;
     activeVariables=runVariables;
     if(runStrict){
@@ -352,11 +353,30 @@ static void runFileTask(int kind,const std::string& source,const std::string& de
     }
   }
 }
+static bool runSnapshotHasWad(const std::string& text){
+  // QC serializes each entity property on its own line. Inspect worldspawn
+  // only, and retain both WAD key spellings accepted by Quake compilers.
+  std::istringstream rows(text);std::string line;int depth=0;
+  while(std::getline(rows,line)){
+    auto first=line.find_first_not_of(" \t\r"),last=line.find_last_not_of(" \t\r");
+    if(first==line.npos)continue;auto row=line.substr(first,last-first+1);
+    if(row=="{"){++depth;continue;}
+    if(row=="}"){if(--depth==0)break;continue;}
+    if(depth==1){std::istringstream property(row);std::string key,value;
+      if(property>>std::quoted(key)>>std::quoted(value))
+        if((key=="wad"||key=="_wad")&&!value.empty())return true;
+    }
+  }
+  return false;
+}
 static void runExportTrenchSnapshot(const RunTask& task,const std::filesystem::path& target){
   auto text=q1Read(documentPath("data/export-map.map"));
-  // Format conversion only; resource staging/model/contents transformations stay in
-  // the legacy build adapter, not in a TrenchBroom Export Map task.
-  if(gameWad())text=ftebroom::quake1::map(text,gameProfile==2&&q1MapFormat==0,"",false,false);
+  // Save supplies the indexed WAD list for a newly authored map, but does not
+  // rewrite its live QC worldspawn. Give immediate Export/Compile the same
+  // default resources without changing any explicitly authored WAD references.
+  // Texture staging/model/contents transformations stay in the legacy adapter.
+  if(gameWad())text=ftebroom::quake1::map(text,gameProfile==2&&q1MapFormat==0,
+    gameProfile==2&&!runSnapshotHasWad(text)?q1WadList():std::string{},false,false);
   auto entity=task.entityToAdd;
   if(!entity.is_null())for(auto it=runCameraEntity.begin();it!=runCameraEntity.end();++it){bool found=false;
     for(auto& p:entity)if(p.at("key")==it.key()){p["value"]=it.value();found=true;}

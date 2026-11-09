@@ -28,8 +28,8 @@ static uint64_t documentGeneration=0;
 static std::chrono::steady_clock::time_point saveProfileStarted;
 static bool savingDocument, savingBackup, savingExport, confirmDocument;
 static bool savePakDetached;
-static std::string savePakBase,savePakMod;
-static void restorePakMounts(){if(!savePakDetached)return;cvars->SetString("ftebroom_assetpath",savePakBase.c_str());cvars->SetString("ftebroom_modassetpath",savePakMod.c_str());savePakDetached=false;command("fs_restart\n");}
+static std::string savePakBase,savePakMod,savePakMapPaths;
+static void restorePakMounts(){if(!savePakDetached)return;cvars->SetString("ftebroom_assetpath",savePakBase.c_str());cvars->SetString("ftebroom_modassetpath",savePakMod.c_str());cvars->SetString("ftebroom_mapassetpaths",savePakMapPaths.c_str());savePakDetached=false;command("fs_restart\n");}
 static bool exportRequest;
 static bool objRequest, fileBrowserObj, savingObj;
 static std::filesystem::path objDestination;
@@ -74,6 +74,8 @@ static std::string documentMetadata(std::string bytes)
   const char* format=documentTerrain?"fte-terrain":gameProfile>=3?"valve220":gameProfile==2?(q1MapFormat?"valve220":"quake-standard"):"quake3";
   return std::string("// ReyondBroom profile=")+profile+" format="+format+"\n"+bytes;
 }
+static void mapModsOpenSource(const std::string& source);
+static std::string mapModsPrepareScene(const std::string& source);
 static void documentSelectProfile(const std::string& bytes)
 {
   auto header=ftebroom::mapProfile(bytes);int selected=header.profile;
@@ -82,7 +84,7 @@ static void documentSelectProfile(const std::string& bytes)
   if(selected<0 || selected==gameProfile)return;
   if(gameProfile<2)q3Root=baseq3;
   q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();
-  gameProfile=selected;
+  gameProfile=selected;gameMapModsKnown=false;gameMapResourcePaths.clear();gameMapResourceRoot.clear();
   std::snprintf(baseq3,sizeof baseq3,"%s",gameProfile==3?q2Mod:gameWad()?q1Authoring().c_str():q3Root.c_str());
   gameProfileSave();if(!mountAssets())setupNeeded=true;
 }
@@ -160,7 +162,7 @@ static void documentProceed()
   else if (next.rfind("__profile:",0)==0) {
     int selected=std::atoi(next.c_str()+10);if(selected<0||selected>4)return;
     if(next.size()>=10 && next.compare(next.size()-10,10,":resources")==0)gameResourcesRequested=true;
-    if(gameProfile<2)q3Root=baseq3;gameProfile=selected;
+    if(gameProfile<2)q3Root=baseq3;gameProfile=selected;gameMapModsKnown=false;gameMapResourcePaths.clear();gameMapResourceRoot.clear();
     std::snprintf(baseq3,sizeof baseq3,"%s",selected==3?q2Mod:(selected==2||selected==4)?q1Authoring().c_str():q3Root.c_str());
     q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();
     gameProfileSave();if(!mountAssets())setupNeeded=true;
@@ -169,7 +171,7 @@ static void documentProceed()
     std::string scene=q1Read(documentPath(selected>=2?"maps/start-quake1.map":"maps/start.map"));
     if(selected!=0){size_t at=0;while((at=scene.find("info_player_deathmatch",at))!=scene.npos){scene.replace(at,22,"info_player_start");at+=17;}}
     if(selected==2){size_t at=0;while((at=scene.find("ftebroom/grid",at))!=scene.npos){scene.replace(at,13,"fb_grey");at+=7;}}
-    std::ofstream(documentPath("maps/_ftebroom_profile_start.map"),std::ios::binary)<<documentMetadata(scene);
+    std::ofstream(documentPath("maps/_ftebroom_profile_start.map"),std::ios::binary)<<documentMetadata(mapModsPrepareScene(scene));
     action("mapedit maps/_ftebroom_profile_start.map\n");
   }
   else if(next=="__tour")tourBegin();
@@ -188,6 +190,7 @@ static void documentProceed()
       const auto source=q1Read(pendingDocumentFile);
       profileLoad("map_read",prepareStarted);
       documentSelectProfile(source);
+      mapModsOpenSource(source);
       if(gameProfile==3)q2ReferenceMapMaterials(source);
       if(gameWad()){std::string member;std::filesystem::path archive;ftebroom::pak::split(pendingDocumentFile,archive,member);bool changed=archive!=q1DocumentPak;q1DocumentPak=archive;if(gameProfile==2)q1MapFormat=ftebroom::quake1::valveMap(source)?1:0;if(q1DiscoverWads(source,pendingDocumentFile)||changed){gameProfileSave();mountAssets();}}
       pendingDocumentAlias =
@@ -287,8 +290,8 @@ static void documentSaveFinished()
     saveNativeTarget.empty() ? documentPath(saveDestination) : saveNativeTarget;
   std::filesystem::path pakArchive;std::string pakMember;
   if(!savePakDetached&&ftebroom::pak::split(target,pakArchive,pakMember)){
-    char base[4096]={},mod[4096]={};cvars->GetString("ftebroom_assetpath",base,sizeof base);cvars->GetString("ftebroom_modassetpath",mod,sizeof mod);savePakBase=base;savePakMod=mod;
-    savePakDetached=true;savingDocument=true;cvars->SetString("ftebroom_assetpath","");cvars->SetString("ftebroom_modassetpath","");command("fs_restart\nftebroom_save_finish\n");return;
+    char base[4096]={},mod[4096]={},paths[32768]={};cvars->GetString("ftebroom_assetpath",base,sizeof base);cvars->GetString("ftebroom_modassetpath",mod,sizeof mod);cvars->GetString("ftebroom_mapassetpaths",paths,sizeof paths);savePakBase=base;savePakMod=mod;savePakMapPaths=paths;
+    savePakDetached=true;savingDocument=true;cvars->SetString("ftebroom_assetpath","");cvars->SetString("ftebroom_modassetpath","");cvars->SetString("ftebroom_mapassetpaths","");command("fs_restart\nftebroom_save_finish\n");return;
   }
   try
   {
@@ -723,7 +726,8 @@ static void documentFileBrowser()
           std::filesystem::create_directories(target.parent_path());
           const char* profile=gameProfileKey(newMapProfile);
           std::ofstream out(target,std::ios::binary);
-          out<<"// ReyondBroom profile="<<profile<<" format="<<(newMapProfile>=3?"valve220":newMapProfile==2?(q1MapFormat?"valve220":"quake-standard"):"quake3")<<"\n{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \""<<(newMapProfile!=0?"info_player_start":"info_player_deathmatch")<<"\"\n\"origin\" \"0 0 64\"\n}\n";
+          std::ostringstream scene;scene<<"// ReyondBroom profile="<<profile<<" format="<<(newMapProfile>=3?"valve220":newMapProfile==2?(q1MapFormat?"valve220":"quake-standard"):"quake3")<<"\n{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \""<<(newMapProfile!=0?"info_player_start":"info_player_deathmatch")<<"\"\n\"origin\" \"0 0 64\"\n}\n";
+          out<<mapModsPrepareScene(scene.str());
           out.close();if(!out)throw std::runtime_error("Cannot create map.");
           documentNext="@"+target.u8string();documentProceed();fileBrowserNew=false;ImGui::CloseCurrentPopup();
         }catch(const std::exception& e){documentError=e.what();}

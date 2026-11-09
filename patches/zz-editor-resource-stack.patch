@@ -1,0 +1,84 @@
+diff --git a/engine/common/fs.c b/engine/common/fs.c
+--- a/engine/common/fs.c
++++ b/engine/common/fs.c
+@@ -240,6 +240,7 @@
+ static cvar_t fs_game				= CVARAFCD	("fs_game"/*q3*/, "", "game"/*q2/qs*/, CVAR_NOSAVE|CVAR_NORESET, fs_game_callback, "Provided for Q2 compat. Contains the subdir of the current mod.");
+ static cvar_t ftebroom_assetpath = CVARFD("ftebroom_assetpath", "", CVAR_NOTFROMSERVER|CVAR_NOSAVE, "Read-only FTEBroom asset directory.");
+ static cvar_t ftebroom_modassetpath = CVARFD("ftebroom_modassetpath", "", CVAR_NOTFROMSERVER|CVAR_NOSAVE, "Read-only FTEBroom mod resource overrides.");
++static cvar_t ftebroom_mapassetpaths = CVARFD("ftebroom_mapassetpaths", "", CVAR_NOTFROMSERVER|CVAR_NOSAVE, "Ordered read-only map resource directories, separated by semicolons (base first).");
+ static cvar_t fs_gamepath			= CVARAFD	("fs_gamepath"/*q3ish*/, "", "fs_gamedir"/*q2*/, CVAR_NOUNSAFEEXPAND|CVAR_NOSET|CVAR_NOSAVE, "Provided for Q2/Q3 compat. System path of the active gamedir.");
+ static cvar_t fs_basepath			= CVARAFD	("fs_basepath"/*q3*/,    "", "fs_basedir"/*q2*/, CVAR_NOUNSAFEEXPAND|CVAR_NOSET|CVAR_NOSAVE, "Provided for Q2/Q3 compat. System path of the base directory.");
+ static cvar_t fs_homepath			= CVARAFD	("fs_homepath"/*q3ish*/, "", "fs_homedir"/*q2ish*/, CVAR_NOUNSAFEEXPAND|CVAR_NOSET|CVAR_NOSAVE, "Provided for Q2/Q3 compat. System path of the base directory.");
+@@ -4510,6 +4511,50 @@
+ 		handle = VFSOS_OpenPath(NULL, NULL, dir, dir, "");
+ 
+ 	return FS_AddPathHandle(oldpaths, puredir, dir, handle, "", flags|keptflags|SPF_ISDIR, loadstuff);
++}
++// The editor owns writable files/configs. Map resources only supply assets;
++// they are added before manifest paths so editor overlays retain priority.
++static void FS_AddEditorResourceDirectories(searchpath_t **oldpaths, unsigned int reloadflags)
++{
++	const char *entry = ftebroom_mapassetpaths.string;
++	unsigned int index = 0;
++	if (*entry)
++	{
++		while (*entry)
++		{
++			const char *end = strchr(entry, ';');
++			size_t length = end ? (size_t)(end-entry) : strlen(entry);
++			char directory[MAX_OSPATH], puredir[64];
++			if (length && length < sizeof(directory))
++			{
++				memcpy(directory, entry, length);
++				directory[length] = 0;
++				// Do not reinterpret a malformed relative path against the editor cwd.
++				if (directory[0] == '/' || directory[0] == '\\' ||
++					(length >= 3 && directory[1] == ':' && (directory[2] == '/' || directory[2] == '\\')))
++				{
++					Q_snprintfz(puredir, sizeof(puredir), "ftebroom-map-%u", index++);
++					FS_AddSingleGameDirectory(oldpaths, puredir, directory,
++						reloadflags, SPF_PRIVATE|SPF_COPYPROTECTED);
++				}
++				else
++					Con_Printf("Ignoring relative editor resource directory: %s\n", directory);
++			}
++			else if (length)
++				Con_Printf("Ignoring an editor resource directory longer than MAX_OSPATH\n");
++			if (!end)break;
++			entry = end+1;
++		}
++	}
++	else
++	{
++		if (*ftebroom_assetpath.string)
++			FS_AddSingleGameDirectory(oldpaths, "baseq3", ftebroom_assetpath.string,
++				reloadflags, SPF_PRIVATE|SPF_COPYPROTECTED);
++		if (*ftebroom_modassetpath.string)
++			FS_AddSingleGameDirectory(oldpaths, "ftebroom-mod", ftebroom_modassetpath.string,
++				reloadflags, SPF_PRIVATE|SPF_COPYPROTECTED);
++	}
+ }
+ static void FS_AddGameDirectory (searchpath_t **oldpaths, const char *puredir, unsigned int loadstuff, unsigned int flags)
+ {
+@@ -5337,12 +5382,7 @@
+ #ifdef NQPROT
+ 	standard_quake = true;
+ #endif
+-	if (*ftebroom_assetpath.string)
+-		FS_AddSingleGameDirectory(&oldpaths, "baseq3", ftebroom_assetpath.string,
+-			reloadflags, SPF_PRIVATE|SPF_COPYPROTECTED);
+-	if (*ftebroom_modassetpath.string)
+-		FS_AddSingleGameDirectory(&oldpaths, "ftebroom-mod", ftebroom_modassetpath.string,
+-			reloadflags, SPF_PRIVATE|SPF_COPYPROTECTED);
++	FS_AddEditorResourceDirectories(&oldpaths, reloadflags);
+ 	for (i = 0; i < countof(fs_manifest->gamepath); i++)
+ 	{
+ 		char *dir = fs_manifest->gamepath[i].path;
+@@ -8496,6 +8536,7 @@
+ 	Cvar_Register(&fs_game, "Filesystem");
+ 	Cvar_Register(&ftebroom_assetpath, "Filesystem");
+ 	Cvar_Register(&ftebroom_modassetpath, "Filesystem");
++	Cvar_Register(&ftebroom_mapassetpaths, "Filesystem");
+ 	Cvar_Register(&fs_gamepath, "Filesystem");
+ 	Cvar_Register(&fs_basepath, "Filesystem");
+ 	Cvar_Register(&fs_homepath, "Filesystem");

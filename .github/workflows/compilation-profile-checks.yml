@@ -50,11 +50,12 @@ jobs:
           # referenced by the current PR after a test-driver-only update.
           git fetch --no-tags --depth=1 origin $revision
           if ($LASTEXITCODE) { throw 'Cannot retrieve the prepared editor source revision' }
-          git diff --exit-code $revision HEAD -- native qc tests/compilation-profile-probe.cpp
+          git diff --exit-code $revision HEAD -- native qc tests/compilation-profile-probe.cpp patches scripts/build-editor-engine.sh scripts/apply-engine-patches.py
           if ($LASTEXITCODE) { throw 'Prepared C++/CSQC/probe sources differ: rebuild the editor first' }
           Copy-Item prepared/fteplug_ftebroom_x64.dll bundle/ReyondBroom-Windows-x64 -Force
           Copy-Item prepared/ftebroom/csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom -Force
           Copy-Item prepared/tools/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools -Force
+          Copy-Item prepared/bin/fteqw64.exe bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe -Force
           gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
           if ($LASTEXITCODE) { throw 'Renderer download failed' }
           if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Renderer checksum mismatch' }
@@ -235,7 +236,11 @@ jobs:
           msystem: MINGW64
           path-type: inherit
           update: false
-          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make mingw-w64-x86_64-zlib git make unzip
+          install: >-
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libpng
+            mingw-w64-x86_64-libjpeg-turbo git curl diffutils tar make unzip
       - name: Verify and unpack base runtime and SDK
         shell: msys2 {0}
         run: |
@@ -259,6 +264,11 @@ jobs:
           cp runtime/glsl/* bundle/ReyondBroom-Windows-x64/ftebroom/glsl/
           cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
           git rev-parse HEAD > bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
+      - name: Build the Windows engine with the current editor patch stack
+        shell: msys2 {0}
+        run: |
+          bash scripts/build-editor-engine.sh Windows-x64 deps/editor-engine
+          cp deps/editor-engine/engine/release-editor/fteglqw64.exe bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe
       # Test-machine renderer only. The editor distribution does not gain a Mesa dependency.
       - name: Install a pinned software OpenGL renderer for the headless Windows host
         shell: pwsh
@@ -286,6 +296,7 @@ jobs:
             bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
             bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
             bundle/ReyondBroom-Windows-x64/tools/compilation-profile-probe.exe
+            bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe
             bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
       - name: Configure a usable desktop for the UI atlas
         shell: pwsh

@@ -25,6 +25,12 @@ the camera. The viewport opens in **Game Preview**, using the active profile's
 model limits and the same geometry preparation as **Add to Map**. It shows the
 target format and final mesh counts. Choose **LOD0–LOD2** from the same menu to
 inspect the editable source. Preview lighting is independent of map lighting.
+In an authoring LOD, click a woody branch to select it. The properties panel
+offers length, tilt, thickness, and removal. Edits follow the same branch when
+the project is reopened or regenerated with the same seed.
+New broadleaf and conifer presets smooth the collars of major branches and
+share one branching plan between LODs. Older projects can enable the new
+settings in **Advanced**.
 Choose perspective/orthographic, textured, solid, normals, UV or
 wireframe display and inspect each of the three actual LOD meshes. Panes resize;
 small windows switch to tabs. Both Modern Light and Modern Dark use the normal
@@ -33,7 +39,10 @@ editor appearance settings.
 **Randomize** changes the deterministic seed without changing species.
 **Keep variation** records that seed in the project; its thumbnail selects it
 again. The Textures/UV tab exposes the generated albedo, normal and ORM atlas
-and a UV inspector. Advanced material controls accept a leaf albedo image.
+and a UV inspector. Advanced material controls accept separate leaf, bark
+and cut-wood albedo images. Bark repeats can be adjusted around the stem and
+in world units along it. The viewport's **Normal map** mode displays the atlas
+on the model.
 
 ## Projects and exports
 
@@ -104,8 +113,10 @@ with UV gutters; normals, indices, bounds and budgets are validated.
 The native preview supports depth-tested, two-sided alpha cutouts with baked
 directional vertex shading and an AO approximation. It is not a full PBR or
 shadow-map renderer. GLB retains normal, roughness and AO maps for supporting
-renderers. Wind animates the authoring preview; exports preserve the undeformed
-static pose. Runtime wind weights, HDRI, dynamic plant shadows, whole-tree
+renderers. Wind animates the authoring preview. For FTE Custom game, enable
+**Wind in FTE Play mod** to stage a height-based GLSL sway with the placed
+model. Portable and classic profile exports use the undeformed static pose.
+HDRI, dynamic plant shadows, whole-tree
 impostor baking, collision meshes, surface-following vines and vegetation scatter
 are not implemented. Distant foliage uses crossed cards, rather than a baked
 whole-plant impostor. Procedural materials are suitable starting assets, not a

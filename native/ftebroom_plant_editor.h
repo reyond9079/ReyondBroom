@@ -48,6 +48,7 @@ struct PlantState {
   std::shared_ptr<plants::Textures> previewMaps;
   bool auxiliaryMapsUploaded=false,checkerUploaded=false;
   uint64_t revision=0;
+  uint64_t selectedBranch=0;
   bool pending=false;
   std::vector<plants::Json> undo,redo;
   ImGuiID gesture=0;
@@ -111,10 +112,34 @@ static std::string plantTextureKey(const plants::Project& d) {
   auto& p=d.p;return plants::Json{{"generator",d.generator},{"foliageMode",d.p.foliageMode},{"barkPattern",p.barkPattern},{"serration",p.serration},{"needleForm",p.needleForm},{"evergreen",p.evergreen},{"leaflets",p.leaflets},{"organ",p.organ},{"seed",d.seed},{"species",d.species},{"family",int(d.family)},{"bark",p.bark},{"leaf",p.leaf},{"flower",p.flower},
     {"shape",p.leafShape},{"profile",p.leafProfile},{"season",p.season},{"quality",p.quality},{"dryness",p.dryness},{"roughness",p.roughness},{"ao",p.ao},{"variation",p.variation},{"ribs",p.ribs},{"gills",p.gills},{"override",d.texture}}.dump();
 }
+static auto plantTextureFiles(plants::Project& doc) {
+  struct Slot {const char* key;const char* stem;std::string* file;};
+  return std::array<Slot,3>{{
+    {"texture","leaf",&doc.texture},{"barkTexture","bark",&doc.barkTexture},{"cutTexture","cut",&doc.cutTexture}}};
+}
+struct PlantTextureInputs {
+  plants::Image leaf,bark,cut;
+};
+static PlantTextureInputs plantReadTextures(const plants::Project& doc,std::string* cacheKey=nullptr) {
+  auto read=[&](const std::string& name){
+    if(cacheKey)*cacheKey+=":";
+    if(name.empty())return plants::Image{};
+    const auto bytes=q1Read(std::filesystem::u8path(name));
+    if(cacheKey)*cacheKey+=std::to_string(plants::hash(bytes));
+    auto decoded=modelImportDecode(bytes);
+    return plants::Image{int(decoded.width),int(decoded.height),std::move(decoded.rgba)};
+  };
+  return {read(doc.texture),read(doc.barkTexture),read(doc.cutTexture)};
+}
+static plants::Textures plantTextureMaps(const plants::Project& doc,const PlantTextureInputs& input,
+                                         const std::atomic<bool>* cancel,int resolution,const plants::PhotoAtlas* photos) {
+  return plants::textureMaps(doc,input.leaf.width?&input.leaf:nullptr,cancel,resolution,photos,
+    input.bark.width?&input.bark:nullptr,input.cut.width?&input.cut:nullptr);
+}
 static std::string plantGeometryKey(const plants::Project& d) {
   auto p=plants::parameters(d.p);
   for(auto key:{"bark","leaf","flower","roughness","ao","variation","dryness","windStrength","windDirection","windFrequency","stiffness","flutter","barkPattern","serration"})p.erase(key);
-  return plants::Json{{"generator",d.generator},{"parameters",p},{"textureOverride",!d.texture.empty()},{"family",int(d.family)},{"species",d.species},{"seed",d.seed}}.dump();
+  return plants::Json{{"generator",d.generator},{"parameters",p},{"textureOverride",!d.texture.empty()},{"family",int(d.family)},{"species",d.species},{"seed",d.seed},{"branchEdits",plants::serializeBranchEdits(d)},{"smoothJunctions",d.smoothJunctions},{"stableLods",d.stableLods},{"woodCut",!d.cutTexture.empty()},{"barkURepeats",d.barkURepeats},{"barkVUnits",d.barkVUnits}}.dump();
 }
 static void plantSchedule(bool immediate=false) {
   auto& s=plantState;s.revision++;s.pending=true;s.nextGenerate=ImGui::GetTime()+(immediate?0:.20);
@@ -123,6 +148,7 @@ static void plantSchedule(bool immediate=false) {
 static void plantChanged(const plants::Json& before) {
   auto& s=plantState;auto active=ImGui::GetActiveID();
   if(!active||active!=s.gesture){s.undo.push_back(before);if(s.undo.size()>100)s.undo.erase(s.undo.begin());}
+  if(before.value("seed",s.doc.seed)!=s.doc.seed)s.selectedBranch=0;
   s.gesture=active;s.redo.clear();plantSchedule();
 }
 static void plantUndo(bool redo=false) {
@@ -130,7 +156,7 @@ static void plantUndo(bool redo=false) {
   if(from.empty())return;to.push_back(plants::serialize(s.doc));s.doc=plants::deserialize(from.back());from.pop_back();s.gesture=0;plantSchedule(true);
 }
 static void plantSelect(const plants::Project& doc) {
-  auto& s=plantState;auto before=plants::serialize(s.doc);s.doc=doc;s.file.clear();s.selected=std::min<int>(1,doc.nodes.size()-1);s.framePending=true;
+  auto& s=plantState;auto before=plants::serialize(s.doc);s.doc=doc;s.file.clear();s.selected=std::min<int>(1,doc.nodes.size()-1);s.selectedBranch=0;s.framePending=true;
   s.undo.push_back(before);s.redo.clear();s.saved.clear();
   s.recent.erase(std::remove(s.recent.begin(),s.recent.end(),doc.preset),s.recent.end());s.recent.insert(s.recent.begin(),doc.preset);if(s.recent.size()>12)s.recent.resize(12);
   plantLibrarySave();plantSchedule(true);
@@ -148,24 +174,34 @@ static void plantTick() {
   }
   if(s.pending&&!s.job.valid()&&ImGui::GetTime()>=s.nextGenerate) {
     s.pending=false;auto doc=s.doc;auto revision=s.revision;auto cached=s.result;auto key=plantTextureKey(doc),geometryKey=plantGeometryKey(doc);
-    plants::Image imported;
-    if(!doc.texture.empty())try{auto bytes=q1Read(std::filesystem::u8path(doc.texture));key+=std::to_string(plants::hash(bytes));auto decoded=modelImportDecode(bytes);imported={int(decoded.width),int(decoded.height),std::move(decoded.rgba)};}
-      catch(const std::exception& e){s.error=e.what();return;}
     const plants::PhotoAtlas* photos=nullptr;
     try{if(doc.generator>=3)photos=plantPhotos();}catch(const std::exception& e){s.error=e.what();return;}
     s.work=std::make_shared<PlantWork>();auto work=s.work;
-    s.job=std::async(std::launch::async,[doc,revision,key,geometryKey,cached,work,photos,imported=std::move(imported)]()mutable {
-      PlantResult out;out.revision=revision;out.textureKey=key;out.geometryKey=geometryKey;auto start=std::chrono::steady_clock::now();
+    s.job=std::async(std::launch::async,[doc,revision,key,geometryKey,cached,work,photos]()mutable {
+      PlantResult out;out.revision=revision;out.geometryKey=geometryKey;auto start=std::chrono::steady_clock::now();
       try {
+        const bool reuse=cached&&cached->geometryKey==geometryKey;
+        std::unique_ptr<plants::Botanical> plan;
+        if(!reuse&&doc.generator>=4&&doc.stableLods&&
+            (doc.family==plants::Family::Broadleaf||doc.family==plants::Family::Conifer)){
+          plants::validate(doc);
+          plan=std::make_unique<plants::Botanical>(doc,0,&work->cancel);
+          if(doc.family==plants::Family::Conifer)plan->planEvergreenTree();
+          else plan->planWoody();
+        }
         for(int i=0;i<3;i++){
           work->stage=i;if(work->cancel.load())throw std::runtime_error("Plant generation cancelled");
-          out.baseLods[i]=cached&&cached->geometryKey==geometryKey?cached->baseLods[i]:plants::generateBase(doc,i,&work->cancel);
+          if(reuse)out.baseLods[i]=cached->baseLods[i];
+          else if(plan)out.baseLods[i]=plants::Botanical(doc,i,&work->cancel).renderTreePlan(*plan);
+          else out.baseLods[i]=plants::generateBase(doc,i,&work->cancel);
           out.lods[i]=plants::hierarchy(out.baseLods[i],doc,i);
           if(out.lods[i].faces.empty())out.lods[i].low=out.lods[i].high={0,0,0};else plants::validate(out.lods[i]);
         }
         work->stage=3;
+        auto imported=plantReadTextures(doc,&key);
+        out.textureKey=key;
         if(cached&&cached->textureKey==key)out.maps=cached->maps;
-        else out.maps=std::make_shared<plants::Textures>(plants::textureMaps(doc,imported.width?&imported:nullptr,&work->cancel,256,photos));
+        else out.maps=std::make_shared<plants::Textures>(plantTextureMaps(doc,imported,&work->cancel,256,photos));
       }catch(const std::exception& e){out.error=e.what();}
       out.milliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();return out;
     });
@@ -214,11 +250,11 @@ static bool plantReady(){return plantState.result&&plantState.result->revision==
 static void plantSave(const std::filesystem::path& file) {
   auto& s=plantState;plants::validate(s.doc);if(std::filesystem::exists(file)&&file!=s.file)throw std::runtime_error("Choose a new project filename; open an existing plant to edit it.");
   std::filesystem::create_directories(file.parent_path());auto portable=plants::serialize(s.doc);
-  if(!s.doc.texture.empty()){
-    auto texture=std::filesystem::u8path(s.doc.texture);auto bytes=q1Read(texture);std::ostringstream id;id<<"leaf-"<<std::hex<<plants::hash(bytes)<<texture.extension().u8string();
+  for(const auto& slot:plantTextureFiles(s.doc))if(!slot.file->empty()){
+    auto texture=std::filesystem::u8path(*slot.file);auto bytes=q1Read(texture);std::ostringstream id;id<<slot.stem<<'-'<<std::hex<<plants::hash(bytes)<<texture.extension().u8string();
     auto target=file.parent_path()/std::filesystem::u8path(id.str());
     if(std::filesystem::exists(target)&&q1Read(target)!=bytes)throw std::runtime_error("Imported texture asset already exists with different contents");
-    if(!std::filesystem::exists(target))bb::atomicWrite(target,bytes);portable["texture"]=id.str();
+    if(!std::filesystem::exists(target))bb::atomicWrite(target,bytes);portable[slot.key]=id.str();
   }
   bb::atomicWrite(file,portable.dump(2));s.file=file;s.saved=plants::serialize(s.doc).dump();s.message="Saved "+file.filename().u8string();
   placementPlantSaved();if(plantReady())s.error.clear();
@@ -240,7 +276,8 @@ static void plantRequest(std::function<void()> next) {
 static void plantOpenFile(const std::filesystem::path& file) {
   if(std::filesystem::file_size(file)>4*1024*1024)throw std::runtime_error("Plant project exceeds 4 MiB");
   auto d=plants::deserialize(plants::Json::parse(q1Read(file)));
-  if(!d.texture.empty()&&std::filesystem::u8path(d.texture).is_relative())d.texture=(file.parent_path()/std::filesystem::u8path(d.texture)).u8string();
+  for(const auto& slot:plantTextureFiles(d))if(!slot.file->empty()&&std::filesystem::u8path(*slot.file).is_relative())
+    *slot.file=(file.parent_path()/std::filesystem::u8path(*slot.file)).u8string();
   placementCancel(plantPlacement);plantSelect(d);plantState.file=placementSnapshotPath(file)?std::filesystem::path{}:file;plantState.saved=plants::serialize(d).dump();plantState.undo.clear();plantState.redo.clear();
 }
 static void plantWriteNew(const std::filesystem::path& file,const std::string& bytes) {
@@ -251,12 +288,7 @@ static plants::Textures plantOpaqueMaps(plants::Project d,int profile) {
   // Opaque runtime geometry uses the original shaped-leaf UVs. Keep bark
   // detail from generator 3, with a smaller atlas for the native skin.
   d.p.foliageMode=2;
-  plants::Image imported;
-  if(!d.texture.empty()){
-    auto decoded=modelImportDecode(q1Read(std::filesystem::u8path(d.texture)));
-    imported={int(decoded.width),int(decoded.height),std::move(decoded.rgba)};
-  }
-  return plants::textureMaps(d,imported.width?&imported:nullptr,nullptr,profile==4?128:64,d.generator>=3?plantPhotos():nullptr);
+  return plantTextureMaps(d,plantReadTextures(d),nullptr,profile==4?128:64,d.generator>=3?plantPhotos():nullptr);
 }
 static void plantExport(const std::filesystem::path& target) {
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
@@ -372,7 +404,13 @@ static PlantRuntimeAsset plantBakeRuntime() {
     for(auto& surface:mesh.surfaces)surface.material=out.material;out.bundle[out.model]=ftebroom::modelExport::md3(mesh);
     auto image=out.material+(gameProfile==1?".dds":".tga");out.bundle[image]=gameProfile==1?plants::coverageDds(s.result->maps->albedo):atlas;dependencies.push_back(image);
     if(gameProfile==1){out.bundle[out.material+".tga"]=atlas;dependencies.push_back(out.material+".tga");}
-    out.shader=plants::shader(out.material,image,gameProfile!=0);auto script="scripts/"+out.id+".shader";out.bundle[script]=out.shader;dependencies.push_back(script);
+    const bool wind=gameProfile==1&&s.doc.runtimeWind;
+    out.shader=plants::shader(out.material,image,gameProfile!=0,wind);
+    auto script="scripts/"+out.id+".shader";out.bundle[script]=out.shader;dependencies.push_back(script);
+    if(wind){
+      const std::string program="glsl/reyond_plant_wind_v1.glsl";
+      out.bundle[program]=plants::windProgramSource();dependencies.push_back(program);
+    }
   }
   if(trueColorQuake){
     // FTE loads this optional replacement for skin 0 of a classic MDL.
@@ -381,7 +419,11 @@ static PlantRuntimeAsset plantBakeRuntime() {
     dependencies.push_back(path);
   }
   auto portable=plants::serialize(s.doc);dependencies.push_back(out.source);
-  if(!s.doc.texture.empty()){auto original=std::filesystem::u8path(s.doc.texture);auto name=out.id+"-leaf"+original.extension().u8string();auto dependency="models/reyond-plugins/"+name;out.bundle[dependency]=q1Read(original);dependencies.push_back(dependency);portable["texture"]=name;}
+  for(const auto& slot:plantTextureFiles(s.doc))if(!slot.file->empty()){
+    auto original=std::filesystem::u8path(*slot.file);
+    auto name=out.id+"-"+slot.stem+original.extension().u8string(),dependency="models/reyond-plugins/"+name;
+    out.bundle[dependency]=q1Read(original);dependencies.push_back(dependency);portable[slot.key]=name;
+  }
   out.bundle[out.source]=portable.dump(2);
   size_t vertices=0,triangles=0;for(auto& surface:mesh.surfaces){vertices+=surface.frames[0].size();triangles+=surface.triangles.size();}
   out.bundle[out.model+".reyond.json"]=plants::Json{{"kind","reyondbroom-authoring-model"},{"version",2},{"low",out.low},{"high",out.high},{"normalization",out.scale},{"dependencies",dependencies},{"plantProject",portable},

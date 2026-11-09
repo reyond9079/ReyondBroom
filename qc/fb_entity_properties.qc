@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 string fb_map_quote(string text);
+int fb_plant_brush_is_plant(int node);
 var float autocvar_ftebroom_instantiate_defaults=0;
 int *fb_property_entities;int fb_property_entity_count,fb_property_epoch;
 int fb_ui_attached,fb_ui_linked;
@@ -104,6 +105,13 @@ string ReyondBroom_UIQuery(float operation,float cursor)
             }
         }
     }else if(operation==3)result=strcat("d 0 \"",fb_organize_escape(fb_nodes[0].fields["_tb_def"]),"\"\n");
+    else if(operation==8) {
+        for(int node=begin;node<min(begin+128,fb_node_count);node++) {
+            if(!fb_plant_brush_is_plant(node))continue;
+            result=strcat(result,fb_map_quote(fb_nodes[node].fields["model"])," ",
+                fb_map_quote(fb_nodes[node].fields["_reyondbroom_source"]),"\n");
+        }
+    }
     return result;
 }
 void fb_entity_property(string operation,string key,string value)

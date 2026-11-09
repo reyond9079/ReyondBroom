@@ -46,12 +46,14 @@ inline void Botanical::herbs() {
       int tufts=std::min(lod==0?(grassPhoto==Photo::Lawn?24:15):lod==1?8:4,std::max(3,blades/7));
       for(int i=0;i<tufts;i++){
         Rng r(mix(doc.seed,i+1000));double a=i*2.399963;
-        double spread=height*(grassPhoto==Photo::Lawn?.54:.24)*std::sqrt((i+.4)/tufts);
+        const double radial=doc.stableLods?std::fmod((i+.5)*.61803398875,1.):(i+.4)/tufts;
+        double spread=height*(grassPhoto==Photo::Lawn?.54:.24)*std::sqrt(radial);
         V base{std::cos(a)*spread,std::sin(a)*spread,0};
         double lean=(.15+p.curvature*.45)*r.range(.72,1.24);
         V aim{std::cos(a)*lean,std::sin(a)*lean,1};
         double size=height*r.range(.63,1.02);
         double width=size*(grassPhoto==Photo::Lawn?1.02:.84)*std::clamp(std::sqrt(p.leafWidth/.04),.65,1.4);
+        if(doc.stableLods)width*=lod==2?1.65:lod==1?1.25:1.;
         double facing=a+r.range(-.65,.65);
         b.foliageCard(base,aim,{std::cos(facing),std::sin(facing),0},size,width,p.leafCurl*.26,lod?1:2,p.leafTwist*r.range(-.45,.45));
       }

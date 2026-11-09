@@ -13,6 +13,8 @@ inline std::vector<Project> presets() {
     for(const auto& entry:catalogManifest().at("presets")) {
       Project d;d.generator=catalogManifest().at("generatorVersion");d.preset=d.species=entry.at("id").get<std::string>();
       d.name=entry.at("name");d.family=Family(entry.at("family").get<int>());
+      d.smoothJunctions=d.generator>=4&&(d.family==Family::Broadleaf||d.family==Family::Conifer);
+      d.stableLods=d.smoothJunctions||(d.generator>=4&&d.family==Family::Grass);
       d.tags=entry.at("tags").get<std::vector<std::string>>();d.nodes=defaultNodes();
       if(d.family==Family::Flower||d.family==Family::Vine||d.family==Family::Fern||d.family==Family::Riparian)d.p.bark={.20,.34,.10};
       if(d.family==Family::Mushroom)d.p.bark={.82,.77,.65};

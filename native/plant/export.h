@@ -173,9 +173,41 @@ inline std::string obj(const Mesh& mesh,const std::string& materialFile) {
 }
 // q3map2 bakes misc_model lighting into world vertices. FTE func_model stays
 // an MD3 entity: it has normals but no vertex RGBA, so use model lighting.
-inline std::string shader(const std::string& material,const std::string& image,bool dynamicModel=false) {
+inline const char* windProgramSource() {
+  return R"GLSL(!!ver 100 150
+!!permu FOG
+!!samps diffuse
+#include "sys/defs.h"
+#include "sys/fog.h"
+varying vec2 tc;
+varying vec3 light;
+#ifdef VERTEX_SHADER
+void main() {
+    vec3 p = v_position.xyz;
+    float height = max(0.0, p.z);
+    float weight = height / (height + 84.0);
+    float phase = dot(m_model[3].xy, vec2(0.007, 0.011));
+    float sway = sin(e_time * 1.9 + p.z * 0.018 + phase);
+    float flutter = sin(e_time * 4.6 + dot(p.xy, vec2(0.11, 0.07)) + phase);
+    p.xy += vec2(4.2 * sway + 0.55 * flutter, 1.9 * sway - 0.38 * flutter) * weight * weight;
+    gl_Position = m_modelviewprojection * vec4(p, 1.0);
+    tc = v_texcoord;
+    light = max(vec3(0.12), e_light_ambient + max(0.0, dot(normalize(v_normal), e_light_dir)) * e_light_mul);
+}
+#endif
+#ifdef FRAGMENT_SHADER
+void main() {
+    vec4 leaf = texture2D(s_diffuse, tc);
+    if (leaf.a < 0.5) discard;
+    gl_FragColor = fog4(vec4(leaf.rgb * light, 1.0));
+}
+#endif
+)GLSL";
+}
+inline std::string shader(const std::string& material,const std::string& image,bool dynamicModel=false,bool wind=false) {
   auto editorImage=image.size()>4&&image.substr(image.size()-4)==".dds"?image.substr(0,image.size()-4)+".tga":image;
-  return material+"\n{\n qer_editorimage "+editorImage+(editorImage!=image?"\n q3map_lightimage "+editorImage:"")+"\n q3map_nonplanar\n q3map_shadeangle 60\n surfaceparm trans\n surfaceparm alphashadow\n cull none\n {\n  map "+image+"\n  alphaFunc GE128\n  depthWrite\n  rgbGen "+(dynamicModel?"lightingDiffuse":"vertex")+"\n  alphaGen identity\n }\n}\n";
+  auto program=wind?"\n program reyond_plant_wind_v1\n diffusemap "+image:std::string{};
+  return material+"\n{\n qer_editorimage "+editorImage+(editorImage!=image?"\n q3map_lightimage "+editorImage:"")+"\n q3map_nonplanar\n q3map_shadeangle 60\n surfaceparm trans\n surfaceparm alphashadow\n cull none"+program+"\n {\n  map "+image+"\n  alphaFunc GE128\n  depthWrite\n  rgbGen "+(dynamicModel?"lightingDiffuse":"vertex")+"\n  alphaGen identity\n }\n}\n";
 }
 inline std::string glb(const Mesh& mesh,const Textures& maps) {
   using modelExport::Binary;Binary data;Json views=Json::array(),accessors=Json::array();
@@ -206,18 +238,20 @@ inline std::string glb(const Mesh& mesh,const Textures& maps) {
 // RBB1 is the existing engine's validated dynamic mesh ABI. It supports
 // depth-tested alpha cutout and two-sided drawing, with baked vertex lighting.
 inline std::string preview(const Mesh& mesh,const Project& doc,int display,double time,bool wind,double lightAngle,
-                           const char* atlas="bbtex/plant-atlas.tga") {
+                           const char* atlas="bbtex/plant-atlas.tga",uint64_t selectedBranch=0) {
   modelExport::Binary out;out.bytes="RBB1";out.u32((mesh.faces.size()+9999)/10000);
   const double a=lightAngle*pi/180;V light=unit({std::cos(a)*.6,std::sin(a)*.6,.8});
   for(size_t first=0;first<mesh.faces.size();first+=10000) {
     size_t count=std::min<size_t>(10000,mesh.faces.size()-first);out.u32(count*3);out.u32(count*3);
-    out.text(display==0?atlas:display==3?"bbtex/plant-uv.tga":"$whiteimage",128);
+    out.text(display==0?atlas:display==3?"bbtex/plant-uv.tga":display==4?"bbtex/plant-normal.tga":"$whiteimage",128);
     for(size_t i=first;i<first+count;i++)for(unsigned n:mesh.faces[i].i) {
       auto& v=mesh.vertices[n];V position=wind?windPosition(v,doc.p,time,doc.p.height):v.p;
       double diffuse=.36+.64*std::max(0.,dot(v.n,light));double ambient=1-doc.p.ao*.16*(1-std::clamp(v.p[2]/doc.p.height,0.,1.));
       V color={diffuse*ambient,diffuse*ambient,diffuse*ambient};
       if(display==2)color={v.n[0]*.5+.5,v.n[1]*.5+.5,v.n[2]*.5+.5};
       else if(display==1)color={.73*diffuse,.77*diffuse,.68*diffuse};
+      else if(display==4)color={1.,1.,1.};
+      if(selectedBranch&&mesh.faces[i].branch==selectedBranch)color={1.,.92,.55};
       for(double x:position)out.real(x);for(double x:v.uv)out.real(x);for(double x:color)out.real(x);out.real(1);
     }
     for(unsigned i=0;i<count*3;i++)out.u32(i);

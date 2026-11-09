@@ -1,0 +1,4 @@
+Photographic bark, grass, fungi and botanical surface plates for Plant Generator 4.
+Generated for ReyondBroom using OpenAI image generation.
+The zlib stream contains 26 RGBA tiles of 192 × 192 texels, ordered by PhotoDetail in native/plant/textures.h.
+Rows use the plant atlas convention, starting at the bottom of the photographic plate.

@@ -28,7 +28,7 @@ inline Project upgradeGenerator(Project d) {
   auto library=presets();auto it=std::find_if(library.begin(),library.end(),[&](auto& p){return p.preset==d.preset;});
   auto defaults=parameters(it==library.end()?Params{}:it->p),values=serialize(d);
   if(d.generator==1)for(auto key:{"crown","phyllotaxy","organ","barkPattern","needleForm","evergreen","leaflets","clusterLeaves","crownBase","crownAspect","crownFill","petiole","serration"})values["parameters"][key]=defaults.at(key);
-  values["generatorVersion"]=3;
+  values["generatorVersion"]=catalogManifest().at("generatorVersion");
   if(d.generator==1&&it!=library.end())values["tags"]=it->tags;
   return deserialize(values);
 }

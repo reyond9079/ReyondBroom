@@ -7,20 +7,36 @@
 namespace ftebroom::plant {
 struct Image {int width=0,height=0;std::vector<unsigned char> rgba;};
 struct Textures {Image albedo,normal,orm;};
+enum class PhotoDetail {
+  Lawn, Fescue, Feather, Sedge, OakBark, PineBark, BirchBark, SmoothBark,
+  Amanita, Bolete, Chanterelle, Morel, Oyster, CrackedCap, Gills, Stipe, DottedCap,
+  Leaf, GrassBlade, Needle, YellowPetal, RosePetal, VioletPetal, Cactus, Bamboo, Palm, None
+};
 struct PhotoAtlas {
-  static constexpr int side=192, layers=int(Photo::None);
-  std::vector<unsigned char> rgba;
-  static PhotoAtlas decode(const char* bytes,size_t size) {
-    PhotoAtlas atlas;
-    atlas.rgba.resize(side*side*layers*4);uLongf length=atlas.rgba.size();
-    if(uncompress(atlas.rgba.data(),&length,reinterpret_cast<const Bytef*>(bytes),size)!=Z_OK||length!=atlas.rgba.size())
+  static constexpr int side=192, layers=int(Photo::Lawn);
+  std::vector<unsigned char> rgba,details;
+  static std::vector<unsigned char> decodeLayers(const char* bytes,size_t size,int count) {
+    std::vector<unsigned char> data(size_t(side)*side*count*4);uLongf length=data.size();
+    if(uncompress(data.data(),&length,reinterpret_cast<const Bytef*>(bytes),size)!=Z_OK||length!=data.size())
       throw std::runtime_error("Invalid photographic plant textures");
-    return atlas;
+    return data;
   }
+  static PhotoAtlas decode(const char* bytes,size_t size) {
+    PhotoAtlas atlas;atlas.rgba=decodeLayers(bytes,size,layers);return atlas;
+  }
+  void loadDetails(const char* bytes,size_t size) {details=decodeLayers(bytes,size,int(PhotoDetail::None));}
+  bool has(Photo layer) const {return layer!=Photo::None&&(int(layer)<layers?!rgba.empty():!details.empty());}
   std::array<double,4> sample(Photo layer,double u,double v) const {
+    return int(layer)<layers?sampleLayer(rgba,int(layer),u,v):sampleLayer(details,int(layer)-layers,u,v);
+  }
+  std::array<double,4> sample(PhotoDetail layer,double u,double v) const {
+    return sampleLayer(details,int(layer),u,v);
+  }
+private:
+  static std::array<double,4> sampleLayer(const std::vector<unsigned char>& data,int layer,double u,double v) {
     double x=u*(side-1),y=v*(side-1);int ix=int(x),iy=int(y);
     int nx=std::min(ix+1,side-1),ny=std::min(iy+1,side-1);
-    auto texel=[&](int sx,int sy,int c){return rgba[((int(layer)*side+sy)*side+sx)*4+c];};
+    auto texel=[&](int sx,int sy,int c){return data[((layer*side+sy)*side+sx)*4+c];};
     std::array<double,4> result{};
     for(int c=0;c<4;c++){
       double top=texel(ix,iy,c)*(1-x+ix)+texel(nx,iy,c)*(x-ix);
@@ -237,6 +253,61 @@ inline Texel texel(const Project& d,int material,double u,double v) {
   for(auto& c:sample.color){c=std::clamp(c,0.,1.);if(p.quality==3)c=std::min(1.,std::round(c*5)/5.+.04);}
   return sample;
 }
+inline PhotoDetail materialPhoto(const Project& d,int mat) {
+  auto& p=d.p;using D=PhotoDetail;
+  if(d.generator<4||p.quality==3)return D::None;
+  if(d.family==Family::Mushroom){
+    if(mat==Bark||mat==Wood)return D::Stipe;
+    if(mat==Gills)return p.organ==1?D::DottedCap:D::Gills;
+    if(mat==Cap){
+      switch(p.organ){
+        case 0:return d.species=="amanita"?D::Amanita:D::Oyster;
+        case 1:return D::Bolete;
+        case 2:case 4:return D::Oyster;
+        case 3:return D::Chanterelle;
+        case 5:case 6:return D::CrackedCap;
+        case 7:return D::Morel;
+      }
+    }
+  }
+  if(mat==Bark||mat==Wood){
+    if(d.family==Family::Bamboo)return D::Bamboo;
+    if(d.family==Family::Conifer)return D::PineBark;
+    if(d.family==Family::Broadleaf||d.family==Family::Bush||d.family==Family::Custom||d.family==Family::Palm)
+      return p.barkPattern==2?D::BirchBark:p.barkPattern==1||p.barkPattern==5||p.barkPattern==7?D::SmoothBark:D::OakBark;
+    return D::GrassBlade;
+  }
+  if(mat==Needle||mat==NeedleLight||mat==NeedleMature)return D::Needle;
+  if(mat==Grass||d.family==Family::Riparian)return D::GrassBlade;
+  if(mat==CactusSkin)return D::Cactus;
+  if(mat==Petal||mat==Center){
+    if(p.flower[2]>p.flower[0]*.85&&p.flower[2]>p.flower[1]*1.20)return D::VioletPetal;
+    return p.flower[0]>p.flower[1]*1.30?D::RosePetal:D::YellowPetal;
+  }
+  if(mat==Leaf||mat==LeafLight||mat==LeafMature||mat==LeafYoung)return d.family==Family::Palm?D::Palm:D::Leaf;
+  return D::None;
+}
+inline void applyMaterialPhoto(Texel& texel,const Project& d,int mat,PhotoDetail layer,
+                              const PhotoAtlas& photos,double u,double v){
+  auto mirror=[](double t){return 1.-std::abs(2.*(t-std::floor(t))-1.);};
+  bool wraps=mat==Bark||mat==Wood||mat==Cap||mat==Gills||mat==CactusSkin;
+  if(layer==PhotoDetail::Morel){u*=2.;v=mirror(v*1.35);}
+  auto pixel=photos.sample(layer,wraps?mirror(u+double(d.seed%47)/47.):u,v);
+  double light=.23*pixel[0]+.67*pixel[1]+.10*pixel[2];
+  V original{pixel[0],pixel[1],pixel[2]};
+  if(d.family==Family::Mushroom&&mat==Cap){
+    // Keep genuine cap markings, while still accepting a custom cap hue.
+    double tint=d.species=="fantasy"?.88:.22;
+    auto base=layer==PhotoDetail::Morel?texel.color:mul(d.p.flower,.45+light*.90);
+    texel.color=blend(original,base,tint);
+  }else{
+    auto shade=mul(texel.color,std::clamp(.42+light*1.40,.55,1.30));
+    double natural=mat==Bark&&layer==PhotoDetail::BirchBark?.64:
+      mat==Bark&&d.family==Family::Broadleaf?.28:mat==Gills?.48:.14;
+    texel.color=blend(shade,original,natural);
+  }
+  texel.height=texel.height*.55+light*.45;
+}
 inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const std::atomic<bool>* cancel=nullptr,int tile=256,const PhotoAtlas* photos=nullptr) {
   if(tile<16||tile>256)throw std::runtime_error("Invalid plant atlas resolution");
   Textures out;const int size=tile*4;
@@ -248,21 +319,25 @@ inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const
     (d.p.barkPattern==0||d.p.barkPattern==3||d.p.barkPattern==4||d.p.barkPattern==6);
   int materialCount=d.generator==1?10:foliage==Photo::None?int(PhotoFoliage):int(Count);
   for(int mat=0;mat<materialCount;mat++) {
+    auto detail=photos&&!photos->details.empty()?materialPhoto(d,mat):PhotoDetail::None;
     for(int y=0;y<tile;y++) {
       if(cancel&&cancel->load())throw std::runtime_error("Plant generation cancelled");
       for(int x=0;x<tile;x++) {
         // Clamp the gutter to the edge of the actual tile contents.
         double u=std::clamp((x-tile*4./256)/(tile*248./256),0.,1.),v=std::clamp((y-tile*4./256)/(tile*248./256),0.,1.);
         auto sample=texel(d,mat==PhotoFoliage?int(Leaf):mat,u,v);
-        if(photos&&mat==PhotoFoliage){
+        if(photos&&mat==PhotoFoliage&&photos->has(foliage)){
           auto pixel=photos->sample(foliage,u,v);
           double light=.25*pixel[0]+.65*pixel[1]+.10*pixel[2];
           double dry=std::clamp(d.p.dryness*.75+(d.p.season==2&&d.p.evergreen!=1?.58:0.),0.,1.);
           V original{pixel[0],pixel[1],pixel[2]};
           V tint=mul(d.p.leaf,std::clamp(.55+light*1.55,.60,1.65));
-          auto color=blend(original,tint,.52);
+          const bool detailedGrass=foliage>=Photo::Lawn;
+          auto color=blend(original,tint,detailedGrass?.32:.52);
           sample.color=blend(color,mul({.52,.32,.13},.65+light),dry);
           sample.alpha=pixel[3];sample.height=.25+light*.32;
+        }else if(detail!=PhotoDetail::None&&mat!=PhotoFoliage){
+          applyMaterialPhoto(sample,d,mat,detail,*photos,u,v);
         }else if(roughBark&&mat==Bark){
           // The generated bark runs along the branch axis. Vary its placement
           // per seed while keeping the U seam continuous.

@@ -213,7 +213,7 @@ struct Botanical : Generator {
         V up=unit({rng.range(-.85,.85),rng.range(-.85,.85),rng.range(.5,1.)});
         double size=p.leafSize*(.5+.5*p.age)*shoot.size*(needles?1.65:2.15)*(lod==2?1.30:1.);
         double width=size*(needles?.70:.74)*std::clamp(std::sqrt(p.leafWidth/.45),.60,1.50);
-        b.foliageCard(shoot.p,shoot.aim,up,size,width,p.leafCurl*.45,strips);
+        b.foliageCard(shoot.p,shoot.aim,up,size,width,p.leafCurl*.45,strips,p.leafTwist*rng.range(-.65,.65));
       }
       return;
     }

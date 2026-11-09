@@ -75,14 +75,25 @@ static void plantLibraryLoad() {
     }
   }catch(const std::exception& e){s.error=e.what();}
 }
+static const plants::PhotoAtlas* plantPhotos() {
+  static const auto atlas=[](){
+    size_t size=0;
+    auto raw=static_cast<char*>(files->LoadFile("plants/builtin/photographic.rgba.z",&size));
+    if(!raw)return plants::PhotoAtlas{};
+    std::string bytes(raw,size);core->Free(raw);
+    try{return plants::PhotoAtlas::decode(bytes.data(),bytes.size());}
+    catch(const std::runtime_error& e){core->Print(e.what());return plants::PhotoAtlas{};}
+  }();
+  return atlas.rgba.empty()?nullptr:&atlas;
+}
 static std::string plantTextureKey(const plants::Project& d) {
-  auto& p=d.p;return plants::Json{{"generator",d.generator},{"barkPattern",p.barkPattern},{"serration",p.serration},{"needleForm",p.needleForm},{"evergreen",p.evergreen},{"leaflets",p.leaflets},{"organ",p.organ},{"seed",d.seed},{"species",d.species},{"family",int(d.family)},{"bark",p.bark},{"leaf",p.leaf},{"flower",p.flower},
+  auto& p=d.p;return plants::Json{{"generator",d.generator},{"foliageMode",d.p.foliageMode},{"barkPattern",p.barkPattern},{"serration",p.serration},{"needleForm",p.needleForm},{"evergreen",p.evergreen},{"leaflets",p.leaflets},{"organ",p.organ},{"seed",d.seed},{"species",d.species},{"family",int(d.family)},{"bark",p.bark},{"leaf",p.leaf},{"flower",p.flower},
     {"shape",p.leafShape},{"profile",p.leafProfile},{"season",p.season},{"quality",p.quality},{"dryness",p.dryness},{"roughness",p.roughness},{"ao",p.ao},{"variation",p.variation},{"ribs",p.ribs},{"gills",p.gills},{"override",d.texture}}.dump();
 }
 static std::string plantGeometryKey(const plants::Project& d) {
   auto p=plants::parameters(d.p);
   for(auto key:{"bark","leaf","flower","roughness","ao","variation","dryness","windStrength","windDirection","windFrequency","stiffness","flutter","barkPattern","serration"})p.erase(key);
-  return plants::Json{{"generator",d.generator},{"parameters",p},{"family",int(d.family)},{"species",d.species},{"seed",d.seed}}.dump();
+  return plants::Json{{"generator",d.generator},{"parameters",p},{"textureOverride",!d.texture.empty()},{"family",int(d.family)},{"species",d.species},{"seed",d.seed}}.dump();
 }
 static void plantSchedule(bool immediate=false) {
   auto& s=plantState;s.revision++;s.pending=true;s.nextGenerate=ImGui::GetTime()+(immediate?0:.20);
@@ -119,8 +130,10 @@ static void plantTick() {
     plants::Image imported;
     if(!doc.texture.empty())try{auto bytes=q1Read(std::filesystem::u8path(doc.texture));key+=std::to_string(plants::hash(bytes));auto decoded=modelImportDecode(bytes);imported={int(decoded.width),int(decoded.height),std::move(decoded.rgba)};}
       catch(const std::exception& e){s.error=e.what();return;}
+    const plants::PhotoAtlas* photos=nullptr;
+    try{if(doc.generator>=3)photos=plantPhotos();}catch(const std::exception& e){s.error=e.what();return;}
     s.work=std::make_shared<PlantWork>();auto work=s.work;
-    s.job=std::async(std::launch::async,[doc,revision,key,geometryKey,cached,work,imported=std::move(imported)]()mutable {
+    s.job=std::async(std::launch::async,[doc,revision,key,geometryKey,cached,work,photos,imported=std::move(imported)]()mutable {
       PlantResult out;out.revision=revision;out.textureKey=key;out.geometryKey=geometryKey;auto start=std::chrono::steady_clock::now();
       try {
         for(int i=0;i<3;i++){
@@ -131,7 +144,7 @@ static void plantTick() {
         }
         work->stage=3;
         if(cached&&cached->textureKey==key)out.maps=cached->maps;
-        else out.maps=std::make_shared<plants::Textures>(plants::textureMaps(doc,imported.width?&imported:nullptr,&work->cancel));
+        else out.maps=std::make_shared<plants::Textures>(plants::textureMaps(doc,imported.width?&imported:nullptr,&work->cancel,256,photos));
       }catch(const std::exception& e){out.error=e.what();}
       out.milliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();return out;
     });
@@ -151,7 +164,8 @@ static int plantThumbnail(const plants::Project& d) {
   }
   if(!s.thumbJob.valid()&&!s.job.valid()){
     s.thumbCancel=std::make_shared<std::atomic<bool>>(false);auto cancel=s.thumbCancel;
-    s.thumbJob=std::async(std::launch::async,[d,cancel](){try{auto mesh=plants::generate(d,2,cancel.get());auto maps=plants::textureMaps(d,nullptr,cancel.get(),48);return std::make_pair(std::to_string(plants::hash(plants::serialize(d).dump())),plants::thumbnail(mesh,maps));}catch(...){if(cancel->load())return std::make_pair(std::string{},plants::Image{});throw;}});
+    const auto photos=d.generator>=3?plantPhotos():nullptr;
+    s.thumbJob=std::async(std::launch::async,[d,cancel,photos](){try{auto mesh=plants::generate(d,2,cancel.get());auto maps=plants::textureMaps(d,nullptr,cancel.get(),48,photos);return std::make_pair(std::to_string(plants::hash(plants::serialize(d).dump())),plants::thumbnail(mesh,maps));}catch(...){if(cancel->load())return std::make_pair(std::string{},plants::Image{});throw;}});
   }
   return 0;
 }
@@ -212,12 +226,23 @@ static void plantWriteNew(const std::filesystem::path& file,const std::string& b
   if(std::filesystem::exists(file)){if(q1Read(file)==bytes)return;throw std::runtime_error("Existing asset differs; choose a new export name: "+file.filename().u8string());}
   std::filesystem::create_directories(file.parent_path());bb::atomicWrite(file,bytes);
 }
+static plants::Textures plantOpaqueMaps(plants::Project d,int profile) {
+  // Opaque runtime geometry uses the original shaped-leaf UVs. Keep bark
+  // detail from generator 3, with a smaller atlas for the native skin.
+  d.p.foliageMode=2;
+  plants::Image imported;
+  if(!d.texture.empty()){
+    auto decoded=modelImportDecode(q1Read(std::filesystem::u8path(d.texture)));
+    imported={int(decoded.width),int(decoded.height),std::move(decoded.rgba)};
+  }
+  return plants::textureMaps(d,imported.width?&imported:nullptr,nullptr,profile==4?128:64,d.generator>=3?plantPhotos():nullptr);
+}
 static void plantExport(const std::filesystem::path& target) {
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
   auto& mesh=s.result->lods[s.lod];auto& maps=*s.result->maps;auto ext=entityLower(target.extension().u8string());
   plants::validate(mesh);
   if(ext==".mdl"||ext==".md2") {
-    int profile=ext==".mdl"?2:3;auto geometry=plants::targetGeometry(s.doc,mesh,profile);auto model=plants::aliasMesh(geometry,"plant");auto skin=plants::aliasSkin(maps.albedo);
+    int profile=ext==".mdl"?2:3;auto geometry=plants::targetGeometry(s.doc,mesh,profile);auto model=plants::aliasMesh(geometry,"plant");auto skin=plants::aliasSkin(s.doc.generator>=3?plantOpaqueMaps(s.doc,profile).albedo:maps.albedo);
     if(profile==2)plantWriteNew(target,ftebroom::modelExport::mdl(model,{skin},q1Palette()));
     else {auto image=target.stem().u8string()+".pcx";auto output=ftebroom::modelExport::md2(model,{skin},q2Palette(),image);plantWriteNew(target.parent_path()/std::filesystem::u8path(image),output.skin);plantWriteNew(target,output.model);}
   }else if(ext==".glb")plantWriteNew(target,plants::glb(mesh,maps));
@@ -240,18 +265,25 @@ struct PlantRuntimeAsset {
 };
 static PlantRuntimeAsset plantBakeRuntime() {
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
-  if(gameProfile==4)throw std::runtime_error("GoldSrc requires a studio model. Export OBJ / GLB and convert it in Model Editor before placing it.");
   PlantRuntimeAsset out;auto geometry=plants::targetGeometry(s.doc,s.result->lods[0],gameProfile);out.low=geometry.low;out.high=geometry.high;
-  auto mesh=plants::targetModel(geometry,"plant",gameProfile);bool alias=gameProfile==2||gameProfile==3;
+  auto mesh=plants::targetModel(geometry,"plant",gameProfile);bool alias=plants::opaquePlantTarget(gameProfile);
   if(!alias){double extent=0;for(auto& surface:mesh.surfaces)for(auto& vertex:surface.frames[0])for(float x:vertex.position)extent=std::max(extent,std::abs(double(x)));out.scale=std::max(1.,extent/450.);for(auto& surface:mesh.surfaces)for(auto& vertex:surface.frames[0])for(auto& x:vertex.position)x/=out.scale;}
   auto palette=gameProfile==2?q1Palette():gameProfile==3?q2Palette():std::string{};
-  auto atlas=plants::tga(s.result->maps->albedo);auto identity=alias?ftebroom::modelExport::mdl(mesh,{plants::aliasSkin(s.result->maps->albedo)},palette):ftebroom::modelExport::md3(mesh);std::ostringstream key;key<<"plant-"<<std::hex<<plants::hash("authoring-target-v3:"+plants::serialize(s.doc).dump()+identity+atlas+palette);
-  out.id=key.str()+(gameProfile==0?"-q3":gameProfile==2?"-q1":gameProfile==3?"-q2":"-fte");
+  auto opaqueMaps=alias?plantOpaqueMaps(s.doc,gameProfile):plants::Textures{};
+  const auto& albedo=alias?opaqueMaps.albedo:s.result->maps->albedo;
+  auto atlas=plants::tga(albedo);
+  auto skin=alias?plants::aliasSkin(albedo):ftebroom::modelExport::Skin{};
+  std::string identity;
+  if(gameProfile==2)identity=ftebroom::modelExport::mdl(mesh,{skin},palette);
+  else if(gameProfile==3)identity=ftebroom::modelExport::md2(mesh,{skin},palette,"plant.pcx").model;
+  else if(gameProfile==4)identity=ftebroom::studioExport::bake(mesh,{skin},1);
+  else identity=ftebroom::modelExport::md3(mesh);
+  std::ostringstream key;key<<"plant-"<<std::hex<<plants::hash("authoring-target-v4:"+plants::serialize(s.doc).dump()+identity+atlas+palette);
+  out.id=key.str()+(gameProfile==0?"-q3":gameProfile==2?"-q1":gameProfile==3?"-q2":gameProfile==4?"-hl":"-fte");
   out.material="textures/reyond-plugins/"+out.id;out.model="models/reyond-plugins/"+out.id+plants::targetExtension(gameProfile);out.source="models/reyond-plugins/"+out.id+".plant.json";
   plants::Json dependencies=plants::Json::array();
   if(alias){
-    auto skin=plants::aliasSkin(s.result->maps->albedo);
-    if(gameProfile==2)out.bundle[out.model]=ftebroom::modelExport::mdl(mesh,{skin},palette);
+    if(gameProfile==2||gameProfile==4)out.bundle[out.model]=std::move(identity);
     else {auto skinName="models/reyond-plugins/"+out.id+".pcx";auto output=ftebroom::modelExport::md2(mesh,{skin},palette,skinName);out.bundle[out.model]=std::move(output.model);out.bundle[skinName]=std::move(output.skin);dependencies.push_back(skinName);}
   }else{
     for(auto& surface:mesh.surfaces)surface.material=out.material;out.bundle[out.model]=ftebroom::modelExport::md3(mesh);
@@ -266,7 +298,7 @@ static PlantRuntimeAsset plantBakeRuntime() {
   out.bundle[out.model+".reyond.json"]=plants::Json{{"kind","reyondbroom-authoring-model"},{"version",2},{"low",out.low},{"high",out.high},{"normalization",out.scale},{"dependencies",dependencies},{"plantProject",portable},
     // This immutable asset records format capabilities, not the scene entity's
     // FTE opt-in. Toggling that option must reuse the same model and manifest.
-    {"target",{{"profile",gameProfile},{"format",plants::targetExtension(gameProfile)},{"vertices",vertices},{"triangles",triangles},{"vertexLimit",gameProfile==2?1024:gameProfile==3?2048:0},{"triangleLimit",gameProfile==2?2048:gameProfile==3?4096:0},{"runtimeLod",alias||geometry.faces.size()!=s.result->lods[0].faces.size()},{"opaqueGeometricFoliage",alias},{"coverageMipmaps",gameProfile==1},{"vanillaRequiresCompatibleGameCode",alias},{"fteStaticModelExtensionAvailable",gameProfile==2}}}}.dump(2);
+    {"target",{{"profile",gameProfile},{"format",plants::targetExtension(gameProfile)},{"vertices",vertices},{"triangles",triangles},{"vertexLimit",gameProfile==2?1024:alias?2048:0},{"triangleLimit",gameProfile==2?2048:alias?4096:0},{"runtimeLod",alias||geometry.faces.size()!=s.result->lods[0].faces.size()},{"opaqueGeometricFoliage",alias},{"coverageMipmaps",gameProfile==1},{"vanillaRequiresCompatibleGameCode",gameProfile==2||gameProfile==3},{"fteStaticModelExtensionAvailable",gameProfile==2}}}}.dump(2);
   return out;
 }
 static void plantAddToMap() {
@@ -276,7 +308,7 @@ static void plantAddToMap() {
   if(!asset.shader.empty()){s.pendingShaders[asset.id]={asset.material,asset.shader.substr(asset.shader.find('{'))};command(("ftebroom_plant shader "+asset.id+"\n").c_str());}
   auto path=documentPath(asset.model);auto view=viewRects[viewFocus];
   auto vector=[](plants::V v){std::ostringstream out;out.imbue(std::locale::classic());out<<v[0]<<' '<<v[1]<<' '<<v[2];return out.str();};
-  auto action="ftebroom_model_drop "+organizationQuote(asset.model)+" "+std::to_string(view.x+view.w*.5f)+" "+std::to_string(view.y+view.h*.5f)+" "+organizationQuote("func_model")+" authoring "+organizationQuote(vector(asset.low))+" "+organizationQuote(vector(asset.high))+" "+organizationQuote(s.allowFteQ1?"fte-q1":"")+" "+std::to_string(asset.scale)+" "+organizationQuote(asset.source)+"\n";
+  auto action="ftebroom_model_drop "+organizationQuote(asset.model)+" "+std::to_string(view.x+view.w*.5f)+" "+std::to_string(view.y+view.h*.5f)+" "+organizationQuote(plants::targetClass(gameProfile))+" authoring "+organizationQuote(vector(asset.low))+" "+organizationQuote(vector(asset.high))+" "+organizationQuote(s.allowFteQ1?"fte-q1":"")+" "+std::to_string(asset.scale)+" "+organizationQuote(asset.source)+"\n";
   command(action.c_str());s.lastModel=path;s.message="Placed target-format model in map — Undo removes the entity; assets remain reusable.";
   if(gameProfile==2||gameProfile==3)s.message+=" Runtime placement requires compatible game code; Quake 1 may explicitly use the FTE static-model extension.";
 }

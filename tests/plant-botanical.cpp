@@ -39,7 +39,7 @@ int main(int argc,char** argv)try{
  for(auto d:catalog){Json entry={{"id",d.preset},{"seeds",Json::array()}};
   for(unsigned seed:{137u,138u,424242u}){d.seed=seed;Json row={{"seed",seed},{"triangles",Json::array()},{"fingerprints",Json::array()}};size_t previous=SIZE_MAX;bool hasFoliage=false;size_t stems=0;double nearHeight=0;
    for(int l=0;l<3;l++){auto mesh=generate(d,l);validate(mesh);check(!mesh.faces.empty(),"nonempty "+d.preset);check(mesh.faces.size()<previous,"strict LOD reduction "+d.preset);previous=mesh.faces.size();check(mesh.faces.size()<=size_t(d.p.budget*(l==0?1:l==1?d.p.lod1Ratio:d.p.lod2Ratio)),"budget "+d.preset);
-    if(l==0)nearHeight=mesh.high[2];else if(d.family==Family::Grass||d.family==Family::Riparian)check(mesh.high[2]<=nearHeight*1.12+.1,"LOD never stretches full-height grass/riparian blades "+d.preset);
+    if(l==0){check(mesh.faces.size()<=12000,"game-ready default triangle budget "+d.preset);nearHeight=mesh.high[2];}else if(d.family==Family::Grass||d.family==Family::Riparian)check(mesh.high[2]<=nearHeight*1.12+.1,"LOD never stretches full-height grass/riparian blades "+d.preset);
     auto foliage=std::count_if(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves&&(f.material==Leaf||f.material==Needle||f.material==Grass||f.material>=LeafLight);});
     std::set<unsigned> trunkOrgans;for(auto& face:mesh.faces)if(face.part==Part::Trunk)trunkOrgans.insert(face.organ);
     if(d.family==Family::Cactus&&d.p.organ==2){
@@ -57,7 +57,7 @@ int main(int argc,char** argv)try{
  std::ifstream input(argc>1?argv[1]:"tests/fixtures/plant-generator1.json");Json legacy;input>>legacy;check(legacy.size()==30,"all original presets in golden corpus");
  for(auto& item:legacy){auto original=item["project"];auto d=deserialize(original);check(d.generator==1,"opening legacy source never upgrades");check(serialize(d)==original,"legacy serialized identity preserved");check(ids.count(d.preset),"original preset ID retained");
   for(auto& seed:item["seeds"]){d.seed=seed["seed"].get<unsigned>();for(int l=0;l<3;l++)check(fingerprint(generate(d,l))==seed["lods"][l],"exact legacy geometry "+d.preset);auto maps=textureMaps(d,nullptr,nullptr,48);int slot=0;for(auto* image:{&maps.albedo,&maps.normal,&maps.orm}){std::ostringstream id;id<<std::hex<<hash(std::string(image->rgba.begin(),image->rgba.end()));check(id.str()==seed["textures"][slot++],"exact legacy atlas "+d.preset);}}
-  auto upgraded=upgradeGenerator(d);check(upgraded.generator==2&&upgraded.seed==d.seed,"explicit upgrade preserves seed");check(deserialize(serialize(upgraded)).generator==2,"new project roundtrip");
+  auto upgraded=upgradeGenerator(d);check(upgraded.generator==3&&upgraded.seed==d.seed,"explicit upgrade preserves seed");check(deserialize(serialize(upgraded)).generator==3,"new project roundtrip");
  }
  auto seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();std::ofstream out(argc>2?argv[2]:"plant-botanical-results.json");out<<Json{{"checks",checks},{"presets",catalog.size()},{"seeds",3},{"lods",3},{"mesh_cases",catalog.size()*9},{"legacy_cases",270},{"elapsed_seconds",seconds},{"matrix",report}}.dump(2);std::cout<<"PASS "<<checks<<" checks in "<<seconds<<" s\n";return 0;
 }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}

@@ -60,7 +60,7 @@ try:
  ui.console('ftebroom_plant qa dark');wait(lambda:'plant/open' in live()['widgets']);click('plant/open');wait(lambda:'plant/file-path' in live()['widgets']);r=live()['widgets']['plant/file-path'];ui.click(r['x']+r['width']*.35,r['y']+r['height']*.5);ui.key('a',('ctrl',));ui.text(str(project));ui.key('enter');click('plant/file-choose');wait(lambda:live()['plantReady'] and live()['plantPath']==str(project))
  check(not live()['plant']['active'],'ordinary tall source open has no pending context insertion')
  click('plant/add-map');wait(lambda:bool(live()['plantMessage']) and not live()['plantError']);placed=wait(lambda:map_entities('tall'))
- check(len(placed)==1,'direct Add to Map creates exactly one authoring func_model')
+ check(len(placed)==1 and placed[0]['classname']=='misc_model','direct Add to Map creates one Quake III misc_model')
  entity=placed[0];scale=float(entity.get('modelscale','1'));normalization=float(entity.get('_reyondbroom_normalization','1'))
  check(scale>1 and abs(scale-normalization)<.0001,'tall MD3 stores its world-size normalization on the entity')
  check(entity['_reyondbroom_source'].endswith('.plant.json'),'direct Add to Map retains immutable editable source')

@@ -145,7 +145,7 @@ class NativeInput:
 
  def key(self,name,mods=()):
   names={'enter':'Return','esc':'Escape','tab':'Tab','backspace':'BackSpace','grave':'grave'}
-  if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
+  if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','space':'{SPACE}','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
   for mod in mods:self.mod(mod,True)
   code=self.d.keysym_to_keycode(self.XK.string_to_keysym(names.get(name,name)));self.xtest.fake_input(self.d,self.X.KeyPress,code);self.xtest.fake_input(self.d,self.X.KeyRelease,code);self.d.sync()
   for mod in reversed(mods):self.mod(mod,False)
@@ -171,7 +171,23 @@ class NativeInput:
     import shutil,subprocess
     executable=os.environ.get('RB_QA_XCLIP') or shutil.which('xclip');assert executable,'Unicode OS-input QA requires xclip'
     subprocess.run([executable,'-selection','clipboard'],input=text.encode('utf-8'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True,timeout=10)
-   self.key('v',('ctrl',));return
+   if os.name=='nt':
+    # Clipboard paste enters the real OS queue, like mouse-wheel modifiers.
+    # Temporary SetKeyboardState around SendMessage is not the keyboard state
+    # observed when the engine later consumes its queued paste key event.
+    self.position();self.mod('ctrl',True)
+    try:
+     # A tap is queued in order; ImGui preserves its down/up transitions.
+     # Holding V over slow render frames triggers InputText paste repeat.
+     self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),0,0)
+     self.user.keybd_event(86,self.user.MapVirtualKeyW(86,0),2,0)
+     self.settle()
+    finally:self.mod('ctrl',False)
+    with (self.output/'clipboard-paste.log').open('a',encoding='utf-8') as log:
+     import hashlib
+     log.write(json.dumps({'length':len(text),'sha256':hashlib.sha256(text.encode('utf-8')).hexdigest(),'method':'OS queued Ctrl+V single tap; modifiers span observed ticks','focus':self.read_focus()})+'\n')
+   else:self.key('v',('ctrl',))
+   return
   if os.name=='nt':self.strokes(''.join('{'+c+'}' if c in '+^%~(){}' else c for c in text));return
   shift=self.d.keysym_to_keycode(self.XK.string_to_keysym('Shift_L'))
   for char in text:

@@ -18,15 +18,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          path-type: inherit
-          update: false
-          install: >-
-            mingw-w64-x86_64-gcc mingw-w64-x86_64-make
-            mingw-w64-x86_64-zlib mingw-w64-x86_64-libpng
-            mingw-w64-x86_64-libjpeg-turbo git make
       - name: Fetch exact authenticated draft runtime and verify original manifest
         shell: pwsh
         run: |
@@ -40,31 +31,19 @@ jobs:
           if ($LASTEXITCODE) { throw 'Cannot verify exact original test source commit' }
           python scripts/run-windows-input-diagnostic.py prepare baseline diagnostics
           if ($LASTEXITCODE) { throw 'Exact runtime/test verification failed' }
-      - name: Reuse the exact authenticated diagnostic engine and build the console probe
-        shell: msys2 {0}
+      - name: Reuse exact authenticated logger engine and canonical source444 probe
+        shell: pwsh
         run: |
-          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13654118230 > diagnostics/reused-engine-artifact-metadata.json
+          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13654118230 > diagnostics/engine-artifact-metadata.json
+          if ($LASTEXITCODE) { throw 'Engine metadata download failed' }
           gh api repos/reyond9079/ReyondBroom/actions/artifacts/13654118230/zip > reused-engine.zip
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib,json,shutil,zipfile
-          expected='e318d80764e563d114e33f072ca5cd753d6bec2d2139cb34fbcdc2a3506b3ffa'
-          meta=json.loads(Path('diagnostics/reused-engine-artifact-metadata.json').read_text())
-          assert meta['id']==13654118230 and meta['size_in_bytes']==4029100
-          assert meta['digest']=='sha256:'+expected
-          assert meta['workflow_run']['id']==42573529300
-          assert meta['workflow_run']['head_sha']=='5b8fd0f95c9bc4beca852c8ce8c94df278182a99'
-          archive=Path('reused-engine.zip');assert archive.stat().st_size==4029100
-          assert hashlib.sha256(archive.read_bytes()).hexdigest()==expected
-          selected=['engine-build.log','engine-source-diff.patch','instrumentation-hashes.json','instrumentation-header.h','instrumented-fteglqw64.exe']
-          with zipfile.ZipFile(archive) as z:
-              for name in selected:Path('diagnostics',name).write_bytes(z.read(name))
-          exe=Path('diagnostics/instrumented-fteglqw64.exe')
-          assert hashlib.sha256(exe.read_bytes()).hexdigest()=='7c6fa083d6664c2ffe0f65d38f0e7e0878d86605d9cb5ba93a4a9b204d5df693'
-          target=Path('engine-diagnostic/engine/release-diagnostic/fteglqw64.exe');target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(exe,target)
-          Path('diagnostics/reused-engine-proof.json').write_text(json.dumps({'artifact_id':13654118230,'artifact_bytes':4029100,'artifact_sha256':expected,'engine_sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'original_build_run':42573529300,'original_build_head':'5b8fd0f95c9bc4beca852c8ce8c94df278182a99','reason':'Previous diagnostic job built the engine successfully then failed linking its standalone wmain probe; preserve that exact engine and source evidence without rebuilding.'},indent=2))
-          PY
-          g++ -std=c++17 -O2 -static -municode tests/compilation-profile-probe.cpp -o diagnostics/compilation-profile-probe.exe
+          if ($LASTEXITCODE) { throw 'Engine archive download failed' }
+          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13652832603 > diagnostics/probe-artifact-metadata.json
+          if ($LASTEXITCODE) { throw 'Probe metadata download failed' }
+          gh api repos/reyond9079/ReyondBroom/actions/artifacts/13652832603/zip > reused-probe.zip
+          if ($LASTEXITCODE) { throw 'Probe archive download failed' }
+          python scripts/reuse-input-diagnostic-binaries.py
+          if ($LASTEXITCODE) { throw 'Authenticated binary checks failed' }
       - name: Install verified renderer and desktop
         shell: pwsh
         run: |

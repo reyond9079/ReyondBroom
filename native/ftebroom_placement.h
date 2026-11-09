@@ -50,7 +50,7 @@ static bool placementSnapshotPath(const std::filesystem::path& file){
   if(name.size()>8&&name.substr(name.size()-8)==".bbmodel")stem=name.substr(0,name.size()-8);
   else if(name.size()>11&&name.substr(name.size()-11)==".plant.json")stem=name.substr(0,name.size()-11);
   else return false;
-  for(auto extension:{".md3",".mdl",".md2"}){
+  for(auto extension:{".md3",".mdl",".md2",".iqm"}){
     auto manifest=file.parent_path()/std::filesystem::u8path(stem+extension+".reyond.json");
     if(!std::filesystem::is_regular_file(manifest)||std::filesystem::file_size(manifest)>4*1024*1024)continue;
     try{auto j=plants::Json::parse(q1Read(manifest));if(j.value("kind","")!="reyondbroom-authoring-model"||!j.contains("dependencies"))continue;for(auto& dependency:j["dependencies"])if(std::filesystem::u8path(dependency.get<std::string>()).filename()==file.filename())return true;}catch(const std::exception&){}

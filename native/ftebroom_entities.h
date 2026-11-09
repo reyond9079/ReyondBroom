@@ -108,9 +108,19 @@ static void definitionsLoadCommand()
     auto source = definitionsExpand(path, includes);
     auto loaded =
       ftebroom::entityRead(source, std::filesystem::u8path(path).extension().u8string());
-    if(gameProfile==2){std::string base; if(definitionsReadSource("quake1.ent",base)){auto defaults=ftebroom::entityRead(base,".ent");for(auto& item:loaded)if(item.second.model.empty()){auto fallback=defaults.find(item.first);if(fallback!=defaults.end())item.second.model=fallback->second.model;}}
-      for(const char* name:{"info_player_start","info_player_start2","info_player_coop","info_player_deathmatch"}){auto it=loaded.find(name);if(it!=loaded.end()&&it->second.model.empty())it->second.model="progs/player.mdl";}}
     if(gameProfile==2) {
+      std::string base;
+      if(definitionsReadSource("quake1.ent",base)) {
+        auto defaults=ftebroom::entityRead(base,".ent");
+        for(auto& item:loaded)
+          if(auto fallback=defaults.find(item.first);item.second.model.empty()&&fallback!=defaults.end())
+            item.second.model=fallback->second.model;
+        // Some mods describe only classes implemented by their game code.
+        for(const char* name:{"func_group","func_detail"})
+          if(auto it=defaults.find(name);it!=defaults.end())loaded.emplace(name,it->second);
+      }
+      for(const char* name:{"info_player_start","info_player_start2","info_player_coop","info_player_deathmatch"})
+        if(auto it=loaded.find(name);it!=loaded.end()&&it->second.model.empty())it->second.model="progs/player.mdl";
       auto player=loaded.find("info_player_start");
       if(player!=loaded.end()) {
         size_t length=0;auto data=files->LoadFile(player->second.model.c_str(),&length);
@@ -311,6 +321,10 @@ static void entityProperty(
 }
 static void entityCreate(const ftebroom::EntityDefinition& d, const float* position)
 {
+  if(gameProfile==2 && d.brush && d.name=="func_group"){
+    command("ftebroom_group \"Group\"\n");
+    return;
+  }
   cvars->SetFloat("ftebroom_instantiate_defaults",1);
   std::ostringstream point;
   point << position[0] << ' ' << position[1] << ' ' << position[2];

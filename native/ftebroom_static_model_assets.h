@@ -2,7 +2,7 @@
 #include "ftebroom_static_models.h"
 static void stageGeneratedModels(const std::string& map,const std::filesystem::path& destination,const std::filesystem::path& snapshot={}){
  std::set<std::string> copied,shaders;
- auto safe=[](const std::string& name){return ftebroom::pak::zipName(name)&&name.find_first_of("\\:\r\n")==name.npos&&(name.rfind("models/",0)==0||name.rfind("textures/",0)==0||name.rfind("progs/",0)==0||((name.rfind("scripts/plant-",0)==0||name.rfind("scripts/model-",0)==0)&&std::filesystem::u8path(name).extension()==".shader"));};
+ auto safe=[](const std::string& name){return ftebroom::pak::zipName(name)&&name.find_first_of("\\:\r\n")==name.npos&&(name.rfind("models/",0)==0||name.rfind("textures/",0)==0||name.rfind("progs/",0)==0||name=="glsl/reyond_plant_wind_v1.glsl"||((name.rfind("scripts/plant-",0)==0||name.rfind("scripts/model-",0)==0)&&std::filesystem::u8path(name).extension()==".shader"));};
  auto read=[&](const std::string& name){
   if(!safe(name))throw std::runtime_error("Invalid generated model dependency path.");
   for(auto folder:{snapshot,documentPath("ftebroom.cfg").parent_path()})if(!folder.empty()){

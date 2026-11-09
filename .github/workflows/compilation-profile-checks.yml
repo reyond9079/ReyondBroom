@@ -2,7 +2,7 @@ name: Isolated Windows OS input diagnostic
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write # GitHub requires push-level visibility to read an existing draft; this workflow never writes a release.
   actions: read
 jobs:
   diagnose:

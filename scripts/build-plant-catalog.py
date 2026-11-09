@@ -208,7 +208,7 @@ def emit():
         if traits.get('evergreen')==1:tags.append('evergreen')
         elif category in ('tree','shrub'):tags.append('deciduous')
         row['tags']=tags
-    document={'format':'ReyondBroomBotanicalCatalog','version':2,'generatorVersion':3,
+    document={'format':'ReyondBroomBotanicalCatalog','version':2,'generatorVersion':4,
               'license':'Original procedural descriptors; GPL-3.0-or-later', 'minimumByCategory':minimum,'presets':ROWS}
     text=json.dumps(document,ensure_ascii=False,sort_keys=True,indent=2)+'\n'
     destination=ROOT/'runtime/plants/builtin/catalog.json';destination.parent.mkdir(parents=True,exist_ok=True);destination.write_text(text)

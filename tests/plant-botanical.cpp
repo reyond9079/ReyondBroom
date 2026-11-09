@@ -29,6 +29,36 @@ static void checkBotanicalAppearance(const std::vector<Project>& catalog){
   auto d=find(id);auto m=generate(d);check(std::any_of(m.faces.begin(),m.faces.end(),[](auto& f){return f.part==Part::Trunk&&f.material==Bark;}),std::string("stipe fibres have their own material: ")+id);
   auto first=textureMaps(d,nullptr,nullptr,48),second=textureMaps(d,nullptr,nullptr,48);check(first.albedo.rgba==second.albedo.rgba&&first.normal.rgba==second.normal.rgba,std::string("repeatable organic materials: ")+id);
  }
+ for(auto id:{"oak","spruce","chanterelle"}){
+  auto d=find(id);d.p.clumps=4;auto mesh=generate(d);
+  std::map<unsigned,std::pair<V,V>> stems;
+  for(auto& face:mesh.faces)if(face.part==Part::Trunk){
+   auto [it,added]=stems.emplace(face.organ,std::make_pair(V{1e30,1e30,1e30},V{-1e30,-1e30,-1e30}));
+   for(auto i:face.i)for(int a=0;a<3;a++){
+    it->second.first[a]=std::min(it->second.first[a],mesh.vertices[i].p[a]);
+    it->second.second[a]=std::max(it->second.second[a],mesh.vertices[i].p[a]);
+   }
+  }
+  check(stems.size()==4,std::string("group retains all four stems: ")+id);
+  double minHeight=1e30,maxHeight=0.;
+  for(auto& [organ,bounds]:stems){
+   auto h=bounds.second[2]-bounds.first[2];
+   minHeight=std::min(minHeight,h);maxHeight=std::max(maxHeight,h);
+  }
+  check(maxHeight>minHeight*1.13,std::string("group visibly varies member height: ")+id);
+  check(fingerprint(mesh)==fingerprint(generate(d)),std::string("repeatable group: ")+id);
+ }
+ auto oakMesh=generate(oak);
+ double rootZ=0.;size_t rootFaces=0;
+ for(auto& face:oakMesh.faces)if(face.part==Part::Roots){
+  ++rootFaces;
+  for(auto i:face.i){
+   const auto& v=oakMesh.vertices[i];
+   check(v.p[2]>=-1e-6,"roots are grounded");
+   rootZ=std::max(rootZ,v.p[2]);
+  }
+ }
+ check(rootFaces>0&&rootZ<oak.p.radius,"roots stay low at the base of the trunk");
  auto morel=find("morel");double low=1e9,high=-1e9;int dark=0,light=0;for(int y=0;y<64;y++)for(int x=0;x<64;x++){auto t=texel(morel,Cap,(x+.5)/64,(y+.5)/64);low=std::min(low,t.height);high=std::max(high,t.height);dark+=t.height<.2;light+=t.height>.6;}
  check(high-low>.5&&dark>1000&&light>100,"morel has recessed cellular pits and raised walls");
 }
@@ -57,7 +87,7 @@ int main(int argc,char** argv)try{
  std::ifstream input(argc>1?argv[1]:"tests/fixtures/plant-generator1.json");Json legacy;input>>legacy;check(legacy.size()==30,"all original presets in golden corpus");
  for(auto& item:legacy){auto original=item["project"];auto d=deserialize(original);check(d.generator==1,"opening legacy source never upgrades");check(serialize(d)==original,"legacy serialized identity preserved");check(ids.count(d.preset),"original preset ID retained");
   for(auto& seed:item["seeds"]){d.seed=seed["seed"].get<unsigned>();for(int l=0;l<3;l++)check(fingerprint(generate(d,l))==seed["lods"][l],"exact legacy geometry "+d.preset);auto maps=textureMaps(d,nullptr,nullptr,48);int slot=0;for(auto* image:{&maps.albedo,&maps.normal,&maps.orm}){std::ostringstream id;id<<std::hex<<hash(std::string(image->rgba.begin(),image->rgba.end()));check(id.str()==seed["textures"][slot++],"exact legacy atlas "+d.preset);}}
-  auto upgraded=upgradeGenerator(d);check(upgraded.generator==3&&upgraded.seed==d.seed,"explicit upgrade preserves seed");check(deserialize(serialize(upgraded)).generator==3,"new project roundtrip");
+  auto upgraded=upgradeGenerator(d);check(upgraded.generator==4&&upgraded.seed==d.seed,"explicit upgrade preserves seed");check(deserialize(serialize(upgraded)).generator==4,"new project roundtrip");
  }
  auto seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();std::ofstream out(argc>2?argv[2]:"plant-botanical-results.json");out<<Json{{"checks",checks},{"presets",catalog.size()},{"seeds",3},{"lods",3},{"mesh_cases",catalog.size()*9},{"legacy_cases",270},{"elapsed_seconds",seconds},{"matrix",report}}.dump(2);std::cout<<"PASS "<<checks<<" checks in "<<seconds<<" s\n";return 0;
 }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}

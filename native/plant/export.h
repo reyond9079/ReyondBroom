@@ -72,14 +72,16 @@ inline modelExport::Mesh aliasMesh(const Mesh& mesh,const std::string& material)
 }
 inline bool opaquePlantTarget(int profile){return profile>=2&&profile<=4;}
 inline const char* targetClass(int profile){return profile==4?"cycler":profile==1?"func_model":"misc_model";}
-inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile) {
+inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile,bool maskedQuake=false) {
   if(!opaquePlantTarget(profile)){
     if(modelMesh(full,"").surfaces.size()<=32)return full;
     auto d=source;d.p.budget=32*(md3PlantVertices/3);return generate(d,0);
   }
   const size_t maxVertices=profile==2?1024:2048,maxTriangles=profile==2?2048:4096;
   const bool foliage=std::any_of(full.faces.begin(),full.faces.end(),[](auto& f){return f.part==Part::Leaves;});
-  auto d=source;d.generator=std::min(2,d.generator);d.p.quality=2;d.p.foliageMode=0;d.p.sides=3;d.p.segments=3;
+  auto d=source;
+  if(d.generator<4)d.generator=std::min(2,d.generator);
+  d.p.quality=2;d.p.foliageMode=0;d.p.sides=maskedQuake?6:3;d.p.segments=maskedQuake?6:3;
   // Spend a fixed budget over the whole crown. Repeatedly regenerate complete
   // geometry, never truncate triangle indices or drop late canopy triangles.
   for(int detail=0;detail<5;detail++){
@@ -90,7 +92,7 @@ inline Mesh targetGeometry(const Project& source,const Mesh& full,int profile) {
     d.p.petals=std::max(3,source.p.petals/(detail+1));d.p.flowerLayers=std::max(1,source.p.flowerLayers/(detail+1));
     for(int budget:{profile==2?1500:3000,profile==2?1000:2000,profile==2?700:1400,500,350,256}){
       d.p.budget=std::min(source.p.budget,budget);
-      auto mesh=generate(d,0);if(mesh.faces.empty())continue;
+      auto mesh=generate(d,0,nullptr,d.generator>=4&&!maskedQuake);if(mesh.faces.empty())continue;
       auto encoded=aliasMesh(mesh,"plant");auto& s=encoded.surfaces.front();
       bool hasLeaves=std::any_of(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves;});
       if(s.frames[0].size()<=maxVertices&&s.triangles.size()<=maxTriangles&&(!foliage||hasLeaves))return mesh;

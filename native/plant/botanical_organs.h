@@ -40,7 +40,23 @@ inline void Botanical::inflorescences() {
 }
 inline void Botanical::herbs() {
   int blades=std::max(12,int(p.branches*p.clumps*(lod==0?1:lod==1?.7:.42)*p.density));
-  if(foliagePhoto(doc)==Photo::Grass){
+  auto grassPhoto=photo();
+  if(grassPhoto!=Photo::None){
+    if(realistic()&&grassPhoto!=Photo::Grass){
+      int tufts=std::min(lod==0?(grassPhoto==Photo::Lawn?24:15):lod==1?8:4,std::max(3,blades/7));
+      for(int i=0;i<tufts;i++){
+        Rng r(mix(doc.seed,i+1000));double a=i*2.399963;
+        double spread=height*(grassPhoto==Photo::Lawn?.54:.24)*std::sqrt((i+.4)/tufts);
+        V base{std::cos(a)*spread,std::sin(a)*spread,0};
+        double lean=(.15+p.curvature*.45)*r.range(.72,1.24);
+        V aim{std::cos(a)*lean,std::sin(a)*lean,1};
+        double size=height*r.range(.63,1.02);
+        double width=size*(grassPhoto==Photo::Lawn?1.02:.84)*std::clamp(std::sqrt(p.leafWidth/.04),.65,1.4);
+        double facing=a+r.range(-.65,.65);
+        b.foliageCard(base,aim,{std::cos(facing),std::sin(facing),0},size,width,p.leafCurl*.26,lod?1:2,p.leafTwist*r.range(-.45,.45));
+      }
+      return;
+    }
     int tufts=std::min(lod==0?12:lod==1?7:4,std::max(2,blades/5));
     for(int i=0;i<tufts;i++){
       Rng r(mix(doc.seed,i+1000));double a=i*2.399963,spread=height*.17*std::sqrt(r.real());
@@ -80,7 +96,7 @@ inline void Botanical::herbs() {
 inline void Botanical::ferns() {
   bool tree=p.organ==7;V crown{0,0,tree?height*.65:0};
   if(tree){std::vector<V> stem;for(int i=0;i<=p.segments;i++)stem.push_back({0,0,crown[2]*i/p.segments});b.tube(stem,p.radius,p.radius*.72,sides(),Bark,Part::Trunk);}
-  bool photo=foliagePhoto(doc)==Photo::Fern;
+  bool photo=this->photo()==Photo::Fern;
   int fronds=photo?std::max(1,count(p.branches,3)):p.branches;
   for(int i=0;i<fronds;i++){
     b.check();Rng r(mix(doc.seed,i+42));double a=leafAngle(i),length=height*(tree?.60:.94)*r.range(.78,1.1);
@@ -244,11 +260,40 @@ inline void Botanical::fungi() {
     b.check();Rng r(mix(doc.seed,stem+49));double az=stem*2.399963,h=height*r.range(.68,1),radius=h*p.spread*.64;
     V base{std::cos(az)*height*.28*std::sqrt(double(stem)/p.clumps),std::sin(az)*height*.28*std::sqrt(double(stem)/p.clumps),0};
     if(p.organ==6)base={height*.13,0,stem*height*.26};
-    auto stalk=arc(base,add(base,{p.organ==2?h*.25:0,0,h*(p.organ==6?.13:.68)}),.03,std::max(3,count(p.segments)),mix(doc.seed,stem));
+    double stemRadius=p.radius,capYaw=0.;
+    V tilt{},lean{p.organ==2?h*.25:0,0,0};
+    if(realistic()){
+      Rng shape(mix(doc.seed,stem+6523));
+      capYaw=shape.range(0.,2*pi);
+      if(stem>0&&p.organ!=6){
+        double spacing=height*(p.organ==2?.30:.56)*std::sqrt(double(stem)/p.clumps);
+        double heading=az+shape.range(-.28,.28);
+        base={std::cos(heading)*spacing,std::sin(heading)*spacing,0};
+      }
+      double maturity=stem==0?shape.range(.94,1.11):shape.range(.59,1.04);
+      h*=maturity;
+      radius*=maturity*shape.range(.84,1.20);
+      stemRadius*=std::sqrt(maturity)*shape.range(.76,1.19);
+      if(p.organ!=6){
+        double leanAmount=h*shape.range(.03,p.organ==2?.32:.23);
+        lean={std::cos(capYaw)*leanAmount,std::sin(capYaw)*leanAmount,0};
+        tilt=mul(unit(lean),shape.range(.09,.36));
+      }
+    }
+    auto stalk=arc(base,add(base,add(lean,{0,0,h*(p.organ==6?.13:.68)})),
+      .03,std::max(3,count(p.segments)),mix(doc.seed,stem));
     if(p.organ==1){
       double span=length(sub(stalk.back(),stalk.front()));
-      b.lathe(base,{{p.radius*.75,0},{p.radius*1.06,span*.16},{p.radius*1.19,span*.40},{p.radius*.95,span*.72},{p.radius*.56,span}},std::max(8,sides()),Bark,Part::Trunk,.018);
-    }else b.tube(stalk,p.radius*.75,p.radius*.58,std::max(6,sides()),Bark,Part::Trunk);
+      size_t first=b.mesh.vertices.size();
+      b.lathe(base,{{stemRadius*.75,0},{stemRadius*1.06,span*.16},{stemRadius*1.19,span*.40},{stemRadius*.95,span*.72},{stemRadius*.56,span}},std::max(8,sides()),Bark,Part::Trunk,.018);
+      if(realistic())for(size_t i=first;i<b.mesh.vertices.size();i++){
+        auto& vertex=b.mesh.vertices[i];
+        double at=std::clamp((vertex.p[2]-base[2])/span,0.,1.)*(stalk.size()-1);
+        size_t index=std::min(stalk.size()-2,size_t(at));
+        auto axis=add(stalk[index],mul(sub(stalk[index+1],stalk[index]),at-index));
+        vertex.p=add(axis,sub(vertex.p,{base[0],base[1],vertex.p[2]}));
+      }
+    }else b.tube(stalk,stemRadius*.75,stemRadius*.58,std::max(6,sides()),Bark,Part::Trunk);
     V top=stalk.back();double thickness=radius*p.capThickness;
     std::vector<std::array<double,2>> cap;
     switch(p.organ){
@@ -258,30 +303,55 @@ inline void Botanical::fungi() {
       case 7:cap={{radius*.45,0},{radius*.65,radius*.18},{radius*.78,radius*.42},{radius*.80,radius*.68},{radius*.74,radius*.98},{radius*.63,radius*1.30},{radius*.48,radius*1.60},{radius*.29,radius*1.85},{.01,radius*1.99}};break;
       default:cap={{radius,-thickness*.12},{radius*.995,thickness*.16},{radius*.94,radius*(p.organ==2?.06:.12)},{radius*.82,radius*(p.organ==2?.12:.28)},{radius*.64,radius*(p.organ==2?.19:.43)},{radius*.39,radius*(p.organ==2?.24:.52)},{radius*.15,radius*(p.organ==2?.26:.55)},{.01,radius*(p.organ==2?.27:.55)}};
     }
-    size_t first=b.mesh.vertices.size();b.lathe(top,cap,std::max(10,count(48,8)),Cap,Part::Surface,0,p.organ==2?.20:0);
+    const bool texturedGills=realistic()&&p.organ!=7&&p.organ!=6;
+    const int capSides=std::max(10,count(48,8));
+    const double capTilt=p.organ==2?.20:0;
+    const size_t first=b.mesh.vertices.size();
+    if(texturedGills){
+      std::vector<std::array<double,2>> underside;
+      if(p.organ==3){
+        // The first three rings of the funnel already form its underside.
+        underside.assign(cap.begin(),cap.begin()+4);
+        cap.erase(cap.begin(),cap.begin()+3);
+      }else{
+        double outer=cap.front()[0],rim=cap.front()[1];
+        underside={{.01,rim-thickness*.72},{outer*.30,rim-thickness*.74},
+          {outer*.68,rim-thickness*.50},{outer*.92,rim-thickness*.19},{outer,rim}};
+      }
+      b.lathe(top,cap,capSides,Cap,Part::Surface,0,capTilt);
+      b.lathe(top,underside,capSides,Gills,Part::Surface,0,capTilt);
+    }else b.lathe(top,cap,capSides,Cap,Part::Surface,0,capTilt);
     for(size_t i=first;i<b.mesh.vertices.size();i++){
       auto& vertex=b.mesh.vertices[i];V q=sub(vertex.p,top);double a=std::atan2(q[1],q[0]),t=q[2]/std::max(.01,radius);
       double ripple=(p.organ==3?.065:p.organ==7?.038:.014)*p.irregularity/.28;
-      double scale=1+ripple*(.55*std::sin(a*3+stem*1.7)+.30*std::sin(a*7+t*2.1)+.15*std::sin(a*11-t*3));
+      double scale=1+ripple*(.55*std::sin(a*3+stem*1.7+capYaw)+.30*std::sin(a*7+t*2.1)+.15*std::sin(a*11-t*3));
       q[0]*=scale;q[1]*=scale;
       if(p.organ==3)q[2]+=radius*.035*std::pow(std::hypot(q[0],q[1])/radius,2)*std::sin(a*5+stem);
+      if(realistic()&&p.organ!=6){
+        double cosine=std::cos(capYaw),sine=std::sin(capYaw);
+        q={cosine*q[0]-sine*q[1],sine*q[0]+cosine*q[1],q[2]};
+        q[2]-=dot(q,tilt);
+        auto n=vertex.n;
+        vertex.n=unit({cosine*n[0]-sine*n[1]+tilt[0]*n[2],
+          sine*n[0]+cosine*n[1]+tilt[1]*n[2],n[2]});
+      }
       vertex.p=add(top,q);
     }
     if(p.organ==6)for(size_t i=first;i<b.mesh.vertices.size();i++){b.mesh.vertices[i].p[1]*=.55;b.mesh.vertices[i].n=unit({b.mesh.vertices[i].n[0],b.mesh.vertices[i].n[1]/.55,b.mesh.vertices[i].n[2]});}
-    if(p.organ==1)b.lathe(top,{{.01,-thickness*.6},{radius*.5,-thickness*.5},{radius,-thickness*.12}},std::max(10,count(36,8)),Gills,Part::Surface);
-    else if(p.organ!=7)for(int i=0;i<std::max(10,count(44,10));i++){
+    if(!texturedGills&&p.organ==1)b.lathe(top,{{.01,-thickness*.6},{radius*.5,-thickness*.5},{radius,-thickness*.12}},std::max(10,count(36,8)),Gills,Part::Surface);
+    else if(!texturedGills&&p.organ!=7)for(int i=0;i<std::max(10,count(44,10));i++){
       double a=2*pi*i/std::max(10,count(44,10));
       if(p.organ==3){
-        V inner=add(top,{std::cos(a)*p.radius*.64,std::sin(a)*p.radius*.64,-radius*.42});
+        V inner=add(top,{std::cos(a)*stemRadius*.64,std::sin(a)*stemRadius*.64,-radius*.42});
         V mid=add(top,{std::cos(a)*radius*.52,std::sin(a)*radius*.52,-radius*.115});
         V outer=add(top,{std::cos(a)*radius*.96,std::sin(a)*radius*.96,radius*.105});
         b.gill(inner,mid,radius*.023);b.gill(mid,outer,radius*.018);
-      }else b.gill(add(top,{std::cos(a)*p.radius*.5,std::sin(a)*p.radius*.5,-thickness*.4}),add(top,{std::cos(a)*radius*.94,std::sin(a)*radius*.94,-thickness*.1}),radius*.055);
+      }else b.gill(add(top,{std::cos(a)*stemRadius*.5,std::sin(a)*stemRadius*.5,-thickness*.4}),add(top,{std::cos(a)*radius*.94,std::sin(a)*radius*.94,-thickness*.1}),radius*.055);
     }
     if(p.organ==0||p.organ==5){
-      auto ring=stalk[stalk.size()*2/3];b.lathe(ring,{{p.radius*.8,-.4},{p.radius*1.7,-1},{p.radius*.7,.3}},std::max(7,sides()),Gills,Part::Trunk);
-      if(p.organ==0){b.lathe(base,{{p.radius*1.4,0},{p.radius*1.15,p.radius},{p.radius*.6,p.radius*1.3}},std::max(7,sides()),Gills,Part::Trunk);
-        if(lod<2){int spots=lod?12:30;
+      auto ring=stalk[stalk.size()*2/3];b.lathe(ring,{{stemRadius*.8,-.4},{stemRadius*1.7,-1},{stemRadius*.7,.3}},std::max(7,sides()),Gills,Part::Trunk);
+      if(p.organ==0){b.lathe(base,{{stemRadius*1.4,0},{stemRadius*1.15,stemRadius},{stemRadius*.6,stemRadius*1.3}},std::max(7,sides()),Gills,Part::Trunk);
+        if(lod<2){int spots=realistic()?0:lod?12:30;
           for(int i=0;i<spots;i++){
             double t=std::sqrt((i+.5)/spots)*.91,a=i*2.399963+stem,s=radius*r.range(.025,.045);
             auto q=add(top,{std::cos(a)*radius*t,std::sin(a)*radius*t,radius*.55*std::pow(1-t*t,.65)});
@@ -407,7 +477,7 @@ inline void Botanical::climbers() {
   std::vector<V> stem;int steps=std::max(12,count(p.segments*4,12));
   for(int i=0;i<=steps;i++){double t=double(i)/steps;auto at=trunk(t);at[0]+=height*p.spread*.22*std::sin(t*pi*3);at[1]+=height*p.spread*.15*std::cos(t*pi*2);stem.push_back(at);}
   b.tube(stem,p.radius,p.radius*.3,sides(),Bark,Part::Trunk);
-  bool ivy=foliagePhoto(doc)==Photo::Ivy;
+  bool ivy=photo()==Photo::Ivy;
   int nodes=ivy?std::max(3,p.leaves/(lod==2?5:3)):std::max(6,p.leaves/(lod==2?2:1));
   for(int i=1;i<nodes;i++){
     double a=leafAngle(i);V dir{std::cos(a),std::sin(a),-.08};

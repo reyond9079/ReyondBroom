@@ -93,6 +93,15 @@ def live():
 def mods_live():
     return read_ui_json(mods_state)
 
+def same_path(actual, expected):
+    # Native telemetry can preserve forward slashes from an imported command;
+    # Windows Path comparisons also accept the equivalent native separators.
+    return bool(actual) and Path(actual) == Path(expected)
+
+def same_paths(actual, expected):
+    # Preserve resource override order while comparing filesystem paths.
+    return [Path(path) for path in actual] == [Path(path) for path in expected]
+
 def wait(fn, timeout=90):
     end = time.monotonic()+timeout
     while time.monotonic() < end:
@@ -162,14 +171,14 @@ try:
         '+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound',
         '-condebug','-window','-width','1600','-height','1000','-basedir',str(root),'+exec','mod-lighting-qa.cfg'],
         cwd=root, env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'}, stdout=stream, stderr=subprocess.STDOUT)
-    wait(lambda:live().get('document') == str(mapfile) and 'compile' in live().get('widgets',{}))
+    wait(lambda:same_path(live().get('document'), mapfile) and 'compile' in live().get('widgets',{}))
     ui = NativeInput(process, state, live, wait, out, focus_required=True)
     ui.position()
     if not windows:
         ui.window.set_input_focus(ui.X.RevertToParent, ui.X.CurrentTime)
         ui.d.sync()
-    wait(lambda:mods_live()['document'] == str(mapfile) and not mods_live()['loading'])
-    check(mods_live()['mods'] == [] and mods_live()['resourcePaths'] == [str(fixture/'id1')],
+    wait(lambda:same_path(mods_live()['document'], mapfile) and not mods_live()['loading'])
+    check(mods_live()['mods'] == [] and same_paths(mods_live()['resourcePaths'], [fixture/'id1']),
           'existing_vanilla_map_does_not_inherit_unrelated_global_AD_resource_selection')
     check_resource('initial', fixture/'id1')
     click_compile('close')
@@ -182,8 +191,8 @@ try:
     click_mod('map_mod_available/AD19b5')
     click_mod('map_mod_add')
     wait(lambda:mods_live()['mods'] == ['AD19b5'] and not mods_live()['loading'])
-    check(mods_live()['resourcePaths'] == [str(fixture/'id1'), str(mod)] and
-          Path(mods_live()['runtime']) == mod and not mods_live()['error'],
+    check(same_paths(mods_live()['resourcePaths'], [fixture/'id1', mod]) and
+          same_path(mods_live()['runtime'], mod) and not mods_live()['error'],
           'actual_Mod_plus_updates_map_list_active_runtime_and_base_mod_resource_stack')
     check(mods_live()['base'] == 'id1' and 'id1' not in mods_live()['mods'],
           'inherited_id1_is_separate_from_editable_enabled_mods')
@@ -191,18 +200,18 @@ try:
     ImageGrab.grab().save(out/'selected-ad-mod.png')
     ui.console('ftebroom_undo')
     wait(lambda:mods_live()['mods'] == [] and not mods_live()['loading'])
-    check(mods_live()['resourcePaths'] == [str(fixture/'id1')],
+    check(same_paths(mods_live()['resourcePaths'], [fixture/'id1']),
           'Undo_restores_vanilla_map_and_its_actual_resource_stack')
     check_resource('undone', fixture/'id1')
     ui.console('ftebroom_redo')
     wait(lambda:mods_live()['mods'] == ['AD19b5'] and not mods_live()['loading'])
-    check(mods_live()['resourcePaths'][-1] == str(mod),
+    check(same_path(mods_live()['resourcePaths'][-1], mod),
           'Redo_restores_AD_map_and_its_actual_resource_stack')
     check_resource('redone', mod)
     click_mod('map_mod_enabled/AD19b5')
     click_mod('map_mod_remove')
     wait(lambda:mods_live()['mods'] == [] and not mods_live()['loading'])
-    check(Path(mods_live()['runtime']) == fixture/'id1',
+    check(same_path(mods_live()['runtime'], fixture/'id1'),
           'actual_Mod_minus_restores_vanilla_active_runtime')
     ui.console('ftebroom_undo')
     wait(lambda:mods_live()['mods'] == ['AD19b5'] and not mods_live()['loading'])
@@ -217,9 +226,9 @@ try:
     old_generation = mods_live()['generation']
     ui.console('ftebroom_test_filepath open '+json.dumps(mapfile.as_posix()))
     wait(lambda:mods_live()['generation'] > old_generation and
-         mods_live()['document'] == str(mapfile) and
+         same_path(mods_live()['document'], mapfile) and
          mods_live()['mods'] == ['AD19b5'] and not mods_live()['loading'])
-    check(Path(mods_live()['runtime']) == mod and not mods_live()['error'],
+    check(same_path(mods_live()['runtime'], mod) and not mods_live()['error'],
           'saved_map_reopens_with_the_same_AD_mod_and_resource_stack')
     check_resource('reopened', mod)
     ui.console('ftebroom_test_run 50')
@@ -281,7 +290,7 @@ try:
     click_compile('engine-launch')
     record = wait(lambda:read_ui_json(receipt))
     wait(lambda:'Engine exited with code 0' in live()['log'])
-    check(not live()['error'] and Path(record['cwd']) == launchdir,
+    check(not live()['error'] and same_path(record['cwd'], launchdir),
           'imported_engine_uses_its_executable_working_directory')
     check(record['argv'][3:] == ['-game','AD19b5','+map','customer_lighting','-noambient',
                                 '+developer','1','+exec','balmapping.cfg'],
@@ -308,7 +317,7 @@ try:
     previous_generation = mods_live()['generation']
     ui.console('ftebroom_test_filepath open '+json.dumps(fresh_map.as_posix()))
     wait(lambda:mods_live()['generation'] > previous_generation and
-         mods_live()['document'] == str(fresh_map) and not mods_live()['loading'])
+         same_path(mods_live()['document'], fresh_map) and not mods_live()['loading'])
     view = live()['views'][0]
     ui.click(view['x']+view['width']*.5,view['y']+view['height']*.5)
     ui.key('s', ('ctrl',))

@@ -177,6 +177,16 @@ struct Botanical : Generator {
     auto steps=[&](Part part){return std::max(1,int(segments*(part==Part::Twigs?.27:part==Part::Secondary?.45:part==Part::Primary?.65:1.)));};
     auto estimate=[&](){size_t sum=0;for(auto& span:skeleton){if(span.part==Part::Twigs&&(lod>0||compact()))sum+=doc.family==Family::Conifer&&lod==2?0:2;else sum+=size_t(std::min<int>(steps(span.part),span.path.size()-1)+1)*rings(span.part)*2;}return sum;};
     while(estimate()>allowance&&(segments>1||radial>3)){if(segments>2)--segments;else if(radial>3)--radial;else --segments;}
+    const auto fullBudget=b.budget;
+    if(compact()){
+      // Keep structural branches ahead of ribbons and leave space for foliage,
+      // including when a small distant LOD exhausts its skeleton allowance.
+      std::stable_sort(skeleton.begin(),skeleton.end(),[](const Span& a,const Span& c){
+        auto rank=[](Part part){return part==Part::Trunk?0:part==Part::Roots?1:int(part);};
+        return rank(a.part)<rank(c.part);
+      });
+      b.budget=std::max<size_t>(fullBudget/2,b.mesh.faces.size());
+    }
     for(auto& span:skeleton){
       if(span.part==Part::Twigs&&(lod>0||compact())){
         if(doc.family==Family::Conifer&&lod==2)continue; // needle cards carry their shoot axis
@@ -187,6 +197,7 @@ struct Botanical : Generator {
       for(int i=0;i<=n;i++)path.push_back(span.path[size_t(double(i)*(span.path.size()-1)/n)]);
       b.tube(path,span.radius,span.tip,rings(span.part),Bark,span.part);
     }
+    b.budget=fullBudget;
   }
   void emitFoliage(bool needles=false) {
     // Stable spatial sampling covers the whole planned crown at all LODs.

@@ -127,6 +127,22 @@ class NativeInput:
   with (self.output/'windows-input-receipts.jsonl').open('a') as stream:stream.write(json.dumps(state)+'\n')
   return state
 
+ def assert_windows_mouse_activation(self,stage):
+  if os.name!='nt':return
+  self.position()
+  # Check the real engine WndProc policy without injecting a button event or
+  # invoking an editor callback. Windows must not eat a DOWN addressed to an
+  # already active editor, including after an external console process exits.
+  result=ctypes.c_size_t()
+  assert self.user.SendMessageTimeoutW(self.hwnd,0x21,self.hwnd,1|(0x201<<16),2,5000,ctypes.byref(result)), 'Mouse activation query timed out'
+  report={'stage':stage,'time_ns':time.time_ns(),'editor':self.hwnd,
+          **self.windows_focus(),'message':'WM_MOUSEACTIVATE','hit_test':'HTCLIENT',
+          'button_message':'WM_LBUTTONDOWN','result':result.value}
+  path=self.output/'windows-mouse-activation.json'
+  rows=json.loads(path.read_text()) if path.exists() else []
+  rows.append(report);path.write_text(json.dumps(rows,indent=2)+'\n')
+  assert result.value==1, ('Active editor must return MA_ACTIVATE, without eating the click',report)
+
  def strokes(self,text):
   self.position()
   self.windows_receipt('before-keys',length=len(text))

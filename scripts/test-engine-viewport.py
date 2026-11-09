@@ -72,6 +72,7 @@ def start(label):
  globals()['wait']=wait
  wait(lambda:live()['game']=='quake1' and len(live()['views'])==4)
  ui=NativeInput(process,statepath,live,wait,out,focus_required=True);ui.position()
+ ui.assert_windows_mouse_activation('initial-'+label)
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
  ui.move(600,300);ui.settle()
 def stop():
@@ -134,6 +135,7 @@ try:
    # Receipt creation precedes process/console teardown. Do not race that
    # teardown with the next profile click; real engines intentionally stay up.
    wait(lambda:'Engine exited with code 0' in live()['log'])
+   ui.assert_windows_mouse_activation('after-engine-'+str(i))
   shot('compiled-engine-'+str(i))
  saved=read_ui_json(store)['games']['quake1']['engines']
  expect(saved==engines,'engine_path_arguments_workdir_map_survive_restart')

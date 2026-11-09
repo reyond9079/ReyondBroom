@@ -346,7 +346,7 @@ try:
     click_compile('close')
 
     # The customer's profile requests a LIT copy even on a grayscale map.
-    # A second build with a zero-brightness light must preserve the good
+    # A second build without a light source must preserve the good
     # deployment and leave the failing intermediate files for inspection.
     gray_map = source_dir/'required_gray_lit.map'
     gray_scene = scene.replace('"_color" "1 0.2 0.1"\n', '').replace('"classname" "worldspawn"',
@@ -377,7 +377,9 @@ try:
           and len(payload)>100 and max(payload)>0
           and payload[::3] == payload[1::3] == payload[2::3],
           'required_grayscale_sidecar_is_generated_and_survives_nested_cleanup')
-    gray_map.write_text(gray_map.read_text().replace('"light" "500"', '"light" "0"',1))
+    light_entity = '{\n"classname" "light"\n"origin" "0 0 192"\n"light" "500"\n}\n'
+    assert light_entity in gray_map.read_text()
+    gray_map.write_text(gray_map.read_text().replace(light_entity, '',1))
     zero_log = compile_gray()
     (out/'empty-lighting-compiler.log').write_text(zero_log)
     check('LIGHT produced no Quake BSP light samples' in zero_log

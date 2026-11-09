@@ -10,7 +10,10 @@ struct Botanical : Generator {
   std::vector<Span> skeleton;
   std::vector<Shoot> foliage;
   bool opaque;
-  Botanical(const Project& d,int l,const std::atomic<bool>* c,bool solid=false):Generator(d,l,c),opaque(solid){}
+  Botanical(const Project& d,int l,const std::atomic<bool>* c,bool solid=false):Generator(d,l,c),opaque(solid){
+    b.repeatBark=d.generator>=4&&(d.family==Family::Broadleaf||d.family==Family::Conifer||
+      d.family==Family::Bush||d.family==Family::Palm||d.family==Family::Custom);
+  }
   bool realistic() const {return doc.generator>=4&&p.quality!=3;}
   Photo photo() const {return opaque?Photo::None:foliagePhoto(doc);}
   bool compact() const {return doc.generator>=3&&p.quality!=3;}

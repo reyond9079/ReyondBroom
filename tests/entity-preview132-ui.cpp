@@ -10,6 +10,8 @@
 #include <fstream>
 #include <map>
 #include <thread>
+// The production ImGui build calls this hook while drawing labels.
+void FteBroomTranslate(const char*&,const char*&){}
 using qhandle_t=int;
 static std::string modelBytes,imageBytes;
 static int reads=0,uploads=0,unloads=0;

@@ -76,6 +76,7 @@ jobs:
           g++ -std=c++17 -O2 tests/map-mod-state.cpp -o deps/map-mod-state
           deps/map-mod-state > qa/mod-profiles/map-mod-state.log
           python tests/check-editor-resource-stack.py deps/editor-engine > qa/mod-profiles/resource-stack.log
+          python tests/check-windows-mouse-activation.py deps/editor-engine > qa/mod-profiles/mouse-activation-policy.log
           LIBGL_ALWAYS_SOFTWARE=1 python tests/test-grid-lod.py --output qa/mod-profiles/grid-lod.json
       - name: Build and test the native module and profile importer
         run: |
@@ -277,6 +278,7 @@ jobs:
           g++ -std=c++17 -O2 tests/map-mod-state.cpp -o deps/map-mod-state.exe
           deps/map-mod-state.exe > qa/mod-profiles/map-mod-state.log
           python tests/check-editor-resource-stack.py deps/editor-engine > qa/mod-profiles/resource-stack.log
+          python tests/check-windows-mouse-activation.py deps/editor-engine > qa/mod-profiles/mouse-activation-policy.log
       - name: Package runtime and complete corresponding sources
         shell: msys2 {0}
         run: |

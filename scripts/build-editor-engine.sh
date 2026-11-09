@@ -18,6 +18,7 @@ python_bin=python3
 if [ "$platform" = Windows-x64 ]; then python_bin=python; fi
 "$python_bin" "$src/scripts/apply-engine-patches.py" "$engine"
 "$python_bin" "$src/tests/check-editor-resource-stack.py" "$engine"
+"$python_bin" "$src/tests/check-windows-mouse-activation.py" "$engine"
 if [ "$platform" = Linux-SDL2-x64 ]; then
   bash "$src/scripts/build-sdl2-engine.sh" "$engine"
 else

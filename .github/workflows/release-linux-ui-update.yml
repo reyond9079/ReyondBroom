@@ -155,6 +155,7 @@ jobs:
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-cleanup.py "$bundle" qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-paths.py "$bundle" qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe
           xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-target-ui.py "$bundle" qa/rb10/plant-target-ui
+          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-brush.py "$bundle" qa/rb10/plant-brush
           for theme in dark light; do
             for dimensions in '1920 1080' '1024 768'; do
               read -r width height <<< "$dimensions"
@@ -361,6 +362,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'TrenchBroom compilation source/working-path acceptance failed' }
           python scripts/test-plant-target-ui.py $bundle qa/rb10/plant-target-ui
           if ($LASTEXITCODE) { throw 'Plant native target acceptance failed' }
+          python scripts/test-plant-brush.py $bundle qa/rb10/plant-brush
+          if ($LASTEXITCODE) { throw 'Plant Brush acceptance failed' }
           foreach ($theme in @('dark','light')) {
             foreach ($width in @(1920,1024)) {
               $height = if ($width -eq 1920) { 1080 } else { 768 }

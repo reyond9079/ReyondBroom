@@ -31,6 +31,11 @@ void fb_sculpt_finish(int apply);
 void fb_sculpt_down(vector pixel);
 void fb_sculpt_move(vector pixel);
 void fb_sculpt_draw();
+void fb_plant_brush_down(vector pixel,int view);
+void fb_plant_brush_move(vector pixel,int view);
+void fb_plant_brush_up(vector pixel,int view);
+void fb_plant_brush_draw();
+int fb_plant_brush_cancel();
 void fb_rotate_reset();
 void fb_rotate_cancel();
 void fb_rotate_down(vector pixel,int alt,int view);
@@ -72,7 +77,7 @@ void fb_assemble_apply();
 // Modal lifecycle and gesture ownership. Geometry tools are implemented in later tasks.
 enum : int { FB_TOOL_NONE, FB_TOOL_BRUSH, FB_TOOL_CLIP, FB_TOOL_ROTATE,
     FB_TOOL_SWEEP, FB_TOOL_SCALE, FB_TOOL_SHEAR, FB_TOOL_VERTEX, FB_TOOL_EDGE,
-    FB_TOOL_FACE, FB_TOOL_CONTROLPOINT, FB_TOOL_SCULPT, FB_TOOL_BEND, FB_TOOL_POLYGONCUT, FB_TOOL_POLYGONSPAWN, FB_TOOL_SPIN, FB_TOOL_GRIDROTATE };
+    FB_TOOL_FACE, FB_TOOL_CONTROLPOINT, FB_TOOL_SCULPT, FB_TOOL_BEND, FB_TOOL_POLYGONCUT, FB_TOOL_POLYGONSPAWN, FB_TOOL_SPIN, FB_TOOL_GRIDROTATE, FB_TOOL_PLANTBRUSH };
 enum : int { FB_OWNER_NONE, FB_OWNER_MOVE, FB_OWNER_SHAPE, FB_OWNER_SELECTION, FB_OWNER_MODAL, FB_OWNER_MATERIAL, FB_OWNER_EXTRUDE };
 int fb_owner, fb_handle_count, fb_shape_count;
 float fb_active;
@@ -96,7 +101,7 @@ void fb_tool_panel_state()
     cvar_set("ftebroom_shape_points",itos(fb_shape_count));
     cvar_set("ftebroom_gesture_owner",itos(fb_owner));
 }
-float fb_tool_can_activate(int tool) { return tool>=FB_TOOL_NONE && tool<=FB_TOOL_GRIDROTATE && !(tool==FB_TOOL_CONTROLPOINT && cvar("ftebroom_classic_map")); }
+float fb_tool_can_activate(int tool) { return tool>=FB_TOOL_NONE && tool<=FB_TOOL_PLANTBRUSH && !(tool==FB_TOOL_CONTROLPOINT && cvar("ftebroom_classic_map")); }
 void fb_tool_refresh()
 {
     fb_cancel(); fb_owner=FB_OWNER_NONE;
@@ -136,6 +141,7 @@ void fb_tool_activate(int tool)
 }
 int fb_tool_id(string name)
 {
+    if(name=="plantbrush")return FB_TOOL_PLANTBRUSH;
     if(name=="gridrotate")return FB_TOOL_GRIDROTATE;
     if(name=="spin")return FB_TOOL_SPIN;
     if(name=="polygoncut")return FB_TOOL_POLYGONCUT;
@@ -160,6 +166,7 @@ float fb_tool_cancel()
     int tool=cvar("ftebroom_tool");
     if(tool==FB_TOOL_CLIP && fb_clip_count>0) {fb_clip_count--; return TRUE;}
     if(tool==FB_TOOL_SWEEP)return fb_sweep_escape();
+    if(tool==FB_TOOL_PLANTBRUSH)return fb_plant_brush_cancel();
     if(tool==FB_TOOL_BRUSH && fb_shape_count>0) {fb_shape_count=0; return TRUE;}
     if(fb_handle_count>0) {fb_vertex_deselect();fb_handle_count=0; vertedit.selectedvert1=vertedit.selectedvert2=-1; return TRUE;}
     return FALSE;
@@ -193,6 +200,7 @@ void fb_tool_pointer_down(vector pixel,float alt,int view)
     else if(tool==FB_TOOL_POLYGONCUT||tool==FB_TOOL_POLYGONSPAWN)fb_polygon_down(pixel,view);
     else if(tool==FB_TOOL_BEND)fb_bend_down(pixel,alt,view);
     else if(tool==FB_TOOL_SCULPT) fb_sculpt_down(pixel);
+    else if(tool==FB_TOOL_PLANTBRUSH) fb_plant_brush_down(pixel,view);
     else if(tool==FB_TOOL_CLIP) fb_clip_down(pixel,view);
     else if(tool==FB_TOOL_SWEEP) fb_sweep_down(pixel,alt,view);
     else if(fb_vertex_tool()) fb_vertex_down(pixel,alt,view);
@@ -215,6 +223,7 @@ void fb_tool_pointer_move(vector pixel,float alt,int view)
     else if(cvar("ftebroom_tool")==FB_TOOL_POLYGONCUT||cvar("ftebroom_tool")==FB_TOOL_POLYGONSPAWN)fb_polygon_move(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_BEND)fb_bend_move(pixel,alt,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_SCULPT)fb_sculpt_move(pixel);
+    else if(tool==FB_TOOL_PLANTBRUSH)fb_plant_brush_move(pixel,view);
     else if(fb_moveface_active)fb_moveface_move(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_CLIP) fb_clip_move(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_SWEEP) fb_sweep_move(pixel,alt,view);
@@ -230,6 +239,7 @@ void fb_tool_pointer_up(vector pixel,float alt,int view)
     else if(cvar("ftebroom_tool")==FB_TOOL_POLYGONCUT||cvar("ftebroom_tool")==FB_TOOL_POLYGONSPAWN)fb_polygon_up(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_BEND)fb_bend_up(pixel,alt,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_SCULPT)fb_sculpt_finish(TRUE);
+    else if(cvar("ftebroom_tool")==FB_TOOL_PLANTBRUSH)fb_plant_brush_up(pixel,view);
     else if(fb_moveface_active)fb_moveface_up(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_CLIP) fb_clip_up(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_SWEEP) fb_sweep_up(pixel,alt,view);
@@ -242,7 +252,7 @@ void fb_tool_pointer_up(vector pixel,float alt,int view)
 }
 void fb_tool_double_click(vector pixel,float alt,int view) { fb_tool_pointer_down(pixel,alt,view); fb_tool_pointer_up(pixel,alt,view); }
 void fb_tool_scroll(float delta) { }
-void fb_tool_draw() { fb_clip_preview();fb_rotate_draw();fb_vertex_draw();fb_scale_draw();fb_assemble_draw();fb_sweep_draw();fb_sculpt_draw();fb_bend_draw();fb_polygon_draw();fb_spin_draw(); }
+void fb_tool_draw() { fb_clip_preview();fb_rotate_draw();fb_vertex_draw();fb_scale_draw();fb_assemble_draw();fb_sweep_draw();fb_sculpt_draw();fb_plant_brush_draw();fb_bend_draw();fb_polygon_draw();fb_spin_draw(); }
 void fb_tools_test()
 {
     string mode=argv(1);

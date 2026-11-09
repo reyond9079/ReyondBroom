@@ -464,7 +464,8 @@ static void runTrenchTask(){
     if(runTesting){++runStep;return;}
     runStartProcess(source,destination,working);return;
   }
-  const auto input=runFilePath(source);
+  auto input=ftebroom::profile::parsePath(source);
+  if(input.is_relative())input=working/input;
   const auto filename=input.filename().u8string(),extension=input.extension().u8string();
   // An exact cleanup of a Quake build output targets its working copy only.
   // A recursive filename match can also find a deployed copy below working.
@@ -517,9 +518,10 @@ static void runTick()
         // Match the reference process status mapping, including breakpoint /
         // guard-page exceptions and its reserved forced-termination code.
         if(code==0xf291UL||(code>=0x80000000UL&&code<0xD0000000UL)||!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error(message);
+        runCheckQuakeLit(true);
         runAppend(message+"; continuing as configured.\n");
       }
-      runCheckQuakeLit(code!=0);
+      if(!code)runCheckQuakeLit(false);
       if(runStageHook)runStageHook();
       ++runStep;
     }
@@ -530,9 +532,9 @@ static void runTick()
       if(!WIFEXITED(status)||WEXITSTATUS(status)){
         if(!WIFEXITED(status))throw std::runtime_error("Tool crashed with signal "+std::to_string(WTERMSIG(status)));
         if(!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error("Tool exited with code "+std::to_string(WEXITSTATUS(status)));
+        runCheckQuakeLit(true);
         runAppend("Tool exited with code "+std::to_string(WEXITSTATUS(status))+"; continuing as configured.\n");
-      }
-      runCheckQuakeLit(WEXITSTATUS(status)!=0);
+      }else runCheckQuakeLit(false);
       if(runStageHook)runStageHook();++runStep;}
 #endif
     if(runExportWaiting)

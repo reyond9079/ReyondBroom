@@ -76,7 +76,7 @@ int main(int argc,char** argv)try{
   for(int profile=0;profile<5;profile++)require(targetClass(profile)==classes[profile],"runtime classname for every profile");
   auto oakMesh=generate(oak);auto gold=targetModel(targetGeometry(oak,oakMesh,4),"plant",4);
   auto maps=textureMaps(oak,nullptr,nullptr,64,&photos);
-  auto oldOak=oak;oldOak.generator=2;auto oldMesh=generate(oldOak);
+  auto oldOak=oak;oldOak.generator=2;oldOak.p.budget=32000;auto oldMesh=generate(oldOak);
   require(oakMesh.faces.size()*3<oldMesh.faces.size(),"photographic oak uses less than a third of the former geometry");
   auto studio=ftebroom::studioExport::bake(gold,{aliasSkin(maps.albedo)},1);
   require(studio.substr(0,4)=="IDST"&&ftebroom::legacyModels::studio(studio,{}).at(0).triangles.size()==gold.surfaces[0].triangles.size(),"GoldSrc plant uses the native importer");

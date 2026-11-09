@@ -362,6 +362,13 @@ inline void Botanical::succulents() {
 }
 inline void Botanical::reedsAndBamboo() {
   bool bamboo=doc.family==Family::Bamboo;
+  int radial=bamboo?sides():p.organ==2?3:std::max(3,sides()-3);
+  int segments=std::max(1,count(p.segments,1));
+  if(compact()){
+    int perCulm=int(b.budget/2/p.clumps);
+    radial=std::min(radial,std::max(3,perCulm/(2*(p.branches+1))));
+    segments=std::min(segments,std::max(1,(perCulm/(2*radial)-1)/p.branches));
+  }
   struct Node {V tip;int stem,index;double az,height;uint64_t id;};std::vector<Node> nodes,heads;
   // Emit every culm first. Internode caps and early leaf sprays must never
   // consume the last culm's budget, especially in the distant LOD.
@@ -370,10 +377,10 @@ inline void Botanical::reedsAndBamboo() {
     V base{std::cos(az)*height*.16,std::sin(az)*height*.16,0},last=base;std::vector<V> stalk{base};
     for(int j=0;j<p.branches;j++){
       double t=double(j+1)/p.branches;auto tip=add(base,{std::cos(az)*h*p.curvature*.13*t*t,std::sin(az)*h*p.curvature*.13*t*t,h*t});
-      auto path=arc(last,tip,0,std::max(1,count(p.segments,1)),mix(stem,j));stalk.insert(stalk.end(),path.begin()+1,path.end());
+      auto path=arc(last,tip,0,segments,mix(stem,j));stalk.insert(stalk.end(),path.begin()+1,path.end());
       nodes.push_back({tip,stem,j,leafAngle(j)+az,h,mix(doc.seed,stem*97+j+19)});last=tip;
     }
-    b.tube(stalk,p.radius,p.radius*.66,bamboo?sides():p.organ==2?3:std::max(3,sides()-3),Bark,Part::Trunk);
+    b.tube(stalk,p.radius,p.radius*.66,radial,Bark,Part::Trunk);
     heads.push_back({last,stem,p.branches-1,az,h,mix(doc.seed,stem+903)});
   }
   if(lod<2&&(bamboo||p.organ==3))for(auto& n:nodes)b.lathe(n.tip,{{p.radius*.9,-p.radius*.2},{p.radius*1.12,0},{p.radius*.86,p.radius*.25}},std::max(4,sides()),Wood,Part::Primary);

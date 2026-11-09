@@ -3,7 +3,7 @@ run-name: Windows input handoff diagnostic @ ${{ github.sha }}
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   diagnose:
     runs-on: windows-2022

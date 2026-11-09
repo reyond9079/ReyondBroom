@@ -92,7 +92,7 @@ try:
  entity=placed[0];scale=float(entity.get('modelscale','1'));normalization=float(entity.get('_reyondbroom_normalization','1'))
  check(scale>1 and abs(scale-normalization)<.0001,'tall MD3 stores its world-size normalization on the entity')
  check(entity['_reyondbroom_source'].endswith('.plant.json'),'direct Add to Map retains immutable editable source')
- model=data/entity['model'];encoded=model.read_bytes();check(encoded[:4]==b'IDP3','FTE/Quake III target is an actual native MD3')
+ model=data/entity['model'];encoded=model.read_bytes();check(encoded[:4]==b'IDP3','Quake III target is an actual native MD3')
  metadata=json.loads((data/(entity['model']+'.reyond.json')).read_text());_,_,zmin=struct.unpack_from('<3f',encoded,108);_,_,zmax=struct.unpack_from('<3f',encoded,120)
  check(all(game[field]==metadata['target'][field] for field in ('vertices','triangles')),
        'Game Preview reports the same geometry counts as the placed MD3')

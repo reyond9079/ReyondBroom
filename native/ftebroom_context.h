@@ -121,22 +121,28 @@ static void sceneContextPanel()
     }
     ImGui::Separator();
     for (int type = 0; type < 2; type++)
-      if (
-        ImGui::BeginMenu(
-          type ? "Create brush entity" : "Create point entity",
-          !type || cvars->GetFloat("ftebroom_selection_count") > 0))
+    {
+      bool open = ImGui::BeginMenu(type ? "Create brush entity" : "Create point entity",
+        !type || cvars->GetFloat("ftebroom_selection_count") > 0);
+      if(type)placementRect("context/brush-entity");
+      if (open)
       {
         std::map<std::string, std::vector<std::string>> categories;
         for (const auto& item : entityDefinitions)
           if (item.first != "worldspawn" && item.second.brush == (type != 0))
             categories[item.first.substr(0, item.first.find('_'))].push_back(item.first);
         for (const auto& category : categories)
-          if (ImGui::BeginMenu(category.first.c_str()))
+        {
+          bool categoryOpen = ImGui::BeginMenu(category.first.c_str());
+          if(type && placementQa())placementRect(("context/brush-category/"+category.first).c_str());
+          if (categoryOpen)
           {
             for (const auto& name : category.second)
             {
               const auto& item = *entityDefinitions.find(name);
-              if (ImGui::MenuItem(item.first.c_str()))
+              bool clicked = ImGui::MenuItem(item.first.c_str());
+              if(type && placementQa())placementRect(("context/brush-class/"+item.first).c_str());
+              if (clicked)
               {
                 if (type)
                 {
@@ -159,8 +165,10 @@ static void sceneContextPanel()
             }
             ImGui::EndMenu();
           }
+        }
         ImGui::EndMenu();
       }
+    }
     ImGui::EndPopup();
   }
   if (organizationNameRequest)

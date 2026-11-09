@@ -23,6 +23,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime', type=Path)
 p.add_argument('output', type=Path)
 p.add_argument('--probe', required=True, type=Path)
+p.add_argument('--ericw', type=Path, help='Override the packaged ericw tools for compiler version checks')
 a = p.parse_args()
 repo = Path(__file__).resolve().parents[1]
 original, out, probe = a.runtime.resolve(), a.output.resolve(), a.probe.resolve()
@@ -35,17 +36,22 @@ shutil.copytree(original, root, ignore=shutil.ignore_patterns('updates', 'downlo
 windows = os.name == 'nt'
 engine = root/('bin/fteqw64.exe' if windows else 'fteqw-gl64')
 module = root/('fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so')
-fixture = out/'Game resources'
+# Keep the deployed mod underneath the working directory to verify that
+# literal cleanup cannot remove the deployed files with the same names.
+source_dir = out/'External source maps'
+source_dir.mkdir()
+fixture = source_dir/'Game resources'
 subprocess.run([sys.executable, str(repo/'tests/make-quake1-fixture.py'), str(fixture)], cwd=repo, check=True)
 mod = fixture/'AD19b5'
 (mod/'textures').mkdir(parents=True)
+(mod/'ad-mapping.fgd').write_text(
+    '@SolidClass = func_detail_illusionary : "Mod detail" []\n'
+    '@SolidClass = trigger_fog : "Mod fog" []\n')
 # Identical virtual names with different physical contents exercise the actual
 # patched FTE search stack independently of native metadata and WAD scanning.
 for phase in ('initial', 'selected', 'undone', 'redone', 'reopened'):
     for folder,label in ((fixture/'id1','BASE'), (mod,'AD')):
         (folder/('rb134-'+phase+'-resource.txt')).write_text(label+' resource winner\n')
-source_dir = out/'External source maps'
-source_dir.mkdir()
 mapfile = source_dir/'customer_lighting.map'
 wad = fixture/'id1/test textures.wad'
 scene = (fixture/'editor/ftebroom/maps/build-fixture.map').read_text()
@@ -65,7 +71,8 @@ original_tasks = json.loads(customer_file.read_text())['profiles'][0]['tasks']
 for task in profile['tasks']:
     if task['type'] == 'tool':
         executable = task['tool'].rsplit('/', 1)[-1]
-        task['tool'] = (root/'tools/ericw'/(executable if windows else executable.removesuffix('.exe'))).as_posix()
+        compiler_dir = a.ericw.resolve() if a.ericw else root/'tools/ericw'
+        task['tool'] = (compiler_dir/(executable if windows else executable.removesuffix('.exe'))).as_posix()
     elif task['type'] == 'copy':
         task['target'] = fixture.as_posix()+'/${MODS[-1]}/maps'
 assert all(task.get('parameters') == original.get('parameters') for task,original in zip(profile['tasks'],original_tasks))
@@ -336,6 +343,80 @@ try:
     check('q1test' in embedded_test_textures(fresh_target.read_bytes()),
           'Save_then_Compile_uses_resolved_WAD_even_when_live_world_had_no_wad_key')
     ImageGrab.grab().save(out/'fresh-map-immediate-compile.png')
+    click_compile('close')
+
+    # The customer's profile requests a LIT copy even on a grayscale map.
+    # A second build with a zero-brightness light must preserve the good
+    # deployment and leave the failing intermediate files for inspection.
+    gray_map = source_dir/'required_gray_lit.map'
+    gray_scene = scene.replace('"_color" "1 0.2 0.1"\n', '').replace('"classname" "worldspawn"',
+        '"classname" "worldspawn"\n"_tb_mod" "AD19b5"', 1)
+    gray_map.write_text('// ReyondBroom profile=quake1 format=quake-standard\n'+gray_scene)
+
+    def compile_gray():
+        generation = mods_live()['generation']
+        ui.console('ftebroom_test_filepath open '+json.dumps(gray_map.as_posix()))
+        wait(lambda:mods_live()['generation'] > generation and same_path(mods_live()['document'],gray_map)
+             and not mods_live()['loading'])
+        ui.console('ftebroom_test_run 50')
+        wait(lambda:live()['compileOpen'])
+        click_compile('compile')
+        wait(lambda:'required_gray_lit-compile.map' in live()['log'] and
+             (live()['running'] or live()['error'] or 'Completed successfully.' in live()['log']))
+        wait(lambda:not live()['running'],180)
+        log = live()['log']
+        click_compile('close')
+        return log
+
+    gray_log = compile_gray()
+    (out/'grayscale-compiler.log').write_text(gray_log)
+    gray_bsp, gray_lit = (mod/'maps'/('required_gray_lit'+ext) for ext in ('.bsp','.lit'))
+    gray_hashes = (sha(gray_bsp),sha(gray_lit))
+    payload = gray_lit.read_bytes()[8:]
+    check('Enabled -lit for the requested copy' in gray_log and 'Completed successfully.' in gray_log
+          and len(payload)>100 and max(payload)>0
+          and payload[::3] == payload[1::3] == payload[2::3],
+          'required_grayscale_sidecar_is_generated_and_survives_nested_cleanup')
+    gray_map.write_text(gray_map.read_text().replace('"light" "500"', '"light" "0"',1))
+    zero_log = compile_gray()
+    (out/'empty-lighting-compiler.log').write_text(zero_log)
+    check('LIGHT produced no Quake BSP light samples' in zero_log
+          and 'Completed successfully.' not in zero_log and '#### Copying to' not in zero_log
+          and (sha(gray_bsp),sha(gray_lit)) == gray_hashes
+          and (source_dir/'required_gray_lit-compile.map').is_file(),
+          'zero_light_samples_are_reported_before_copy_or_cleanup')
+
+    ui.console('set ftebroom_placement_qa 1')
+    ui.console('set ftebroom_tool 0')
+    placement = data/'placement-ui-live.json'
+    def context_item(key, click=False):
+        rect = wait(lambda:read_ui_json(placement)['widgets'].get('context/'+key))
+        x,y = rect['x']+rect['width']*.5,rect['y']+rect['height']*.5
+        if click:
+            ui.click(x,y)
+        else:
+            ui.move(x,y)
+            time.sleep(.45)
+    def context_brushes():
+        v = wait(lambda:read_ui_json(placement)['views'][0])
+        ui.click(v['x']+v['width']*.44,v['y']+v['height']*.40,button=3,hold=.5)
+        context_item('brush-entity')
+    for i,name in enumerate(('func_detail','func_group')):
+        ui.console('ftebroom_box '+str(-92+200*i)+' -90 72 32 32 32')
+        context_brushes()
+        context_item('brush-category/func')
+        wait(lambda:read_ui_json(placement)['widgets'].get('context/brush-class/func_detail_illusionary'))
+        if i==0:
+            context_item('brush-category/trigger')
+            wait(lambda:read_ui_json(placement)['widgets'].get('context/brush-class/trigger_fog'))
+            context_item('brush-category/func')
+        context_item('brush-class/'+name,True)
+        snapshot = data/'maps'/('qa-brush-'+name+'.map')
+        ui.console('mod_terrain_save "" '+snapshot.stem)
+        wait(snapshot.is_file)
+        output = snapshot.read_text()
+        check('"classname" "'+name+'"' in output and (name!='func_group' or '"_tb_type" "_tb_group"' in output),
+              name+'_available_in_mod_brush_menu_and_created_with_expected_semantics')
 except Exception:
     ImageGrab.grab().save(out/'failure.png')
     try:

@@ -6,7 +6,7 @@
 namespace ftebroom::plant {
 enum Material { Bark, Leaf, Needle, Petal, Center, Cap, Gills, CactusSkin, Grass, Wood,
                 LeafLight, LeafMature, LeafYoung, NeedleLight, NeedleMature, PhotoFoliage, Count };
-enum class Photo { Bark, Oak, Spruce, Fern, Grass, Maple, Birch, Pine, Ivy, None };
+enum class Photo { Bark, Oak, Spruce, Fern, Grass, Maple, Birch, Pine, Ivy, Lawn, Fescue, Feather, Sedge, None };
 inline Photo foliagePhoto(const Project& d) {
   if(d.generator<3||d.p.quality==3||d.p.foliageMode>=2||!d.texture.empty())return Photo::None;
   const auto& species=d.species;
@@ -18,6 +18,12 @@ inline Photo foliagePhoto(const Project& d) {
   if(d.family==Family::Conifer&&(species=="spruce"||species=="blue-spruce"||species=="fir"))return Photo::Spruce;
   if(d.family==Family::Fern&&(d.p.organ<=3||d.p.organ==7))return Photo::Fern;
   if(d.family==Family::Grass&&species=="meadow-grass")return Photo::Grass;
+  if(d.generator>=4&&d.family==Family::Grass){
+    if(d.p.organ==1)return Photo::Lawn;
+    if(d.p.organ==2)return Photo::Fescue;
+    if(d.p.organ==3||d.p.organ==11)return Photo::Feather;
+    if(d.p.organ==6)return Photo::Sedge;
+  }
   return Photo::None;
 }
 struct Vertex {V p,n;std::array<double,2> uv;double wind=0,phase=0;};
@@ -54,9 +60,10 @@ struct Builder {
     if(length(n)>1e-9)mesh.faces.push_back({{a,b,c},mat,part,organ});
   }
   void quad(unsigned a,unsigned b,unsigned c,unsigned d,int mat,Part part) {face(a,b,c,mat,part);face(a,c,d,mat,part);}
-  bool tube(const std::vector<V>& path,double radius,double tip,int sides,int mat,Part part,double ribs=0,double hold=0) {
+  bool tube(const std::vector<V>& path,double radius,double tip,int sides,int mat,Part part,double ribs=0,double hold=0,double wood=0,uint64_t seed=0) {
     if(path.size()<2||!room((path.size()-1)*sides*2+sides*2))return false;
     organ++;unsigned first=mesh.vertices.size();V frame{1,0,0};
+    double phase=wood?Rng(seed).range(0,2*pi):0;
     for(size_t i=0;i<path.size();i++) {
       V tangent=unit(sub(path[std::min(i+1,path.size()-1)],path[i?i-1:0]));
       frame=sub(frame,mul(tangent,dot(frame,tangent)));
@@ -67,6 +74,11 @@ struct Builder {
       for(int j=0;j<=sides;j++) {
         double angle=2*pi*j/sides;V radial=add(mul(frame,std::cos(angle)),mul(binormal,std::sin(angle)));
         double ridge=ribs>0?1+.10*std::cos(angle*ribs):1;
+        if(wood){
+          double flare=(part==Part::Trunk?std::pow(std::max(0.,1.-t*4.),2):0.);
+          double ribs=std::cos(angle*3+phase+t*.7)+.42*std::cos(angle*5-phase+t*2.5);
+          ridge*=1+wood*(.10*std::cos(2*angle-phase)+(.075+.16*flare)*ribs+.15*flare);
+        }
         V normal=unit(add(radial,mul(tangent,(radius-tip)/std::max(.01,length(sub(path.back(),path.front()))))));
         vertex(add(path[i],mul(radial,r*ridge)),normal,double(j)/sides,t,mat,t);
       }

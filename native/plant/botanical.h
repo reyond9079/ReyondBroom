@@ -9,7 +9,10 @@ struct Botanical : Generator {
   struct Shoot {V p,aim;uint64_t id;double size;};
   std::vector<Span> skeleton;
   std::vector<Shoot> foliage;
-  Botanical(const Project& d,int l,const std::atomic<bool>* c):Generator(d,l,c){}
+  bool opaque;
+  Botanical(const Project& d,int l,const std::atomic<bool>* c,bool solid=false):Generator(d,l,c),opaque(solid){}
+  bool realistic() const {return doc.generator>=4&&p.quality!=3;}
+  Photo photo() const {return opaque?Photo::None:foliagePhoto(doc);}
   bool compact() const {return doc.generator>=3&&p.quality!=3;}
   double leafAngle(int i) const {
     if(p.phyllotaxy==1)return (i%2)*pi+(i/2)*.27;
@@ -69,7 +72,7 @@ struct Botanical : Generator {
     }else if(mode>=2){
       b.leaf(origin,direction,up,size,width,shape,mode,material,part,p.leafCurl*.45,p.leafTwist*r.range(-.6,.6),p.leafProfile);
     }else {
-      int steps=compact()?(lod?3:4):lod==1?3:mode==1?4:8,columns=compact()||mode==1?1:2;
+      int steps=compact()?(opaque?2:lod?3:4):lod==1?3:mode==1?4:8,columns=compact()||mode==1?1:2;
       if(!b.room(steps*columns*2))return;b.organ++;
       auto first=b.mesh.vertices.size();V right=unit(cross(direction,up)),normal=unit(cross(right,direction));
       double curl=(p.leafCurl+r.range(-.06,.06)*p.irregularity)*.48,twist=p.leafTwist*r.range(-.6,.6),asym=r.range(-.055,.055)*p.irregularity;
@@ -77,7 +80,7 @@ struct Botanical : Generator {
         double t=double(i)/steps,profile=botanicalLeafWidth(shape,t,p.leafProfile,p.serration);
         // A loose contour follows the selected morphology without clipping
         // the finer lobes/teeth between compact ribbon rows.
-        double w=(compact()||mode==1)?.80+.20*std::clamp(profile,0.,1.):std::max(.005,profile);
+        double w=(compact()||mode==1)&&!opaque?.80+.20*std::clamp(profile,0.,1.):std::max(.005,profile);
         auto center=add(origin,add(mul(direction,size*t),mul(normal,size*curl*t*t)));
         center=add(center,mul(right,size*asym*std::sin(pi*t)));
         for(int k=0;k<=columns;k++){
@@ -129,7 +132,7 @@ struct Botanical : Generator {
   }
   size_t leafCost() const {
     size_t cost=lod==2?4:p.foliageMode>=2?4:lod==1?6:p.foliageMode==1?8:32;
-    if(compact())cost=lod==2?4:lod==1?6:8;
+    if(compact())cost=opaque||lod==2?4:lod==1?6:8;
     else if(p.leafShape==4&&p.foliageMode<2&&lod!=2)cost=std::clamp(p.leaflets,3,9)*4+2;
     if(p.leafShape==7)cost=cost*p.leaflets*(doc.family==Family::Broadleaf&&p.organ==3?4:1)+24;
     return cost;
@@ -168,7 +171,75 @@ struct Botanical : Generator {
       }
     }
   }
+  void emitGroundRoot(const Span& span,int steps) {
+    const int columns=lod==0?4:lod==1?3:2;
+    if(!b.room(size_t(steps)*columns*2))return;
+    const unsigned first=b.mesh.vertices.size();
+    const double ground=span.path.back()[2];
+    b.organ++;
+    for(int i=0;i<=steps;i++){
+      const double t=double(i)/steps,at=t*(span.path.size()-1);
+      const size_t segment=std::min(span.path.size()-2,size_t(at));
+      auto tangent=sub(span.path[segment+1],span.path[segment]);
+      const V across=unit(V{-tangent[1],tangent[0],0.});
+      const V center=add(span.path[segment],mul(tangent,at-segment));
+      const double rise=std::max(.004,center[2]-ground);
+      const double width=std::max(.01,span.radius*std::pow(1.-t,.74));
+      for(int j=0;j<=columns;j++){
+        const double angle=pi*double(j)/columns;
+        const double dome=std::sin(angle);
+        V point=add(V{center[0],center[1],ground+rise*dome},mul(across,width*std::cos(angle)));
+        V normal=unit(add(mul(across,std::cos(angle)),V{0.,0.,dome}));
+        b.vertex(point,normal,double(j)/columns,t,Bark,t);
+      }
+    }
+    for(int i=0;i<steps;i++)for(int j=0;j<columns;j++){
+      unsigned a=first+i*(columns+1)+j,c=a+columns+1;
+      b.quad(a,a+1,c+1,c,Bark,Part::Roots);
+    }
+  }
+  void emitNaturalSkeleton() {
+    // Allocate rings by branch size. A crowded crown should never turn a
+    // close trunk into a prism or remove its curves to pay for small twigs.
+    std::stable_sort(skeleton.begin(),skeleton.end(),[](const Span& a,const Span& c){
+      auto rank=[](Part part){return part==Part::Trunk?0:part==Part::Roots?1:int(part);};
+      if(rank(a.part)!=rank(c.part))return rank(a.part)<rank(c.part);
+      return a.radius>c.radius;
+    });
+    size_t budget=b.budget;b.budget=std::max(b.mesh.faces.size(),budget/2);
+    for(auto& span:skeleton){
+      b.check();
+      int sidesForSpan=0,stepsForSpan=0;
+      switch(span.part){
+        case Part::Trunk:sidesForSpan=std::max(lod==0?8:lod==1?6:5,sides());stepsForSpan=std::max(3,count(p.segments,1));break;
+        case Part::Roots:emitGroundRoot(span,lod==0&&p.quality!=2?4:2);continue;
+        case Part::Primary:
+          if(p.quality==2){sidesForSpan=4;stepsForSpan=2;break;}
+          sidesForSpan=lod==0?std::max(5,sides()*2/3):lod==1?4:3;stepsForSpan=lod==0?5:lod==1?3:2;break;
+        case Part::Secondary:sidesForSpan=lod==0?4:3;stepsForSpan=lod==0?3:2;break;
+        default:
+          if(lod==2||span.radius<.24)continue;
+          sidesForSpan=3;stepsForSpan=lod==0?2:1;break;
+      }
+      int n=std::min<int>(stepsForSpan,span.path.size()-1);
+      std::vector<V> path;
+      for(int i=0;i<=n;i++) {
+        double at=double(i)*(span.path.size()-1)/n;
+        size_t index=std::min(span.path.size()-2,size_t(at));
+        path.push_back(add(span.path[index],mul(sub(span.path[index+1],span.path[index]),at-index)));
+      }
+      const size_t first=b.mesh.vertices.size();
+      b.tube(path,span.radius,span.tip,sidesForSpan,Bark,span.part,0,0,
+        (.55+.45*p.irregularity)*(span.part==Part::Trunk?1.:.60),span.id);
+      if(span.part==Part::Trunk)for(size_t i=first;i<b.mesh.vertices.size();i++){
+        auto& z=b.mesh.vertices[i].p[2];
+        z=std::max(z,path.front()[2]);
+      }
+    }
+    b.budget=budget;
+  }
   void emitSkeleton() {
+    if(realistic()){emitNaturalSkeleton();return;}
     // Plan the entire canopy before spending triangles. Reduce every branch's
     // tessellation together; never discard late limbs by traversal order.
     int segments=std::max(1,count(p.segments,1)),radial=std::max(3,sides());
@@ -202,84 +273,146 @@ struct Botanical : Generator {
   void emitFoliage(bool needles=false) {
     // Stable spatial sampling covers the whole planned crown at all LODs.
     std::stable_sort(foliage.begin(),foliage.end(),[](auto& a,auto& b){return mix(a.id,13)<mix(b.id,13);});
-    auto photo=foliagePhoto(doc);
+    auto photo=this->photo();
     if(photo==Photo::Oak||photo==Photo::Spruce||photo==Photo::Maple||photo==Photo::Birch||photo==Photo::Pine){
-      int strips=lod?1:2;
+      int strips=lod||(realistic()&&p.quality==2)?1:2;
       size_t groups=(foliage.size()+(lod?5:3))/(lod?6:4);
       size_t count=std::min((b.budget-b.mesh.faces.size())/(strips*2),size_t(groups*phenology()));
       for(size_t i=0;i<count;i++){
         auto& shoot=foliage[i*foliage.size()/count];
         Rng rng(mix(shoot.id,doc.seed));
         V up=unit({rng.range(-.85,.85),rng.range(-.85,.85),rng.range(.5,1.)});
-        double size=p.leafSize*(.5+.5*p.age)*shoot.size*(needles?1.65:2.15)*(lod==2?1.30:1.);
+        double size=p.leafSize*(.5+.5*p.age)*shoot.size*(needles?1.65:2.15)*(lod==2?1.30:realistic()&&p.quality==2?1.20:1.);
         double width=size*(needles?.70:.74)*std::clamp(std::sqrt(p.leafWidth/.45),.60,1.50);
         b.foliageCard(shoot.p,shoot.aim,up,size,width,p.leafCurl*.45,strips,p.leafTwist*rng.range(-.65,.65));
       }
       return;
     }
-    auto capacity=(b.budget-b.mesh.faces.size())/std::max<size_t>(1,needles?8:leafCost()+2);
+    auto capacity=(b.budget-b.mesh.faces.size())/std::max<size_t>(1,needles?8:leafCost()+(opaque?0:2));
     size_t survivors=std::min(capacity,foliage.size()),count=size_t(survivors*std::min(1.,phenology()));
     double compensation=survivors?std::clamp(std::sqrt(double(foliage.size())/survivors)/(lod==2?1.85:lod==1?1.18:1.),1.,lod?1.65:1.35):1.;
     for(size_t i=0;i<count;i++){
       auto& s=foliage[i*foliage.size()/count];double size=p.leafSize*(.5+.5*p.age)*s.size*(needles?1.:1.20)*compensation;
       if(needles){Rng r(mix(s.id,doc.seed));V tilt=unit({r.range(-.65,.65),r.range(-.65,.65),1});lamina(s.p,s.aim,tilt,size,p.leafWidth,s.id,5,foliageMaterial(s.id,true));continue;}
-      V end=add(s.p,mul(s.aim,size*p.petiole));
+      V end=opaque?s.p:add(s.p,mul(s.aim,size*p.petiole));
       V side=unit(cross(s.aim,V{0,0,1}));if(length(side)<.01)side={1,0,0};side=mul(side,std::max(.015,size*.005));
-      if(b.room(2)){b.organ++;auto a=b.vertex(sub(s.p,side),{0,0,1},.2,.2,Bark),c=b.vertex(add(s.p,side),{0,0,1},.3,.2,Bark),d=b.vertex(add(end,side),{0,0,1},.3,.3,Bark),e=b.vertex(sub(end,side),{0,0,1},.2,.3,Bark);b.quad(a,c,d,e,Bark,Part::Twigs);}
+      if(!opaque&&b.room(2)){b.organ++;auto a=b.vertex(sub(s.p,side),{0,0,1},.2,.2,Bark),c=b.vertex(add(s.p,side),{0,0,1},.3,.2,Bark),d=b.vertex(add(end,side),{0,0,1},.3,.3,Bark),e=b.vertex(sub(end,side),{0,0,1},.2,.3,Bark);b.quad(a,c,d,e,Bark,Part::Twigs);}
       blade(end,s.aim,size,s.id);
     }
   }
+  struct TreeMember {
+    V offset{}, lean{};
+    double stature=1., crownX=1., crownY=1., girth=1., yaw=0.;
+  };
+  TreeMember treeMember(int member,int members,bool shrub=false) const {
+    if(!realistic())return {};
+    Rng r(mix(doc.seed,member+19761));
+    TreeMember tree;
+    tree.yaw=r.range(0.,2*pi);
+    tree.stature=members>1&&member>0?r.range(.57,.96):1.;
+    tree.crownX=r.range(.77,1.18);
+    tree.crownY=r.range(.77,1.18);
+    tree.girth=(.67+.33*tree.stature)*r.range(.78,1.19);
+    double lean=height*p.curvature*r.range(.10,.36);
+    tree.lean={std::cos(tree.yaw)*lean,std::sin(tree.yaw)*lean,0.};
+    if(member>0){
+      double az=tree.yaw*.20+member*2.399963;
+      double radius=height*(shrub?.17:.58)*std::sqrt(double(member))*r.range(.73,1.19);
+      tree.offset={std::cos(az)*radius,std::sin(az)*radius,0.};
+    }
+    return tree;
+  }
+  V treeTrunk(double t,const TreeMember& member) const {
+    auto point=trunk(t);
+    if(realistic()){
+      point[2]*=member.stature;
+      point=add(point,mul(member.lean,t*t*(1.28-.28*t)));
+    }
+    return add(point,member.offset);
+  }
   void woody(bool shrub=false) {
     int stems=std::max(1,p.clumps),primaries=std::max(3,p.branches);
+    if(realistic()&&stems>1)primaries=std::max(3,int(primaries/std::sqrt(double(stems))));
     for(int stem=0;stem<stems;stem++){
       double a=stem*2.399963;V offset=stems>1?V{std::cos(a)*height*.09,std::sin(a)*height*.09,0}:V{};
-      if(shrub&&p.organ==5)offset={height*(stem-(stems-1)*.5)*.22,0,0};
-      auto origin=trunk(0,offset);std::vector<V> path;for(int j=0;j<=p.segments;j++)path.push_back(trunk(double(j)/p.segments,offset));
-      skeleton.push_back({path,p.radius*(1+p.rootFlare*.20),p.radius*(1-p.taper)*.35,Part::Trunk,mix(doc.seed,stem)});
+      auto member=treeMember(stem,stems,shrub);
+      if(!realistic())member.offset=offset;
+      if(shrub&&p.organ==5)member.offset={height*(stem-(stems-1)*.5)*.22,0,0};
+      auto origin=treeTrunk(0.,member);
+      std::vector<V> path;
+      for(int j=0;j<=p.segments;j++)path.push_back(treeTrunk(double(j)/p.segments,member));
+      double radius=p.radius*member.girth;
+      skeleton.push_back({path,radius*(1+p.rootFlare*.20),radius*(1-p.taper)*.35,Part::Trunk,mix(doc.seed,stem)});
       for(int k=0;k<5;k++){
-        double az=2*pi*k/5+a;auto from=add(origin,{std::cos(az)*p.radius*.3,std::sin(az)*p.radius*.3,p.radius*1.4});
-        auto to=add(origin,{std::cos(az)*p.radius*(1.5+p.rootFlare),std::sin(az)*p.radius*(1.5+p.rootFlare),0});
-        skeleton.push_back({arc(from,to,0,3,mix(stem,k)),p.radius*.38,.025,Part::Roots,mix(stem,k+19)});
+        double az=2*pi*k/5+a+member.yaw;
+        if(realistic()){
+          Rng root(mix(doc.seed,stem*31+k+811));
+          az+=root.range(-.30,.30);
+          V outward{std::cos(az),std::sin(az),0.},side{-outward[1],outward[0],0.};
+          double reach=radius*(1.38+p.rootFlare*.46)*root.range(.70,1.30);
+          double rise=radius*root.range(.36,.72);
+          double bend=reach*root.range(-.20,.20);
+          std::vector<V> rootPath;
+          for(int i=0;i<=5;i++){
+            double t=double(i)/5;
+            auto point=add(origin,add(mul(outward,.40*radius+reach*t),mul(side,bend*t*t)));
+            point[2]+=rise*(1.-t)*(1.-t);
+            rootPath.push_back(point);
+          }
+          skeleton.push_back({std::move(rootPath),radius*root.range(.26,.55),.01,Part::Roots,mix(stem,k+19)});
+        }else{
+          auto from=add(origin,{std::cos(az)*radius*.3,std::sin(az)*radius*.3,radius*1.4});
+          auto to=add(origin,{std::cos(az)*radius*(1.5+p.rootFlare),std::sin(az)*radius*(1.5+p.rootFlare),0});
+          skeleton.push_back({arc(from,to,0,3,mix(stem,k)),radius*.38,.025,Part::Roots,mix(stem,k+19)});
+        }
       }
       for(int i=0;i<primaries;i++){
         b.check();Rng r(mix(doc.seed,stem*71+i+13));double u=(i+.5)/primaries;
         double t=p.crownBase+(1-p.crownBase)*u*.9;
-        double az=i*2.399963+stem+r.range(-.32,.32)*p.irregularity;
+        double az=i*2.399963+stem+member.yaw+r.range(-.32,.32)*p.irregularity;
         double reach=height*p.spread*envelope(u)*(.32+.48*curve(p.growth,t))*r.range(.88,1.1);
+        if(realistic())reach*=(.65+.35*member.stature)*r.range(.69,1.27);
         double angle=p.branchAngle*pi/180;
         double top=p.crown==4?.88+u*.08:p.crown==3?.84+u*.10:std::min(1.02,t+reach/height*std::cos(angle)*.55);
-        V end=add(offset,{std::cos(az)*reach*std::sin(angle),std::sin(az)*reach*std::sin(angle),height*top});
-        end[2]=height*(p.crownBase+(top-p.crownBase)*p.crownAspect)+offset[2];
-        planBranch(trunk(t,offset),end,p.radius*.38*(1-t*.65),0,mix(stem+7,i+100));
+        V end=add(member.offset,{std::cos(az)*reach*std::sin(angle)*member.crownX,
+          std::sin(az)*reach*std::sin(angle)*member.crownY,0.});
+        end[2]=height*member.stature*(p.crownBase+(top-p.crownBase)*p.crownAspect)+member.offset[2];
+        end=add(end,mul(member.lean,t*t*.66));
+        planBranch(treeTrunk(t,member),end,radius*.38*(1-t*.65),0,mix(stem+7,i+100));
       }
     }
     emitSkeleton();auto total=b.budget;if(shrub&&p.organ>=4)b.budget=size_t(total*.88);emitFoliage();b.budget=total;
     if(shrub&&p.organ>=4&&p.organ<=10)inflorescences();
   }
   void evergreenTree() {
-    auto origin=trunk(0);std::vector<V> trunkPath;for(int i=0;i<=p.segments;i++)trunkPath.push_back(trunk(double(i)/p.segments));
-    skeleton.push_back({trunkPath,p.radius,.035,Part::Trunk,doc.seed});
-    int levels=p.branches,per=p.needleForm==0?4:5;
-    for(int level=0;level<levels;level++)for(int j=0;j<per;j++){
-      b.check();uint64_t id=mix(doc.seed,level*31+j+500);Rng r(id);
-      double u=(level+r.range(.18,.65))/levels,t=p.crownBase+(1-p.crownBase)*u;
-      double profile=p.crown==5?std::pow(1-u,.9):p.crown==2?.24+.16*std::sin(u*pi):p.crown==8?.75:envelope(u);
-      double span=height*p.spread*profile*r.range(.82,1.08);
-      double az=j*2*pi/per+level*1.73+r.range(-.16,.16)*p.irregularity;
-      V base=trunk(t),end=add(base,{std::cos(az)*span,std::sin(az)*span,span*(p.needleForm==0?.30:.12)});
-      auto path=arc(base,end,p.gravity,std::max(4,p.segments),id);
-      skeleton.push_back({path,p.radius*.25*(1-u*.8),.025,Part::Primary,id});
-      int shoots=std::max(4,p.leaves/2);
-      for(int k=0;k<shoots;k++)for(int side:{-1,1}){
-        double v=.16+.80*(k+.5)/shoots;auto node=path[std::min(path.size()-1,size_t(v*(path.size()-1)))];
-        V dir=unit({std::cos(az+side*.72),std::sin(az+side*.72),p.needleForm==1?-.30:.22});
-        auto tip=add(node,mul(dir,span*.32*(1-v*.7)));
-        if(k%3==0)skeleton.push_back({{node,tip},std::max(.025,p.radius*.025),.01,Part::Twigs,mix(id,k+side+17)});
-        for(int n=0;n<3;n++){
-          double f=(n+.2)/3;auto at=add(node,mul(sub(tip,node),f));
-          double turn=leafAngle(n)+az;
-          V aim=p.needleForm==0?unit(add(dir,V{std::cos(turn)*.45,std::sin(turn)*.45,.45})):p.needleForm==3?unit({std::cos(turn),std::sin(turn),.4}):unit(add(dir,V{std::cos(turn)*.14,std::sin(turn)*.14,0}));
-          foliage.push_back({at,aim,mix(id,k*21+n+side+100),std::max(1.8,length(sub(tip,node))/p.leafSize*1.5)});
+    int stems=realistic()?std::max(1,p.clumps):1;
+    for(int stem=0;stem<stems;stem++){
+      auto member=treeMember(stem,stems);
+      std::vector<V> trunkPath;
+      for(int i=0;i<=p.segments;i++)trunkPath.push_back(treeTrunk(double(i)/p.segments,member));
+      skeleton.push_back({trunkPath,p.radius*member.girth,.035,Part::Trunk,stem?mix(doc.seed,stem):doc.seed});
+      int levels=realistic()?std::max(3,int(std::round(p.branches*member.stature))):p.branches,per=p.needleForm==0?4:5;
+      for(int level=0;level<levels;level++)for(int j=0;j<per;j++){
+        b.check();uint64_t id=mix(doc.seed,stem*317+level*31+j+500);Rng r(id);
+        double u=(level+r.range(.18,.65))/levels,t=p.crownBase+(1-p.crownBase)*u;
+        double profile=p.crown==5?std::pow(1-u,.9):p.crown==2?.24+.16*std::sin(u*pi):p.crown==8?.75:envelope(u);
+        double span=height*p.spread*profile*r.range(.82,1.08)*member.stature;
+        double az=j*2*pi/per+level*1.73+member.yaw+r.range(-.16,.16)*p.irregularity;
+        V base=treeTrunk(t,member),end=add(base,{std::cos(az)*span*member.crownX,std::sin(az)*span*member.crownY,span*(p.needleForm==0?.30:.12)});
+        auto path=arc(base,end,p.gravity,std::max(4,p.segments),id);
+        skeleton.push_back({path,p.radius*member.girth*.25*(1-u*.8),.025,Part::Primary,id});
+        int shoots=std::max(4,p.leaves/2);
+        for(int k=0;k<shoots;k++)for(int side:{-1,1}){
+          double v=.16+.80*(k+.5)/shoots;auto node=path[std::min(path.size()-1,size_t(v*(path.size()-1)))];
+          V dir=unit({std::cos(az+side*.72),std::sin(az+side*.72),p.needleForm==1?-.30:.22});
+          auto tip=add(node,mul(dir,span*.32*(1-v*.7)));
+          if(k%3==0)skeleton.push_back({{node,tip},std::max(.025,p.radius*member.girth*.025),.01,Part::Twigs,mix(id,k+side+17)});
+          for(int n=0;n<3;n++){
+            double f=(n+.2)/3;auto at=add(node,mul(sub(tip,node),f));
+            double turn=leafAngle(n)+az;
+            V aim=p.needleForm==0?unit(add(dir,V{std::cos(turn)*.45,std::sin(turn)*.45,.45})):p.needleForm==3?unit({std::cos(turn),std::sin(turn),.4}):unit(add(dir,V{std::cos(turn)*.14,std::sin(turn)*.14,0}));
+            foliage.push_back({at,aim,mix(id,k*21+n+side+100),std::max(1.8,length(sub(tip,node))/p.leafSize*1.5)});
+          }
         }
       }
     }

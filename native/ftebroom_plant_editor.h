@@ -81,7 +81,16 @@ static const plants::PhotoAtlas* plantPhotos() {
     auto raw=static_cast<char*>(files->LoadFile("plants/builtin/photographic.rgba.z",&size));
     if(!raw)return plants::PhotoAtlas{};
     std::string bytes(raw,size);core->Free(raw);
-    try{return plants::PhotoAtlas::decode(bytes.data(),bytes.size());}
+    try{
+      auto atlas=plants::PhotoAtlas::decode(bytes.data(),bytes.size());
+      auto detail=static_cast<char*>(files->LoadFile("plants/builtin/photographic-details.rgba.z",&size));
+      if(detail){
+        bytes.assign(detail,size);core->Free(detail);
+        try{atlas.loadDetails(bytes.data(),bytes.size());}
+        catch(const std::runtime_error& e){core->Print(e.what());}
+      }
+      return atlas;
+    }
     catch(const std::runtime_error& e){core->Print(e.what());return plants::PhotoAtlas{};}
   }();
   return atlas.rgba.empty()?nullptr:&atlas;
@@ -265,16 +274,21 @@ struct PlantRuntimeAsset {
 };
 static PlantRuntimeAsset plantBakeRuntime() {
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
-  PlantRuntimeAsset out;auto geometry=plants::targetGeometry(s.doc,s.result->lods[0],gameProfile);out.low=geometry.low;out.high=geometry.high;
+  const bool trueColorQuake=gameProfile==2&&q1UseLibre&&s.doc.generator>=4;
+  const bool maskedQuake=trueColorQuake&&plants::foliagePhoto(s.doc)!=plants::Photo::None;
+  PlantRuntimeAsset out;auto geometry=plants::targetGeometry(s.doc,s.result->lods[0],gameProfile,maskedQuake);out.low=geometry.low;out.high=geometry.high;
   auto mesh=plants::targetModel(geometry,"plant",gameProfile);bool alias=plants::opaquePlantTarget(gameProfile);
   if(!alias){double extent=0;for(auto& surface:mesh.surfaces)for(auto& vertex:surface.frames[0])for(float x:vertex.position)extent=std::max(extent,std::abs(double(x)));out.scale=std::max(1.,extent/450.);for(auto& surface:mesh.surfaces)for(auto& vertex:surface.frames[0])for(auto& x:vertex.position)x/=out.scale;}
   auto palette=gameProfile==2?q1Palette():gameProfile==3?q2Palette():std::string{};
-  auto opaqueMaps=alias?plantOpaqueMaps(s.doc,gameProfile):plants::Textures{};
-  const auto& albedo=alias?opaqueMaps.albedo:s.result->maps->albedo;
+  auto opaqueMaps=alias&&!maskedQuake?plantOpaqueMaps(s.doc,gameProfile):plants::Textures{};
+  const auto& albedo=alias&&!maskedQuake?opaqueMaps.albedo:s.result->maps->albedo;
   auto atlas=plants::tga(albedo);
-  auto skin=alias?plants::aliasSkin(albedo):ftebroom::modelExport::Skin{};
+  auto skin=maskedQuake?ftebroom::modelExport::Skin{unsigned(albedo.width),unsigned(albedo.height),albedo.rgba}:
+    alias?plants::aliasSkin(albedo):ftebroom::modelExport::Skin{};
   std::string identity;
-  if(gameProfile==2)identity=ftebroom::modelExport::mdl(mesh,{skin},palette);
+  ftebroom::modelExport::Skin replacementSkin;
+  if(gameProfile==2)identity=ftebroom::modelExport::mdl(mesh,{skin},palette,maskedQuake,
+    trueColorQuake?&replacementSkin:nullptr);
   else if(gameProfile==3)identity=ftebroom::modelExport::md2(mesh,{skin},palette,"plant.pcx").model;
   else if(gameProfile==4)identity=ftebroom::studioExport::bake(mesh,{skin},1);
   else identity=ftebroom::modelExport::md3(mesh);
@@ -291,6 +305,12 @@ static PlantRuntimeAsset plantBakeRuntime() {
     if(gameProfile==1){out.bundle[out.material+".tga"]=atlas;dependencies.push_back(out.material+".tga");}
     out.shader=plants::shader(out.material,image,gameProfile!=0);auto script="scripts/"+out.id+".shader";out.bundle[script]=out.shader;dependencies.push_back(script);
   }
+  if(trueColorQuake){
+    // FTE loads this optional replacement for skin 0 of a classic MDL.
+    auto path=out.model+"_0.png";
+    out.bundle[path]=plants::png({int(replacementSkin.width),int(replacementSkin.height),std::move(replacementSkin.rgba)});
+    dependencies.push_back(path);
+  }
   auto portable=plants::serialize(s.doc);dependencies.push_back(out.source);
   if(!s.doc.texture.empty()){auto original=std::filesystem::u8path(s.doc.texture);auto name=out.id+"-leaf"+original.extension().u8string();auto dependency="models/reyond-plugins/"+name;out.bundle[dependency]=q1Read(original);dependencies.push_back(dependency);portable["texture"]=name;}
   out.bundle[out.source]=portable.dump(2);
@@ -298,7 +318,7 @@ static PlantRuntimeAsset plantBakeRuntime() {
   out.bundle[out.model+".reyond.json"]=plants::Json{{"kind","reyondbroom-authoring-model"},{"version",2},{"low",out.low},{"high",out.high},{"normalization",out.scale},{"dependencies",dependencies},{"plantProject",portable},
     // This immutable asset records format capabilities, not the scene entity's
     // FTE opt-in. Toggling that option must reuse the same model and manifest.
-    {"target",{{"profile",gameProfile},{"format",plants::targetExtension(gameProfile)},{"vertices",vertices},{"triangles",triangles},{"vertexLimit",gameProfile==2?1024:alias?2048:0},{"triangleLimit",gameProfile==2?2048:alias?4096:0},{"runtimeLod",alias||geometry.faces.size()!=s.result->lods[0].faces.size()},{"opaqueGeometricFoliage",alias},{"coverageMipmaps",gameProfile==1},{"vanillaRequiresCompatibleGameCode",gameProfile==2||gameProfile==3},{"fteStaticModelExtensionAvailable",gameProfile==2}}}}.dump(2);
+    {"target",{{"profile",gameProfile},{"format",plants::targetExtension(gameProfile)},{"vertices",vertices},{"triangles",triangles},{"vertexLimit",gameProfile==2?1024:alias?2048:0},{"triangleLimit",gameProfile==2?2048:alias?4096:0},{"runtimeLod",alias||geometry.faces.size()!=s.result->lods[0].faces.size()},{"opaqueGeometricFoliage",alias&&!maskedQuake},{"fteMaskedSkin",maskedQuake},{"coverageMipmaps",gameProfile==1},{"vanillaRequiresCompatibleGameCode",gameProfile==2||gameProfile==3},{"fteStaticModelExtensionAvailable",gameProfile==2}}}}.dump(2);
   return out;
 }
 static void plantAddToMap() {

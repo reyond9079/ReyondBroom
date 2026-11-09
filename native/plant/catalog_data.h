@@ -3,7 +3,7 @@
 namespace ftebroom::plant {
 inline constexpr const char botanicalCatalog[] = R"RBPLANT({
   "format": "ReyondBroomBotanicalCatalog",
-  "generatorVersion": 3,
+  "generatorVersion": 4,
   "license": "Original procedural descriptors; GPL-3.0-or-later",
   "minimumByCategory": {
     "bamboo": 4,

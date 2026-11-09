@@ -63,7 +63,7 @@ struct Params {
   std::array<V,4> controls{{{0,0,0},{0,0,.33},{0,0,.67},{0,0,1}}};
 };
 struct Project {
-  int version=1, generator=3;
+  int version=1, generator=4;
   std::string name="English oak", preset="oak", species="oak";
   Family family=Family::Broadleaf;
   uint32_t seed=137;
@@ -130,7 +130,7 @@ inline Json serialize(const Project& d) {
   return out;
 }
 inline void validate(const Project& d) {
-  if(d.version!=1||(d.generator<1||d.generator>3))throw std::runtime_error("Unsupported plant project / generator version");
+  if(d.version!=1||(d.generator<1||d.generator>4))throw std::runtime_error("Unsupported plant project / generator version");
   if(int(d.family)<0||int(d.family)>(d.generator==1?11:12)||d.name.size()>256||d.species.size()>80||d.tags.size()>16)throw std::runtime_error("Invalid plant identity");
   for(auto& tag:d.tags)if(tag.size()>80)throw std::runtime_error("Plant tag exceeds 80 bytes");
   const auto values=parameters(d.p);

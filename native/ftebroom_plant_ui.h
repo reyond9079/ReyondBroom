@@ -37,7 +37,7 @@ static void plantProperties() {
       plantCombo("Crown architecture",p.crown,"Spreading\0Oval\0Columnar\0Weeping\0Umbrella\0Pyramidal\0Vase\0Multiple leaders\0Layered\0");
       plantSlider("Crown start",p.crownBase,.05,.85);plantSlider("Crown aspect",p.crownAspect,.2,1.5);plantSlider("Crown fill",p.crownFill,.1,1.8);
     }
-    if(tree) {plantSlider("Apical taper",p.taper,.1,.98);plantSlider("Root flare",p.rootFlare,0,3);}
+    if(tree) {plantSlider("Apical taper",p.taper,.1,.98);plantSlider(s.doc.generator>=4?"Trunk base flare":"Root flare",p.rootFlare,0,3);}
     if(tree||f==plants::Family::Conifer||f==plants::Family::Fern||f==plants::Family::Palm)plantSlider("Gravity / droop",p.gravity,-.2,1.7);
     if(tree)plantSlider("Light tropism",p.light,-.5,1);
     plantSlider("Organic irregularity",p.irregularity,0,1);
@@ -116,7 +116,12 @@ static void plantProperties() {
   }
 }
 static void plantStructureNode(size_t index) {
-  auto& s=plantState;auto& n=s.doc.nodes[index];ImGui::PushID(n.id.c_str());
+  auto& s=plantState;auto& n=s.doc.nodes[index];
+  if(s.doc.generator>=4&&n.kind==plants::Part::Roots){
+    for(size_t i=0;i<s.doc.nodes.size();i++)if(s.doc.nodes[i].parent==n.id)plantStructureNode(i);
+    return;
+  }
+  ImGui::PushID(n.id.c_str());
   bool children=std::any_of(s.doc.nodes.begin(),s.doc.nodes.end(),[&](auto& x){return x.parent==n.id;});
   ImGui::Checkbox("##visible",&n.visible);plantRect("node-visible/"+n.id);ImGui::SameLine();
   ImGuiTreeNodeFlags flags=ImGuiTreeNodeFlags_OpenOnArrow|ImGuiTreeNodeFlags_SpanAvailWidth|ImGuiTreeNodeFlags_DefaultOpen;
@@ -129,7 +134,8 @@ static void plantStructureNode(size_t index) {
 static void plantStructure() {
   auto& s=plantState;
   for(size_t i=0;i<s.doc.nodes.size();i++)if(s.doc.nodes[i].parent.empty())plantStructureNode(i);
-  if(s.selected>=0&&s.selected<int(s.doc.nodes.size())) {
+  if(s.selected>=0&&s.selected<int(s.doc.nodes.size())&&
+     (s.doc.generator<4||s.doc.nodes[s.selected].kind!=plants::Part::Roots)) {
     auto& n=s.doc.nodes[s.selected];ImGui::Separator();plantText("Component name",n.name);
     float offset[3],scale[3];for(int i=0;i<3;i++){offset[i]=n.offset[i];scale[i]=n.scale[i];}
     plantFieldWidth("Offset XYZ");if(ImGui::DragFloat3("Offset XYZ",offset,.25f,-4096,4096))for(int i=0;i<3;i++)n.offset[i]=offset[i];
@@ -146,6 +152,7 @@ static void plantStructure() {
   }
   ImGui::BeginDisabled(s.doc.nodes.size()>=64);if(plantButton("Add component","add-component"))ImGui::OpenPopup("Plant component kind");ImGui::EndDisabled();
   if(ImGui::BeginPopup("Plant component kind")){for(int i=0;i<8;i++){
+    if(s.doc.generator>=4&&i==int(plants::Part::Roots))continue;
     bool available=s.result&&std::any_of(s.result->baseLods[0].faces.begin(),s.result->baseLods[0].faces.end(),[&](auto& face){return int(face.part)==i;});
     if(ImGui::MenuItem(plants::partName(plants::Part(i)),nullptr,false,available)){
     plants::Component n;n.id="component-"+std::to_string(s.revision)+"-"+std::to_string(s.doc.nodes.size());n.name=plants::partName(plants::Part(i));n.kind=plants::Part(i);

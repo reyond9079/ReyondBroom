@@ -48,17 +48,10 @@ static void checkBotanicalAppearance(const std::vector<Project>& catalog){
   check(maxHeight>minHeight*1.13,std::string("group visibly varies member height: ")+id);
   check(fingerprint(mesh)==fingerprint(generate(d)),std::string("repeatable group: ")+id);
  }
- auto oakMesh=generate(oak);
- double rootZ=0.;size_t rootFaces=0;
- for(auto& face:oakMesh.faces)if(face.part==Part::Roots){
-  ++rootFaces;
-  for(auto i:face.i){
-   const auto& v=oakMesh.vertices[i];
-   check(v.p[2]>=-1e-6,"roots are grounded");
-   rootZ=std::max(rootZ,v.p[2]);
-  }
- }
- check(rootFaces>0&&rootZ<oak.p.radius,"roots stay low at the base of the trunk");
+ auto stylized=oak;stylized.p.quality=3;
+ auto upgradedOak=generate(stylized);
+ check(std::none_of(upgradedOak.faces.begin(),upgradedOak.faces.end(),[](const auto& face){return face.part==Part::Roots;}),
+       "photographic generator omits exposed roots even in stylized quality");
  auto morel=find("morel");double low=1e9,high=-1e9;int dark=0,light=0;for(int y=0;y<64;y++)for(int x=0;x<64;x++){auto t=texel(morel,Cap,(x+.5)/64,(y+.5)/64);low=std::min(low,t.height);high=std::max(high,t.height);dark+=t.height<.2;light+=t.height>.6;}
  check(high-low>.5&&dark>1000&&light>100,"morel has recessed cellular pits and raised walls");
 }
@@ -71,6 +64,7 @@ int main(int argc,char** argv)try{
    for(int l=0;l<3;l++){auto mesh=generate(d,l);validate(mesh);check(!mesh.faces.empty(),"nonempty "+d.preset);check(mesh.faces.size()<previous,"strict LOD reduction "+d.preset);previous=mesh.faces.size();check(mesh.faces.size()<=size_t(d.p.budget*(l==0?1:l==1?d.p.lod1Ratio:d.p.lod2Ratio)),"budget "+d.preset);
     if(l==0){check(mesh.faces.size()<=12000,"game-ready default triangle budget "+d.preset);nearHeight=mesh.high[2];}else if(d.family==Family::Grass||d.family==Family::Riparian)check(mesh.high[2]<=nearHeight*1.12+.1,"LOD never stretches full-height grass/riparian blades "+d.preset);
     auto foliage=std::count_if(mesh.faces.begin(),mesh.faces.end(),[](auto& f){return f.part==Part::Leaves&&(f.material==Leaf||f.material==Needle||f.material==Grass||f.material>=LeafLight);});
+    check(std::none_of(mesh.faces.begin(),mesh.faces.end(),[](const auto& face){return face.part==Part::Roots;}),"no exposed roots "+d.preset);
     std::set<unsigned> trunkOrgans;for(auto& face:mesh.faces)if(face.part==Part::Trunk)trunkOrgans.insert(face.organ);
     if(d.family==Family::Cactus&&d.p.organ==2){
      std::map<unsigned,std::pair<V,V>> boxes;for(auto& f:mesh.faces)if(f.part==Part::Trunk){auto [it,inserted]=boxes.emplace(f.organ,std::make_pair(V{1e30,1e30,1e30},V{-1e30,-1e30,-1e30}));for(auto i:f.i)for(int a=0;a<3;a++){it->second.first[a]=std::min(it->second.first[a],mesh.vertices[i].p[a]);it->second.second[a]=std::max(it->second.second[a],mesh.vertices[i].p[a]);}}

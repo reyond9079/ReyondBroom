@@ -44,7 +44,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p qa/targets
-          g++ -std=c++17 -O2 tests/plant-legacy-corpus.cpp -lz -o qa/legacy.exe
+          git fetch --no-tags --depth=1 origin 9e5b30a57724602b0d1e0f261af742dd68ae571b
+          mkdir -p qa/plant-baseline
+          git archive 9e5b30a57724602b0d1e0f261af742dd68ae571b native/plant native/ftebroom_bb_math.h native/third_party/json.hpp | tar -x -C qa/plant-baseline
+          g++ -std=c++17 -O2 -Iqa/plant-baseline/native tests/plant-legacy-corpus.cpp -lz -o qa/legacy.exe
           g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o qa/botanical.exe
           g++ -std=c++17 -O2 tests/plant-runtime-targets.cpp -lz -o qa/targets.exe
           qa/legacy.exe > qa/legacy.json

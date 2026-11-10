@@ -12,6 +12,7 @@ import sys
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime', type=Path)
 p.add_argument('output', type=Path)
+p.add_argument('--targeted', action='store_true', help='Profile behavior/migration/compiler checks without navigation or UI atlas')
 a = p.parse_args()
 repo = Path(__file__).resolve().parents[1]
 root, out = a.runtime.resolve(), a.output.resolve()
@@ -26,7 +27,9 @@ for name in ['compilation-profiles.json', 'ftebroom-run-profiles.txt', 'ftebroom
 engine = root/('bin/fteqw64.exe' if os.name == 'nt' else 'fteqw-gl64')
 renderer_args=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 results = {}
-for case in ['run', 'trenchbroom-native', 'trenchbroom-restore', 'compilation-parity-native', 'context-navigation-native']:
+cases = ['run', 'trenchbroom-native', 'trenchbroom-restore', 'compilation-parity-native']
+if not a.targeted: cases.append('context-navigation-native')
+for case in cases:
     console = data/'qconsole.log'
     console.unlink(missing_ok=True)
     log = out/(case+'.log')
@@ -72,44 +75,45 @@ for stage in [70, 71]:
     (out/f'migration-{stage}.log').write_text(text)
     assert 'FTEBROOM_PARITY_FAIL' not in text and len(set(re.findall(r'FTEBROOM_PARITY_PASS ([^\r\n]*)',text)))==6, text
 legacy.unlink()
-# Capture the imported fixture using the actual ImGui editor and its measured geometry.
-for scale in ['1', '1.5', '2']:
-    (data/'compilation-profiles.json').unlink(missing_ok=True)
-    shutil.rmtree(data/'compile-ui-atlas', ignore_errors=True)
-    (data/'qconsole.log').unlink(missing_ok=True)
-    choice={'1':0,'1.5':2,'2':4}[scale]
-    (data/'profile-atlas.cfg').write_text('exec qa-clip.cfg\nin 5 ftebroom_test_run '+str(60+choice)+'\nin 6 ftebroom_test_run 10\n'+
-        '\n'.join(f'in {9+3*i} ftebroom_test_run {40+i}' for i in range(4))+'\nin 23 quit force\n')
-    with (out/f'atlas-{scale}.log').open('wb') as stream:
-        subprocess.run([str(engine), *renderer_args, '-ftebroom-child-processes', '-nohome', '-noupdates', '-nosound',
-            '-window', '-width', '2520', '-height', '1700', '-condebug', '-basedir', str(root), '+exec', 'profile-atlas.cfg'],
-            cwd=root, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}, stdout=stream, stderr=subprocess.STDOUT,
-            timeout=65, check=True)
-    atlas_log=(out/f'atlas-{scale}.log').read_text(errors='replace')
-    if (data/'qconsole.log').is_file():atlas_log+='\n'+(data/'qconsole.log').read_text(errors='replace')
-    (out/f'atlas-{scale}.log').write_text(atlas_log)
-    if 'FTEBROOM_PARITY_FAIL' in atlas_log or not (data/'compile-ui-atlas').is_dir():
-        raise RuntimeError('ImGui capture failed: '+atlas_log[-5000:])
-    shutil.copytree(data/'compile-ui-atlas', out/'ui-atlas'/scale, dirs_exist_ok=True)
-    assert len(list((out/'ui-atlas'/scale).glob('*/compile.png'))) == 4
+if not a.targeted:
+    # Capture the imported fixture using the actual ImGui editor and its measured geometry.
+    for scale in ['1', '1.5', '2']:
+        (data/'compilation-profiles.json').unlink(missing_ok=True)
+        shutil.rmtree(data/'compile-ui-atlas', ignore_errors=True)
+        (data/'qconsole.log').unlink(missing_ok=True)
+        choice={'1':0,'1.5':2,'2':4}[scale]
+        (data/'profile-atlas.cfg').write_text('exec qa-clip.cfg\nin 5 ftebroom_test_run '+str(60+choice)+'\nin 6 ftebroom_test_run 10\n'+
+            '\n'.join(f'in {9+3*i} ftebroom_test_run {40+i}' for i in range(4))+'\nin 23 quit force\n')
+        with (out/f'atlas-{scale}.log').open('wb') as stream:
+            subprocess.run([str(engine), *renderer_args, '-ftebroom-child-processes', '-nohome', '-noupdates', '-nosound',
+                '-window', '-width', '2520', '-height', '1700', '-condebug', '-basedir', str(root), '+exec', 'profile-atlas.cfg'],
+                cwd=root, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}, stdout=stream, stderr=subprocess.STDOUT,
+                timeout=65, check=True)
+        atlas_log=(out/f'atlas-{scale}.log').read_text(errors='replace')
+        if (data/'qconsole.log').is_file():atlas_log+='\n'+(data/'qconsole.log').read_text(errors='replace')
+        (out/f'atlas-{scale}.log').write_text(atlas_log)
+        if 'FTEBROOM_PARITY_FAIL' in atlas_log or not (data/'compile-ui-atlas').is_dir():
+            raise RuntimeError('ImGui capture failed: '+atlas_log[-5000:])
+        shutil.copytree(data/'compile-ui-atlas', out/'ui-atlas'/scale, dirs_exist_ok=True)
+        assert len(list((out/'ui-atlas'/scale).glob('*/compile.png'))) == 4
 
-# Assert structural layout invariants from real rendered widgets, not a mockup.
-layout_checks=[]
-for meta in (out/'ui-atlas').glob('*/*/geometry.json'):
-    g=json.loads(meta.read_text());w=g['widgets'];u=g['scale']
-    assert w['profile-remove']['x']>w['profile-add']['x']
-    assert abs(w['profile-remove']['y']-w['profile-add']['y'])<u
-    assert w['import']['y']+w['import']['height']<=w['profile-add']['y']+u
-    assert [w[k]['x'] for k in ['task-add','task-remove','task-up','task-down']]==sorted(w[k]['x'] for k in ['task-add','task-remove','task-up','task-down'])
-    footer=[w[k] for k in ['launch','stop','test','compile','close']]
-    assert all(footer[i]['x']+footer[i]['width']<=footer[i+1]['x']+u for i in range(4))
-    assert all(abs(v['width']-80*u)<u for v in footer)
-    assert w['output']['height']>0 and w['output']['y']>=w['splitter']['y']+w['splitter']['height']-u
-    assert w['close']['y']+w['close']['height']<=w['window']['height']+u
-    assert abs(w['Profile name']['x']-w['Working directory']['x'])<u
-    layout_checks.append(str(meta.relative_to(out)))
-(out/'layout-results.json').write_text(json.dumps({'passed':layout_checks,'toolkit':'ImGui','pixel_equality_required':False},indent=2))
-print('PASS',len(layout_checks),'real UI layouts',flush=True)
+    # Assert structural layout invariants from real rendered widgets, not a mockup.
+    layout_checks=[]
+    for meta in (out/'ui-atlas').glob('*/*/geometry.json'):
+        g=json.loads(meta.read_text());w=g['widgets'];u=g['scale']
+        assert w['profile-remove']['x']>w['profile-add']['x']
+        assert abs(w['profile-remove']['y']-w['profile-add']['y'])<u
+        assert w['import']['y']+w['import']['height']<=w['profile-add']['y']+u
+        assert [w[k]['x'] for k in ['task-add','task-remove','task-up','task-down']]==sorted(w[k]['x'] for k in ['task-add','task-remove','task-up','task-down'])
+        footer=[w[k] for k in ['launch','stop','test','compile','close']]
+        assert all(footer[i]['x']+footer[i]['width']<=footer[i+1]['x']+u for i in range(4))
+        assert all(abs(v['width']-80*u)<u for v in footer)
+        assert w['output']['height']>0 and w['output']['y']>=w['splitter']['y']+w['splitter']['height']-u
+        assert w['close']['y']+w['close']['height']<=w['window']['height']+u
+        assert abs(w['Profile name']['x']-w['Working directory']['x'])<u
+        layout_checks.append(str(meta.relative_to(out)))
+    (out/'layout-results.json').write_text(json.dumps({'passed':layout_checks,'toolkit':'ImGui','pixel_equality_required':False},indent=2))
+    print('PASS',len(layout_checks),'real UI layouts',flush=True)
 
 # Real bundled compiler, without legacy staging/preview hooks: export, compile,
 # deploy the resulting BSP, then remove the compiler's portal file.

@@ -2,7 +2,7 @@
 # Build the isolated audio helper with MSYS2 MinGW64. No network protocols are enabled.
 set -eu
 export PATH=/mingw64/bin:/usr/bin:$PATH
-destination=$(cd "$(dirname "$0")/.." && pwd)/tools/audio
+destination=${RB_AUDIO_OUTPUT_DIR:-$(cd "$(dirname "$0")/.." && pwd)/tools/audio}
 workspace=${1:?Pass a dedicated build directory}
 msys_shell=$(cygpath -m /usr/bin/sh.exe)
 mkdir -p "$workspace" "$destination"

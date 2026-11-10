@@ -22,3 +22,6 @@ __pycache__/
 # Generated neutral textures are rebuilt by the package scripts.
 /runtime/halflife-editor.wad
 /runtime/textures/fb_grey.wal
+
+# Disposable CI dependency outputs
+/.ci-deps/

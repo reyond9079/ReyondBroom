@@ -237,12 +237,13 @@ static int plantThumbnail(const plants::Project& d) {
   }
   return 0;
 }
-static void plantVideoChanged() {
-  auto& s=plantState;s.dirtyRender=true;s.previewMaps.reset();s.auxiliaryMapsUploaded=false;s.checkerUploaded=false;s.gameAtlasUploaded=false;for(auto& item:s.thumbs)item.second.handle=0;
+static void plantVideoChanged(bool resetThumbnails=true) {
+  auto& s=plantState;s.dirtyRender=true;s.previewMaps.reset();s.auxiliaryMapsUploaded=false;s.checkerUploaded=false;s.gameAtlasUploaded=false;
+  if(resetThumbnails)for(auto& item:s.thumbs)item.second.handle=0;
 }
 static void plantResumePreview() {
   auto& s=plantState;
-  bbLeave([](){auto& s=plantState;bbActive=false;modelViewerOpen=false;modelEditorActive=false;modelEditorCameraEnd();bbRegister();s.owner=true;plantVideoChanged();});
+  bbLeave([](){auto& s=plantState;bbActive=false;modelViewerOpen=false;modelEditorActive=false;modelEditorCameraEnd();bbRegister();s.owner=true;plantVideoChanged(false);});
 }
 static void plantShow() {
   auto& s=plantState;

@@ -80,6 +80,26 @@ class ScopeTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_cached_profile_tests_include_transitive_application_headers(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); (root/'native/profile').mkdir(parents=True)
+            (root/'scripts').mkdir(); (root/'tests/fixtures').mkdir(parents=True)
+            for name in ('ci-dependency.py', 'build-profile-support.py'):
+                (root/'scripts'/name).write_text('recipe')
+            for name in ('trenchbroom-profiles.cpp', 'compilation-profile-core.cpp', 'engine-launch.cpp',
+                         'profile-order.cpp', 'compilation-profile-probe.cpp',
+                         'fixtures/CompilationProfiles-original.cfg', 'fixtures/CompilationProfiles-cpu-count.cfg'):
+                (root/'tests'/name).write_text('#include "../native/engine.h"\n')
+            (root/'native/engine.h').write_text('#include "profile/nested.h"\n')
+            header = root/'native/profile/nested.h'; header.write_text('old')
+            with patch.object(cache, 'REPO', root):
+                first = cache.fingerprint('profile', root/'native/profile', 'test', tools={})
+                (root/'native/engine.h').write_text('#include "profile/nested.h"\n// changed engine behavior\n')
+                self.assertNotEqual(first, cache.fingerprint('profile', root/'native/profile', 'test', tools={}))
+                dependencies = cache.quoted_dependencies([root/'tests/engine-launch.cpp'])
+                self.assertIn('native/engine.h', dependencies)
+                self.assertIn('native/profile/nested.h', dependencies)
+
     def test_header_toolchain_platform_and_flags_invalidate_exact_key(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); header = root/'header.h'; header.write_text('AAAA')

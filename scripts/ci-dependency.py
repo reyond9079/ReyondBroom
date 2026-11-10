@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -26,6 +27,24 @@ def inventory(root):
     return {p.relative_to(root).as_posix(): sha(p) for p in sorted(root.rglob('*'))
             if p.is_file() and not {'.git', 'Testing'} & set(p.relative_to(root).parts)
             and p.name != '.ci-cache.json'}
+
+
+def quoted_dependencies(roots):
+    """Track app headers used by cached tests/probes, not unrelated editor code."""
+    pending = list(roots); visited = set(); result = {}
+    include_dirs = [REPO/'native', REPO/'native/third_party/fmt']
+    include_dirs += list((REPO/'native/third_party/trenchbroom').glob('*/include'))
+    include_dirs += list((REPO/'native/third_party/trenchbroom').glob('*/test-utils/include'))
+    while pending:
+        file = pending.pop().resolve()
+        if file in visited or not file.is_file() or REPO not in file.parents:
+            continue
+        visited.add(file); result[file.relative_to(REPO).as_posix()] = sha(file)
+        for name in re.findall(r'^\s*#\s*include\s*"([^"]+)"', file.read_text(errors='replace'), re.MULTILINE):
+            match = next((p for p in [file.parent/name, *(d/name for d in include_dirs)] if p.is_file()), None)
+            if match:
+                pending.append(match)
+    return result
 
 
 def toolchain():
@@ -72,6 +91,9 @@ def fingerprint(component, source, platform, tools=None, destination=None):
                  'profile-order.cpp', 'compilation-profile-probe.cpp',
                  'fixtures/CompilationProfiles-original.cfg', 'fixtures/CompilationProfiles-cpu-count.cfg']
         inputs['tests'] = {name: sha(REPO/'tests'/name) for name in names}
+        inputs['local_headers'] = quoted_dependencies(
+            [*(REPO/'native/profile').glob('*.cpp'), *(REPO/'native/profile').glob('*.h'),
+             *(REPO/'tests'/name for name in names if name.endswith('.cpp'))])
     identity = {'schema': 1, 'component': component, 'platform': platform,
                 'workspace': str(REPO), 'source': str(source.resolve()),
                 'build_directory': str(destination.resolve()) if destination is not None else None,

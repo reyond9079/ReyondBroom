@@ -3,7 +3,7 @@ on:
   push:
     branches: [qa/rb20-plant-brush-diagnostics]
 permissions:
-  contents: read
+  contents: write
   actions: read
 jobs:
   original-evidence:
@@ -60,6 +60,22 @@ jobs:
           }
           python -m pip install Pillow pywinauto
           if ($LASTEXITCODE) { throw 'QA dependencies failed' }
+      - name: Stabilize the test viewport on a reused workspace
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          path = Path('scripts/test-plant-brush.py')
+          s = path.read_text()
+          old = 'in 9 ftebroom_camera_restore'
+          assert s.count(old) == 1
+          s = s.replace(old, 'in 8.5 set ftebroom_view_layout 4\nin 9 set ftebroom_view_layout 1\n' + old)
+          old = "    view = live()['views'][0]"
+          assert s.count(old) == 1
+          s = s.replace(old, "    view = wait(lambda: views[0] if len(views := live()['views']) == 1 and views[0]['type'] == 0 else None)")
+          path.write_text(s)
+          '@ | python -
+          if ($LASTEXITCODE) { throw 'QA viewport fixture preparation failed' }
       - name: Compare the same pointer scenario on both runtimes
         shell: pwsh
         run: |
@@ -75,6 +91,18 @@ jobs:
             if ($testCode -ne 0) { $failed = $true }
           }
           if ($failed) { exit 1 }
+      - name: Complete Windows view checks on the exact staged release
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build-144/payload -Filter 'fteqw64.exe' -Recurse | Select-Object -First 1
+          $root = $exe.Directory.Parent.FullName
+          foreach ($theme in @('dark','light')) {
+            foreach ($width in @(1920,1024)) {
+              $height = if ($width -eq 1920) { 1080 } else { 768 }
+              python scripts/test-rb10-views.py $root "qa/144/views-$theme-$width" --theme $theme --width $width --height $height
+              if ($LASTEXITCODE) { throw "View Options/Tools acceptance failed: $theme / $width" }
+            }
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

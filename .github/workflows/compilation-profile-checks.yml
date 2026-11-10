@@ -251,6 +251,8 @@ jobs:
     - name: Check changed grid shaders
       if: fromJSON(needs.plan.outputs.plan).flags.grid
       run: LIBGL_ALWAYS_SOFTWARE=1 python tests/test-grid-lod.py --output qa/grid-lod.json
+    - name: Stage current release assets in the source runtime
+      run: python scripts/ci-stage-assets.py bundle/ReyondBroom-Linux-x64
     - name: Short native startup of the rebuilt module
       run: xvfb-run -a -s '-screen 0 1280x800x24' python scripts/ci-startup-smoke.py bundle/ReyondBroom-Linux-x64 qa/startup
     - name: Run affected subsystem checks
@@ -423,6 +425,8 @@ jobs:
     - name: Reimport changed plant core exports
       if: fromJSON(needs.plan.outputs.plan).flags.plant_core
       run: python scripts/test-plant-exports.py qa/plants/core
+    - name: Stage current release assets in the source runtime
+      run: python scripts/ci-stage-assets.py bundle/ReyondBroom-Windows-x64
     - name: Short native startup of the rebuilt module
       run: python scripts/ci-startup-smoke.py bundle/ReyondBroom-Windows-x64 qa/startup
     - name: Run affected subsystem checks

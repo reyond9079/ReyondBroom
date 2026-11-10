@@ -28,7 +28,8 @@ and the multi-scale UI atlas. Themes/sizes are not multiplied on every PR.
 
 ## Comparison refs and manual full checks
 
-PR validation compares against the merge base with the PR base SHA. A manual
+PR validation compares against the merge base with the PR base SHA. Releases
+compare actual endpoint trees, including reversions and rollbacks. A manual
 source/release run defaults to the latest published release. `validation_base`
 overrides this ref. It is deliberately independent of `base_tag` and
 `linux_base_tag`, which select the compatible SDK/runtime used for packaging.

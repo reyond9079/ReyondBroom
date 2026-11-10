@@ -168,6 +168,18 @@ struct Botanical : Generator {
     auto path=arc(origin,end,droop,std::max(4,p.segments),id);
     const double tipRadius=std::max(.015,radius*(1-p.taper)*.45);
     skeleton.push_back({path,radius,tipRadius,order==0?Part::Primary:order==1?Part::Secondary:Part::Twigs,id,editId,joint});
+    const bool column=doc.generator>=5&&doc.family==Family::Broadleaf&&p.crown==2;
+    if(column&&order<2&&r.real()>=p.dead){
+      const int leaves=std::max(2,int(p.leaves*p.density*p.crownFill*.5));
+      V axis=unit(sub(end,origin));
+      for(int i=0;i<leaves;i++){
+        const double t=.42+.57*(i+.5)/leaves;
+        const auto node=path[size_t(t*(path.size()-1))];
+        const double a=leafAngle(i)+r.range(-.2,.2);
+        const auto aim=unit(add(axis,{std::cos(a)*.85,std::sin(a)*.85,r.range(-.4,.1)}));
+        foliage.push_back({node,aim,mix(id,i+801),r.range(.72,1.06)});
+      }
+    }
     double span=length(sub(end,origin));int depth=doc.family==Family::Bush?std::min(3,p.depth):p.depth;
     if(order+1<depth){
       int children=order==0?4:3;
@@ -398,7 +410,7 @@ struct Botanical : Generator {
         b.check();Rng r(mix(doc.seed,stem*71+i+13));double u=(i+.5)/primaries;
         const bool column=doc.generator>=5&&!shrub&&p.crown==2;
         if(doc.generator>=5&&!shrub)u+=r.range(-.42,.42)/primaries;
-        double t=p.crownBase+(1-p.crownBase)*u*.9;
+        double t=p.crownBase+(1-p.crownBase)*u*(column?.993:.9);
         double az=i*2.399963+stem+member.yaw+r.range(-.32,.32)*p.irregularity;
         double reach=height*p.spread*envelope(u)*(.32+.48*curve(p.growth,t))*r.range(.88,1.1);
         if(realistic())reach*=(.65+.35*member.stature)*r.range(.69,1.27);
@@ -438,7 +450,7 @@ struct Botanical : Generator {
         b.check();uint64_t id=mix(doc.seed,stem*317+level*31+j+500);Rng r(id);
         double u=(level+r.range(.18,.65))/levels,t=p.crownBase+(1-p.crownBase)*u;
         double profile=p.crown==5?std::pow(1-u,.9):p.crown==2?.24+.16*std::sin(u*pi):p.crown==8?.75:envelope(u);
-        if(column)profile=(.46+.54*std::min(1.,u/.21))*(1.-.90*std::pow(u,2.2));
+        if(column)profile=(.56+.44*std::min(1.,u/.18))*(1.-.90*std::pow(u,2.2));
         double span=height*p.spread*profile*r.range(.82,1.08)*member.stature;
         double az=j*2*pi/per+level*1.73+member.yaw+r.range(-.16,.16)*p.irregularity;
         V base=treeTrunk(t,member),end=add(base,{std::cos(az)*span*member.crownX,std::sin(az)*span*member.crownY,span*(p.needleForm==0?.30:.12)});
@@ -454,14 +466,15 @@ struct Botanical : Generator {
           double v=.16+.80*(k+.5)/shoots;auto node=path[std::min(path.size()-1,size_t(v*(path.size()-1)))];
           V dir=unit({std::cos(az+side*.72),std::sin(az+side*.72),column?r.range(1.1,2.5):p.needleForm==1?-.30:.22});
           auto tip=add(node,mul(dir,span*.32*(1-v*.7)));
-          if(k%3==0)skeleton.push_back({{node,tip},std::max(.025,p.radius*member.girth*.025),.01,Part::Twigs,mix(id,k+side+17)});
+          if(k%(column?6:3)==0)skeleton.push_back({{node,tip},std::max(.025,p.radius*member.girth*.025),.01,Part::Twigs,mix(id,k+side+17)});
           for(int n=0;n<3;n++){
             double f=(n+.2)/3;auto at=add(node,mul(sub(tip,node),f));
             double turn=leafAngle(n)+az;
             V aim=p.needleForm==0?unit(add(dir,V{std::cos(turn)*.45,std::sin(turn)*.45,.45})):p.needleForm==3?unit({std::cos(turn),std::sin(turn),.4}):unit(add(dir,V{std::cos(turn)*.14,std::sin(turn)*.14,0}));
             if(scaled){
               aim=unit(add(dir,{std::cos(turn)*.37,std::sin(turn)*.37,r.range(.10,.55)}));
-              foliage.push_back({at,aim,mix(id,k*21+n+side+100),r.range(1.05,1.80)});
+              const double size=column?r.range(1.30,2.05)*(1.-.54*std::pow(u,4.)):r.range(1.05,1.80);
+              foliage.push_back({at,aim,mix(id,k*21+n+side+100),size});
               continue;
             }
             foliage.push_back({at,aim,mix(id,k*21+n+side+100),std::max(1.8,length(sub(tip,node))/p.leafSize*1.5)});

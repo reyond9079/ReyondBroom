@@ -1,0 +1,52 @@
+name: Plan affected validation
+on:
+  workflow_call:
+    inputs:
+      base:
+        type: string
+        default: ''
+      head:
+        type: string
+        default: ''
+      full:
+        type: boolean
+        default: false
+      release:
+        type: boolean
+        default: false
+    outputs:
+      plan:
+        value: ${{ jobs.plan.outputs.plan }}
+      runtime:
+        value: ${{ jobs.plan.outputs.runtime }}
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      runtime: ${{ steps.plan.outputs.runtime }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          fetch-depth: 0
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ inputs.base }}
+          HEAD: ${{ inputs.head || github.sha }}
+          FULL: ${{ inputs.full }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          if test -z "$BASE"; then BASE=$(gh release view --json tagName --jq .tagName); fi
+          args=()
+          if test "$FULL" = true; then args+=(--full); fi
+          if test "$RELEASE" = true; then args+=(--release); fi
+          python scripts/ci-plan.py --base "$BASE" --head "$HEAD" "${args[@]}" --output ci-plan.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validation-plan
+          path: ci-plan.json
+          retention-days: 7

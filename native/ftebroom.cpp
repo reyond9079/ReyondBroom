@@ -329,6 +329,7 @@ static void panel(float w, float h)
 #endif
   if(runUiNavigation()||plantFocused())io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::NewFrame();
+  placementWidgets=nlohmann::json::object();
   browser132QaBegin();
   if(tourActive){
     uiHasScene=true;uiScenePos={0,0};uiSceneSize={w,h};popupOpen=false;viewCompute(w,h);
@@ -989,7 +990,6 @@ static void panel(float w, float h)
   if (uiSoftPanelBegin("Face",nullptr,uiPanelFlags()))
     materialBrowser();
   ImGui::End();
-  placementWidgets=nlohmann::json::object();
   plantBrushPanel();
   selectMapTab = selectMaterialTab = false;
   fixedPanel("##status",statusY,statusHeight);

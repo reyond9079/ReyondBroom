@@ -261,7 +261,11 @@ jobs:
         python scripts/ci-run-checks.py --plan ci-plan.json --runtime bundle/ReyondBroom-Linux-x64 --output qa/affected --probe deps/profile-core/compilation-profile-probe --platform "$PLATFORM"
     - name: Collect compact affected evidence
       if: always()
-      run: python scripts/collect-release-qa.py --qa qa --release unused-release --output qa-artifact
+      run: |-
+        python -c "import os,pathlib; p=pathlib.Path('qa'); p.mkdir(exist_ok=True); (p/'planned-scope.json').write_text(os.environ['CI_PLAN'])"
+        python scripts/collect-release-qa.py --qa qa --release unused-release --output qa-artifact
+      env:
+        CI_PLAN: ${{ needs.plan.outputs.plan }}
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -436,7 +440,11 @@ jobs:
         if ($LASTEXITCODE) { throw 'Affected acceptance failed' }
     - name: Collect compact affected evidence
       if: always()
-      run: python scripts/collect-release-qa.py --qa qa --release unused-release --output qa-artifact
+      run: |-
+        python -c "import os,pathlib; p=pathlib.Path('qa'); p.mkdir(exist_ok=True); (p/'planned-scope.json').write_text(os.environ['CI_PLAN'])"
+        python scripts/collect-release-qa.py --qa qa --release unused-release --output qa-artifact
+      env:
+        CI_PLAN: ${{ needs.plan.outputs.plan }}
     - uses: actions/upload-artifact@v4
       if: always()
       with:

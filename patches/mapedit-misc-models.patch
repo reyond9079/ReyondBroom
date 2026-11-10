@@ -1,0 +1,63 @@
+diff --git a/engine/server/pr_cmds.c b/engine/server/pr_cmds.c
+--- a/engine/server/pr_cmds.c
++++ b/engine/server/pr_cmds.c
+@@ -1695,6 +1695,7 @@ static void PR_FallbackSpawn_Func_Detail(pubprogfuncs_t *progfuncs, edict_t *self)
+ struct spawnents_s
+ {
+ 	int killonspawnflags;
++	qboolean editor;
+ 	eval_t *fulldata;
+ 	qboolean foundfuncs;
+ 	func_t CheckSpawn;	//fte's alternative to spawn functions.
+@@ -1738,6 +1739,13 @@ static void PDECL PR_DoSpawnInitialEntity(pubprogfuncs_t *progfuncs, struct edict_
+ 	}
+ 
+ 	eclassname = PR_GetString(progfuncs, ed->v->classname);
++	if (ctx->editor && !strcmp(eclassname, "misc_model"))
++	{
++		// The editor renders these from live MAP data. An engine static
++		// copy would remain visible after the editable entity is removed.
++		ED_Free(progfuncs, ed);
++		return;
++	}
+ 	if (!*eclassname)
+ 	{
+ 		Con_Printf("No classname\n");
+@@ -1848,11 +1856,12 @@ static void PDECL PR_DoSpawnInitialEntity(pubprogfuncs_t *progfuncs, struct edict_
+ 		PR_ExecuteProgram(progfuncs, ctx->SV_OnEntityPreSpawnFunction);
+ 	}
+ }
+-void PR_SpawnInitialEntities(const char *file)
++void PR_SpawnInitialEntities(const char *file, qboolean editor)
+ {
+ 	extern cvar_t skill;
+ 	struct spawnents_s ctx;
+ 	memset(&ctx, 0, sizeof(ctx));
++	ctx.editor = editor;
+ 
+ #ifdef HEXEN2
+ 	if (progstype == PROG_H2)
+diff --git a/engine/server/progs.h b/engine/server/progs.h
+--- a/engine/server/progs.h
++++ b/engine/server/progs.h
+@@ -36,7 +36,7 @@ enum initprogs_e
+ 	INITPROGS_REQUIRE	= 1<<1,
+ };
+ void Q_InitProgs(enum initprogs_e flags);
+-void PR_SpawnInitialEntities(const char *file);
++void PR_SpawnInitialEntities(const char *file, qboolean editor);
+ void PR_RegisterFields(void);
+ void PR_Init(void);
+ void QDECL ED_Spawned (struct edict_s *ent, int loading);
+diff --git a/engine/server/sv_init.c b/engine/server/sv_init.c
+--- a/engine/server/sv_init.c
++++ b/engine/server/sv_init.c
+@@ -1594,7 +1594,7 @@ void SV_SpawnServer (const char *server, const char *startspot, qboolean noents, q
+ 	switch(svs.gametype)
+ 	{
+ 	default:
+-		PR_SpawnInitialEntities(file);
++		PR_SpawnInitialEntities(file, noents);
+ 		break;
+ #ifdef Q2SERVER
+ 	case GT_QUAKE2:

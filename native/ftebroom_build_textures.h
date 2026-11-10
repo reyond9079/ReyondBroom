@@ -37,6 +37,15 @@ static void buildPublishPlaceholder(const std::string& name,const ftebroom::quak
   auto material="textures/"+name;materials[material]={material,image,false};buildRegisterMaterialAlias(name,image);
   runPlaceholderNames.insert(name);runAppend("Placeholder texture: "+name+"\n");
 }
+static void buildStageQ3ShaderList(const std::filesystem::path& folder,const std::set<std::string>& scripts){
+  if(scripts.empty())return;
+  auto path=folder/"scripts/shaderlist.txt";
+  std::filesystem::create_directories(path.parent_path());
+  std::ofstream output(path,std::ios::app);
+  output<<'\n';
+  for(const auto& script:scripts)output<<std::quoted(script)<<'\n';
+  if(!output)throw std::runtime_error("Cannot stage shader list for q3map2.");
+}
 static bool runPrepareExport(const std::filesystem::path& target){
   if(!runExportPrepared){
     std::filesystem::create_directories(target.parent_path());
@@ -58,6 +67,7 @@ static bool runPrepareExport(const std::filesystem::path& target){
       std::istringstream rows(source);std::string row;int patch=0;
       while(std::getline(rows,row)){auto at=row.find_first_not_of(" \t\r");if(at==row.npos)continue;auto text=row.substr(at);if(text=="patchDef2"||text=="patchDef3"){patch=1;continue;}if(patch&&text=="{")continue;if(patch){std::istringstream value(text);std::string name;if(value>>std::quoted(name))names.insert(ftebroom::materialKey(name));patch=0;}}
       auto q2pal=gameProfile==3?q2Palette():std::string{};bool aliasesChanged=false;
+      std::set<std::string> q3Shaders;
       for(const auto& name:names){
         if(!ftebroom::safeMaterialPath(name))throw std::runtime_error("Unsafe material path: "+name);
         bool neutral=name=="__tb_empty"||name=="fb_grey";
@@ -73,9 +83,15 @@ static bool runPrepareExport(const std::filesystem::path& target){
         auto found=materials.find("textures/"+name);
         if(found==materials.end())found=std::find_if(materials.begin(),materials.end(),[&](const auto& entry){return ftebroom::materialKey(entry.first)==name;});
         bool absent=found==materials.end();
+        if(gameProfile<2&&!absent&&found->second.shader){
+          const auto& shader=found->second.source;
+          if(shader.rfind("scripts/",0)==0&&shader.size()>15&&ftebroom::safeMaterialPath(shader))
+            q3Shaders.insert(shader.substr(8,shader.size()-15));
+        }
         if(!absent&&!found->second.shader){size_t size=0;auto bytes=files->LoadFile(found->second.preview.c_str(),&size);absent=!bytes||!size;if(bytes)core->Free(bytes);}
         if(absent || (found!=materials.end()&&found->second.preview.rfind("textures/_ftebroom_missing/",0)==0))runMissingNames.push_back(name);
       }
+      buildStageQ3ShaderList(target.parent_path(),q3Shaders);
       if(aliasesChanged){++materialDataRevision;publishMaterialTags();}
     }
     runExportPrepared=true;

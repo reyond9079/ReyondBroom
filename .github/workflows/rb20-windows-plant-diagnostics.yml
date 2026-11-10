@@ -67,12 +67,13 @@ jobs:
           from pathlib import Path
           path = Path('scripts/test-plant-brush.py')
           s = path.read_text()
-          old = 'in 9 ftebroom_camera_restore'
-          assert s.count(old) == 1
-          s = s.replace(old, 'in 8.5 set ftebroom_view_layout 4\nin 9 set ftebroom_view_layout 1\n' + old)
-          old = "    view = live()['views'][0]"
-          assert s.count(old) == 1
-          s = s.replace(old, "    view = wait(lambda: views[0] if len(views := live()['views']) == 1 and views[0]['type'] == 0 else None)")
+          start = s.index("    wait(lambda: any('RB_PLANT_BRUSH_FIXTURE_READY'")
+          end = s.index("    x, y = view", start)
+          s = s[:start] + (
+              "    ui.console('set ftebroom_view_layout 1')\n"
+              "    ui.console('ftebroom_camera_restore 0 -320 340 45 90 0 80')\n"
+              "    view = wait(lambda: views[0] if len(views := live()['views']) == 1 and views[0]['type'] == 0 else None)\n"
+          ) + s[end:]
           path.write_text(s)
           '@ | python -
           if ($LASTEXITCODE) { throw 'QA viewport fixture preparation failed' }
@@ -88,7 +89,12 @@ jobs:
             python scripts/test-plant-brush.py $root "qa/$v/plant-brush"
             $testCode = $LASTEXITCODE
             Write-Output "Plant Brush alpha.$v exit code: $testCode"
-            if ($testCode -ne 0) { $failed = $true }
+            if ($testCode -ne 0) {
+              Get-Content "qa/$v/plant-brush/editor.log" -Tail 40
+              $state = Get-Content "qa/$v/plant-brush/failure-state.json" -Raw | ConvertFrom-Json
+              $state | Select-Object mapPath,views,plantBrush | ConvertTo-Json -Depth 4
+              $failed = $true
+            }
           }
           if ($failed) { exit 1 }
       - name: Complete Windows view checks on the exact staged release

@@ -54,6 +54,49 @@ static void buildStageQ3ShaderList(const std::filesystem::path& folder,const std
   for(const auto& script:scripts)output<<std::quoted(script)<<'\n';
   if(!output)throw std::runtime_error("Cannot stage shader list for q3map2.");
 }
+static std::string buildMapMaterials(const std::string& source,std::set<std::string>& names,bool q3){
+  std::istringstream rows(source);
+  std::ostringstream snapshot;
+  std::string line;
+  bool patchMaterial=false,changed=false;
+  while(std::getline(rows,line)){
+    const auto first=line.find_first_not_of(" \t\r");
+    if(first!=line.npos){
+      const auto text=line.substr(first);
+      if(text=="patchDef2"||text=="patchDef3")patchMaterial=true;
+      else if(text!="{"){
+        std::istringstream row(line);
+        if(patchMaterial||text.front()=='('){
+          if(!patchMaterial){
+            // Engine snapshots write a Valve 220 face as three plane points
+            // followed by the material. Leave the original UV tokens intact.
+            char open,close;double x,y,z;
+            for(int point=0;point<3;++point)
+              if(!(row>>open>>x>>y>>z>>close)||open!='('||close!=')'){
+                row.setstate(std::ios::failbit);break;
+              }
+          }
+          row>>std::ws;
+          const auto materialAt=row.tellg();
+          std::string material;
+          if(materialAt>=0&&row>>std::quoted(material)){
+            const auto name=ftebroom::materialKey(material);
+            names.insert(name);
+            if(q3&&material.size()>9&&ftebroom::materialKey(material.substr(0,9)).empty()){
+              size_t start=size_t(materialAt);
+              if(line[start]=='"')++start;
+              line.erase(start,9);
+              changed=true;
+            }
+          }
+          patchMaterial=false;
+        }
+      }
+    }
+    if(q3)snapshot<<line<<'\n';
+  }
+  return changed?snapshot.str():std::string{};
+}
 static bool runPrepareExport(const std::filesystem::path& target){
   if(!runExportPrepared){
     std::filesystem::create_directories(target.parent_path());
@@ -70,10 +113,10 @@ static bool runPrepareExport(const std::filesystem::path& target){
       buildWriteTexture(target,ftebroom::quake1::map(source,false,wads,false,gameProfile==4));
       if(!q1MissingWads.empty())runAppend("Unavailable WAD archives: "+std::to_string(q1MissingWads.size())+". Only unresolved textures used by this snapshot require placeholders.\n");
     }else{
-      std::set<std::string> names;for(auto name:ftebroom::quake1::mapTextures(source))names.insert(ftebroom::materialKey(name));
-      // Engine exports curved surfaces as patchDef2/3 followed by their material.
-      std::istringstream rows(source);std::string row;int patch=0;
-      while(std::getline(rows,row)){auto at=row.find_first_not_of(" \t\r");if(at==row.npos)continue;auto text=row.substr(at);if(text=="patchDef2"||text=="patchDef3"){patch=1;continue;}if(patch&&text=="{")continue;if(patch){std::istringstream value(text);std::string name;if(value>>std::quoted(name))names.insert(ftebroom::materialKey(name));patch=0;}}
+      std::set<std::string> names;
+      // q3map2 prepends textures/ itself to both face and patch materials.
+      auto normalized=buildMapMaterials(source,names,gameProfile<2);
+      if(!normalized.empty())buildWriteTexture(target,normalized);
       auto q2pal=gameProfile==3?q2Palette():std::string{};bool aliasesChanged=false;
       std::set<std::string> q3Shaders;
       for(const auto& name:names){

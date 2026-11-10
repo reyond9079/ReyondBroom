@@ -34,6 +34,7 @@ RULES = [
     (['scripts/setup-ci-renderer.ps1'], {'ci'}),
     (['native/profile/**', 'native/third_party/trenchbroom/**',
       'native/ftebroom_run*', 'native/ftebroom_engine_launch*',
+      'native/ftebroom_profile_*',
       'tests/*profile*', 'tests/engine-launch*', 'tests/legacy-profiles*',
       'tests/fixtures/CompilationProfiles*', 'scripts/*compilation*',
       'scripts/test-engine-cleanup.py', 'scripts/test-mod-profile*',

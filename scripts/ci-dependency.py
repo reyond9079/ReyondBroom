@@ -117,10 +117,29 @@ def valid(root, key):
         return False
 
 
+def audio_shell(windows=None):
+    if windows is None:
+        windows = os.name == 'nt'
+    if windows:
+        # CreateProcess("bash") searches System32 before PATH and can select
+        # the WSL launcher. Use this compiler's MSYS2 shell explicitly.
+        compiler = shutil.which('gcc')
+        if not compiler:
+            raise RuntimeError('Audio build requires the MSYS2 MinGW compiler')
+        shell = Path(compiler).parents[2]/'usr/bin/bash.exe'
+        if not shell.is_file():
+            raise RuntimeError('Cannot locate MSYS2 bash beside the MinGW toolchain')
+        return str(shell)
+    shell = shutil.which('bash')
+    if not shell:
+        raise RuntimeError('Missing bash')
+    return shell
+
+
 def build(component, source, destination):
     if component == 'audio':
         destination.mkdir(parents=True, exist_ok=True)
-        subprocess.run(['bash', (REPO/'scripts/build-audio.sh').as_posix(), source.resolve().as_posix()],
+        subprocess.run([audio_shell(), (REPO/'scripts/build-audio.sh').as_posix(), source.resolve().as_posix()],
                        env={**os.environ, 'RB_AUDIO_OUTPUT_DIR': destination.resolve().as_posix()}, check=True)
     elif component == 'profile':
         args = ['python', str(REPO/'scripts/build-profile-support.py'), 'core', '--build-dir', str(destination), '--tests']

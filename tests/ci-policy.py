@@ -80,6 +80,18 @@ class ScopeTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_windows_audio_uses_msys_bash_instead_of_system32_wsl(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); compiler = root/'mingw64/bin/gcc.exe'; shell = root/'usr/bin/bash.exe'
+            compiler.parent.mkdir(parents=True); compiler.write_bytes(b'gcc')
+            shell.parent.mkdir(parents=True); shell.write_bytes(b'msys bash')
+            with patch.object(cache.shutil, 'which', return_value=str(compiler)):
+                self.assertEqual(cache.audio_shell(windows=True), str(shell))
+            with patch.object(cache, 'audio_shell', return_value=str(shell)), patch.object(cache.subprocess, 'run') as run:
+                cache.build('audio', root/'source', root/'output')
+                self.assertEqual(run.call_args.args[0][0], str(shell))
+                self.assertEqual(run.call_args.kwargs['env']['RB_AUDIO_OUTPUT_DIR'], (root/'output').as_posix())
+
     def test_cached_profile_tests_include_transitive_application_headers(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); (root/'native/profile').mkdir(parents=True)

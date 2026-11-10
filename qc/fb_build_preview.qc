@@ -17,7 +17,7 @@ void fb_build_preview_leave()
     while(fb_build_entities){entity next=fb_build_entities.fb_build_next;remove(fb_build_entities);fb_build_entities=next;}
     fb_build_preview_active=FALSE;cvar_set("ftebroom_bsp_preview","0");
 }
-void fb_build_preview_enter(string path)
+void fb_build_preview_enter(string path,int unlit)
 {
     fb_build_preview_leave();
     if(substring(path,0,20)!="maps/ftebroom-build/")return;
@@ -60,7 +60,11 @@ void fb_build_preview_enter(string path)
             if(!item.modelindex){remove(item);strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);strunzone(scalarText);continue;}
             item.origin=stov(positionText);entityCount++;
             item.angles=stov(anglesText);if(anglesText=="")if(external||!cvar("ftebroom_quake1"))item.angles_y=stof(yawText);
-            if(external){if(scalarText!="")modelScale=stof(scalarText);if(modelScale==0)modelScale=1;item.scale=modelScale;item.fb_build_axes=modelAxes;item.skin=modelSkin;item.frame=modelFrame;}
+            if(external){
+                if(scalarText!="")modelScale=stof(scalarText);if(modelScale==0)modelScale=1;
+                item.scale=modelScale;item.fb_build_axes=modelAxes;item.skin=modelSkin;item.frame=modelFrame;
+                if(unlit)item.effects|=EF_FULLBRIGHT;
+            }
             item.fb_build_next=fb_build_entities;fb_build_entities=item;
         }
         strunzone(modelPath);strunzone(positionText);strunzone(anglesText);strunzone(yawText);strunzone(className);strunzone(scalarText);

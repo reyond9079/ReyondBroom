@@ -17,7 +17,7 @@ static std::string runUiRecordPrefix;
 static int runUiAtlasWidth=0,runUiAtlasHeight=0,runUiAtlasTheme=-1,runUiAtlasFrames=0;
 static std::filesystem::path runUiAtlasDirectory;
 static bool runUiImportRequested=false;
-static void runUiShow(int mode){if(mode==1)runSettingsWindow=true;else if(mode==2)runLaunchWindow=true;else if(mode==3)runUiCloseRequest=2;else runWindow=true;}
+static void runUiShow(int mode){if(mode==1)runSettingsWindow=true;else if(mode==2)runLaunchWindow=true;else runWindow=true;}
 static void runOpenSettings(){runUiShow(1);}
 static bool runBeforeDocument(const std::string& next){if(!runActive)return false;runUiPendingDocument=next;runUiCloseRequest=3;return true;}
 static bool runUiNavigation(){
@@ -395,12 +395,22 @@ static void runUiLaunch(){
  }
  ImGui::End();if(!open){runLaunchWindow=false;runUiSave();}
 }
+static void modEmbedEnd();
 static void runUiConfirmClose(){
  static int reason=0;if(runUiCloseRequest){reason=runUiCloseRequest;runUiCloseRequest=0;ImGui::OpenPopup("Stop compilation?");}
  if(ImGui::BeginPopupModal("Stop compilation?",nullptr,ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking)){
-  ImGui::TextUnformatted((reason==2||(reason==3&&documentIsExit(runUiPendingDocument)))?"Closing the editor will stop the running compilation. Are you sure?":reason==3?"Changing the map will stop the running compilation. Are you sure?":"Closing this dialog will stop the running compilation. Are you sure?");
-  if(ImGui::Button("Yes",{80*uiScale(),0})){if(runActive)runStop();runWindow=false;runUiSave();ImGui::CloseCurrentPopup();if(reason==2)documentRequest("exit");else if(reason==3){auto next=std::move(runUiPendingDocument);runUiPendingDocument.clear();documentRequest(next);}}ImGui::SetItemDefaultFocus();runUiRecord("close-confirm-yes");
-  ImGui::SameLine();if(ImGui::Button("No",{80*uiScale(),0})||(!ImGui::IsWindowAppearing()&&ImGui::IsKeyPressed(ImGuiKey_Escape)))ImGui::CloseCurrentPopup();runUiRecord("close-confirm-no");ImGui::EndPopup();
+  ImGui::TextUnformatted(modEmbedded?"Closing the editor will stop Play mod. Are you sure?":
+    (reason==3&&documentIsExit(runUiPendingDocument))?"Closing the editor will stop the running compilation. Are you sure?":reason==3?"Changing the map will stop the running compilation. Are you sure?":"Closing this dialog will stop the running compilation. Are you sure?");
+  if(ImGui::Button("Yes",{80*uiScale(),0})){
+    if(modEmbedded)modEmbedEnd();else if(runActive)runStop();
+    runWindow=false;runUiSave();ImGui::CloseCurrentPopup();
+    if(reason==3){auto next=std::move(runUiPendingDocument);runUiPendingDocument.clear();documentRequest(next);}
+  }ImGui::SetItemDefaultFocus();runUiRecord("close-confirm-yes");
+  ImGui::SameLine();
+  if(ImGui::Button("No",{80*uiScale(),0})||(!ImGui::IsWindowAppearing()&&ImGui::IsKeyPressed(ImGuiKey_Escape))){
+    runUiPendingDocument.clear();ImGui::CloseCurrentPopup();
+  }
+  runUiRecord("close-confirm-no");ImGui::EndPopup();
  }
 }
 static void runUiWriteLive(){
@@ -417,5 +427,5 @@ static void runImGuiPanel(){
  if(!runUiLive&&!runWindow&&!runSettingsWindow&&!runLaunchWindow&&!runEngineWindow&&!runUiCloseRequest&&!runUiBrowseOpen&&!ImGui::IsPopupOpen("Stop compilation?"))return;runLoad();
  if(runUiAtlasWidth&&runUiAtlasTheme>=0){uiTheme=runUiAtlasTheme;uiStyle();}
  if(!runWindow){runUiOrigin={0,0};runUiRects=nlohmann::json::object();runUiRects["window"]={{"x",0},{"y",0},{"width",ImGui::GetIO().DisplaySize.x},{"height",ImGui::GetIO().DisplaySize.y}};}
- RunUiStyle style;if(runWindow)runUiCompile();runUiSettings();runUiEngines();runUiLaunch();runUiBrowsePanel();runUiConfirmClose();
+ RunUiStyle style;if(runWindow)runUiCompile();runUiSettings();runUiEngines();runUiLaunch();runUiBrowsePanel();
 }

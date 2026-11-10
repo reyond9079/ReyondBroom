@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Build jobs use immutable snapshots beside the source map; previews use a local cache.
 static bool buildWindow,buildRunning,buildGeometry=true,buildVis=true,buildLight=true;
-static bool buildWasPreview;
+static bool buildWasPreview,buildUnlitPreview;
+static double buildPreviewRequested;
 static bool gpuBakeRunning=false;
 static bool mapGpuRunning=false,mapGpuSnapshotPending=false;
 static double mapGpuSnapshotStarted=0,mapGpuSnapshotPoll=0;
@@ -110,7 +111,7 @@ static void buildRestoreLayout()
 }
 static void buildEdit()
 {
-  command("ftebroom_bsp edit\n");buildRestoreLayout();
+  command("ftebroom_bsp edit\n");buildRestoreLayout();buildUnlitPreview=false;buildPreviewRequested=0;
 }
 static void traceEditingView(){if(cvars->GetFloat("ftebroom_bsp_preview"))buildEdit();}
 static void buildShow()
@@ -127,7 +128,15 @@ static void buildShow()
     for(const auto& file:std::filesystem::directory_iterator(buildResult.parent_path()))
       if(file.path().extension()!=".map" && file.path().extension()!=".log")
         std::filesystem::copy(file.path(),cache/file.path().filename(),std::filesystem::copy_options::overwrite_existing|std::filesystem::copy_options::recursive);
-    command(("fs_flush\nftebroom_bsp "+buildResultModel+"\n").c_str());
+    buildUnlitPreview=false;
+    if(gameProfile<2&&buildResult.extension()==".bsp"&&!std::filesystem::is_directory(buildResult.parent_path()/buildResult.stem())){
+      auto bytes=buildRead(buildResult);
+      buildUnlitPreview=ftebroom::quake1::neutralizeBlackQ3Lightmaps(bytes);
+      if(buildUnlitPreview)buildWriteTexture(cache/buildResult.filename(),bytes);
+    }
+    cvars->SetString("ftebroom_build_error","");
+    buildPreviewRequested=ImGui::GetTime();
+    command(("fs_flush\nftebroom_bsp "+buildResultModel+(buildUnlitPreview?" unlit\n":"\n")).c_str());
     // World materials register lazily on their first rendered frame.
     if(!buildPlaceholderHandles.empty())command("in .2 ftebroom_build_placeholders\n");
   }catch(const std::exception& error){buildMessage=error.what();buildRestoreLayout();}
@@ -263,7 +272,11 @@ static void buildBegin(bool allowLeaks=false)
         profile.tasks.push_back({1,std::string("${")+names[i]+"}",args});buildStages.push_back(names[i]);
       }
     } else {
-    common+="-fs_pakpath \"${WORK_DIR_PATH}\" ";
+    // q3map2 needs the same texture dimensions as the editor, including
+    // built-in textures from the installed editor resource directory.
+    if(gameProfile!=1 || !*gameMod || !std::filesystem::is_directory(std::filesystem::u8path(gameMod)))
+      common+="-fs_pakpath "+modQuote(std::filesystem::u8path(baseq3).generic_u8string())+" ";
+    common+="-fs_pakpath \"${WORK_DIR_PATH}\" -fs_pakpath "+modQuote(documentPath("ftebroom.cfg").parent_path().generic_u8string())+" ";
     if(buildGeometry){profile.tasks.push_back({1,"${q3map2}",common+"-meta "+geometryArguments+" \"${WORK_DIR_PATH}/snapshot.map\""});buildStages.push_back("Geometry / BSP");}
     if(visibility){profile.tasks.push_back({1,"${q3map2}",common+"-vis "+buildArguments[1]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});buildStages.push_back("Visibility / VIS");}
     if(buildLight){profile.tasks.push_back({1,"${q3map2}",common+"-light "+buildArguments[2]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});buildStages.push_back("Lighting / LIGHT");}
@@ -286,7 +299,16 @@ static void mapGpuTestTick(){
 static void buildTick()
 {
   mapGpuTestTick();
-  if(buildWasPreview && !modEmbedded && !cvars->GetFloat("ftebroom_bsp_preview"))buildRestoreLayout();
+  const bool preview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
+  if(buildPreviewRequested){
+    char error[256]{};cvars->GetString("ftebroom_build_error",error,sizeof error);
+    if(preview)buildPreviewRequested=0;
+    else if(*error||ImGui::GetTime()-buildPreviewRequested>15.){
+      buildMessage=*error?error:"Timed out loading BSP preview.";
+      buildPreviewRequested=0;
+    }
+  }
+  if(buildWasPreview && !modEmbedded && !sceneDrag && !preview && !buildPreviewRequested){buildRestoreLayout();buildUnlitPreview=false;}
   if(mapGpuRunning&&!runActive){
     {std::ofstream log(mapGpuFolder/"build.log");log<<runLog;}
     mapGpuRunning=false;gameProfileLocked=false;runReadyHook=nullptr;mapGpuSnapshotPending=false;runExportHook=nullptr;runStageHook=nullptr;
@@ -451,7 +473,8 @@ static void buildToolbar(bool inlineTools=false,bool iconOnly=false)
     ImGui::PushStyleColor(ImGuiCol_Button,uiModern()?uiModernPalette().action:uiColor(47,99,160));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiModern()?uiModernPalette().actionHover:uiColor(58,122,195));
     ImGui::PushStyleColor(ImGuiCol_Text,uiColor(255,255,255));
-    if(control("Compile",0))buildBegin();
+    const bool compile=control("Compile",0);placementRect("build/compile");
+    if(compile)buildBegin();
     ImGui::PopStyleColor(3);ImGui::EndDisabled();next("Setup compile");
     if(control("Setup compile",1))buildWindow=true;
     next(preview?"Back to editing":"Show BSP");
@@ -492,6 +515,8 @@ static void buildOverlay()
       if(runHadError)ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().danger:ImVec4(1,.35f,.3f,1));
       ImGui::TextWrapped("%s",buildMessage.c_str());if(runHadError)ImGui::PopStyleColor();
       if(runHadError && ImGui::SmallButton("Show error log"))runWindow=true;
+      if(buildUnlitPreview&&cvars->GetFloat("ftebroom_bsp_preview"))
+        ImGui::TextWrapped("This BSP has no baked light. Showing an unlit preview.");
       if(ImGui::SmallButton("Dismiss"))buildMessage.clear();
     }
     if(!buildResult.empty()&&buildResultDocument==documentFile&&buildResultRevision!=(int)cvars->GetFloat("ftebroom_revision"))

@@ -112,6 +112,12 @@ static void modEmbedTick(float width,float height)
   float sx=float(client.right)/std::max(1.f,width),sy=float(client.bottom)/std::max(1.f,height);
   int x=int(r.x*sx),y=int(r.y*sy),w=std::max(16,int(r.w*sx)),h=std::max(16,int(r.h*sy));
   if(modCaptured && (covered || GetForegroundWindow()!=modHost))modReleaseInput();
+  // The child can cover the close/save confirmation while its command
+  // pipe waits for an acknowledgement. Hide it without waiting on the VM.
+  if(covered && modChild && IsWindowVisible(modChild)){
+    ShowWindowAsync(modChild,SW_HIDE);
+    modLastWindow.clear();
+  }
   // Allow a bounded pipeline instead of halving the mouse update rate with stop-and-wait.
   if(runControlAcks!=modAckCount){modAckCount=runControlAcks;modPendingSince=ImGui::GetTime();}
   if(modSentAcks>=runControlAcks+3){if(ImGui::GetTime()-modPendingSince>10)buildMessage="Mod preview is not responding. Back to editing stops the process.";return;}

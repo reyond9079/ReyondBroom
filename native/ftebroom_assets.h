@@ -156,7 +156,7 @@ static void assetsReady()
         continue;
       auto material=ftebroom::shaderpreview::parse(source,offset);
       if(name.rfind("reyondpack/",0)==0 || (gameProfile!=1&&name.rfind("textures/reyondpack/",0)==0))continue;
-      if(material.valid)materials[name]={name,material.preview,true,material.tags,material.opacity,material.masked,material.blend,material.alphaTest};
+      if(material.valid)materials[name]={name,material.preview,true,material.tags,material.opacity,material.masked,material.blend,material.alphaTest,false,path};
     }
   }
   if(gameProfile==3){try{q2IndexAssets();}catch(const std::exception& e){assetError=e.what();assetsLoading=false;setupNeeded=true;return;}}

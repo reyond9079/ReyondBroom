@@ -76,6 +76,18 @@ inline bool bsp(const std::string& bytes,bool q1) {
   for(int i=0;i<lumps;i++) {uint64_t at=word(bytes,header+i*8),size=word(bytes,header+i*8+4);if(at>bytes.size() || size>bytes.size()-at || (size && at<header+lumps*8))return false;}
   auto models=word(bytes,header+(q1?14:7)*8+4);return models>0 && models%(q1?64:40)==0;
 }
+// The game BSP remains untouched. Only the disposable viewport copy gets
+// neutral lightmaps when the compiler emitted a completely black atlas.
+inline bool neutralizeBlackQ3Lightmaps(std::string& bytes) {
+  if(!bsp(bytes,false))return false;
+  constexpr size_t lightmaps=8+14*8;
+  const auto offset=word(bytes,lightmaps),length=word(bytes,lightmaps+4);
+  if(!length || length%(128*128*3))return false;
+  auto first=bytes.begin()+offset,last=first+length;
+  if(std::any_of(first,last,[](char channel){return channel!=0;}))return false;
+  std::fill(first,last,char(128));
+  return true;
+}
 // Convert the engine's explicit UV axes to Quake's axial representation, only if lossless.
 inline std::string face(const std::string& line,bool classic,bool engineOutput=false) {
   // The engine already validated its Valve 220 output. Preserve every numeric

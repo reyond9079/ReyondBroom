@@ -132,7 +132,7 @@ inline double scaleSprayCoverage(double x,double v,double grain,double& relief) 
     const double reach=(.76-.053*i)*(x>0.?.93:1.);
     const double center=reach*t*(1.42-.42*t);
     const double scale=1.-std::abs(2.*(t*8.-std::floor(t*8.))-1.);
-    const double radius=(.055+.06*scale)*(1.-t)*(.67+.33*grain);
+    const double radius=(.088+.081*scale)*(1.-t)*(.78+.22*grain);
     const double distance=std::abs(std::abs(x)-center);
     edge=std::max(edge,radius-distance);
     relief=std::max(relief,std::clamp((radius-distance)*20.,0.,1.)*(.45+.55*scale));

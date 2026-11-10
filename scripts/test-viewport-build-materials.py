@@ -61,7 +61,7 @@ def main():
     game = out / 'fixture' / 'baseq3'
     (game / 'maps').mkdir(parents=True)
     (game / 'scripts').mkdir()
-    (game / 'scripts/shaderlist.txt').write_text('// The compiler must add editor-side shaders.\n')
+    (game / 'scripts/shaderlist.txt').write_text('ftebroom\n')
     textures = data / 'textures/rb25'
     textures.mkdir(parents=True)
     (textures / 'old.tga').write_bytes(tga(64, 64, (210, 70, 30)))

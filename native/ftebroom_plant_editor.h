@@ -208,7 +208,11 @@ static void plantTick() {
   }
   if(s.thumbJob.valid()&&s.thumbJob.wait_for(std::chrono::seconds(0))==std::future_status::ready) {
     try {auto result=s.thumbJob.get();if(result.first.empty())return;int slot=s.thumbSlot++%160;
-      for(auto it=s.thumbs.begin();it!=s.thumbs.end();)if(it->second.slot==slot)it=s.thumbs.erase(it);else ++it;
+      for(auto it=s.thumbs.begin();it!=s.thumbs.end();){
+        if(it->second.slot!=slot){++it;continue;}
+        if(it->second.handle)draw->UnloadImage(it->second.handle);
+        it=s.thumbs.erase(it);
+      }
       s.thumbs[result.first]={std::move(result.second),0,slot};
     }catch(const std::exception& e){s.error=e.what();}
   }
@@ -216,8 +220,15 @@ static void plantTick() {
 static int plantThumbnail(const plants::Project& d) {
   auto& s=plantState;auto it=s.thumbs.find(std::to_string(plants::hash(plants::serialize(d).dump())));
   if(it!=s.thumbs.end()) {
-    if(!it->second.handle)if(auto api=bbImageAPI()){auto& t=it->second;auto name="bbtex/plant-thumb-"+std::to_string(t.slot)+".tga";t.handle=api->upload(name.c_str(),t.image.rgba.data(),t.image.width,t.image.height);}
-    return it->second.handle;
+    auto& thumb=it->second;
+    if(!thumb.handle){
+      // Catalogue images outlive individual model previews and profile mounts.
+      // Use the same independent UI image path as entity thumbnails.
+      auto name="ftebroom/plant-thumb-"+std::to_string(thumb.slot)+".tga";
+      auto pixels=plants::tga(thumb.image);
+      thumb.handle=draw->LoadImageData(name.c_str(),"image/tga",pixels.data(),pixels.size());
+    }
+    return thumb.handle;
   }
   if(!s.thumbJob.valid()&&!s.job.valid()){
     s.thumbCancel=std::make_shared<std::atomic<bool>>(false);auto cancel=s.thumbCancel;
@@ -250,7 +261,7 @@ static void plantClose() {
 }
 static void plantBrushShutdown();
 static void plantBrushFromEditor();
-static void plantShutdown(){plantBrushShutdown();placementShutdown();if(plantState.work)plantState.work->cancel=true;if(plantState.thumbCancel)*plantState.thumbCancel=true;if(plantState.job.valid())plantState.job.wait();if(plantState.thumbJob.valid())plantState.thumbJob.wait();if(plantState.gameJob.valid())plantState.gameJob.wait();}
+static void plantShutdown(){plantBrushShutdown();placementShutdown();if(plantState.work)plantState.work->cancel=true;if(plantState.thumbCancel)*plantState.thumbCancel=true;if(plantState.job.valid())plantState.job.wait();if(plantState.thumbJob.valid())plantState.thumbJob.wait();if(plantState.gameJob.valid())plantState.gameJob.wait();for(const auto& entry:plantState.thumbs)if(entry.second.handle)draw->UnloadImage(entry.second.handle);plantState.thumbs.clear();}
 static bool plantBusy(){return plantState.pending||plantState.job.valid();}
 static bool plantReady(){return plantState.result&&plantState.result->revision==plantState.revision&&!plantBusy();}
 static void plantSave(const std::filesystem::path& file) {

@@ -12,7 +12,9 @@ static void uiApplySky(){
 
 static bool uiHasScene = false;
 static ImVec2 uiScenePos, uiSceneSize;
-static ImGuiID uiDockId;
+static ImGuiID uiDockId, uiToolbarDock, uiStatusDock;
+static constexpr const char* uiToolbarName="##toolbar";
+static constexpr const char* uiStatusName="##status";
 static bool uiExplorerDockChecked=false;
 static bool uiExplorerMarkerChecked=false;
 static float uiLayerFraction=.48f;
@@ -127,8 +129,58 @@ static void uiSaveLayout()
   }
   io.WantSaveIniSettings = false;
 }
-static void uiWorkspace(float w, float h, float top, float bottom, float margin)
+static ImGuiID uiSavedDock(const char* name)
 {
+  if(const auto* window=ImGui::FindWindowByName(name))
+    return window->DockId;
+  if(const auto* settings=ImGui::FindWindowSettingsByID(ImHashStr(name)))
+    return settings->DockId;
+  return 0;
+}
+
+static bool uiHasRightInspector(const ImGuiDockNode* root)
+{
+  if(!root || root->SplitAxis!=ImGuiAxis_X)
+    return false;
+  const auto* right=root->ChildNodes[1];
+  const auto* left=root->ChildNodes[0];
+  return right&&right->IsLeafNode()&&left&&left->HasCentralNodeChild&&
+    (uiSavedDock("Entity")==right->ID||uiSavedDock("Face")==right->ID||uiSavedDock("Map")==right->ID);
+}
+
+static void uiDockWorkspaceBars(ImGuiID left,float toolbarHeight,float statusHeight)
+{
+  bool changed=false;
+  auto dockBar=[&](const char* name,ImGuiDir direction,float height){
+    ImGuiID id=uiSavedDock(name);
+    auto* node=ImGui::DockBuilderGetNode(id);
+    if(!node){
+      const float available=ImGui::DockBuilderGetNode(left)->Size.y;
+      ImGui::DockBuilderSplitNode(left,direction,std::min(.25f,height/std::max(1.f,available)),&id,&left);
+      ImGui::DockBuilderDockWindow(name,id);
+      node=ImGui::DockBuilderGetNode(id);
+      changed=true;
+    }else if(direction==ImGuiDir_Up&&node->ParentNode){
+      // The bottom bar belongs below the same subtree as the toolbar.
+      left=node->ParentNode->ChildNodes[1]->ID;
+    }
+    node->LocalFlags|=ImGuiDockNodeFlags_NoTabBar|ImGuiDockNodeFlags_NoDocking|ImGuiDockNodeFlags_NoResizeY;
+    node->SizeRef.y=height;
+    return id;
+  };
+  uiToolbarDock=dockBar(uiToolbarName,ImGuiDir_Up,toolbarHeight);
+  uiStatusDock=dockBar(uiStatusName,ImGuiDir_Down,statusHeight);
+  if(changed)ImGui::DockBuilderFinish(uiDockId);
+}
+
+static void uiWorkspace(float w,float h,float toolbarY,float toolbarHeight,float statusHeight,float margin,float gap)
+{
+  uiDockId=ImHashStr("WorkspaceDock",0,ImHashStr("##workspace"));
+  auto* root=ImGui::DockBuilderGetNode(uiDockId);
+  const bool rebuild=uiReset||!root;
+  const bool sidebar=rebuild||uiHasRightInspector(root);
+  const float top=sidebar?toolbarY:toolbarY+toolbarHeight+gap;
+  const float bottom=sidebar?margin:statusHeight+margin+gap;
   const ImVec2 workspaceSize{std::max(1.f,w-2*margin),std::max(1.f,h-top-bottom)};
   ImGui::SetNextWindowPos({margin, top});
   ImGui::SetNextWindowSize(workspaceSize);
@@ -143,11 +195,10 @@ static void uiWorkspace(float w, float h, float top, float bottom, float margin)
       | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDocking
       | ImGuiWindowFlags_NoSavedSettings);
   ImGui::PopStyleVar(3);
-  uiDockId = ImGui::GetID("WorkspaceDock");
   const auto flags = ImGuiDockNodeFlags_PassthruCentralNode
                      | ImGuiDockNodeFlags_NoDockingOverCentralNode
                      | (uiLocked ? ImGuiDockNodeFlags_NoResize : 0);
-  if (uiReset || !ImGui::DockBuilderGetNode(uiDockId))
+  if (rebuild)
   {
     ImGui::DockBuilderRemoveNode(uiDockId);
     ImGui::DockBuilderAddNode(uiDockId, ImGuiDockNodeFlags_DockSpace | flags);
@@ -185,6 +236,11 @@ static void uiWorkspace(float w, float h, float top, float bottom, float margin)
   if(!uiExplorerMarkerChecked) {
     uiExplorerMarkerChecked=true;
     if(!cvars->GetFloat("ftebroom_skip_setup")&&!std::filesystem::exists(documentPath("explorer-layout-v1.cfg")))std::ofstream(documentPath("explorer-layout-v1.cfg"))<<"1\n";
+  }
+  uiToolbarDock=uiStatusDock=0;
+  if(sidebar){
+    root=ImGui::DockBuilderGetNode(uiDockId);
+    uiDockWorkspaceBars(root->ChildNodes[0]->ID,toolbarHeight,statusHeight);
   }
   const bool soft=uiModern();
   // Size references in the dock tree can exceed the resized window. Clamp the

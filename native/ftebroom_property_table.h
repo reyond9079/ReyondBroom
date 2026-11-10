@@ -190,7 +190,7 @@ static void entityPropertyTable()
     ImGui::BeginTable(
       "Properties table",
       linked ? 3 : 2,
-      ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg))
+      ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInner | ImGuiTableFlags_RowBg))
   {
     ImGui::TableSetupColumn("Key", ImGuiTableColumnFlags_WidthStretch, .4f);
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, .6f);
@@ -201,6 +201,10 @@ static void entityPropertyTable()
       const auto& row = rows[i];
       ImGui::PushID(row.key.c_str());
       ImGui::TableNextRow();
+      if (selectedRows.count(row.key) || editing == row.key)
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_Header));
+      else if (ImGui::TableGetHoveredRow() == ImGui::TableGetRowIndex())
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_HeaderHovered, .55f));
       if (!row.complete)
         ImGui::PushStyleColor(
           ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));

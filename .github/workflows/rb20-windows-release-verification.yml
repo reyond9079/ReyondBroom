@@ -1,0 +1,59 @@
+name: Verify RB-20 release on Windows
+on:
+  push:
+    branches: [qa/rb20-plant-brush-diagnostics]
+    paths: [.github/workflows/rb20-windows-release-verification.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 8bcc2cc5aea4d7a806273d9c213f3822a3f82b2a
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          update: false
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-zlib
+      - name: Validate the exact draft archives and originating commit
+        shell: pwsh
+        run: |
+          $release = gh release view v0.5.0-alpha.144 --repo $env:GITHUB_REPOSITORY --json isDraft,assets,targetCommitish | ConvertFrom-Json
+          if (!$release.isDraft -or $release.assets.Count -ne 12) { throw 'Expected the complete draft release' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/42767982013" | ConvertFrom-Json
+          if ($run.head_sha -ne (git rev-parse HEAD)) { throw 'The staged release uses a different revision' }
+          gh release download v0.5.0-alpha.144 --repo $env:GITHUB_REPOSITORY --dir archives --pattern '*-Windows-x64.zip*' --pattern '*-Windows-x64-Sources.zip*'
+          if ($LASTEXITCODE -or (Get-ChildItem archives -File).Count -ne 4) { throw 'Windows asset download failed' }
+          foreach ($checksum in (Get-ChildItem archives -Filter '*.sha256')) {
+            $parts = ((Get-Content $checksum.FullName) -split '\s+')
+            $file = Join-Path $checksum.DirectoryName $parts[1]
+            if ((Get-FileHash $file -Algorithm SHA256).Hash.ToLower() -ne $parts[0]) { throw "Archive checksum mismatch: $file" }
+            Write-Output "Verified $($parts[1]) $($parts[0])"
+          }
+      - name: Validate botanical appearance and native plant export on Windows
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p qa/targets
+          g++ -std=c++17 -O2 tests/plant-legacy-corpus.cpp -lz -o qa/legacy.exe
+          g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o qa/botanical.exe
+          g++ -std=c++17 -O2 tests/plant-runtime-targets.cpp -lz -o qa/targets.exe
+          qa/legacy.exe > qa/legacy.json
+          qa/botanical.exe qa/legacy.json qa/botanical.json
+          qa/targets.exe qa/targets
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rb20-windows-verified
+          path: |
+            qa/botanical.json
+            qa/targets/

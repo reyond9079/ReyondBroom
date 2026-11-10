@@ -40,6 +40,14 @@ static void buildPublishPlaceholder(const std::string& name,const ftebroom::quak
 static void buildStageQ3ShaderList(const std::filesystem::path& folder,const std::set<std::string>& scripts){
   if(scripts.empty())return;
   auto path=folder/"scripts/shaderlist.txt";
+  if(!std::filesystem::exists(path)){
+    size_t size=0,offset=0;
+    auto data=static_cast<char*>(files->LoadFile("scripts/shaderlist.txt",&size));
+    std::string list(data?data:"",data?size:0);
+    if(data)core->Free(data);
+    // q3map2 scans all scripts when its lists contain no entries.
+    if(token(list,offset).empty())return;
+  }
   std::filesystem::create_directories(path.parent_path());
   std::ofstream output(path,std::ios::app);
   output<<'\n';

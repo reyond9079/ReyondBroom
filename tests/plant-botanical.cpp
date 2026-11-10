@@ -33,7 +33,7 @@ static void checkBotanicalAppearance(const std::vector<Project>& catalog){
   auto poplarMesh=generate(poplar),cypressMesh=generate(cypress);
   const double poplarWidth=slender(poplarMesh),cypressWidth=slender(cypressMesh);
   check(poplarWidth>.14&&poplarWidth<.34,"Lombardy poplar has a tapered columnar crown");
-  check(cypressWidth>.06&&cypressWidth<.18&&cypressWidth<poplarWidth*.83,"cypress is a much narrower column");
+  check(cypressWidth>.08&&cypressWidth<.20&&cypressWidth<poplarWidth*.75,"cypress is a much narrower column");
   for(int profile:{2,3,4,5}){
    auto alias=targetGeometry(cypress,cypressMesh,profile);
    check(!alias.faces.empty()&&std::any_of(alias.faces.begin(),alias.faces.end(),[](const auto& f){return f.part==Part::Leaves;}),

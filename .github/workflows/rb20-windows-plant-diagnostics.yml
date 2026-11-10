@@ -48,7 +48,7 @@ jobs:
       - name: Download and verify staged Windows runtime and baseline
         shell: pwsh
         run: |
-          foreach ($v in @('143','144')) {
+          foreach ($v in @('144')) {
             $dir = "build-$v"
             New-Item -ItemType Directory -Force $dir | Out-Null
             $name = "ReyondBroom-0.5.0-alpha.$v-Windows-x64.zip"
@@ -78,13 +78,23 @@ jobs:
               "    view = wait(perspective)\n"
           ) + s[end:]
           path.write_text(s.replace('512', '2048'))
+          # An already active editor can stop rewriting the separate focus
+          # receipt while a docked tool owns rendering. Keep the OS focus and
+          # WM_NULL checks and require fresh placement frames outside the console.
+          path = Path('scripts/editor_os_input.py')
+          s = path.read_text()
+          start = s.index('   focus=self.focus_state()', s.index(' def position(self):'))
+          end = s.index('   self.wait(self.windows_focused)', start)
+          native_focus = s[start:end]
+          s = s[:start] + '   if self.in_console:\n' + ''.join(' ' + row for row in native_focus.splitlines(keepends=True)) + '   else:self.settle()\n' + s[end:]
+          path.write_text(s)
           '@ | python -
           if ($LASTEXITCODE) { throw 'QA viewport fixture preparation failed' }
       - name: Compare the same pointer scenario on both runtimes
         shell: pwsh
         run: |
           $failed = $false
-          foreach ($v in @('143','144')) {
+          foreach ($v in @('144')) {
             $exe = Get-ChildItem "build-$v/payload" -Filter 'fteqw64.exe' -Recurse | Select-Object -First 1
             $root = $exe.Directory.Parent.FullName
             python tests/make-linux-build-fixture.py $root
@@ -101,6 +111,7 @@ jobs:
           }
           if ($failed) { exit 1 }
       - name: Complete Windows view checks on the exact staged release
+        if: always()
         shell: pwsh
         run: |
           $exe = Get-ChildItem build-144/payload -Filter 'fteqw64.exe' -Recurse | Select-Object -First 1

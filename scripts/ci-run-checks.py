@@ -57,7 +57,10 @@ def main():
     if 'viewport' in suites:
         if selected['flags'].get('input') or selected['mode'] == 'full':
             run('viewport', 'scripts/test-engine-viewport.py', root, out/'engine-viewport', '--probe', a.probe.resolve())
-        run('viewport', 'scripts/test-viewport-appearance.py', root, out/'appearance')
+        cases = [('dark', 1920, 1080), ('light', 1920, 1080), ('dark', 1024, 768), ('light', 1024, 768)] if 'matrix_ui' in suites else [('dark', 1920, 1080)]
+        for theme, width, height in cases:
+            run('viewport', 'scripts/test-viewport-appearance.py', root, out/f'appearance-{theme}-{width}',
+                '--theme', theme, '--width', width, '--height', height)
     if 'browser' in suites:
         run('browser', 'scripts/test-rb10-browsers.py', root, out/'browsers')
     if 'onboarding' in suites:

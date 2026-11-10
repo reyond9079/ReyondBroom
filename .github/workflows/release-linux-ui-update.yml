@@ -182,7 +182,7 @@ jobs:
         CI_PLAN: ${{ needs.plan.outputs.plan }}
         FORCE_VIEWPORT: ${{ inputs.viewport_checks }}
         FORCE_RB10: ${{ inputs.rb10_checks }}
-      run: python -c "import os,json,pathlib; p=json.loads(os.environ['CI_PLAN']); extra=(['viewport'] if os.environ['FORCE_VIEWPORT']=='true'
+      run: python -c "import os,json,pathlib; p=json.loads(os.environ['CI_PLAN']); extra=(['viewport','matrix_ui'] if os.environ['FORCE_VIEWPORT']=='true'
         else [])+(['browser','onboarding','updater','placement','plant_ui'] if os.environ['FORCE_RB10']=='true' else []); p['suites']=sorted(set(p['suites'])|set(extra));
         pathlib.Path('ci-plan.json').write_text(json.dumps(p))"
     - name: Validate every packaged release (short smoke)
@@ -190,7 +190,7 @@ jobs:
       run: xvfb-run -a -s '-screen 0 1280x800x24' python scripts/ci-release-smoke.py out/release --platform "$PLATFORM" --version "$VERSION"
         --output qa/smoke
     - name: Install selected plant import probes
-      if: fromJSON(needs.plan.outputs.plan).flags.plant_ui
+      if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
     - name: Install OS input probes
       run: python -m pip install python-xlib Pillow
@@ -202,6 +202,7 @@ jobs:
       if: matrix.platform == 'Linux-x64' && (inputs.capture_catalog || fromJSON(needs.plan.outputs.plan).flags.catalog)
       run: |
         bundle="$PWD/out/release/ReyondBroom-Linux-x64"
+        python tests/make-linux-build-fixture.py "$bundle"
         RB_QA_BUILD="packaged-$VERSION" xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/capture-plant-catalog.py "$bundle" "$PWD/qa/catalog-originals" --extended
         python scripts/plant-contact-sheets.py qa/catalog-originals qa/catalog-sheets
     - uses: actions/upload-artifact@v4
@@ -392,7 +393,7 @@ jobs:
         CI_PLAN: ${{ needs.plan.outputs.plan }}
         FORCE_VIEWPORT: ${{ inputs.viewport_checks }}
         FORCE_RB10: ${{ inputs.rb10_checks }}
-      run: python -c "import os,json,pathlib; p=json.loads(os.environ['CI_PLAN']); extra=(['viewport'] if os.environ['FORCE_VIEWPORT']=='true'
+      run: python -c "import os,json,pathlib; p=json.loads(os.environ['CI_PLAN']); extra=(['viewport','matrix_ui'] if os.environ['FORCE_VIEWPORT']=='true'
         else [])+(['browser','onboarding','updater','placement','plant_ui'] if os.environ['FORCE_RB10']=='true' else []); p['suites']=sorted(set(p['suites'])|set(extra));
         pathlib.Path('ci-plan.json').write_text(json.dumps(p))"
     - name: Set up test-machine renderer
@@ -407,7 +408,7 @@ jobs:
         python scripts/ci-release-smoke.py out/release --platform Windows-x64 --version $env:VERSION --output qa/smoke
         if ($LASTEXITCODE) { throw 'Packaged smoke failed' }
     - name: Install selected plant import probes
-      if: fromJSON(needs.plan.outputs.plan).flags.plant_ui
+      if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
     - name: Run affected packaged checks
       shell: pwsh

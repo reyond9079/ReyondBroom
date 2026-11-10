@@ -356,10 +356,10 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         ],
         "barkPattern": 0,
         "branchAngle": 24,
-        "branchLength": 0.52,
-        "branches": 22,
+        "branchLength": 0.5,
+        "branches": 24,
         "crown": 2,
-        "crownBase": 0.2,
+        "crownBase": 0.16,
         "curvature": 0.075,
         "depth": 3,
         "foliageMode": 1,
@@ -370,13 +370,13 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
           0.18
         ],
         "leafShape": 8,
-        "leafSize": 6.5,
-        "leafWidth": 0.86,
-        "leaves": 18,
+        "leafSize": 8.2,
+        "leafWidth": 0.91,
+        "leaves": 20,
         "petiole": 0.22,
         "radius": 5,
         "serration": 0.52,
-        "spread": 0.1
+        "spread": 0.092
       },
       "scientificName": "Populus nigra italica",
       "tags": [
@@ -1340,23 +1340,23 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
         "barkPattern": 4,
         "branches": 26,
         "crown": 2,
-        "crownBase": 0.12,
+        "crownBase": 0.1,
         "curvature": 0.065,
         "evergreen": 1,
         "gravity": 0,
         "height": 290,
         "leaf": [
-          0.15,
-          0.26,
-          0.21
+          0.18,
+          0.32,
+          0.23
         ],
         "leafShape": 5,
-        "leafSize": 4.3,
-        "leafWidth": 0.67,
+        "leafSize": 7.0,
+        "leafWidth": 1.08,
         "leaves": 22,
         "needleForm": 2,
         "radius": 3.5,
-        "spread": 0.053
+        "spread": 0.06
       },
       "scientificName": "Cupressus sempervirens",
       "tags": [

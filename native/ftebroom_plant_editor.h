@@ -226,7 +226,8 @@ static int plantThumbnail(const plants::Project& d) {
       // Use the same independent UI image path as entity thumbnails.
       auto name="ftebroom/plant-thumb-"+std::to_string(thumb.slot)+".tga";
       auto pixels=plants::tga(thumb.image);
-      thumb.handle=draw->LoadImageData(name.c_str(),"image/tga",pixels.data(),pixels.size());
+      draw->LoadImageData(name.c_str(),"image/tga",pixels.data(),pixels.size());
+      thumb.handle=draw->LoadImage(name.c_str());
     }
     return thumb.handle;
   }

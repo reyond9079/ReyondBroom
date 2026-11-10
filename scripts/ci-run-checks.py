@@ -27,6 +27,10 @@ def main():
             if root in args and suite != 'fixture':
                 isolated = Path(directory)/root.name
                 shutil.copytree(root, isolated)
+                if suite in {'compilation', 'compilation_ui'}:
+                    name = 'compilation-profile-probe.exe' if a.platform == 'Windows-x64' else 'compilation-profile-probe'
+                    (isolated/'tools').mkdir(exist_ok=True)
+                    shutil.copy2(a.probe, isolated/'tools'/name)
                 args = tuple(isolated if arg == root else arg for arg in args)
             command = [sys.executable, str(repo/script), *map(str, args)] if script.endswith('.py') else ['bash', str(repo/script), *map(str, args)]
             if gui and os.name != 'nt':
@@ -35,6 +39,8 @@ def main():
             subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
         completed.append({'suite': suite, 'script': script})
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
+    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding'}:
+        run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))
@@ -54,8 +60,6 @@ def main():
         run('plant_ui', 'scripts/test-plant-exports.py', out/'plants/ui', gui=False)
         run('plant_ui', 'scripts/test-plant-map.py', root, out/'plants/ui', gui=False)
         run('plant_ui', 'scripts/test-plant-brush.py', root, out/'plants/brush')
-    if suites & {'placement', 'model_ui', 'viewport', 'browser', 'onboarding'}:
-        run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
     if 'placement' in suites:
         cases = [('dark', 1920, 1080), ('light', 1920, 1080), ('dark', 1024, 768), ('light', 1024, 768)] if 'matrix_ui' in suites else [('dark', 1280, 800)]
         for theme, width, height in cases:

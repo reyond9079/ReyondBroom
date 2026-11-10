@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 
@@ -35,6 +36,14 @@ def toolchain():
             raise RuntimeError('Missing dependency build tool: '+command)
         result[command] = {'version': subprocess.check_output([binary, '--version'], text=True).splitlines()[0],
                            'binary': sha(binary)}
+    for name in ('CC', 'CXX'):
+        if os.environ.get(name):
+            command = shlex.split(os.environ[name])[0]
+            binary = shutil.which(command)
+            if not binary:
+                raise RuntimeError('Missing configured compiler: '+command)
+            result[name] = {'path': binary, 'binary': sha(binary),
+                            'version': subprocess.check_output([binary, '--version'], text=True).splitlines()[0]}
     if shutil.which('pacman'):
         result['packages'] = subprocess.check_output(['pacman', '-Q'], text=True)
         if shutil.which('mingw32-make'):
@@ -46,7 +55,7 @@ def toolchain():
     return result
 
 
-def fingerprint(component, source, platform, tools=None):
+def fingerprint(component, source, platform, tools=None, destination=None):
     recipes = {'bullet': ['scripts/ci-dependency.py'],
                'profile': ['scripts/ci-dependency.py', 'scripts/build-profile-support.py'],
                'audio': ['scripts/ci-dependency.py', 'scripts/build-audio.sh']}[component]
@@ -65,11 +74,16 @@ def fingerprint(component, source, platform, tools=None):
         inputs['tests'] = {name: sha(REPO/'tests'/name) for name in names}
     identity = {'schema': 1, 'component': component, 'platform': platform,
                 'workspace': str(REPO), 'source': str(source.resolve()),
+                'build_directory': str(destination.resolve()) if destination is not None else None,
                 'image': os.environ.get('ImageVersion', ''),
                 'flags': BULLET_FLAGS if component == 'bullet' else 'recipe',
                 'environment': {k: os.environ.get(k, '') for k in
-                    ('CC', 'CXX', 'CFLAGS', 'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS')},
+                    ('CC', 'CXX', 'CFLAGS', 'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS',
+                     'CMAKE_GENERATOR', 'CMAKE_GENERATOR_PLATFORM', 'CMAKE_GENERATOR_TOOLSET',
+                     'CMAKE_TOOLCHAIN_FILE', 'PKG_CONFIG_PATH')},
                 'toolchain': tools if tools is not None else toolchain(), 'inputs': inputs}
+    if os.environ.get('CMAKE_TOOLCHAIN_FILE'):
+        inputs['toolchain_file'] = sha(os.environ['CMAKE_TOOLCHAIN_FILE'])
     return 'rb-dep-v1-'+component+'-'+hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 
@@ -110,7 +124,7 @@ def main():
     p.add_argument('--key')
     a = p.parse_args()
     if a.operation == 'key':
-        key = fingerprint(a.component, a.source, a.platform)
+        key = fingerprint(a.component, a.source, a.platform, destination=a.destination)
         output = {'key': key}
     elif a.operation == 'verify':
         assert a.key, 'A pre-build fingerprint is required'
@@ -128,7 +142,7 @@ def main():
             assert target != a.source.resolve() and target != REPO and REPO in target.parents
             shutil.rmtree(target)
         build(a.component, a.source, a.destination)
-        assert fingerprint(a.component, a.source, a.platform) == a.key, 'Dependency inputs changed during build'
+        assert fingerprint(a.component, a.source, a.platform, destination=a.destination) == a.key, 'Dependency inputs changed during build'
         files = inventory(a.destination)
         assert files, 'Dependency build produced no outputs'
         (a.destination/'.ci-cache.json').write_text(json.dumps({'key': a.key, 'files': files}, sort_keys=True))

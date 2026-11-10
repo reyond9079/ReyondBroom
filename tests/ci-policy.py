@@ -90,6 +90,8 @@ class CacheTests(unittest.TestCase):
             self.assertNotEqual(original, key())
             self.assertNotEqual(key(), key('Windows-x64'))
             self.assertNotEqual(key(), key(compiler='GCC2'))
+            self.assertNotEqual(cache.fingerprint('bullet', root, 'Linux-x64', tools={}, destination=root/'one'),
+                                cache.fingerprint('bullet', root, 'Linux-x64', tools={}, destination=root/'two'))
             before_flags = key()
             with patch.dict(os.environ, CXXFLAGS='-DNEW_ABI'):
                 self.assertNotEqual(key(), before_flags)

@@ -4,8 +4,10 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 
 
 def main():
@@ -21,11 +23,16 @@ def main():
     repo = Path(__file__).resolve().parents[1]
     completed = []
     def run(suite, script, *args, gui=True):
-        command = [sys.executable, str(repo/script), *map(str, args)] if script.endswith('.py') else ['bash', str(repo/script), *map(str, args)]
-        if gui and os.name != 'nt':
-            command = ['xvfb-run', '-a', '-s', '-screen 0 1920x1080x24', *command]
-        print('RUN '+suite+': '+script, flush=True)
-        subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
+        with tempfile.TemporaryDirectory(prefix='reyond-suite-') as directory:
+            if root in args and suite != 'fixture':
+                isolated = Path(directory)/root.name
+                shutil.copytree(root, isolated)
+                args = tuple(isolated if arg == root else arg for arg in args)
+            command = [sys.executable, str(repo/script), *map(str, args)] if script.endswith('.py') else ['bash', str(repo/script), *map(str, args)]
+            if gui and os.name != 'nt':
+                command = ['xvfb-run', '-a', '-s', '-screen 0 1920x1080x24', *command]
+            print('RUN '+suite+': '+script, flush=True)
+            subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
         completed.append({'suite': suite, 'script': script})
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
     if 'compilation' in suites:

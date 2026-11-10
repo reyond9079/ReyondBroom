@@ -61,6 +61,7 @@ jobs:
         destination: .ci-deps/probe-build
         platform: cache-contract-${{ runner.os }}
         shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+      id: cold
     - run: python scripts/ci-cache-probe.py --clear-output
     - id: dependency
       uses: ./.github/actions/build-dependency
@@ -70,7 +71,9 @@ jobs:
         destination: .ci-deps/probe-build
         platform: cache-contract-${{ runner.os }}
         shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
-    - name: Require a verified cache hit
+    - name: Require cold build and verified warm restore
       env:
         REUSED: ${{ steps.dependency.outputs.reused }}
-      run: python -c "import os; assert os.environ['REUSED'] == 'true', 'Warm cache did not reuse verified outputs'"
+        COLD: ${{ steps.cold.outputs.reused }}
+      run: python -c "import os; assert os.environ['COLD'] == 'false', 'Cold build was not exercised'; assert os.environ['REUSED'] ==
+        'true', 'Warm cache did not reuse verified outputs'"

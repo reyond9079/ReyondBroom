@@ -243,6 +243,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
       BASE_TAG: ${{ inputs.base_tag }}
+      RB_QA_RENDERER: gl rb_qa_opengl.dll
+      GALLIUM_DRIVER: llvmpipe
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5

@@ -72,9 +72,12 @@ jobs:
           s = s[:start] + (
               "    ui.console('set ftebroom_view_layout 1')\n"
               "    ui.console('ftebroom_camera_restore 0 -320 340 45 90 0 80')\n"
-              "    view = wait(lambda: views[0] if len(views := live()['views']) == 1 and views[0]['type'] == 0 else None)\n"
+              "    def perspective():\n"
+              "        active = [v for v in live()['views'] if v['width'] > 0 and v['height'] > 0]\n"
+              "        return active[0] if len(active) == 1 and active[0]['type'] == 0 else None\n"
+              "    view = wait(perspective)\n"
           ) + s[end:]
-          path.write_text(s)
+          path.write_text(s.replace('512', '2048'))
           '@ | python -
           if ($LASTEXITCODE) { throw 'QA viewport fixture preparation failed' }
       - name: Compare the same pointer scenario on both runtimes

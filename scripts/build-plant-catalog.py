@@ -26,7 +26,7 @@ species('maple','Field maple','Acer campestre','tree',210,crown=0,spread=.65,cro
 species('japanese-maple','Japanese maple','Acer palmatum','tree',130,crown=4,spread=.85,crownBase=.35,radius=3.2,phyllotaxy=1,leafShape=4,leaflets=7,leafSize=12,leafWidth=1,barkPattern=1,branches=10,clumps=2)
 species('willow','Weeping willow','Salix babylonica','tree',245,crown=3,spread=.8,crownBase=.42,radius=8,gravity=1.3,branchLength=.9,leafShape=2,leafSize=15,leafWidth=.14,branches=16,leaves=34,barkPattern=0)
 species('white-willow','White willow','Salix alba','tree',265,crown=6,spread=.60,crownBase=.24,radius=7,gravity=.5,leafShape=2,leafSize=12,leafWidth=.20,branches=14,clumps=2,barkPattern=0)
-species('lombardy-poplar','Lombardy poplar','Populus nigra italica','tree',350,crown=2,spread=.10,crownBase=.20,radius=5,branchAngle=24,branchLength=.52,leafSize=6.5,leafWidth=.86,leafShape=8,branches=22,depth=3,leaves=18,curvature=.075,serration=.52,petiole=.22,barkPattern=0,bark=[.34,.33,.28])
+species('lombardy-poplar','Lombardy poplar','Populus nigra italica','tree',350,crown=2,spread=.092,crownBase=.16,radius=5,branchAngle=24,branchLength=.50,leafSize=8.2,leafWidth=.91,leafShape=8,branches=24,depth=3,leaves=20,curvature=.075,serration=.52,petiole=.22,barkPattern=0,bark=[.34,.33,.28])
 species('aspen','European aspen','Populus tremula','tree',260,crown=1,spread=.35,crownBase=.45,radius=4.2,leafShape=1,leafSize=9,leafWidth=1.05,barkPattern=1,petiole=.30,serration=.5)
 species('beech','European beech','Fagus sylvatica','tree',285,crown=1,spread=.56,crownBase=.28,radius=10,leafShape=1,leafSize=12,leafWidth=.55,barkPattern=1,crownFill=1.05,branchAngle=57)
 species('linden','Small-leaved lime','Tilia cordata','tree',270,crown=1,spread=.50,crownBase=.25,radius=8,leafShape=6,leafProfile=[.12,1.2,.9,.5,0],leafSize=13,leafWidth=.9,barkPattern=0,serration=.65)
@@ -51,7 +51,7 @@ species('blue-spruce','Blue spruce','Picea pungens','conifer',245,crown=5,spread
 species('fir','Silver fir','Abies alba','conifer',320,crown=5,spread=.36,crownBase=.13,radius=6,branches=16,needleForm=1,gravity=-.05,leafSize=9,leafShape=5,evergreen=1,barkPattern=1,phyllotaxy=1)
 species('larch','European larch','Larix decidua','conifer',295,crown=5,spread=.40,crownBase=.16,radius=5,branches=14,needleForm=3,gravity=.48,leafSize=9,leafShape=5,evergreen=0,barkPattern=0,crownFill=.7)
 species('cedar','Cedar of Lebanon','Cedrus libani','conifer',265,crown=8,spread=.78,crownBase=.22,radius=9,branches=9,needleForm=3,leafSize=10,leafShape=5,evergreen=1,barkPattern=0,gravity=.05,crownAspect=.55)
-species('cypress','Mediterranean cypress','Cupressus sempervirens','conifer',290,crown=2,spread=.053,crownBase=.12,radius=3.5,branches=26,needleForm=2,leafSize=4.3,leafShape=5,leafWidth=.67,leaves=22,evergreen=1,barkPattern=4,bark=[.31,.28,.23],curvature=.065,gravity=0)
+species('cypress','Mediterranean cypress','Cupressus sempervirens','conifer',290,crown=2,spread=.060,crownBase=.10,radius=3.5,branches=26,needleForm=2,leafSize=7.0,leafShape=5,leafWidth=1.08,leaves=22,evergreen=1,barkPattern=4,bark=[.31,.28,.23],curvature=.065,gravity=0)
 species('tree-juniper','Tree juniper','Juniperus excelsa','conifer',180,crown=7,spread=.50,crownBase=.12,radius=6,branches=11,needleForm=2,leafSize=10,leafShape=5,evergreen=1,barkPattern=4,clumps=2,curvature=.6)
 species('redwood','Coast redwood','Sequoia sempervirens','conifer',460,crown=5,spread=.30,crownBase=.27,radius=15,branches=23,needleForm=1,leafSize=10,leafShape=5,evergreen=1,barkPattern=4,taper=.9)
 species('araucaria','Monkey puzzle tree','Araucaria araucana','conifer',260,crown=5,spread=.55,crownBase=.18,radius=8,branches=10,needleForm=4,leafSize=12,leafShape=2,evergreen=1,barkPattern=3,phyllotaxy=2,leafWidth=.45)
@@ -185,7 +185,7 @@ TREE_FOLIAGE = {
     'baobab': [.37,.44,.23], 'umbrella-acacia': [.42,.46,.21],
     'maritime-pine': [.17,.32,.22], 'stone-pine': [.24,.34,.20],
     'fir': [.18,.32,.25], 'larch': [.36,.46,.22],
-    'cedar': [.27,.37,.31], 'cypress': [.15,.26,.21],
+    'cedar': [.27,.37,.31], 'cypress': [.18,.32,.23],
     'tree-juniper': [.23,.34,.28], 'redwood': [.20,.33,.23],
     'araucaria': [.24,.35,.16],
 }

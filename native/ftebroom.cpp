@@ -338,14 +338,16 @@ static void panel(float w, float h)
     tourPanel(w,h);uiCursorUpdate(sceneLook,uiCursorPercent/100.f);render();return;
   }
   const float menuHeight = ImGui::GetFrameHeight();
-  const float toolbarHeight = ImGui::GetFrameHeight() + 18 * uiScale();
-  const float statusHeight = ImGui::GetTextLineHeight() + 16 * uiScale();
+  const auto* toolbarWindow=ImGui::FindWindowByName(uiToolbarName);
+  const float scrollbar=toolbarWindow&&toolbarWindow->ScrollbarX?ImGui::GetStyle().ScrollbarSize:0;
+  const float toolbarHeight = ImGui::GetFrameHeight() + 18 * uiScale() + scrollbar;
+  const float statusHeight = ImGui::GetTextLineHeight() + std::max(16 * uiScale(),2*ImGui::GetStyle().WindowPadding.y);
   const bool softChrome=uiModern();
   const float margin=softChrome?ModernChrome::margin*uiScale():0;
   const float gap=softChrome?ModernChrome::gutter*uiScale():0;
   const float toolbarY=menuHeight+(softChrome?6*uiScale():0);
   const float statusY=h-statusHeight-margin;
-  uiWorkspace(w,h,toolbarY+toolbarHeight+gap,statusHeight+margin+gap,margin);
+  uiWorkspace(w,h,toolbarY,toolbarHeight,statusHeight,margin,gap);
   projectSetup();
   tourOfferPanel();
   modPreviewPanel();
@@ -501,19 +503,22 @@ static void panel(float w, float h)
     ImGui::EndMainMenuBar();
   }
   viewOptionsToolbar();
-  const auto fixed = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
-                     | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking;
-  auto fixedPanel=[&](const char* name,float y,float height,ImGuiWindowFlags flags=0){
-    const ImVec2 pos{margin,y},size{std::max(1.f,w-2*margin),height};
-    if(softChrome){
-      uiSoftSurface(ImGui::GetBackgroundDrawList(),{pos,{pos.x+size.x,pos.y+size.y}},11*uiScale());
-      flags|=ImGuiWindowFlags_NoBackground;
+  auto fixedPanel=[&](const char* name,ImGuiID dock,float y,float height,ImGuiWindowFlags flags=0){
+    flags|=ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove;
+    if(flags&ImGuiWindowFlags_HorizontalScrollbar)
+      flags&=~ImGuiWindowFlags_NoScrollbar;
+    if(softChrome)flags|=ImGuiWindowFlags_NoBackground;
+    ImGui::SetNextWindowDockID(dock,ImGuiCond_Always);
+    if(!dock){
+      flags|=ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoSavedSettings;
+      ImGui::SetNextWindowPos({margin,y});
+      ImGui::SetNextWindowSize({std::max(1.f,w-2*margin),height});
     }
-    ImGui::SetNextWindowPos(pos);
-    ImGui::SetNextWindowSize(size);
-    ImGui::Begin(name,nullptr,fixed|flags);
+    ImGui::Begin(name,nullptr,flags);
+    if(softChrome)
+      uiSoftSurface(ImGui::GetBackgroundDrawList(),ImGui::GetCurrentWindow()->Rect(),11*uiScale());
   };
-  fixedPanel("##toolbar",toolbarY,toolbarHeight,ImGuiWindowFlags_HorizontalScrollbar);
+  fixedPanel(uiToolbarName,uiToolbarDock,toolbarY,toolbarHeight,ImGuiWindowFlags_HorizontalScrollbar);
   actionButton("Menu/Edit/Undo");
   ImGui::SameLine();
   actionButton("Menu/Edit/Redo");
@@ -992,25 +997,33 @@ static void panel(float w, float h)
   ImGui::End();
   plantBrushPanel();
   selectMapTab = selectMaterialTab = false;
-  fixedPanel("##status",statusY,statusHeight);
-  char selectionStatus[192] = {};
-  cvars->GetString("ftebroom_selection_status", selectionStatus, sizeof selectionStatus);
-  if (!selectionStatus[0])
-    ImGui::Text(
-      "%s | Grid %g | Selected: %g | %s",
-      modalNames[std::clamp(currentTool,0,plantBrushTool)],
-      cvars->GetFloat("ca_grid"),
-      cvars->GetFloat("ftebroom_selection_count"),
-      currentTool==plantBrushTool?uiTr("Drag on a surface in the 3D view."):
-      sceneDrag ? (altHeld ? "Z constraint | Esc cancels" : "XY constraint | Esc cancels")
-                : (currentTool == 2
-                     ? "Place 2 or 3 points | Enter applies | Ctrl+Enter changes side | "
-                       "Esc removes last point"
-                     : "Click selects | Drag creates / moves | Shift+Esc exits tool"));
+  fixedPanel(uiStatusName,uiStatusDock,statusY,statusHeight);
+  char selectionStatus[192]={}, statusText[512]={};
+  cvars->GetString("ftebroom_selection_status",selectionStatus,sizeof selectionStatus);
+  if(selectionStatus[0])
+    std::snprintf(statusText,sizeof statusText,"%s",selectionStatus);
   else
-    ImGui::TextColored(uiModern()?uiModernPalette().warning:ImVec4{1,.65f,.15f,1},"%s",selectionStatus);
-  ImGui::SameLine();
-  if(ImGui::SmallButton(modFilesOpen ? "Hide files" : "Show files"))modFilesOpen=!modFilesOpen;
+    std::snprintf(statusText,sizeof statusText,uiTr("%s | Grid %g | Selected: %g | %s"),
+      modalNames[std::clamp(currentTool,0,plantBrushTool)],
+      cvars->GetFloat("ca_grid"),cvars->GetFloat("ftebroom_selection_count"),
+      currentTool==plantBrushTool?uiTr("Drag on a surface in the 3D view."):
+      sceneDrag?(altHeld?"Z constraint | Esc cancels":"XY constraint | Esc cancels"):
+      currentTool==2?"Place 2 or 3 points | Enter applies | Ctrl+Enter changes side | Esc removes last point":
+      "Click selects | Drag creates / moves | Shift+Esc exits tool");
+  const char* fileLabel=modFilesOpen?"Hide files":"Show files";
+  const auto& style=ImGui::GetStyle();
+  const float buttonWidth=ImGui::CalcTextSize(uiTr(fileLabel)).x+2*style.FramePadding.x;
+  const float textWidth=ImGui::GetContentRegionAvail().x-buttonWidth-style.ItemSpacing.x-100*uiScale();
+  if(textWidth>0){
+    const char* end=nullptr;
+    ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(),textWidth,0,statusText,nullptr,&end);
+    if(selectionStatus[0])
+      ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().warning:ImVec4{1,.65f,.15f,1});
+    ImGui::TextUnformatted(statusText,end);
+    if(selectionStatus[0])ImGui::PopStyleColor();
+    ImGui::SameLine();
+  }
+  if(ImGui::SmallButton(fileLabel))modFilesOpen=!modFilesOpen;
   ImGui::SameLine();
   ImGui::TextDisabled("%s.map%s",documentName.c_str(),cvars->GetFloat("ftebroom_dirty")?" *":"");
   if(ImGui::IsItemHovered()){

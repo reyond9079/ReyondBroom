@@ -14,7 +14,37 @@ static void testWorkspace()
   auto& io = ImGui::GetIO();
   const bool trickle = io.ConfigInputTrickleEventQueue;
   io.ConfigInputTrickleEventQueue = false;
-  if(std::string(mode)=="rb10tools"){
+  if(std::string(mode)=="entity-inspector"){
+    const int width=std::max(640,int(io.DisplaySize.x)), height=std::max(480,int(io.DisplaySize.y));
+    auto refresh=[&](ImVec2 pointer={0,0}){event(0,0,0,pointer.x,pointer.y,width,height);};
+    modFilesOpen=true;
+    selectEntityTab=true;
+    for(int i=0;i<5;i++)refresh();
+    const auto* inspector=ImGui::FindWindowByName("Entity");
+    const auto* toolbar=ImGui::FindWindowByName(uiToolbarName);
+    const auto* status=ImGui::FindWindowByName(uiStatusName);
+    const auto* files=ImGui::FindWindowByName("Mod file manager");
+    expect(inspector&&toolbar&&status&&files&&toolbar->DockId&&status->DockId&&
+      toolbar->Rect().Max.x<=inspector->Pos.x&&status->Rect().Max.x<=inspector->Pos.x&&
+      files->Rect().Max.x<=inspector->Pos.x&&
+      std::abs(inspector->Pos.y-toolbar->Pos.y)<2&&std::abs(inspector->Rect().Max.y-status->Rect().Max.y)<2,
+      "entity_inspector_spans_history_and_status");
+    if(auto item=entityTestItems.find("value/targetname");item!=entityTestItems.end()){
+      const auto point=item->second;
+      auto click=[&]{
+        refresh(point);
+        event(1,mouseKeys[0],0,point.x,point.y,width,height);
+        refresh(point);
+        event(2,mouseKeys[0],0,point.x,point.y,width,height);
+        refresh(point);
+      };
+      click();click();refresh(point);
+      char editing[160]{};
+      cvars->GetString("ftebroom_property_editing",editing,sizeof editing);
+      expect(std::string(editing)=="targetname","entity_inspector_existing_value_edit");
+    }else expect(false,"entity_inspector_existing_value_edit");
+  }
+  else if(std::string(mode)=="rb10tools"){
     uiScaleChoice=0;uiLocked=false;uiReset=true;extraToolsExpanded=false;
     cvars->SetFloat("ftebroom_tool",0);
     auto toolsFrame=[](){event(0,0,0,300,350,640,800);};

@@ -119,6 +119,26 @@ inline Texel legacyTexel(const Project& d,int mat,double u,double v) {
   c=mul(c,1+p.variation*(fine-.5));for(double& x:c){x=std::clamp(x,0.,1.);if(p.quality==3)x=std::min(1.,std::round(x*5)/5.+.04);}
   return {c,h,alpha};
 }
+// Paired sprays on an axial twig. Offset their bases and lengths so the
+// silhouette stays open between branchlets, even in the distant atlas mips.
+inline double scaleSprayCoverage(double x,double v,double grain,double& relief) {
+  x-=.035*v*(1.-v)*4.;
+  double edge=.032*(1.-.75*v)-std::abs(x);
+  for(int i=0;i<7;i++){
+    const double base=.10+.105*i+(x>0.?.023:0.);
+    const double rise=.37-.027*i;
+    const double t=(v-base)/rise;
+    if(t<0.||t>1.)continue;
+    const double reach=(.76-.053*i)*(x>0.?.93:1.);
+    const double center=reach*t*(1.42-.42*t);
+    const double scale=1.-std::abs(2.*(t*8.-std::floor(t*8.))-1.);
+    const double radius=(.088+.081*scale)*(1.-t)*(.78+.22*grain);
+    const double distance=std::abs(std::abs(x)-center);
+    edge=std::max(edge,radius-distance);
+    relief=std::max(relief,std::clamp((radius-distance)*20.,0.,1.)*(.45+.55*scale));
+  }
+  return std::clamp(edge*52.+.5,0.,1.);
+}
 inline Texel texel(const Project& d,int material,double u,double v) {
   if(d.generator==1)return legacyTexel(d,material,u,v);
   int mat=material>=LeafLight&&material<=LeafYoung?Leaf:material>=NeedleLight?Needle:material;
@@ -175,7 +195,11 @@ inline Texel texel(const Project& d,int material,double u,double v) {
     double x=2*(u-.5),width=botanicalLeafWidth(mat==Grass?2:p.leafShape,v,p.leafProfile,p.serration);
     sample.alpha=std::clamp((width-std::abs(x))*100,0.,1.);
     if(p.leafShape==4&&mat!=Grass)sample.alpha=botanicalPalmateMask(u,v,p.leaflets)?1:0;
-    if(mat==Needle){
+    const bool scales=mat==Needle&&treeScaleFoliage(d);
+    double scaleRelief=0.;
+    if(scales){
+      sample.alpha=scaleSprayCoverage(x,v,grain,scaleRelief);
+    }else if(mat==Needle){
       double mask=std::abs(x)<.024?1:0;
       if(p.needleForm==0||p.needleForm==3){
         int needles=p.needleForm==0?9:12;
@@ -207,8 +231,15 @@ inline Texel texel(const Project& d,int material,double u,double v) {
     sample.color=blend(sample.color,mul(base,1.24),mid*.38+vein*.16);
     double margin=std::clamp((std::abs(x)/std::max(.025,width)-.82)*5,0.,1.);
     sample.color=mul(sample.color,1-margin*.065);sample.height=.32+.025*grain+mid*.085+vein*.026;
+    if(scales){
+      sample.color=blend(mul(base,.74+.38*grain+.24*scaleRelief),{.34,.26,.16},mid*.27);
+      sample.height=.31+.12*scaleRelief+.06*mid;
+    }
     double dry=p.dryness+((p.evergreen==1||p.evergreen==3)?0:p.season==3?.65:p.season==2?.35:0);
-    if(p.season==2&&p.evergreen!=1&&p.evergreen!=3)sample.color=blend(sample.color,{.55,.28,.085},.53+.12*grain);
+    if(p.season==2&&p.evergreen!=1&&p.evergreen!=3){
+      const V autumn=d.generator>=5&&d.species=="lombardy-poplar"?V{.76,.55,.13}:V{.55,.28,.085};
+      sample.color=blend(sample.color,autumn,.53+.12*grain);
+    }
     sample.color=blend(sample.color,{.47,.39,.23},std::clamp(dry,0.,.94));
     if(p.season==0)sample.color=blend(sample.color,mul(base,1.18),.18);
   }else if(mat==Petal){
@@ -277,7 +308,7 @@ inline PhotoDetail materialPhoto(const Project& d,int mat) {
       return p.barkPattern==2?D::BirchBark:p.barkPattern==1||p.barkPattern==5||p.barkPattern==7?D::SmoothBark:D::OakBark;
     return D::GrassBlade;
   }
-  if(mat==Needle||mat==NeedleLight||mat==NeedleMature)return D::Needle;
+  if(mat==Needle||mat==NeedleLight||mat==NeedleMature)return treeScaleFoliage(d)?D::None:D::Needle;
   if(mat==Grass||d.family==Family::Riparian)return D::GrassBlade;
   if(mat==CactusSkin)return D::Cactus;
   if(mat==Petal||mat==Center){
@@ -337,7 +368,7 @@ inline Textures textureMaps(const Project& d,const Image* imported=nullptr,const
           V original{pixel[0],pixel[1],pixel[2]};
           V tint=mul(d.p.leaf,std::clamp(.55+light*1.55,.60,1.65));
           const bool detailedGrass=foliage>=Photo::Lawn;
-          auto color=blend(original,tint,detailedGrass?.32:.52);
+          auto color=blend(original,tint,detailedGrass?.32:d.generator>=5?.73:.52);
           sample.color=blend(color,mul({.52,.32,.13},.65+light),dry);
           sample.alpha=pixel[3];sample.height=.25+light*.32;
         }else if(detail!=PhotoDetail::None&&mat!=PhotoFoliage){

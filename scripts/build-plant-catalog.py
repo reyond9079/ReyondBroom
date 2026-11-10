@@ -26,7 +26,7 @@ species('maple','Field maple','Acer campestre','tree',210,crown=0,spread=.65,cro
 species('japanese-maple','Japanese maple','Acer palmatum','tree',130,crown=4,spread=.85,crownBase=.35,radius=3.2,phyllotaxy=1,leafShape=4,leaflets=7,leafSize=12,leafWidth=1,barkPattern=1,branches=10,clumps=2)
 species('willow','Weeping willow','Salix babylonica','tree',245,crown=3,spread=.8,crownBase=.42,radius=8,gravity=1.3,branchLength=.9,leafShape=2,leafSize=15,leafWidth=.14,branches=16,leaves=34,barkPattern=0)
 species('white-willow','White willow','Salix alba','tree',265,crown=6,spread=.60,crownBase=.24,radius=7,gravity=.5,leafShape=2,leafSize=12,leafWidth=.20,branches=14,clumps=2,barkPattern=0)
-species('lombardy-poplar','Lombardy poplar','Populus nigra italica','tree',350,crown=2,spread=.19,crownBase=.12,radius=6,branchAngle=23,leafSize=11,leafWidth=.8,leafShape=1,branches=22,depth=3,barkPattern=0)
+species('lombardy-poplar','Lombardy poplar','Populus nigra italica','tree',350,crown=2,spread=.092,crownBase=.16,radius=5,branchAngle=24,branchLength=.50,leafSize=8.2,leafWidth=.91,leafShape=8,branches=24,depth=3,leaves=20,curvature=.075,serration=.52,petiole=.22,barkPattern=0,bark=[.34,.33,.28])
 species('aspen','European aspen','Populus tremula','tree',260,crown=1,spread=.35,crownBase=.45,radius=4.2,leafShape=1,leafSize=9,leafWidth=1.05,barkPattern=1,petiole=.30,serration=.5)
 species('beech','European beech','Fagus sylvatica','tree',285,crown=1,spread=.56,crownBase=.28,radius=10,leafShape=1,leafSize=12,leafWidth=.55,barkPattern=1,crownFill=1.05,branchAngle=57)
 species('linden','Small-leaved lime','Tilia cordata','tree',270,crown=1,spread=.50,crownBase=.25,radius=8,leafShape=6,leafProfile=[.12,1.2,.9,.5,0],leafSize=13,leafWidth=.9,barkPattern=0,serration=.65)
@@ -51,7 +51,7 @@ species('blue-spruce','Blue spruce','Picea pungens','conifer',245,crown=5,spread
 species('fir','Silver fir','Abies alba','conifer',320,crown=5,spread=.36,crownBase=.13,radius=6,branches=16,needleForm=1,gravity=-.05,leafSize=9,leafShape=5,evergreen=1,barkPattern=1,phyllotaxy=1)
 species('larch','European larch','Larix decidua','conifer',295,crown=5,spread=.40,crownBase=.16,radius=5,branches=14,needleForm=3,gravity=.48,leafSize=9,leafShape=5,evergreen=0,barkPattern=0,crownFill=.7)
 species('cedar','Cedar of Lebanon','Cedrus libani','conifer',265,crown=8,spread=.78,crownBase=.22,radius=9,branches=9,needleForm=3,leafSize=10,leafShape=5,evergreen=1,barkPattern=0,gravity=.05,crownAspect=.55)
-species('cypress','Mediterranean cypress','Cupressus sempervirens','conifer',290,crown=2,spread=.16,crownBase=.08,radius=5,branches=21,needleForm=2,leafSize=12,leafShape=5,evergreen=1,barkPattern=0,crownFill=1.2)
+species('cypress','Mediterranean cypress','Cupressus sempervirens','conifer',290,crown=2,spread=.060,crownBase=.10,radius=3.5,branches=26,needleForm=2,leafSize=7.0,leafShape=5,leafWidth=1.08,leaves=22,evergreen=1,barkPattern=4,bark=[.31,.28,.23],curvature=.065,gravity=0)
 species('tree-juniper','Tree juniper','Juniperus excelsa','conifer',180,crown=7,spread=.50,crownBase=.12,radius=6,branches=11,needleForm=2,leafSize=10,leafShape=5,evergreen=1,barkPattern=4,clumps=2,curvature=.6)
 species('redwood','Coast redwood','Sequoia sempervirens','conifer',460,crown=5,spread=.30,crownBase=.27,radius=15,branches=23,needleForm=1,leafSize=10,leafShape=5,evergreen=1,barkPattern=4,taper=.9)
 species('araucaria','Monkey puzzle tree','Araucaria araucana','conifer',260,crown=5,spread=.55,crownBase=.18,radius=8,branches=10,needleForm=4,leafSize=12,leafShape=2,evergreen=1,barkPattern=3,phyllotaxy=2,leafWidth=.45)
@@ -170,6 +170,26 @@ for key,name,latin,h,form,rad,clumps,width in [
  ('horsetail','Field horsetail','Equisetum arvense',55,3,.7,9,.015)]:
  species(key,name,latin,'riparian',h,organ=form,radius=rad,clumps=clumps,branches=8,leafSize=30,leafWidth=width,leafShape=2,barkPattern=5,evergreen=3,flowerSize=13)
 
+TREE_FOLIAGE = {
+    'oak': [.29,.39,.15], 'cork-oak': [.20,.29,.16],
+    'birch': [.36,.48,.19], 'paper-birch': [.30,.43,.18],
+    'maple': [.26,.41,.15], 'japanese-maple': [.38,.21,.15],
+    'willow': [.35,.43,.26], 'white-willow': [.40,.46,.33],
+    'lombardy-poplar': [.31,.43,.18], 'aspen': [.34,.45,.25],
+    'beech': [.32,.40,.16], 'linden': [.32,.45,.19],
+    'ash': [.25,.39,.20], 'elm': [.23,.33,.16],
+    'plane': [.38,.46,.19], 'horse-chestnut': [.24,.38,.15],
+    'walnut': [.29,.39,.21], 'alder': [.21,.33,.16],
+    'rowan': [.32,.43,.21], 'apple': [.28,.40,.20],
+    'cherry': [.30,.40,.18], 'magnolia': [.22,.32,.14],
+    'baobab': [.37,.44,.23], 'umbrella-acacia': [.42,.46,.21],
+    'maritime-pine': [.17,.32,.22], 'stone-pine': [.24,.34,.20],
+    'fir': [.18,.32,.25], 'larch': [.36,.46,.22],
+    'cedar': [.27,.37,.31], 'cypress': [.18,.32,.23],
+    'tree-juniper': [.23,.34,.28], 'redwood': [.20,.33,.23],
+    'araucaria': [.24,.35,.16],
+}
+
 def emit():
     minimum={'tree':24,'conifer':12,'shrub':14,'grass':12,'fern':8,'flower':14,
              'mushroom':8,'cactus':8,'palm':6,'vine':6,'bamboo':4,'riparian':4}
@@ -188,7 +208,7 @@ def emit():
               'vine':[.22,.34,.14],'riparian':[.29,.39,.18]}.get(category)
         if leaf:
             if evergreen and category in ('tree','shrub','vine'):leaf=[.19,.30,.15]
-            traits.setdefault('leaf',leaf)
+            traits.setdefault('leaf',TREE_FOLIAGE.get(row['id'],leaf))
         if category in ('tree','conifer','shrub','palm'):
             bark={0:[.32,.29,.24],1:[.43,.43,.37],3:[.35,.29,.23],
                   4:[.34,.27,.21],5:[.44,.41,.33],6:[.37,.33,.27],
@@ -204,11 +224,11 @@ def emit():
         if category in ('grass','fern','bamboo','riparian'):tags.append('clumping')
         if category=='flower':tags.append('flowering')
         if traits.get('leafShape')==7:tags.append('compound leaves')
-        if category=='conifer':tags.append('needles')
+        if category=='conifer':tags.append('scale foliage' if traits.get('needleForm')==2 else 'needles')
         if traits.get('evergreen')==1:tags.append('evergreen')
         elif category in ('tree','shrub'):tags.append('deciduous')
         row['tags']=tags
-    document={'format':'ReyondBroomBotanicalCatalog','version':2,'generatorVersion':4,
+    document={'format':'ReyondBroomBotanicalCatalog','version':2,'generatorVersion':4,'treeGeneratorVersion':5,
               'license':'Original procedural descriptors; GPL-3.0-or-later', 'minimumByCategory':minimum,'presets':ROWS}
     text=json.dumps(document,ensure_ascii=False,sort_keys=True,indent=2)+'\n'
     destination=ROOT/'runtime/plants/builtin/catalog.json';destination.parent.mkdir(parents=True,exist_ok=True);destination.write_text(text)

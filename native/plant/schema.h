@@ -153,7 +153,7 @@ inline Json serialize(const Project& d) {
   return out;
 }
 inline void validate(const Project& d) {
-  if(d.version!=1||(d.generator<1||d.generator>4))throw std::runtime_error("Unsupported plant project / generator version");
+  if(d.version!=1||(d.generator<1||d.generator>5))throw std::runtime_error("Unsupported plant project / generator version");
   if(int(d.family)<0||int(d.family)>(d.generator==1?11:12)||d.name.size()>256||d.species.size()>80||d.tags.size()>16)throw std::runtime_error("Invalid plant identity");
   if(d.barkURepeats<1||d.barkURepeats>4||!std::isfinite(d.barkVUnits)||d.barkVUnits<16.||d.barkVUnits>512.)
     throw std::runtime_error("Invalid plant bark scale");
@@ -178,7 +178,7 @@ inline void validate(const Project& d) {
   if(p.height<.1||p.height>2048||p.radius<.01||p.radius>200||p.branches<(d.family==Family::Cactus?0:1)||p.branches>48||p.depth<1||p.depth>4||
     p.segments<3||p.segments>20||p.sides<3||p.sides>20||p.leaves<1||p.leaves>40||p.clumps<1||p.clumps>40||
     p.budget<256||p.budget>180000||p.petals<3||p.petals>40||p.flowerLayers<1||p.flowerLayers>8||
-    p.season<0||p.season>3||p.quality<0||p.quality>3||p.foliageMode<0||p.foliageMode>4||p.leafShape<0||p.leafShape>7||
+    p.season<0||p.season>3||p.quality<0||p.quality>3||p.foliageMode<0||p.foliageMode>4||p.leafShape<0||p.leafShape>8||
     p.leafSize<.01||p.leafSize>160||p.flowerSize<.01||p.flowerSize>240||p.windStrength<0||p.windStrength>4)
     throw std::runtime_error("Plant parameters exceed safe generation bounds");
   if(d.nodes.size()>64||d.variations.size()>64)throw std::runtime_error("Plant hierarchy / variations exceed 64 entries");

@@ -41,8 +41,8 @@ static void plantProperties() {
   }
   if(ImGui::CollapsingHeader("General",ImGuiTreeNodeFlags_DefaultOpen)) {
     plantText("Plant name",s.doc.name);
-    if(s.doc.generator<int(plants::catalogManifest().at("generatorVersion"))){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade to photographic foliage","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
-    else ImGui::TextDisabled("Photographic generator %d",s.doc.generator);ImGui::TextDisabled("%s",plants::familyName(f));
+    if(s.doc.generator<plants::latestGenerator(s.doc.family)){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade plant generator","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
+    else ImGui::TextDisabled("Plant generator %d",s.doc.generator);ImGui::TextDisabled("%s",plants::familyName(f));
     plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
     if(s.advanced&&s.doc.generator>=4&&(f==plants::Family::Broadleaf||f==plants::Family::Conifer))
@@ -89,7 +89,7 @@ static void plantProperties() {
       }
       plantSlider("Leaf curl",p.leafCurl,-.5,1);plantSlider("Leaf twist",p.leafTwist,-1,1);
       if(tree||f==plants::Family::Fern||f==plants::Family::Palm||f==plants::Family::Conifer||f==plants::Family::Vine)plantInt("Leaves / shoot",p.leaves,3,40);
-      if(f!=plants::Family::Conifer&&f!=plants::Family::Grass)plantCombo("Leaf shape",p.leafShape,"Oval\0Elliptical\0Lanceolate\0Lobed\0Palmate\0Needle\0Custom profile\0Compound\0");
+      if(f!=plants::Family::Conifer&&f!=plants::Family::Grass)plantCombo("Leaf shape",p.leafShape,"Oval\0Elliptical\0Lanceolate\0Lobed\0Palmate\0Needle\0Custom profile\0Compound\0Deltoid\0");
       if(p.leafShape==6)for(int i=0;i<5;i++){ImGui::PushID(i);float x=p.leafProfile[i];if(ImGui::SliderFloat("Leaf outline",&x,0,1.5))p.leafProfile[i]=x;ImGui::PopID();}
       if(f!=plants::Family::Conifer)plantCombo("Foliage geometry",p.foliageMode,"Detailed curved leaf\0Curved low-poly leaf\0Alpha-cutout card\0Crossed cards\0Distant foliage cards\0");
     }

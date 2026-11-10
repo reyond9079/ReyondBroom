@@ -36,7 +36,6 @@ static LRESULT CALLBACK desktopProc(HWND h,UINT message,WPARAM w,LPARAM l){
   if(runUiInputTrace.size()>=100)runUiInputTrace.erase(runUiInputTrace.begin());
   runUiInputTrace.push_back({{"windowMessage",message},{"virtualKey",w},{"scanCode",(l>>16)&511},{"rawKeyboard",cvars->GetFloat("in_rawinput_keyboard")}});
  }
- if(message==WM_CLOSE && modEmbedded)modEmbedEnd();
  if(message==WM_ACTIVATE && LOWORD(w)!=WA_INACTIVE)cvars->SetFloat("ftebroom_focus_time",float(core->GetMilliseconds())/1000.f);
  // Forward WM_SETCURSOR so FTE can install the newly sized hardware image.
  if(message==WM_DROPFILES){auto drop=(HDROP)w;if(modEmbedded){importError="Return to map editing before importing resources.";DragFinish(drop);return 0;}POINT point;DragQueryPoint(drop,&point);RECT rect;GetClientRect(h,&rect);auto size=ImGui::GetIO().DisplaySize;ImVec2 p{point.x*size.x/std::max(1L,rect.right),point.y*size.y/std::max(1L,rect.bottom)};

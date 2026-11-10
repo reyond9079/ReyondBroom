@@ -663,7 +663,7 @@ float() ftebroom_command =
 {
     if(argv(0)=="ftebroom_bsp") {
         if(argv(1)=="edit")fb_build_preview_leave();
-        else fb_build_preview_enter(argv(1));
+        else fb_build_preview_enter(argv(1),argv(2)=="unlit");
         return TRUE;
     }
     if(argv(0)=="ftebroom_material_remap") {
@@ -677,7 +677,7 @@ float() ftebroom_command =
     // Editing a document always restores its world before touching geometry.
     if(fb_build_preview_active && substring(argv(0),0,9)=="ftebroom_" &&
         substring(argv(0),0,16)!="ftebroom_camera_" && argv(0)!="ftebroom_camera") {
-        if(argv(0)=="ftebroom_pointer")return TRUE;
+        if(argv(0)=="ftebroom_pointer" && argv(1)!="down" && argv(1)!="dblclick" && argv(1)!="drill")return TRUE;
         fb_build_preview_leave();
     }
     if(fb_document_command()) return TRUE;

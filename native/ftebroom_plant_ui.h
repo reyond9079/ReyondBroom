@@ -42,7 +42,7 @@ static void plantProperties() {
   if(ImGui::CollapsingHeader("General",ImGuiTreeNodeFlags_DefaultOpen)) {
     plantText("Plant name",s.doc.name);
     if(s.doc.generator<plants::latestGenerator(s.doc.family)){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade plant generator","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
-    else ImGui::TextDisabled("Photographic generator %d",s.doc.generator);ImGui::TextDisabled("%s",plants::familyName(f));
+    else ImGui::TextDisabled("Plant generator %d",s.doc.generator);ImGui::TextDisabled("%s",plants::familyName(f));
     plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
     if(s.advanced&&s.doc.generator>=4&&(f==plants::Family::Broadleaf||f==plants::Family::Conifer))

@@ -11,8 +11,12 @@ inline double botanicalLeafWidth(int shape,double t,const std::array<double,5>& 
   if(shape==3)w=std::pow(std::max(0.,std::sin(pi*t)),.72)*(.71+.29*std::cos((t-.08)*pi*8))*(.78+.22*t);
   if(shape==5)w=.08*std::pow(std::max(0.,std::sin(pi*t)),.3);
   if(shape==6)w=std::max(0.,curve(profile,t));
+  if(shape==8)w=t<.27?std::pow(t/.27,.72):std::pow((1.-t)/.73,1.23);
   // Fine teeth follow the edge, rather than cutting holes through the lamina.
   return w*(1-serration*.045*(.5+.5*std::sin(t*pi*46)));
+}
+inline bool treeScaleFoliage(const Project& d) {
+  return d.generator>=5&&d.family==Family::Conifer&&d.p.needleForm==2;
 }
 inline std::array<double,2> botanicalPalmatePoint(int index,int lobes) {
   lobes=std::clamp(lobes,3,9);

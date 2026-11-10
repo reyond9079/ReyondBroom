@@ -11,6 +11,35 @@ static std::string fingerprint(const Mesh& m){std::string bytes;auto append=[&](
 static void checkBotanicalAppearance(const std::vector<Project>& catalog){
  auto find=[&](const char* id){auto it=std::find_if(catalog.begin(),catalog.end(),[&](auto& d){return d.preset==id;});if(it==catalog.end())throw std::runtime_error("missing appearance control");return *it;};
  auto oak=find("oak"),beech=find("beech"),birch=find("birch");
+ auto poplar=find("lombardy-poplar"),cypress=find("cypress");
+ check(poplar.generator==5&&cypress.generator==5&&find("wild-shrub").generator==4,"tree refresh does not advance unrelated generators");
+ check(poplar.p.leafShape==8&&cypress.p.needleForm==2,"distinct leaf organs for poplar and cypress");
+ check(botanicalLeafWidth(8,.27,poplar.p.leafProfile,0.)>1.6*botanicalLeafWidth(8,.70,poplar.p.leafProfile,0.),
+       "poplar leaf widens at the shoulder and tapers to a point");
+ int scalePixels=0,edgeGaps=0;
+ for(int y=0;y<64;y++)for(int x=0;x<64;x++){
+  bool covered=texel(cypress,Needle,(x+.5)/64.,(y+.5)/64.).alpha>=.5;
+  scalePixels+=covered;
+  if(x>45&&y>9&&y<43)edgeGaps+=!covered;
+ }
+ check(scalePixels>400&&scalePixels<1900&&edgeGaps>420,"cypress spray has separated, tapered branchlets");
+ auto autumn=poplar;autumn.p.season=2;
+ auto summerLeaf=texel(poplar,Leaf,.5,.45).color,autumnLeaf=texel(autumn,Leaf,.5,.45).color;
+ check(summerLeaf[1]>summerLeaf[0]&&autumnLeaf[0]>autumnLeaf[1]&&autumnLeaf[1]>2*autumnLeaf[2],
+       "Lombardy poplar turns from green to gold");
+ for(unsigned seed:{137u,138u,424242u}){
+  poplar.seed=cypress.seed=seed;
+  auto slender=[](const Mesh& mesh){auto d=sub(mesh.high,mesh.low);return std::max(d[0],d[1])/d[2];};
+  auto poplarMesh=generate(poplar),cypressMesh=generate(cypress);
+  const double poplarWidth=slender(poplarMesh),cypressWidth=slender(cypressMesh);
+  check(poplarWidth>.14&&poplarWidth<.34,"Lombardy poplar has a tapered columnar crown");
+  check(cypressWidth>.08&&cypressWidth<.20&&cypressWidth<poplarWidth*.75,"cypress is a much narrower column");
+  for(int profile:{2,3,4,5}){
+   auto alias=targetGeometry(cypress,cypressMesh,profile);
+   check(!alias.faces.empty()&&std::any_of(alias.faces.begin(),alias.faces.end(),[](const auto& f){return f.part==Part::Leaves;}),
+         "cypress retains foliage after target conversion");
+  }
+ }
  auto relief=[&](Project d){double low=1e9,high=-1e9,dx=0,dy=0;for(int y=1;y<64;y++)for(int x=1;x<64;x++){double u=x/64.,v=y/64.,h=texel(d,Bark,u,v).height;low=std::min(low,h);high=std::max(high,h);dx+=std::abs(h-texel(d,Bark,u-1./64,v).height);dy+=std::abs(h-texel(d,Bark,u,v-1./64).height);}return V{high-low,dx,dy};};
  auto rough=relief(oak),smooth=relief(beech),paper=relief(birch);
  check(rough[0]>.20&&smooth[0]<.10,"fissured oak and smooth beech have distinct material relief");
@@ -81,7 +110,7 @@ int main(int argc,char** argv)try{
  std::ifstream input(argc>1?argv[1]:"tests/fixtures/plant-generator1.json");Json legacy;input>>legacy;check(legacy.size()==30,"all original presets in golden corpus");
  for(auto& item:legacy){auto original=item["project"];auto d=deserialize(original);check(d.generator==1,"opening legacy source never upgrades");check(serialize(d)==original,"legacy serialized identity preserved");check(ids.count(d.preset),"original preset ID retained");
   for(auto& seed:item["seeds"]){d.seed=seed["seed"].get<unsigned>();for(int l=0;l<3;l++)check(fingerprint(generate(d,l))==seed["lods"][l],"exact legacy geometry "+d.preset);auto maps=textureMaps(d,nullptr,nullptr,48);int slot=0;for(auto* image:{&maps.albedo,&maps.normal,&maps.orm}){std::ostringstream id;id<<std::hex<<hash(std::string(image->rgba.begin(),image->rgba.end()));check(id.str()==seed["textures"][slot++],"exact legacy atlas "+d.preset);}}
-  auto upgraded=upgradeGenerator(d);check(upgraded.generator==4&&upgraded.seed==d.seed,"explicit upgrade preserves seed");check(deserialize(serialize(upgraded)).generator==4,"new project roundtrip");
+  auto upgraded=upgradeGenerator(d);check(upgraded.generator==latestGenerator(d.family)&&upgraded.seed==d.seed,"explicit upgrade preserves seed");check(deserialize(serialize(upgraded)).generator==upgraded.generator,"new project roundtrip");
  }
  auto seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();std::ofstream out(argc>2?argv[2]:"plant-botanical-results.json");out<<Json{{"checks",checks},{"presets",catalog.size()},{"seeds",3},{"lods",3},{"mesh_cases",catalog.size()*9},{"legacy_cases",270},{"elapsed_seconds",seconds},{"matrix",report}}.dump(2);std::cout<<"PASS "<<checks<<" checks in "<<seconds<<" s\n";return 0;
 }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}

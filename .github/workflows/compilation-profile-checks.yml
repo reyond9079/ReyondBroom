@@ -1,7 +1,14 @@
 name: Compilation profile parity
-on:
+'on':
   pull_request:
-    paths: ['native/**', 'qc/**', 'tests/**', 'scripts/**', 'patches/**', 'tools/qa/**', 'docs/qa/reyon-9/**', '.github/workflows/compilation-profile-checks.yml', '.github/workflows/release-linux-ui-update.yml']
+    paths:
+    - native/**
+    - qc/**
+    - tests/**
+    - scripts/**
+    - patches/**
+    - runtime/**
+    - .github/**
   workflow_dispatch:
     inputs:
       prepared_run_id:
@@ -12,6 +19,18 @@ on:
         description: Focus a prepared Windows run on plant map rendering diagnostics
         required: false
         default: ''
+      validation_mode:
+        description: Affected checks by default; full suites only on explicit request
+        type: choice
+        options:
+        - affected
+        - full
+        default: affected
+      validation_base:
+        description: Validation baseline ref; default is PR base or latest published release (independent of SDK base)
+        type: string
+        required: false
+        default: ''
 permissions:
   contents: read
   actions: read
@@ -19,6 +38,13 @@ concurrency:
   group: compilation-profiles-${{ github.head_ref || github.ref_name }}-${{ inputs.prepared_run_id || 'full' }}
   cancel-in-progress: true
 jobs:
+  plan:
+    uses: ./.github/workflows/ci-plan.yml
+    with:
+      base: ${{ github.event.pull_request.base.sha || inputs.validation_base }}
+      head: ${{ github.event.pull_request.head.sha || github.sha }}
+      full: ${{ inputs.validation_mode == 'full' }}
+      release: false
   windows-input-reproduction:
     if: github.event_name == 'workflow_dispatch' && inputs.prepared_run_id != ''
     runs-on: windows-2022
@@ -28,346 +54,401 @@ jobs:
       RB_QA_RENDERER: gl rb_qa_opengl.dll
       GALLIUM_DRIVER: llvmpipe
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Restore verified runtime and the compiled editor with matching sources
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force base, prepared, mesa | Out-Null
-          gh release download v0.5.0-alpha.126 --repo $env:GITHUB_REPOSITORY --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256'
-          if ($LASTEXITCODE) { throw 'Runtime download failed' }
-          $sum = (Get-Content (Get-ChildItem base/*.sha256).FullName) -split '\s+'
-          if ((Get-FileHash (Join-Path base $sum[1]) -Algorithm SHA256).Hash.ToLower() -ne $sum[0]) { throw 'Runtime checksum mismatch' }
-          Expand-Archive (Get-ChildItem base/*.zip).FullName bundle
-          gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Windows-editor --dir prepared
-          if ($LASTEXITCODE) { throw 'Prepared editor download failed' }
-          $revision = (Get-Content prepared/compilation-editor-revision.txt).Trim()
-          # PR checkouts build a synthetic merge commit, which may no longer be
-          # referenced by the current PR after a test-driver-only update.
-          git fetch --no-tags --depth=1 origin $revision
-          if ($LASTEXITCODE) { throw 'Cannot retrieve the prepared editor source revision' }
-          git diff --exit-code $revision HEAD -- native qc tests/compilation-profile-probe.cpp patches scripts/build-editor-engine.sh scripts/apply-engine-patches.py
-          if ($LASTEXITCODE) { throw 'Prepared C++/CSQC/probe sources differ: rebuild the editor first' }
-          Copy-Item prepared/fteplug_ftebroom_x64.dll bundle/ReyondBroom-Windows-x64 -Force
-          Copy-Item prepared/ftebroom/csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom -Force
-          Copy-Item prepared/tools/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools -Force
-          Copy-Item prepared/bin/fteqw64.exe bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe -Force
-          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
-          if ($LASTEXITCODE) { throw 'Renderer download failed' }
-          if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Renderer checksum mismatch' }
-          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
-          if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
-          Copy-Item mesa/extracted/x64/*.dll bundle/ReyondBroom-Windows-x64/bin -Force
-          Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
-          python -m pip install Pillow==12.0.0 pywinauto trimesh==4.8.3 numpy==2.3.4
-      - name: Exercise actual Windows controls with OS input
-        if: inputs.plant_scene_only != 'true'
-        run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
-      - name: Exercise the prepared Plant Editor with OS input
-        shell: pwsh
-        run: |
-          $plantArgs = @()
-          if ('${{ inputs.plant_scene_only }}' -eq 'true') {
-            python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
-            if ($LASTEXITCODE) { throw 'FTE source-directory fixture failed' }
-            $plantArgs += '--scene-only'
-          }
-          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui @plantArgs
-          if ($LASTEXITCODE) { throw 'Prepared Plant UI acceptance failed' }
-          python scripts/test-plant-exports.py qa/plants/ui
-          if ($LASTEXITCODE) { throw 'Prepared plant reimport failed' }
-          python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
-          if ($LASTEXITCODE) { throw 'Prepared plant BSP failed' }
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: compilation-Windows-input-reproduction
-          path: qa
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Restore verified runtime and the compiled editor with matching sources
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force base, prepared, mesa | Out-Null
+        gh release download v0.5.0-alpha.126 --repo $env:GITHUB_REPOSITORY --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256'
+        if ($LASTEXITCODE) { throw 'Runtime download failed' }
+        $sum = (Get-Content (Get-ChildItem base/*.sha256).FullName) -split '\s+'
+        if ((Get-FileHash (Join-Path base $sum[1]) -Algorithm SHA256).Hash.ToLower() -ne $sum[0]) { throw 'Runtime checksum mismatch' }
+        Expand-Archive (Get-ChildItem base/*.zip).FullName bundle
+        gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Windows-editor --dir prepared
+        if ($LASTEXITCODE) { throw 'Prepared editor download failed' }
+        $revision = (Get-Content prepared/compilation-editor-revision.txt).Trim()
+        # PR checkouts build a synthetic merge commit, which may no longer be
+        # referenced by the current PR after a test-driver-only update.
+        git fetch --no-tags --depth=1 origin $revision
+        if ($LASTEXITCODE) { throw 'Cannot retrieve the prepared editor source revision' }
+        git diff --exit-code $revision HEAD -- native qc tests/compilation-profile-probe.cpp patches scripts/build-editor-engine.sh scripts/apply-engine-patches.py
+        if ($LASTEXITCODE) { throw 'Prepared C++/CSQC/probe sources differ: rebuild the editor first' }
+        Copy-Item prepared/fteplug_ftebroom_x64.dll bundle/ReyondBroom-Windows-x64 -Force
+        Copy-Item prepared/ftebroom/csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom -Force
+        Copy-Item prepared/tools/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools -Force
+        Copy-Item prepared/bin/fteqw64.exe bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe -Force
+        gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
+        if ($LASTEXITCODE) { throw 'Renderer download failed' }
+        if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Renderer checksum mismatch' }
+        & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
+        if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
+        Copy-Item mesa/extracted/x64/*.dll bundle/ReyondBroom-Windows-x64/bin -Force
+        Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
+        python -m pip install Pillow==12.0.0 pywinauto trimesh==4.8.3 numpy==2.3.4
+    - name: Exercise actual Windows controls with OS input
+      if: inputs.plant_scene_only != 'true'
+      run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
+    - name: Exercise the prepared Plant Editor with OS input
+      shell: pwsh
+      run: |
+        $plantArgs = @()
+        if ('${{ inputs.plant_scene_only }}' -eq 'true') {
+          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
+          if ($LASTEXITCODE) { throw 'FTE source-directory fixture failed' }
+          $plantArgs += '--scene-only'
+        }
+        python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui @plantArgs
+        if ($LASTEXITCODE) { throw 'Prepared Plant UI acceptance failed' }
+        python scripts/test-plant-exports.py qa/plants/ui
+        if ($LASTEXITCODE) { throw 'Prepared plant reimport failed' }
+        python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
+        if ($LASTEXITCODE) { throw 'Prepared plant BSP failed' }
+      if: inputs.plant_scene_only == 'true' || fromJSON(needs.plan.outputs.plan).flags.plant_ui
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: compilation-Windows-input-reproduction
+        path: qa
+        retention-days: 7
+    needs: plan
   windows-reference:
-    if: github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == ''
+    if: fromJSON(needs.plan.outputs.plan).mode == 'full' && (github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == '')
     runs-on: windows-2022
     env:
       GH_TOKEN: ${{ github.token }}
       GALLIUM_DRIVER: llvmpipe
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Prepare the unmodified official TB reference and test-machine renderer
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force reference, mesa | Out-Null
-          gh release download v2026.2 --repo TrenchBroom/TrenchBroom --dir reference --pattern TrenchBroom-Win64-AMD64-v2026.2-Release.zip
-          if ($LASTEXITCODE) { throw 'Reference download failed' }
-          if ((Get-FileHash reference/TrenchBroom-Win64-AMD64-v2026.2-Release.zip -Algorithm SHA256).Hash.ToLower() -ne 'dd2c5491851275a805110ce465eee3deb45be98e80b00e7b21bb6d250de57fe6') { throw 'Reference checksum mismatch' }
-          Expand-Archive reference/TrenchBroom-Win64-AMD64-v2026.2-Release.zip reference/app
-          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
-          if ($LASTEXITCODE) { throw 'Renderer download failed' }
-          if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Renderer checksum mismatch' }
-          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
-          if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
-          Copy-Item mesa/extracted/x64/*.dll reference/app -Force
-          python -m pip install Pillow pywinauto
-      - name: Capture actual Windows TB controls through OS accessibility/input
-        run: python tools/qa/capture-trenchbroom-windows.py reference/app qa/windows-reference
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: compilation-Windows-reference
-          path: qa
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Prepare the unmodified official TB reference and test-machine renderer
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force reference, mesa | Out-Null
+        gh release download v2026.2 --repo TrenchBroom/TrenchBroom --dir reference --pattern TrenchBroom-Win64-AMD64-v2026.2-Release.zip
+        if ($LASTEXITCODE) { throw 'Reference download failed' }
+        if ((Get-FileHash reference/TrenchBroom-Win64-AMD64-v2026.2-Release.zip -Algorithm SHA256).Hash.ToLower() -ne 'dd2c5491851275a805110ce465eee3deb45be98e80b00e7b21bb6d250de57fe6') { throw 'Reference checksum mismatch' }
+        Expand-Archive reference/TrenchBroom-Win64-AMD64-v2026.2-Release.zip reference/app
+        gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
+        if ($LASTEXITCODE) { throw 'Renderer download failed' }
+        if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Renderer checksum mismatch' }
+        & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
+        if ($LASTEXITCODE) { throw 'Renderer extraction failed' }
+        Copy-Item mesa/extracted/x64/*.dll reference/app -Force
+        python -m pip install Pillow pywinauto
+    - name: Capture actual Windows TB controls through OS accessibility/input
+      run: python tools/qa/capture-trenchbroom-windows.py reference/app qa/windows-reference
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: compilation-Windows-reference
+        path: qa
+        retention-days: 7
+    needs: plan
   linux:
-    if: github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == ''
+    if: needs.plan.outputs.runtime == 'true' && (github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == '')
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        platform: [Linux-x64, Linux-SDL2-x64]
+        platform:
+        - Linux-x64
+        - Linux-SDL2-x64
     env:
       GH_TOKEN: ${{ github.token }}
       PLATFORM: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install build/runtime dependencies
-        run: |
-          if test -f /etc/apt/apt-mirrors.txt; then
-            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
-          fi
-          sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
-          sudo timeout 180s apt-get install -y cmake ninja-build build-essential libgl-dev libx11-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip libsdl2-dev ripgrep
-      - name: Install UI probe dependencies
-        run: python -m pip install python-xlib Pillow
-      - name: Verify base runtime and extract build dependencies
-        run: |
-          mkdir base deps bundle
-          gh release download v0.5.0-alpha.126 --repo "$GITHUB_REPOSITORY" --dir base --pattern "*-$PLATFORM.tar.gz" --pattern "*-$PLATFORM.tar.gz.sha256" --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
-          (cd base && sha256sum -c ./*.sha256)
-          tar -xf base/*-$PLATFORM.tar.gz -C bundle
-          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
-          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
-      - name: Build core, upstream corpus, host and CSQC
-        run: |
-          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests
-          python tests/check-run-workspace-selection.py
-          cmake -S deps/bullet -B deps/bullet-build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
-          cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
-          g++ -std=c++17 -O1 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o bundle/ReyondBroom-Linux-x64/fteplug_ftebroom_amd64.so
-          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz'
-          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
-          cp csaddon.dat bundle/ReyondBroom-Linux-x64/ftebroom/csaddon.dat
-          cp runtime/glsl/* bundle/ReyondBroom-Linux-x64/ftebroom/glsl/
-          cp deps/profile-core/compilation-profile-probe bundle/ReyondBroom-Linux-x64/tools/
-      - name: Rebuild SDL2 engine with the window-close guard
-        if: matrix.platform == 'Linux-SDL2-x64'
-        run: |
-          bash scripts/build-sdl2-engine.sh deps/sdl-engine
-          cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/fteqw-gl64
-      - name: Build SDL2 with native UTF-8 input and document guards
-        if: matrix.platform == 'Linux-SDL2-x64'
-        run: |
-          bash scripts/build-sdl2-engine.sh deps/sdl-engine
-          cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/fteqw-gl64
-          cp deps/sdl-engine/engine/release-sdl2/fteqw-glsdl2_64 bundle/ReyondBroom-Linux-x64/tools/runtimes/fteqw-preview64
-      - name: Verify Quake II resources and source/working paths with OS input
-        run: |
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-quake2-resources.py bundle/ReyondBroom-Linux-x64 qa/rb10/quake2
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-cleanup.py bundle/ReyondBroom-Linux-x64 qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-paths.py bundle/ReyondBroom-Linux-x64 qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe
-      - name: Run existing editor regression, restart, processes, files and UI atlas
-        run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-runtime.py bundle/ReyondBroom-Linux-x64 qa
-      - name: Exercise actual ImGui controls with OS input
-        run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-compilation-ui.py bundle/ReyondBroom-Linux-x64 qa/ui
-      - name: Validate plant generators, codecs, materials and all preset LODs
-        run: |
-          g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests
-          deps/plant-editor-tests qa/plants/core
-          g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests
-          git fetch --no-tags --depth=1 origin 9e5b30a57724602b0d1e0f261af742dd68ae571b
-          mkdir -p deps/plant-baseline
-          git archive 9e5b30a57724602b0d1e0f261af742dd68ae571b native/plant native/ftebroom_bb_math.h native/third_party/json.hpp | tar -x -C deps/plant-baseline
-          g++ -std=c++17 -O2 -Ideps/plant-baseline/native tests/plant-legacy-corpus.cpp -lz -o deps/plant-legacy-corpus
-          deps/plant-legacy-corpus > qa/plants/legacy-platform.json
-          deps/plant-botanical-tests qa/plants/legacy-platform.json qa/plants/botanical-results.json
-          python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
-          python scripts/test-plant-exports.py qa/plants/core
-      - name: Exercise native Plant Editor and map placement with OS input
-        run: |
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-plant-ui.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
-          python scripts/test-plant-exports.py qa/plants/ui
-          python scripts/test-plant-map.py bundle/ReyondBroom-Linux-x64 qa/plants/ui
-      - name: Verify viewport creation through both authoring editors
-        run: |
-          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Linux-x64
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-create.py bundle/ReyondBroom-Linux-x64 qa/viewport-create
-      - name: Verify viewport appearance, keyboard actions and profile ordering
-        run: |
-          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Linux-x64
-          xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-viewport-appearance.py bundle/ReyondBroom-Linux-x64 qa/appearance
-      - name: Verify engine launch and viewport colors with real OS input
-        run: xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py bundle/ReyondBroom-Linux-x64 qa/engine-viewport
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: compilation-${{ matrix.platform }}
-          path: |
-            qa
-            deps/profile-core/Testing/Temporary/LastTest.log
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install build/runtime dependencies
+      run: |
+        if test -f /etc/apt/apt-mirrors.txt; then
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
+        fi
+        sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
+        sudo timeout 180s apt-get install -y cmake ninja-build build-essential libgl-dev libegl1 libasound2-dev libxss-dev libxrandr-dev libxcursor-dev ffmpeg libx11-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip libsdl2-dev ripgrep
+    - name: Install UI probe dependencies
+      run: python -m pip install python-xlib Pillow
+    - name: Verify base runtime and extract build dependencies
+      run: |
+        mkdir base deps bundle
+        gh release download v0.5.0-alpha.134 --repo "$GITHUB_REPOSITORY" --dir base --pattern "*-$PLATFORM.tar.gz" --pattern "*-$PLATFORM.tar.gz.sha256" --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+        (cd base && sha256sum -c ./*.sha256)
+        tar -xf base/*-$PLATFORM.tar.gz -C bundle
+        unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
+        for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+    - name: Cache/build bullet
+      uses: ./.github/actions/build-dependency
+      with:
+        component: bullet
+        source: deps/bullet
+        destination: deps/bullet-build
+        platform: ${{ matrix.platform }}
+        shell: bash
+    - name: Cache/build profile
+      uses: ./.github/actions/build-dependency
+      with:
+        component: profile
+        source: native/profile
+        destination: deps/profile-core
+        platform: ${{ matrix.platform }}
+        shell: bash
+    - name: Run current profile core tests
+      if: fromJSON(needs.plan.outputs.plan).flags.profile_core
+      shell: bash
+      run: ctest --test-dir deps/profile-core -C Release --output-on-failure
+    - name: Build core, upstream corpus, host and CSQC
+      run: |
+        python tests/check-run-workspace-selection.py
+        g++ -std=c++17 -O1 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o bundle/ReyondBroom-Linux-x64/fteplug_ftebroom_amd64.so
+        make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz'
+        deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
+        cp csaddon.dat bundle/ReyondBroom-Linux-x64/ftebroom/csaddon.dat
+        cp runtime/glsl/* bundle/ReyondBroom-Linux-x64/ftebroom/glsl/
+        cp deps/profile-core/compilation-profile-probe bundle/ReyondBroom-Linux-x64/tools/
+    - name: Build current editor engine
+      run: |
+        bash scripts/build-editor-engine.sh "$PLATFORM" deps/editor-engine
+        engine=deps/editor-engine/engine/release-editor/fteqw-gl64
+        if test "$PLATFORM" = Linux-SDL2-x64; then engine=deps/editor-engine/engine/release-sdl2/fteqw-glsdl2_64; fi
+        cp "$engine" bundle/ReyondBroom-Linux-x64/fteqw-gl64
+        cp "$engine" bundle/ReyondBroom-Linux-x64/tools/runtimes/fteqw-preview64
+    - name: Validate plant generators, codecs, materials and all preset LODs
+      run: |
+        g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests
+        deps/plant-editor-tests qa/plants/core
+        g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests
+        git fetch --no-tags --depth=1 origin 9e5b30a57724602b0d1e0f261af742dd68ae571b
+        mkdir -p deps/plant-baseline
+        git archive 9e5b30a57724602b0d1e0f261af742dd68ae571b native/plant native/ftebroom_bb_math.h native/third_party/json.hpp | tar -x -C deps/plant-baseline
+        g++ -std=c++17 -O2 -Ideps/plant-baseline/native tests/plant-legacy-corpus.cpp -lz -o deps/plant-legacy-corpus
+        deps/plant-legacy-corpus > qa/plants/legacy-platform.json
+        deps/plant-botanical-tests qa/plants/legacy-platform.json qa/plants/botanical-results.json
+        python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+        python scripts/test-plant-exports.py qa/plants/core
+      if: fromJSON(needs.plan.outputs.plan).flags.plant_core
+    - name: Materialize selected validation scope
+      shell: bash
+      env:
+        CI_PLAN: ${{ needs.plan.outputs.plan }}
+      run: python -c "import os,pathlib; pathlib.Path('ci-plan.json').write_text(os.environ['CI_PLAN'])"
+    - name: Check changed audio DSP
+      if: fromJSON(needs.plan.outputs.plan).flags.audio_core
+      run: scripts/test-audio-core.sh "$PWD/qa/audio-core" /usr/bin/ffmpeg
+    - name: Install selected plant import probes
+      if: fromJSON(needs.plan.outputs.plan).flags.plant_ui
+      run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+    - name: Check changed grid shaders
+      if: fromJSON(needs.plan.outputs.plan).flags.grid
+      run: LIBGL_ALWAYS_SOFTWARE=1 python tests/test-grid-lod.py --output qa/grid-lod.json
+    - name: Stage current release assets in the source runtime
+      run: python scripts/ci-stage-assets.py bundle/ReyondBroom-Linux-x64
+    - name: Short native startup of the rebuilt module
+      run: xvfb-run -a -s '-screen 0 1280x800x24' python scripts/ci-startup-smoke.py bundle/ReyondBroom-Linux-x64 qa/startup
+    - name: Run affected subsystem checks
+      shell: bash
+      run: |
+        python scripts/ci-run-checks.py --plan ci-plan.json --runtime bundle/ReyondBroom-Linux-x64 --output qa/affected --probe deps/profile-core/compilation-profile-probe --platform "$PLATFORM"
+    - name: Collect compact affected evidence
+      if: always()
+      run: |-
+        python -c "import os,pathlib; p=pathlib.Path('qa'); p.mkdir(exist_ok=True); (p/'planned-scope.json').write_text(os.environ['CI_PLAN'])"
+        python scripts/collect-release-qa.py --qa qa --release unused-release --output qa-artifact
+      env:
+        CI_PLAN: ${{ needs.plan.outputs.plan }}
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: compilation-${{ matrix.platform }}
+        path: qa-artifact/
+        retention-days: 7
+    needs: plan
   windows:
-    if: github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == ''
+    if: needs.plan.outputs.runtime == 'true' && (github.event_name != 'workflow_dispatch' || inputs.prepared_run_id == '')
     runs-on: windows-2022
     env:
       RB_QA_RENDERER: gl rb_qa_opengl.dll
       GALLIUM_DRIVER: llvmpipe
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          path-type: inherit
-          update: false
-          install: >-
-            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-make mingw-w64-x86_64-zlib
-            mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libpng
-            mingw-w64-x86_64-libjpeg-turbo git curl diffutils tar make unzip
-      - name: Verify and unpack base runtime and SDK
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        path-type: inherit
+        update: false
+        install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make mingw-w64-x86_64-zlib mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libpng
+          mingw-w64-x86_64-libjpeg-turbo git curl diffutils tar make unzip
+    - name: Verify and unpack base runtime and SDK
+      shell: msys2 {0}
+      run: |
+        mkdir base deps bundle
+        gh release download v0.5.0-alpha.134 --repo "$GITHUB_REPOSITORY" --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
+        (cd base && sha256sum -c ./*.sha256)
+        unzip -q base/*-Windows-x64.zip -d bundle
+        unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
+        for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
+    - name: Cache/build bullet
+      uses: ./.github/actions/build-dependency
+      with:
+        component: bullet
+        source: deps/bullet
+        destination: deps/bullet-build
+        platform: Windows-x64
         shell: msys2 {0}
-        run: |
-          mkdir base deps bundle
-          gh release download v0.5.0-alpha.126 --repo "$GITHUB_REPOSITORY" --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
-          (cd base && sha256sum -c ./*.sha256)
-          unzip -q base/*-Windows-x64.zip -d bundle
-          unzip -q base/*-Sources.zip 'sources/bullet-source.zip' 'sources/fteqw-source.zip' 'sources/imgui-source.zip' -d deps
-          for lib in bullet fteqw imgui; do mkdir "deps/$lib"; unzip -q "deps/sources/$lib-source.zip" -d "deps/$lib"; done
-      - name: Build MinGW host, core, upstream tests, actual probe and CSQC
+    - name: Cache/build profile
+      uses: ./.github/actions/build-dependency
+      with:
+        component: profile
+        source: native/profile
+        destination: deps/profile-core
+        platform: Windows-x64
         shell: msys2 {0}
-        run: |
-          python scripts/build-profile-support.py core --build-dir deps/profile-core --tests --generator 'MinGW Makefiles'
-          python tests/check-run-workspace-selection.py
-          cmake -S deps/bullet -B deps/bullet-build -G 'MinGW Makefiles' -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF -DBUILD_BULLET3=OFF -DINSTALL_LIBS=OFF
-          cmake --build deps/bullet-build -j4 --target BulletDynamics BulletCollision LinearMath
-          g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
-          make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
-          deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
-          cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
-          cp runtime/glsl/* bundle/ReyondBroom-Windows-x64/ftebroom/glsl/
-          cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
-          git rev-parse HEAD > bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
-      - name: Build the Windows engine with the current editor patch stack
+    - name: Run current profile core tests
+      if: fromJSON(needs.plan.outputs.plan).flags.profile_core
+      shell: msys2 {0}
+      run: ctest --test-dir deps/profile-core -C Release --output-on-failure
+    - name: Build MinGW host, core, upstream tests, actual probe and CSQC
+      shell: msys2 {0}
+      run: |
+        python tests/check-run-workspace-selection.py
+        g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
+        make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
+        deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
+        cp csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
+        cp runtime/glsl/* bundle/ReyondBroom-Windows-x64/ftebroom/glsl/
+        cp deps/profile-core/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools/
+        git rev-parse HEAD > bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
+    - name: Build the Windows engine with the current editor patch stack
+      shell: msys2 {0}
+      run: |
+        bash scripts/build-editor-engine.sh Windows-x64 deps/editor-engine
+        cp deps/editor-engine/engine/release-editor/fteglqw64.exe bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe
+    - name: Install a pinned software OpenGL renderer for the headless Windows host
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force mesa | Out-Null
+        gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
+        if ($LASTEXITCODE) { throw 'Mesa test renderer download failed' }
+        if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Mesa checksum mismatch' }
+        & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
+        if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
+        $gl = Get-ChildItem mesa/extracted -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
+        if (!$gl) { throw '64-bit Mesa OpenGL DLL missing' }
+        Copy-Item (Join-Path $gl.DirectoryName '*.dll') bundle/ReyondBroom-Windows-x64/bin -Force
+        # FTE deliberately bypasses application-local opengl32.dll. A distinct
+        # minidriver name selects the test renderer instead of system GDI 1.1.
+        Copy-Item $gl.FullName bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
+    - name: Install UI screenshot dependency
+      shell: pwsh
+      run: python -m pip install Pillow pywinauto
+    - name: Preserve the built Windows editor for focused UI reproductions
+      uses: actions/upload-artifact@v4
+      with:
+        name: compilation-Windows-editor
+        path: |
+          bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
+          bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
+          bundle/ReyondBroom-Windows-x64/tools/compilation-profile-probe.exe
+          bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe
+          bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
+        retention-days: 7
+      if: github.event_name == 'workflow_dispatch'
+    - name: Configure a usable desktop for the UI atlas
+      shell: pwsh
+      run: |
+        if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) {
+          # Hosted Windows rejects 4K and otherwise stays at 1024x768.
+          # Match the supported desktop used by packaged-release acceptance.
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+        }
+    - name: Validate Windows plant generators, codecs, materials and preset LODs
+      shell: msys2 {0}
+      run: |
+        g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests.exe
+        deps/plant-editor-tests.exe qa/plants/core
+        g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests.exe
+        git fetch --no-tags --depth=1 origin 9e5b30a57724602b0d1e0f261af742dd68ae571b
+        mkdir -p deps/plant-baseline
+        git archive 9e5b30a57724602b0d1e0f261af742dd68ae571b native/plant native/ftebroom_bb_math.h native/third_party/json.hpp | tar -x -C deps/plant-baseline
+        g++ -std=c++17 -O2 -Ideps/plant-baseline/native tests/plant-legacy-corpus.cpp -lz -o deps/plant-legacy-corpus.exe
+        deps/plant-legacy-corpus.exe > qa/plants/legacy-platform.json
+        deps/plant-botanical-tests.exe qa/plants/legacy-platform.json qa/plants/botanical-results.json
+      if: fromJSON(needs.plan.outputs.plan).flags.plant_core
+    - name: Materialize selected validation scope
+      shell: pwsh
+      env:
+        CI_PLAN: ${{ needs.plan.outputs.plan }}
+      run: python -c "import os,pathlib; pathlib.Path('ci-plan.json').write_text(os.environ['CI_PLAN'])"
+    - name: Install selected plant import probes
+      if: fromJSON(needs.plan.outputs.plan).flags.plant_ui
+      run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+    - name: Fetch current audio build source when affected
+      if: fromJSON(needs.plan.outputs.plan).flags.audio_core
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force audio-base,audio-deps | Out-Null
+        gh release download v0.5.0-alpha.134 --repo $env:GITHUB_REPOSITORY --dir audio-base --pattern '*-Windows-x64-Sources.zip' --pattern '*-Windows-x64-Sources.zip.sha256'
+        if ($LASTEXITCODE) { throw 'Audio source download failed' }
+        $archive = (Get-ChildItem audio-base/*-Sources.zip).FullName
+        $expected = ((Get-Content audio-base/*-Sources.zip.sha256) -split '\s+')[0]
+        if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Audio source checksum mismatch' }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
+        try { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz'), "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true) } finally { $zip.Dispose() }
+    - name: Cache/build audio
+      uses: ./.github/actions/build-dependency
+      with:
+        component: audio
+        source: audio-deps
+        destination: .ci-deps/audio
+        platform: Windows-x64
         shell: msys2 {0}
-        run: |
-          bash scripts/build-editor-engine.sh Windows-x64 deps/editor-engine
-          cp deps/editor-engine/engine/release-editor/fteglqw64.exe bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe
-      # Test-machine renderer only. The editor distribution does not gain a Mesa dependency.
-      - name: Install a pinned software OpenGL renderer for the headless Windows host
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force mesa | Out-Null
-          gh release download 25.3.3 --repo pal1000/mesa-dist-win --dir mesa --pattern mesa3d-25.3.3-release-msvc.7z
-          if ($LASTEXITCODE) { throw 'Mesa test renderer download failed' }
-          if ((Get-FileHash mesa/mesa3d-25.3.3-release-msvc.7z -Algorithm SHA256).Hash.ToLower() -ne '66b79057ba273c08daa03551a231995d48b8623bb1efa9f3a7c3e09792d8f1ba') { throw 'Mesa checksum mismatch' }
-          & 'C:/Program Files/7-Zip/7z.exe' x mesa/mesa3d-25.3.3-release-msvc.7z '-omesa/extracted' -y
-          if ($LASTEXITCODE) { throw 'Mesa extraction failed' }
-          $gl = Get-ChildItem mesa/extracted -Recurse -Filter opengl32.dll | Where-Object { $_.DirectoryName -match 'x64|amd64' } | Select-Object -First 1
-          if (!$gl) { throw '64-bit Mesa OpenGL DLL missing' }
-          Copy-Item (Join-Path $gl.DirectoryName '*.dll') bundle/ReyondBroom-Windows-x64/bin -Force
-          # FTE deliberately bypasses application-local opengl32.dll. A distinct
-          # minidriver name selects the test renderer instead of system GDI 1.1.
-          Copy-Item $gl.FullName bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
-      - name: Install UI screenshot dependency
-        shell: pwsh
-        run: python -m pip install Pillow pywinauto
-      - name: Preserve the built Windows editor for focused UI reproductions
-        uses: actions/upload-artifact@v4
-        with:
-          name: compilation-Windows-editor
-          path: |
-            bundle/ReyondBroom-Windows-x64/fteplug_ftebroom_x64.dll
-            bundle/ReyondBroom-Windows-x64/ftebroom/csaddon.dat
-            bundle/ReyondBroom-Windows-x64/tools/compilation-profile-probe.exe
-            bundle/ReyondBroom-Windows-x64/bin/fteqw64.exe
-            bundle/ReyondBroom-Windows-x64/compilation-editor-revision.txt
-      - name: Configure a usable desktop for the UI atlas
-        shell: pwsh
-        run: |
-          if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) {
-            # Hosted Windows rejects 4K and otherwise stays at 1024x768.
-            # Match the supported desktop used by packaged-release acceptance.
-            Set-DisplayResolution -Width 1920 -Height 1080 -Force
-          }
-      - name: Verify Quake II resources and source/working paths on Windows
-        shell: pwsh
-        run: |
-          python scripts/test-quake2-resources.py bundle/ReyondBroom-Windows-x64 qa/rb10/quake2
-          if ($LASTEXITCODE) { throw 'Quake II custom-mod acceptance failed' }
-          python scripts/test-engine-cleanup.py bundle/ReyondBroom-Windows-x64 qa/rb10/engine-cleanup --probe deps/profile-core/compilation-profile-probe.exe
-          if ($LASTEXITCODE) { throw 'Quake engine copy/cleanup launch failed' }
-          python scripts/test-compilation-paths.py bundle/ReyondBroom-Windows-x64 qa/rb10/compilation-paths --probe deps/profile-core/compilation-profile-probe.exe
-          if ($LASTEXITCODE) { throw 'TrenchBroom source/working paths failed' }
-      - name: Verify existing viewport appearance, keyboard actions and profile ordering on Windows
-        shell: pwsh
-        run: |
-          # Isolate preferences/profiles and run the changed behavior first,
-          # before the longer existing authoring scenarios.
-          Copy-Item -Recurse bundle/ReyondBroom-Windows-x64 appearance-runtime
-          python tests/make-linux-build-fixture.py appearance-runtime
-          if ($LASTEXITCODE) { throw 'Appearance fixture failed' }
-          python scripts/test-viewport-appearance.py appearance-runtime qa/appearance
-          if ($LASTEXITCODE) { throw 'Appearance / shortcuts / order acceptance failed' }
-      - name: Run real Windows editor checks and UI atlas
-        shell: pwsh
-        run: python scripts/test-compilation-runtime.py bundle/ReyondBroom-Windows-x64 qa
-      - name: Exercise actual Windows ImGui controls with OS input
-        shell: pwsh
-        run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
-      - name: Validate Windows plant generators, codecs, materials and preset LODs
-        shell: msys2 {0}
-        run: |
-          g++ -std=c++17 -O2 tests/plant-editor.cpp -lz -o deps/plant-editor-tests.exe
-          deps/plant-editor-tests.exe qa/plants/core
-          g++ -std=c++17 -O2 tests/plant-botanical.cpp -lz -o deps/plant-botanical-tests.exe
-          git fetch --no-tags --depth=1 origin 9e5b30a57724602b0d1e0f261af742dd68ae571b
-          mkdir -p deps/plant-baseline
-          git archive 9e5b30a57724602b0d1e0f261af742dd68ae571b native/plant native/ftebroom_bb_math.h native/third_party/json.hpp | tar -x -C deps/plant-baseline
-          g++ -std=c++17 -O2 -Ideps/plant-baseline/native tests/plant-legacy-corpus.cpp -lz -o deps/plant-legacy-corpus.exe
-          deps/plant-legacy-corpus.exe > qa/plants/legacy-platform.json
-          deps/plant-botanical-tests.exe qa/plants/legacy-platform.json qa/plants/botanical-results.json
-      - name: Exercise actual Windows Plant Editor and independent model import
-        shell: pwsh
-        run: |
-          python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
-          if ($LASTEXITCODE) { throw 'Plant QA dependencies failed' }
-          python scripts/test-plant-exports.py qa/plants/core
-          if ($LASTEXITCODE) { throw 'Independent core model reimport failed' }
-          python scripts/test-plant-ui.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
-          if ($LASTEXITCODE) { throw 'Plant UI acceptance failed' }
-          python scripts/test-plant-exports.py qa/plants/ui
-          if ($LASTEXITCODE) { throw 'Independent UI model reimport failed' }
-          python scripts/test-plant-map.py bundle/ReyondBroom-Windows-x64 qa/plants/ui
-          if ($LASTEXITCODE) { throw 'Real plant BSP compilation failed' }
-      - name: Verify viewport creation through both authoring editors on Windows
-        shell: pwsh
-        run: |
-          python tests/make-linux-build-fixture.py bundle/ReyondBroom-Windows-x64
-          python scripts/test-viewport-create.py bundle/ReyondBroom-Windows-x64 qa/viewport-create
-          if ($LASTEXITCODE) { throw 'Viewport Create / Save acceptance failed' }
-      - name: Verify engine launch and viewport colors with real Windows input
-        run: python scripts/test-engine-viewport.py bundle/ReyondBroom-Windows-x64 qa/engine-viewport
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: compilation-Windows-x64
-          path: |
-            qa
-            deps/profile-core/Testing/Temporary/LastTest.log
+      if: fromJSON(needs.plan.outputs.plan).flags.audio_core
+    - name: Check changed Windows audio DSP
+      if: fromJSON(needs.plan.outputs.plan).flags.audio_core
+      shell: msys2 {0}
+      run: |
+        scripts/test-audio-core.sh "$PWD/qa/audio-core" "$(cygpath -m "$PWD/tools/audio/ffmpeg.exe")"
+        cp tools/audio/ffmpeg.exe bundle/ReyondBroom-Windows-x64/tools/audio/ffmpeg.exe
+    - name: Reimport changed plant core exports
+      if: fromJSON(needs.plan.outputs.plan).flags.plant_core
+      run: python scripts/test-plant-exports.py qa/plants/core
+    - name: Stage current release assets in the source runtime
+      run: python scripts/ci-stage-assets.py bundle/ReyondBroom-Windows-x64
+    - name: Short native startup of the rebuilt module
+      run: python scripts/ci-startup-smoke.py bundle/ReyondBroom-Windows-x64 qa/startup
+    - name: Run affected subsystem checks
+      shell: pwsh
+      run: |
+        python scripts/ci-run-checks.py --plan ci-plan.json --runtime bundle/ReyondBroom-Windows-x64 --output qa/affected --probe deps/profile-core/compilation-profile-probe.exe --platform Windows-x64
+        if ($LASTEXITCODE) { throw 'Affected acceptance failed' }
+    - name: Collect compact affected evidence
+      if: always()
+      run: |-
+        python -c "import os,pathlib; p=pathlib.Path('qa'); p.mkdir(exist_ok=True); (p/'planned-scope.json').write_text(os.environ['CI_PLAN'])"
+        python scripts/collect-release-qa.py --qa qa --release unused-release --output qa-artifact
+      env:
+        CI_PLAN: ${{ needs.plan.outputs.plan }}
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: compilation-Windows-x64
+        path: qa-artifact/
+        retention-days: 7
+    needs: plan

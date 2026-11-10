@@ -145,6 +145,7 @@ class RunnerTests(unittest.TestCase):
     def run_plan(self, paths, full=False, fail=False):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); plan = root/'plan.json'; plan.write_text(json.dumps(planner.plan(paths, full=full)))
+            (root/'runtime').mkdir()
             argv = ['checks', '--plan', str(plan), '--runtime', str(root/'runtime'), '--output', str(root/'qa'),
                     '--probe', str(root/'probe'), '--platform', 'Linux-x64']
             with patch.object(sys, 'argv', argv), patch.object(runner.subprocess, 'run') as calls:
@@ -167,6 +168,25 @@ class RunnerTests(unittest.TestCase):
     def test_infrastructure_runs_no_editor_and_failure_stops_immediately(self):
         self.assertEqual(self.run_plan(['scripts/ci-plan.py']), [])
         self.assertEqual(len(self.run_plan(['native/ftebroom_run.h'], fail=True)), 1)
+
+    def test_suites_cannot_inherit_each_others_runtime_settings(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); runtime = root/'runtime'; runtime.mkdir()
+            settings = runtime/'settings.cfg'; settings.write_text('pristine')
+            plan = root/'plan.json'
+            plan.write_text(json.dumps(planner.plan(['native/ftebroom_run.h'])))
+            argv = ['checks', '--plan', str(plan), '--runtime', str(runtime),
+                    '--output', str(root/'qa'), '--probe', str(root/'probe'), '--platform', 'Linux-x64']
+            def mutate_private_runtime(command, **kwargs):
+                script = next(i for i, arg in enumerate(command) if str(arg).startswith(str(REPO/'scripts')))
+                private_settings = Path(command[script+1])/'settings.cfg'
+                self.assertNotEqual(private_settings, settings)
+                self.assertEqual(private_settings.read_text(), 'pristine')
+                private_settings.write_text('state left by an earlier suite')
+            with patch.object(sys, 'argv', argv), patch.object(runner.subprocess, 'run', side_effect=mutate_private_runtime) as calls:
+                runner.main()
+                self.assertGreater(calls.call_count, 1)
+            self.assertEqual(settings.read_text(), 'pristine')
 
 
 class PackageGateTests(unittest.TestCase):

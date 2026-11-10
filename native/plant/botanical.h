@@ -416,16 +416,17 @@ struct Botanical : Generator {
         if(realistic())reach*=(.65+.35*member.stature)*r.range(.69,1.27);
         double angle=p.branchAngle*pi/180;
         double top=p.crown==4?.88+u*.08:p.crown==3?.84+u*.10:std::min(1.02,t+reach/height*std::cos(angle)*.55);
-        double lateral=reach*std::sin(angle);
+        V end=add(member.offset,{std::cos(az)*reach*std::sin(angle)*member.crownX,
+          std::sin(az)*reach*std::sin(angle)*member.crownY,0.});
         if(column){
           const double shoulder=.57+.43*std::min(1.,u/.22);
           const double taper=1.-.80*std::pow(u,2.15);
-          lateral=height*p.spread*shoulder*taper*r.range(.78,1.08);
+          const double lateral=height*p.spread*shoulder*taper*r.range(.78,1.08);
           const double rise=lateral/height*std::clamp(std::cos(angle)/std::max(.1,std::sin(angle)),.25,2.45);
           top=std::min(1.00,t+rise);
+          end=add(member.offset,{std::cos(az)*lateral*member.crownX,
+            std::sin(az)*lateral*member.crownY,0.});
         }
-        V end=add(member.offset,{std::cos(az)*lateral*member.crownX,
-          std::sin(az)*lateral*member.crownY,0.});
         end[2]=height*member.stature*(p.crownBase+(top-p.crownBase)*p.crownAspect)+member.offset[2];
         end=add(end,mul(member.lean,t*t*.66));
         planBranch(treeTrunk(t,member),end,radius*.38*(1-t*.65),0,mix(stem+7,i+100),trunkJunction(t,member,trunkRadius,trunkTip));

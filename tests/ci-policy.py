@@ -75,6 +75,8 @@ class ScopeTests(unittest.TestCase):
                     changed = planner.changed_paths(base, 'HEAD')
                     self.assertEqual(set(changed), {'native/ftebroom_run.h', 'native/ftebroom_audio.h'})
                     self.assertTrue(planner.plan(changed)['flags']['audio_core'])
+                    self.assertEqual(planner.changed_paths('HEAD', base), [])
+                    self.assertEqual(set(planner.changed_paths('HEAD', base, release=True)), set(changed))
                     with self.assertRaises(subprocess.CalledProcessError): planner.changed_paths('missing-ref', 'HEAD')
                 finally: os.chdir(REPO)
 

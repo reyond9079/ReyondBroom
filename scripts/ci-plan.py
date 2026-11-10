@@ -115,10 +115,12 @@ def plan(paths, full=False, release=False):
             'flags': {name: name in suites or name in selected for name in sorted(SUITES | DEPENDENCIES.keys())}}
 
 
-def changed_paths(base, head):
+def changed_paths(base, head, release=False):
     # --no-renames includes BOTH removed and added paths, including renames
-    # across subsystems. Triple-dot is required for pull requests.
-    body = subprocess.check_output(['git', 'diff', '--no-renames', '--name-only', '-z', base+'...'+head], stderr=subprocess.PIPE)
+    # across subsystems. PRs use their merge base; releases compare actual trees
+    # so a rollback to an older ancestor cannot look like an empty change.
+    comparison = base+('..' if release else '...')+head
+    body = subprocess.check_output(['git', 'diff', '--no-renames', '--name-only', '-z', comparison], stderr=subprocess.PIPE)
     return [os.fsdecode(p) for p in body.split(b'\0') if p]
 
 
@@ -133,7 +135,7 @@ def main():
     a = p.parse_args()
     if a.files is None and not a.base:
         p.error('--base or --files is required; a missing base must not mean no changes')
-    result = plan(a.files if a.files is not None else changed_paths(a.base, a.head), a.full, a.release)
+    result = plan(a.files if a.files is not None else changed_paths(a.base, a.head, a.release), a.full, a.release)
     text = json.dumps(result, sort_keys=True)
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)

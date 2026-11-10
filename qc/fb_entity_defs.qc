@@ -19,7 +19,12 @@ void fb_entity_definitions_load()
     string line;while((line=fgets(stream))) {
         int count=fb_entity_tokenize(line);
         if(count==3 && argv(0)=="kind"){fb_entity_kinds[argv(1)]=stoi(argv(2))+1i;continue;}
-        if(count==4 && argv(0)=="property"){fb_entity_defaults[strcat(argv(1),"/",argv(2))]=argv(3);continue;}
+        if(count==4 && argv(0)=="property"){
+            // Definitions without a default still appear in the native inspector.
+            // Do not instantiate their empty values as MAP keys.
+            if(argv(3)!="")fb_entity_defaults[strcat(argv(1),"/",argv(2))]=argv(3);
+            continue;
+        }
         if(count==7 && argv(0)=="modelrule"&&fb_entity_definition_count>0){
             fb_entity_definition_t *owner=&fb_entity_definitions[fb_entity_definition_count-1];if(owner->classname!=argv(1))continue;
             if(fb_definition_rule_count==fb_definition_rule_capacity){fb_definition_rule_capacity=max(32,fb_definition_rule_capacity*2);fb_definition_rule_t *grown=memalloc(fb_definition_rule_capacity*sizeof(fb_definition_rule_t));memcpy(grown,fb_definition_rules,fb_definition_rule_count*sizeof(fb_definition_rule_t));memfree(fb_definition_rules);fb_definition_rules=grown;}

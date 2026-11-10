@@ -36,11 +36,11 @@ shutil.copytree(original, root, ignore=shutil.ignore_patterns('updates', 'downlo
 windows = os.name == 'nt'
 engine = root/('bin/fteqw64.exe' if windows else 'fteqw-gl64')
 module = root/('fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so')
-# Keep the deployed mod underneath the working directory to verify that
-# literal cleanup cannot remove the deployed files with the same names.
+# Like the customer setup, the deployed mod is outside the working directory.
+# The reference Delete task also removes matching files under that directory.
 source_dir = out/'External source maps'
 source_dir.mkdir()
-fixture = source_dir/'Game resources'
+fixture = out/'Game resources'
 subprocess.run([sys.executable, str(repo/'tests/make-quake1-fixture.py'), str(fixture)], cwd=repo, check=True)
 mod = fixture/'AD19b5'
 (mod/'textures').mkdir(parents=True)
@@ -241,6 +241,10 @@ try:
     ui.console('ftebroom_test_run 50')
     wait(lambda:live()['compileOpen'] and 'compile' in live()['widgets'])
     original_source = mapfile.read_bytes()
+    nested = source_dir/'nested'
+    nested.mkdir()
+    for suffix in ('.bsp', '.lit'):
+        (nested/(mapfile.stem+suffix)).write_bytes(b'old intermediate')
     click_compile('compile')
     wait(lambda:live()['running'] or live()['error'] or 'Completed successfully.' in live()['log'])
     wait(lambda:not live()['running'], 180)
@@ -286,6 +290,7 @@ try:
     check(mapfile.read_bytes() == original_source and
           all(not (source_dir/name).exists() for name in cleanup_names),
           'customer_cleanup_removes_every_explicit_target_and_preserves_original_map')
+    check(not any(nested.iterdir()), 'literal_bsp_and_lit_cleanup_matches_nested_files_like_trenchbroom')
     # ericw releases differ in log naming. Never make the editor delete files
     # the imported profile did not name (v0.18.1 uses light.log and vis.log).
     (out/'cleanup-evidence.json').write_text(json.dumps({'configured_targets':cleanup_names,
@@ -345,9 +350,8 @@ try:
     ImageGrab.grab().save(out/'fresh-map-immediate-compile.png')
     click_compile('close')
 
-    # The customer's profile requests a LIT copy even on a grayscale map.
-    # A second build without a light source must preserve the good
-    # deployment and leave the failing intermediate files for inspection.
+    # The imported profile does not pass -lit. ericw only writes the
+    # sidecar automatically when the map actually uses colored lighting.
     gray_map = source_dir/'required_gray_lit.map'
     gray_scene = scene.replace('"_color" "1 0.2 0.1"\n', '').replace('"classname" "worldspawn"',
         '"classname" "worldspawn"\n"_tb_mod" "AD19b5"', 1)
@@ -371,22 +375,21 @@ try:
     gray_log = compile_gray()
     (out/'grayscale-compiler.log').write_text(gray_log)
     gray_bsp, gray_lit = (mod/'maps'/('required_gray_lit'+ext) for ext in ('.bsp','.lit'))
-    gray_hashes = (sha(gray_bsp),sha(gray_lit))
-    payload = gray_lit.read_bytes()[8:]
-    check('Enabled -lit for the requested copy' in gray_log and 'Completed successfully.' in gray_log
-          and len(payload)>100 and max(payload)>0
-          and payload[::3] == payload[1::3] == payload[2::3],
-          'required_grayscale_sidecar_is_generated_and_survives_nested_cleanup')
+    def light_size(path):
+        return struct.unpack_from('<II', path.read_bytes(), 4+8*8)[1]
+
+    check('Enabled -lit' not in gray_log and 'Completed successfully.' in gray_log
+          and "no source files matched" in gray_log and light_size(gray_bsp)>100 and not gray_lit.exists(),
+          'grayscale_build_respects_light_argv_and_missing_copy_matches')
     light_entity = '{\n"classname" "light"\n"origin" "0 0 192"\n"light" "500"\n}\n'
     assert light_entity in gray_map.read_text()
     gray_map.write_text(gray_map.read_text().replace(light_entity, '',1))
     zero_log = compile_gray()
     (out/'empty-lighting-compiler.log').write_text(zero_log)
-    check('LIGHT produced no Quake BSP light samples' in zero_log
-          and 'Completed successfully.' not in zero_log and '#### Copying to' not in zero_log
-          and (sha(gray_bsp),sha(gray_lit)) == gray_hashes
-          and (source_dir/'required_gray_lit-compile.map').is_file(),
-          'zero_light_samples_are_reported_before_copy_or_cleanup')
+    check('Completed successfully.' in zero_log and '#### Copying to' in zero_log
+          and light_size(gray_bsp)==0 and not gray_lit.exists()
+          and not (source_dir/'required_gray_lit-compile.map').exists(),
+          'successful_light_tool_with_zero_samples_still_runs_copy_and_cleanup')
 
     ui.console('set ftebroom_placement_qa 1')
     ui.console('set ftebroom_tool 0')

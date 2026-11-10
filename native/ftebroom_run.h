@@ -386,45 +386,6 @@ static void runExportTrenchSnapshot(const RunTask& task,const std::filesystem::p
   text=ftebroom::profile::exportEntities(text,task.stripTbProperties,task.stripEntityPattern,entity);
   std::filesystem::create_directories(target.parent_path());buildWriteTexture(target,text);
 }
-// An exact later Copy Files task is an explicit request for this Quake LIT.
-// Keep custom tools, other game formats and explicitly different outputs intact.
-static std::filesystem::path runQuakeLitBsp(const RunTask& tool,const std::vector<std::string>& arguments)
-{
-  if(runActiveGame!="quake1" || tool.kind!=1 || arguments.empty())return {};
-  auto executable=ftebroom::profile::parsePath(runExpand(tool.source)).stem().u8string();
-  if(!runGlobMatch("light",executable))return {};
-  for(const auto& arg:arguments)
-    if(arg=="-onlyents" || arg=="-nolighting" || arg=="-litonly" || arg=="-lit2" ||
-       arg=="-bspxonly" || arg=="-bspx" || arg=="-bspxlit" || arg=="-bspxhdr" || arg=="-novanilla")return {};
-  auto bsp=runFilePath(arguments.back());
-  if(!runGlobMatch(".bsp",bsp.extension().u8string()))return {};
-  auto lit=bsp;lit.replace_extension(".lit");
-  for(size_t i=runStep+1;i<runningProfile.tasks.size();++i){
-    const auto& task=runningProfile.tasks[i];
-    if(!task.enabled || task.kind!=2)continue;
-    auto source=runFilePath(runExpand(task.source));
-    if(source.filename().u8string().find_first_of("*?")==std::string::npos && runSameFile(source,lit))return bsp;
-  }
-  return {};
-}
-static void runCheckQuakeLit(bool toolFailed)
-{
-  if(!runStrict || runActiveGame!="quake1")return;
-  const auto& task=runningProfile.tasks[runStep];
-  auto bsp=runQuakeLitBsp(task,ftebroom::profile::parseArguments(runExpand(task.destination)));
-  if(bsp.empty())return;
-  auto lit=bsp;lit.replace_extension(".lit");
-  if(toolFailed)throw std::runtime_error("LIGHT failed before the required .lit could be deployed: "+lit.u8string());
-  std::ifstream bspFile(bsp,std::ios::binary),litFile(lit,std::ios::binary);
-  std::string bspHeader(124,'\0');
-  char litHeader[8]{};
-  constexpr size_t quakeLightingLength = 4 + 8*8 + 4;
-  if(!bspFile.read(bspHeader.data(),bspHeader.size()) || !ftebroom::quake1::word(bspHeader,quakeLightingLength))
-    throw std::runtime_error("LIGHT produced no Quake BSP light samples for "+bsp.u8string()+". Check light brightness, placement and the LIGHT options before deploying.");
-  if(!litFile.read(litHeader,sizeof litHeader) || std::string(litHeader,4)!="QLIT" || litFile.peek()==std::char_traits<char>::eof())
-    throw std::runtime_error("LIGHT did not create a usable .lit file: "+lit.u8string());
-  runAppend("#### Verified baked BSP lighting and .lit: "+lit.u8string()+"\n");
-}
 static void runTrenchTask(){
   const auto& task=runningProfile.tasks[runStep];
   if(task.kind==5){
@@ -434,13 +395,16 @@ static void runTrenchTask(){
       auto e=std::find_if(engines.begin(),engines.end(),[&](const auto& p){return p.id==task.engineProfileId;});
       if(e==engines.end())throw std::runtime_error("Engine profile '"+task.engineProfileId+"' was not found");
       runAppend("#### Launching engine profile '"+e->name+"' at '"+e->path+"'\n");
-      if(runTesting){ftebroom::profile::interpolate(e->path,activeTypedVariables);ftebroom::profile::parseArguments(ftebroom::profile::interpolate(e->parameters,activeTypedVariables));++runStep;return;}
-      auto vars=activeTypedVariables;
-      // Compilation launch uses the frozen document/workdir, including WORK_DIR_PATH.
+      if(runTesting){++runStep;return;}
+      // TrenchBroom launch profiles use the common variables, without compiler
+      // context. Editor engine profiles with explicit staging/workdir use it.
+      const auto& vars=e->work.empty()&&e->mapFile.empty()?activeLaunchVariables:activeTypedVariables;
       auto plan=ftebroom::engineLaunchPlan(*e,vars,runApplicationDirectory());
       runAppend("#### Engine command: "+plan.executable.u8string()+" "+plan.arguments+"\n#### Engine working directory: "+plan.working.u8string()+"\n");
       if(!plan.target.empty())runAppend("#### Map: "+plan.source.u8string()+" -> "+plan.target.u8string()+"\n");
-      if(!runTesting){ftebroom::stageEngineMap(plan);runStartProcess(plan.executable.u8string(),plan.arguments,plan.working,true);runAppend("#### Engine process started (BSP compilation and game startup are separate results).\n");}
+      ftebroom::stageEngineMap(plan);
+      runStartProcess(plan.executable.u8string(),plan.arguments,plan.working,true);
+      runAppend("#### Engine process started (BSP compilation and game startup are separate results).\n");
     }catch(const std::exception& e){runAppend("#### Launch failed: "+std::string(e.what())+"\n");if(!(task.flags&RunAllowLaunchFailure))throw;runAppend("#### Continuing despite launch failure\n");}
     ++runStep;return;
   }
@@ -453,27 +417,11 @@ static void runTrenchTask(){
     cvars->SetFloat("ftebroom_export_status",0);command("ftebroom_export_map\n");runExportWaiting=true;return;
   }
   if(task.kind==1){
-    const auto arguments=ftebroom::profile::parseArguments(destination);
-    auto bsp=runQuakeLitBsp(task,arguments);
-    if(!bsp.empty() && std::find(arguments.begin(),arguments.end(),"-lit")==arguments.end()){
-      auto lit=bsp;lit.replace_extension(".lit");
-      destination="-lit "+destination;
-      runAppend("#### Enabled -lit for the requested copy: "+lit.u8string()+"\n");
-    }
     runAppend("#### Executing '"+source+" "+destination+"'\n");
     if(runTesting){++runStep;return;}
     runStartProcess(source,destination,working);return;
   }
-  auto input=ftebroom::profile::parsePath(source);
-  if(input.is_relative())input=working/input;
-  const auto filename=input.filename().u8string(),extension=input.extension().u8string();
-  // An exact cleanup of a Quake build output targets its working copy only.
-  // A recursive filename match can also find a deployed copy below working.
-  const bool exactOutputCleanup=runActiveGame=="quake1" && task.kind==4 && filename.find_first_of("*?")==std::string::npos &&
-    (runGlobMatch(".bsp",extension)||runGlobMatch(".lit",extension));
-  auto plan=exactOutputCleanup?ftebroom::profile::FilePlan{4,{},{}}
-    :ftebroom::profile::planFiles(task.kind,source,destination,working);
-  if(exactOutputCleanup && std::filesystem::is_regular_file(input))plan.sources.push_back(input);
+  auto plan=ftebroom::profile::planFiles(task.kind,source,destination,working);
   runAppend(task.kind==2?"#### Copying to '"+plan.target.u8string()+"/': ":task.kind==3?"#### Renaming to '"+plan.target.u8string()+"': ":"#### Deleting: ");
   for(const auto& p:plan.sources)runAppend(p.u8string()+", ");
   if(task.kind==2 && plan.sources.empty())runAppend("no source files matched '"+source+"'");
@@ -518,10 +466,8 @@ static void runTick()
         // Match the reference process status mapping, including breakpoint /
         // guard-page exceptions and its reserved forced-termination code.
         if(code==0xf291UL||(code>=0x80000000UL&&code<0xD0000000UL)||!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error(message);
-        runCheckQuakeLit(true);
         runAppend(message+"; continuing as configured.\n");
       }
-      if(!code)runCheckQuakeLit(false);
       if(runStageHook)runStageHook();
       ++runStep;
     }
@@ -532,9 +478,8 @@ static void runTick()
       if(!WIFEXITED(status)||WEXITSTATUS(status)){
         if(!WIFEXITED(status))throw std::runtime_error("Tool crashed with signal "+std::to_string(WTERMSIG(status)));
         if(!(runningProfile.tasks[runStep].flags&RunAllowNonzero))throw std::runtime_error("Tool exited with code "+std::to_string(WEXITSTATUS(status)));
-        runCheckQuakeLit(true);
         runAppend("Tool exited with code "+std::to_string(WEXITSTATUS(status))+"; continuing as configured.\n");
-      }else runCheckQuakeLit(false);
+      }
       if(runStageHook)runStageHook();++runStep;}
 #endif
     if(runExportWaiting)

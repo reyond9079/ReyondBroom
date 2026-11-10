@@ -160,6 +160,8 @@ class RunnerTests(unittest.TestCase):
         for name in ('test-compilation-runtime.py', '--targeted', 'test-engine-cleanup.py',
                      'test-compilation-paths.py', 'test-mod-profile-lighting.py', 'test-compilation-ui.py'):
             self.assertIn(name, text)
+        runtime_check = next(command for command in calls if any(arg.endswith('test-compilation-runtime.py') for arg in command))
+        self.assertEqual(Path(runtime_check[runtime_check.index('--probe') + 1]).name, 'probe')
         self.assertNotIn('plant', text); self.assertNotIn('viewport-create', text)
 
     def test_infrastructure_runs_no_editor_and_failure_stops_immediately(self):

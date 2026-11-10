@@ -12,12 +12,18 @@ import sys
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime', type=Path)
 p.add_argument('output', type=Path)
+p.add_argument('--probe', type=Path, help='Built compilation-profile-probe executable')
 p.add_argument('--targeted', action='store_true', help='Profile behavior/migration/compiler checks without navigation or UI atlas')
 a = p.parse_args()
 repo = Path(__file__).resolve().parents[1]
 root, out = a.runtime.resolve(), a.output.resolve()
 out.mkdir(parents=True, exist_ok=True)
 data = root/'ftebroom'
+probe = root/'tools'/('compilation-profile-probe.exe' if os.name == 'nt' else 'compilation-profile-probe')
+if a.probe is not None and a.probe.resolve() != probe.resolve():
+    shutil.copy2(a.probe, probe)
+if not probe.is_file():
+    p.error('Pass --probe with the built compilation-profile-probe executable')
 for name in ['run.cfg', 'trenchbroom-native.cfg', 'trenchbroom-restore.cfg', 'compilation-parity-native.cfg', 'context-navigation-native.cfg']:
     shutil.copy2(repo/'tests'/name, data/name)
 shutil.copy2(repo/'tests/fixtures/CompilationProfiles-original.cfg', data/'CompilationProfiles-regression.cfg')

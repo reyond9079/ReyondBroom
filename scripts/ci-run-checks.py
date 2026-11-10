@@ -29,7 +29,7 @@ def main():
         completed.append({'suite': suite, 'script': script})
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
     if 'compilation' in suites:
-        run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles',
+        run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))
         run('compilation', 'scripts/test-engine-cleanup.py', root, out/'engine-cleanup', '--probe', a.probe.resolve())
         run('compilation', 'scripts/test-compilation-paths.py', root, out/'compilation-paths', '--probe', a.probe.resolve())

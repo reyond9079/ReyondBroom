@@ -7,12 +7,17 @@ inline const Json& catalogManifest() {
   static const auto manifest=Json::parse(botanicalCatalog);
   return manifest;
 }
+inline int latestGenerator(Family family) {
+  const auto& catalog=catalogManifest();
+  return catalog.at(family==Family::Broadleaf||family==Family::Conifer?"treeGeneratorVersion":"generatorVersion");
+}
 inline std::vector<Project> presets() {
   static const auto library=[](){
     std::vector<Project> out;
     for(const auto& entry:catalogManifest().at("presets")) {
-      Project d;d.generator=catalogManifest().at("generatorVersion");d.preset=d.species=entry.at("id").get<std::string>();
+      Project d;d.preset=d.species=entry.at("id").get<std::string>();
       d.name=entry.at("name");d.family=Family(entry.at("family").get<int>());
+      d.generator=latestGenerator(d.family);
       d.smoothJunctions=d.generator>=4&&(d.family==Family::Broadleaf||d.family==Family::Conifer);
       d.stableLods=d.smoothJunctions||(d.generator>=4&&d.family==Family::Grass);
       d.tags=entry.at("tags").get<std::vector<std::string>>();d.nodes=defaultNodes();
@@ -30,7 +35,7 @@ inline Project upgradeGenerator(Project d) {
   auto library=presets();auto it=std::find_if(library.begin(),library.end(),[&](auto& p){return p.preset==d.preset;});
   auto defaults=parameters(it==library.end()?Params{}:it->p),values=serialize(d);
   if(d.generator==1)for(auto key:{"crown","phyllotaxy","organ","barkPattern","needleForm","evergreen","leaflets","clusterLeaves","crownBase","crownAspect","crownFill","petiole","serration"})values["parameters"][key]=defaults.at(key);
-  values["generatorVersion"]=catalogManifest().at("generatorVersion");
+  values["generatorVersion"]=latestGenerator(d.family);
   if(d.generator==1&&it!=library.end())values["tags"]=it->tags;
   return deserialize(values);
 }

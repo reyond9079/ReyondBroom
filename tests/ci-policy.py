@@ -146,6 +146,7 @@ class RunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); plan = root/'plan.json'; plan.write_text(json.dumps(planner.plan(paths, full=full)))
             (root/'runtime').mkdir()
+            (root/'probe').write_bytes(b'process probe')
             argv = ['checks', '--plan', str(plan), '--runtime', str(root/'runtime'), '--output', str(root/'qa'),
                     '--probe', str(root/'probe'), '--platform', 'Linux-x64']
             with patch.object(sys, 'argv', argv), patch.object(runner.subprocess, 'run') as calls:
@@ -173,15 +174,21 @@ class RunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); runtime = root/'runtime'; runtime.mkdir()
             settings = runtime/'settings.cfg'; settings.write_text('pristine')
+            (root/'probe').write_bytes(b'process probe')
             plan = root/'plan.json'
             plan.write_text(json.dumps(planner.plan(['native/ftebroom_run.h'])))
             argv = ['checks', '--plan', str(plan), '--runtime', str(runtime),
                     '--output', str(root/'qa'), '--probe', str(root/'probe'), '--platform', 'Linux-x64']
             def mutate_private_runtime(command, **kwargs):
+                if any(arg.endswith('make-linux-build-fixture.py') for arg in command):
+                    (runtime/'fixture.cfg').write_text('prepared')
+                    return
                 script = next(i for i, arg in enumerate(command) if str(arg).startswith(str(REPO/'scripts')))
                 private_settings = Path(command[script+1])/'settings.cfg'
                 self.assertNotEqual(private_settings, settings)
                 self.assertEqual(private_settings.read_text(), 'pristine')
+                self.assertEqual(private_settings.with_name('fixture.cfg').read_text(), 'prepared')
+                self.assertEqual((private_settings.parent/'tools/compilation-profile-probe').read_bytes(), b'process probe')
                 private_settings.write_text('state left by an earlier suite')
             with patch.object(sys, 'argv', argv), patch.object(runner.subprocess, 'run', side_effect=mutate_private_runtime) as calls:
                 runner.main()

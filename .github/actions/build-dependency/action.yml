@@ -1,0 +1,71 @@
+name: Build or restore an exact dependency
+description: Reuse compiled outputs only with matching sources, toolchain, platform and recipe
+outputs:
+  reused:
+    description: Whether a verified exact cache avoided the build
+    value: ${{ steps.verify.outputs.valid }}
+inputs:
+  component:
+    required: true
+    description: bullet, profile or audio
+  source:
+    required: true
+    description: Immutable source directory (audio uses its verified tarball)
+  destination:
+    required: true
+    description: Dedicated build output directory
+  platform:
+    required: true
+    description: Full target platform
+  shell:
+    default: bash
+    description: bash on Linux, msys2 {0} on Windows
+runs:
+  using: composite
+  steps:
+    - id: key
+      shell: ${{ inputs.shell }}
+      env:
+        COMPONENT: ${{ inputs.component }}
+        SOURCE: ${{ inputs.source }}
+        DESTINATION: ${{ inputs.destination }}
+        PLATFORM: ${{ inputs.platform }}
+      run: python scripts/ci-dependency.py key --component "$COMPONENT" --source "$SOURCE" --destination "$DESTINATION" --platform "$PLATFORM"
+    - id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ inputs.destination }}
+        key: ${{ steps.key.outputs.key }}
+        # No restore-keys: compiled dependencies cannot use a partial match.
+    - id: verify
+      shell: ${{ inputs.shell }}
+      env:
+        COMPONENT: ${{ inputs.component }}
+        SOURCE: ${{ inputs.source }}
+        DESTINATION: ${{ inputs.destination }}
+        PLATFORM: ${{ inputs.platform }}
+        CACHE_KEY: ${{ steps.key.outputs.key }}
+      run: python scripts/ci-dependency.py verify --component "$COMPONENT" --source "$SOURCE" --destination "$DESTINATION" --platform "$PLATFORM" --key "$CACHE_KEY"
+    - if: steps.verify.outputs.valid != 'true'
+      shell: ${{ inputs.shell }}
+      env:
+        COMPONENT: ${{ inputs.component }}
+        SOURCE: ${{ inputs.source }}
+        DESTINATION: ${{ inputs.destination }}
+        PLATFORM: ${{ inputs.platform }}
+        CACHE_KEY: ${{ steps.key.outputs.key }}
+      run: python scripts/ci-dependency.py build --component "$COMPONENT" --source "$SOURCE" --destination "$DESTINATION" --platform "$PLATFORM" --key "$CACHE_KEY"
+    - if: inputs.component == 'audio'
+      shell: ${{ inputs.shell }}
+      env:
+        COMPONENT: ${{ inputs.component }}
+        SOURCE: ${{ inputs.source }}
+        DESTINATION: ${{ inputs.destination }}
+        PLATFORM: ${{ inputs.platform }}
+        CACHE_KEY: ${{ steps.key.outputs.key }}
+      run: python scripts/ci-dependency.py install --component "$COMPONENT" --source "$SOURCE" --destination "$DESTINATION" --platform "$PLATFORM" --key "$CACHE_KEY"
+    - if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ inputs.destination }}
+        key: ${{ steps.key.outputs.key }}

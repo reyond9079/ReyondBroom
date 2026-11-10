@@ -1,0 +1,82 @@
+name: RB-20 Windows Plant Brush diagnostic
+on:
+  push:
+    branches: [qa/rb20-plant-brush-diagnostics]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-evidence:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Compare failed drag maps
+        run: |
+          for id in 13744612183 13751128979; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$id.zip"
+          done
+          python - <<'PY'
+          import json, re, zipfile
+          from pathlib import Path
+          for path in Path('.').glob('*.zip'):
+              with zipfile.ZipFile(path) as z:
+                  base='qa/rb10/plant-brush/'
+                  for filename in ('plant-brush-undo-erase-filter.map','plant-brush-paint-drag.map'):
+                      data=z.read(base+filename).decode(errors='replace')
+                      for item in re.findall(r'\{([^{}]*)\}', data):
+                          row=dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"', item))
+                          if row.get('model','').startswith('models/reyond-plugins/plant-'):
+                              print(path, filename, row.get('origin'), row['model'])
+                  state=json.loads(z.read(base+'failure-state.json'))
+                  print(path, 'brush and viewport',state.get('plantBrush'),state.get('views'))
+          PY
+  windows-comparison:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RB_QA_RENDERER: gl rb_qa_opengl.dll
+      GALLIUM_DRIVER: llvmpipe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 8bcc2cc5aea4d7a806273d9c213f3822a3f82b2a
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download and verify staged Windows runtime and baseline
+        shell: pwsh
+        run: |
+          foreach ($v in @('143','144')) {
+            $dir = "build-$v"
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            $name = "ReyondBroom-0.5.0-alpha.$v-Windows-x64.zip"
+            gh release download "v0.5.0-alpha.$v" --repo $env:GITHUB_REPOSITORY --dir $dir --pattern $name --pattern "$name.sha256"
+            if ($LASTEXITCODE) { throw 'Runtime download failed' }
+            $expected = (Get-Content "$dir/$name.sha256") -split '\s+' | Select-Object -First 1
+            if ((Get-FileHash "$dir/$name" -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Runtime checksum mismatch' }
+            Expand-Archive "$dir/$name" "$dir/payload"
+          }
+          python -m pip install Pillow pywinauto
+          if ($LASTEXITCODE) { throw 'QA dependencies failed' }
+      - name: Compare the same pointer scenario on both runtimes
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($v in @('143','144')) {
+            $exe = Get-ChildItem "build-$v/payload" -Filter 'fteqw64.exe' -Recurse | Select-Object -First 1
+            $root = $exe.Directory.Parent.FullName
+            python tests/make-linux-build-fixture.py $root
+            if ($LASTEXITCODE) { throw 'Editor fixture failed' }
+            python scripts/test-plant-brush.py $root "qa/$v/plant-brush"
+            $testCode = $LASTEXITCODE
+            Write-Output "Plant Brush alpha.$v exit code: $testCode"
+            if ($testCode -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rb20-windows-compare
+          path: qa/

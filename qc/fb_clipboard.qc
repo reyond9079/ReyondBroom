@@ -199,8 +199,10 @@ int fb_clip_insert(vector delta)
     if(success) fb_tx_commit();else {fb_tx_cancel();fb_map_error="Could not insert complete clipboard";}
     memfree(entities);memfree(models);memfree(identities);return success;
 }
+#include "fb_world_architect.qc"
 float fb_clip_command()
 {
+    if(argv(0)=="ftebroom_world_apply"){fb_world_architect_apply();return TRUE;}
     if(argv(0)=="ftebroom_copy_file") {
         int cut=stoi(argv(1));
         if(fb_clip_export()) localcmd(strcat("ftebroom_clipboard_ready ",itos(cut && !fb_faces_count()),"\n"));

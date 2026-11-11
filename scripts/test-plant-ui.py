@@ -6,6 +6,7 @@ import os
 import re
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import time
 from PIL import Image,ImageGrab
@@ -23,6 +24,12 @@ for name in ['plant-placed','plant-undo','plant-redo','plant-reopened']:(data/'m
 (data/'plant-asset-qa.json').unlink(missing_ok=True)
 shutil.rmtree(data/'plant-qa-build',ignore_errors=True)
 (data/'plant-interaction.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\n'+'in 12 ftebroom_plant qa dark\n')
+if a.export_only:
+ # An original grayscale PCX supplies the explicit Quake II palette required
+ # by MD2 export even though this disposable editor opens in FTE/Q3 mode.
+ header=bytearray(128);header[:4]=bytes([10,5,1,8]);struct.pack_into('<4H',header,4,0,0,15,15);header[65]=1;struct.pack_into('<H',header,66,16)
+ (data/'pics').mkdir(exist_ok=True)
+ (data/'pics/colormap.pcx').write_bytes(bytes(header)+bytes([160]*256)+bytes([12])+b''.join(bytes([i,i,i]) for i in range(256)))
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 stream=(out/'editor.log').open('wb');process=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','plant-interaction.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})

@@ -68,7 +68,7 @@ struct Settings {
   std::vector<uint64_t> pinnedRegions;
   std::map<uint64_t,uint64_t> regionSeeds;
   std::vector<Influence> influences;
-  std::map<std::string,double> weights{{"loops",1},{"choice",1},{"variety",1},{"route",1},{"landmarks",1}};
+  std::map<std::string,double> weights{{"variety",1},{"route",1}};
 };
 struct WorldPlan {
   int schema=schemaVersion;uint64_t seed=0;int profile=2;std::string preset,theme,sourceRevision;
@@ -117,7 +117,7 @@ inline void validate(const Settings& s,const Registry& r){
   finite(s.player.radius,8,32,"Player radius must be 8..32");finite(s.player.height,32,80,"Player height must be 32..80");finite(s.player.step,4,18,"Player step must be 4..18");
   if(std::any_of(s.locked.begin(),s.locked.end(),[](bool b){return b;})||!s.pinnedRegions.empty())throw std::runtime_error("Stage / region locking is not yet supported by this development slice");
   if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
-  for(auto& [name,weight]:s.weights){safeToken(name);if(name!="loops"&&name!="choice"&&name!="variety"&&name!="route"&&name!="landmarks")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
+  for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
   std::set<uint64_t> ids;for(const auto& p:s.missionPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate mission pin");for(int a=0;a<3;a++)finite(p.position[a],-30000,30000,"Invalid mission pin");}
   ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}finite(p.width,96,512,"Invalid road width");if(al::length(p.a-p.b)<128)throw std::runtime_error("Road pin is too short");}
   for(const auto& mask:s.influences){for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing")throw std::runtime_error("Unknown influence type");}

@@ -5,7 +5,9 @@ void fb_world_architect_apply()
 {
     string request=strzone(argv(1));int epoch=stoi(argv(2)),profile=stoi(argv(3));
     string status="invalid";
-    if(request==itos(stoi(request)) && stoi(request)>0) {
+    int safe=strlen(request)>0 && strlen(request)<=24;
+    for(int i=0;i<strlen(request)&&safe;i++){int ch=str2chr(request,i);if(ch<48||ch>57)safe=FALSE;}
+    if(safe) {
         fb_tool_refresh();fb_document_tick();
         if(epoch!=cvar("ftebroom_map_instance") || profile!=cvar("ftebroom_game_profile"))status="stale";
         else {

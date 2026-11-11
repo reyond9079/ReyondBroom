@@ -22,6 +22,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
   "presets": [
     {
       "category": "tree",
+      "defaultHeightMetres": 24.0,
       "family": 0,
       "id": "oak",
       "name": "English oak",
@@ -63,6 +64,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 12.0,
       "family": 0,
       "id": "cork-oak",
       "name": "Cork oak",
@@ -104,6 +106,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 28.0,
       "family": 0,
       "id": "birch",
       "name": "Silver birch",
@@ -144,6 +147,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 25.5,
       "family": 0,
       "id": "paper-birch",
       "name": "Paper birch",
@@ -184,6 +188,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 21.0,
       "family": 0,
       "id": "maple",
       "name": "Field maple",
@@ -223,6 +228,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 5.0,
       "family": 0,
       "id": "japanese-maple",
       "name": "Japanese maple",
@@ -264,6 +270,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 24.5,
       "family": 0,
       "id": "willow",
       "name": "Weeping willow",
@@ -305,6 +312,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 26.5,
       "family": 0,
       "id": "white-willow",
       "name": "White willow",
@@ -345,6 +353,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 35.0,
       "family": 0,
       "id": "lombardy-poplar",
       "name": "Lombardy poplar",
@@ -390,6 +399,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 26.0,
       "family": 0,
       "id": "aspen",
       "name": "European aspen",
@@ -429,6 +439,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 28.5,
       "family": 0,
       "id": "beech",
       "name": "European beech",
@@ -468,6 +479,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 27.0,
       "family": 0,
       "id": "linden",
       "name": "Small-leaved lime",
@@ -513,6 +525,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 30.0,
       "family": 0,
       "id": "ash",
       "name": "European ash",
@@ -555,6 +568,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 30.0,
       "family": 0,
       "id": "elm",
       "name": "English elm",
@@ -594,6 +608,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 32.0,
       "family": 0,
       "id": "plane",
       "name": "London plane",
@@ -633,6 +648,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 25.0,
       "family": 0,
       "id": "horse-chestnut",
       "name": "Horse chestnut",
@@ -675,6 +691,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 24.0,
       "family": 0,
       "id": "walnut",
       "name": "Common walnut",
@@ -716,6 +733,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 24.0,
       "family": 0,
       "id": "alder",
       "name": "Black alder",
@@ -754,6 +772,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 10.0,
       "family": 0,
       "id": "rowan",
       "name": "Rowan",
@@ -794,6 +813,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 5.0,
       "family": 0,
       "id": "apple",
       "name": "Orchard apple",
@@ -835,6 +855,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 18.5,
       "family": 0,
       "id": "cherry",
       "name": "Wild cherry",
@@ -875,6 +896,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 19.5,
       "family": 0,
       "id": "magnolia",
       "name": "Southern magnolia",
@@ -917,6 +939,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 24.0,
       "family": 0,
       "id": "baobab",
       "name": "African baobab",
@@ -961,6 +984,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "tree",
+      "defaultHeightMetres": 10.0,
       "family": 0,
       "id": "umbrella-acacia",
       "name": "Umbrella thorn acacia",
@@ -1004,6 +1028,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 30.0,
       "family": 1,
       "id": "pine",
       "name": "Scots pine",
@@ -1044,6 +1069,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 27.5,
       "family": 1,
       "id": "maritime-pine",
       "name": "Maritime pine",
@@ -1084,6 +1110,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 29.0,
       "family": 1,
       "id": "stone-pine",
       "name": "Siberian stone pine",
@@ -1124,6 +1151,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 29.0,
       "family": 1,
       "id": "spruce",
       "name": "Norway spruce",
@@ -1165,6 +1193,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 24.5,
       "family": 1,
       "id": "blue-spruce",
       "name": "Blue spruce",
@@ -1206,6 +1235,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 32.0,
       "family": 1,
       "id": "fir",
       "name": "Silver fir",
@@ -1247,6 +1277,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 29.5,
       "family": 1,
       "id": "larch",
       "name": "European larch",
@@ -1287,6 +1318,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 26.5,
       "family": 1,
       "id": "cedar",
       "name": "Cedar of Lebanon",
@@ -1328,6 +1360,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 29.0,
       "family": 1,
       "id": "cypress",
       "name": "Mediterranean cypress",
@@ -1371,6 +1404,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 9.0,
       "family": 1,
       "id": "tree-juniper",
       "name": "Tree juniper",
@@ -1412,6 +1446,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 46.0,
       "family": 1,
       "id": "redwood",
       "name": "Coast redwood",
@@ -1452,6 +1487,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "conifer",
+      "defaultHeightMetres": 26.0,
       "family": 1,
       "id": "araucaria",
       "name": "Monkey puzzle tree",
@@ -1493,6 +1529,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.64,
       "family": 2,
       "id": "boxwood",
       "name": "Round boxwood",
@@ -1534,6 +1571,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 1.04,
       "family": 2,
       "id": "hedge",
       "name": "Clipped hornbeam hedge",
@@ -1576,6 +1614,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.82,
       "family": 2,
       "id": "wild-shrub",
       "name": "Wild hawthorn shrub",
@@ -1616,6 +1655,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.96,
       "family": 2,
       "id": "flowering-shrub",
       "name": "Flowering dog rose",
@@ -1664,6 +1704,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 1.2,
       "family": 2,
       "id": "lilac",
       "name": "Common lilac",
@@ -1717,6 +1758,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.82,
       "family": 2,
       "id": "hydrangea",
       "name": "Bigleaf hydrangea",
@@ -1763,6 +1805,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 1.1,
       "family": 2,
       "id": "rhododendron",
       "name": "Rhododendron",
@@ -1810,6 +1853,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.35,
       "family": 2,
       "id": "heather",
       "name": "Common heather",
@@ -1857,6 +1901,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 1.3,
       "family": 2,
       "id": "viburnum",
       "name": "Guelder rose",
@@ -1899,6 +1944,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.7,
       "family": 2,
       "id": "currant",
       "name": "Blackcurrant",
@@ -1940,6 +1986,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.65,
       "family": 2,
       "id": "gooseberry",
       "name": "Gooseberry",
@@ -1981,6 +2028,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.95,
       "family": 2,
       "id": "blackberry",
       "name": "Bramble blackberry",
@@ -2023,6 +2071,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.28,
       "family": 2,
       "id": "creeping-juniper",
       "name": "Creeping juniper",
@@ -2064,6 +2113,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "shrub",
+      "defaultHeightMetres": 0.88,
       "family": 2,
       "id": "barberry",
       "name": "Common barberry",
@@ -2105,6 +2155,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.38,
       "family": 3,
       "id": "meadow-grass",
       "name": "Meadow grass clump",
@@ -2136,6 +2187,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.12,
       "family": 3,
       "id": "lawn-grass",
       "name": "Low lawn grass",
@@ -2167,6 +2219,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.3,
       "family": 3,
       "id": "blue-fescue",
       "name": "Blue fescue",
@@ -2198,6 +2251,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.68,
       "family": 3,
       "id": "feather-grass",
       "name": "Feather grass",
@@ -2229,6 +2283,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 1.25,
       "family": 3,
       "id": "miscanthus",
       "name": "Chinese silver grass",
@@ -2260,6 +2315,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 1.65,
       "family": 3,
       "id": "pampas-grass",
       "name": "Pampas grass",
@@ -2291,6 +2347,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.48,
       "family": 3,
       "id": "sedge",
       "name": "Tufted sedge",
@@ -2322,6 +2379,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.75,
       "family": 3,
       "id": "hair-grass",
       "name": "Tufted hairgrass",
@@ -2353,6 +2411,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.65,
       "family": 3,
       "id": "foxtail-grass",
       "name": "Meadow foxtail",
@@ -2384,6 +2443,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.62,
       "family": 3,
       "id": "couch-grass",
       "name": "Couch grass",
@@ -2415,6 +2475,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 1.1,
       "family": 3,
       "id": "rye",
       "name": "Rye",
@@ -2446,6 +2507,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "grass",
+      "defaultHeightMetres": 0.56,
       "family": 3,
       "id": "dry-grass",
       "name": "Dry steppe tussock",
@@ -2477,6 +2539,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 0.65,
       "family": 4,
       "id": "bracken",
       "name": "Common bracken fern",
@@ -2508,6 +2571,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 1.0,
       "family": 4,
       "id": "ostrich-fern",
       "name": "Ostrich fern",
@@ -2539,6 +2603,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 0.75,
       "family": 4,
       "id": "wood-fern",
       "name": "Male wood fern",
@@ -2570,6 +2635,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 0.7,
       "family": 4,
       "id": "lady-fern",
       "name": "Lady fern",
@@ -2601,6 +2667,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 0.38,
       "family": 4,
       "id": "maidenhair",
       "name": "Maidenhair fern",
@@ -2632,6 +2699,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 0.9,
       "family": 4,
       "id": "birds-nest-fern",
       "name": "Birds nest fern",
@@ -2664,6 +2732,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 0.35,
       "family": 4,
       "id": "polypody",
       "name": "Common polypody",
@@ -2696,6 +2765,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "fern",
+      "defaultHeightMetres": 2.3,
       "family": 4,
       "id": "tree-fern",
       "name": "Soft tree fern",
@@ -2728,6 +2798,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.42,
       "family": 5,
       "id": "daisy",
       "name": "Oxeye daisy",
@@ -2766,6 +2837,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.9,
       "family": 5,
       "id": "sunflower",
       "name": "Wild sunflower",
@@ -2804,6 +2876,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.6,
       "family": 5,
       "id": "rose",
       "name": "Garden rose",
@@ -2843,6 +2916,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.5,
       "family": 5,
       "id": "poppy",
       "name": "Corn poppy",
@@ -2881,6 +2955,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.38,
       "family": 5,
       "id": "tulip",
       "name": "Garden tulip",
@@ -2919,6 +2994,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.35,
       "family": 5,
       "id": "daffodil",
       "name": "Wild daffodil",
@@ -2957,6 +3033,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.6,
       "family": 5,
       "id": "iris",
       "name": "Bearded iris",
@@ -2995,6 +3072,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.8,
       "family": 5,
       "id": "lily",
       "name": "White lily",
@@ -3033,6 +3111,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.45,
       "family": 5,
       "id": "lavender",
       "name": "Lavender",
@@ -3071,6 +3150,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.9,
       "family": 5,
       "id": "lupin",
       "name": "Garden lupin",
@@ -3110,6 +3190,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 1.15,
       "family": 5,
       "id": "foxglove",
       "name": "Common foxglove",
@@ -3148,6 +3229,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.65,
       "family": 5,
       "id": "bellflower",
       "name": "Peach-leaved bellflower",
@@ -3186,6 +3268,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.25,
       "family": 5,
       "id": "clover",
       "name": "Red clover",
@@ -3225,6 +3308,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "flower",
+      "defaultHeightMetres": 0.28,
       "family": 5,
       "id": "dandelion",
       "name": "Dandelion seed head",
@@ -3263,6 +3347,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.18,
       "family": 6,
       "id": "amanita",
       "name": "Fly agaric",
@@ -3295,6 +3380,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.2,
       "family": 6,
       "id": "boletus",
       "name": "Porcini bolete",
@@ -3327,6 +3413,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.15,
       "family": 6,
       "id": "oyster",
       "name": "Oyster mushroom cluster",
@@ -3359,6 +3446,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.12,
       "family": 6,
       "id": "chanterelle",
       "name": "Golden chanterelle",
@@ -3391,6 +3479,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.2,
       "family": 6,
       "id": "woodland",
       "name": "Shaggy inkcap",
@@ -3423,6 +3512,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.15,
       "family": 6,
       "id": "honey-fungus",
       "name": "Honey fungus cluster",
@@ -3455,6 +3545,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.2,
       "family": 6,
       "id": "bracket-fungus",
       "name": "Bracket fungus",
@@ -3487,6 +3578,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 0.15,
       "family": 6,
       "id": "morel",
       "name": "Common morel",
@@ -3519,6 +3611,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "mushroom",
+      "defaultHeightMetres": 3.0,
       "family": 6,
       "id": "fantasy",
       "name": "Giant violet parasol",
@@ -3551,6 +3644,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 9.0,
       "family": 7,
       "id": "saguaro",
       "name": "Saguaro cactus",
@@ -3583,6 +3677,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 0.48,
       "family": 7,
       "id": "barrel-cactus",
       "name": "Golden barrel cactus",
@@ -3615,6 +3710,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 2.0,
       "family": 7,
       "id": "prickly-pear",
       "name": "Prickly pear",
@@ -3647,6 +3743,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 7.0,
       "family": 7,
       "id": "cereus",
       "name": "Columnar cereus",
@@ -3679,6 +3776,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 0.7,
       "family": 7,
       "id": "agave",
       "name": "Blue agave",
@@ -3711,6 +3809,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 0.46,
       "family": 7,
       "id": "aloe",
       "name": "Aloe vera",
@@ -3743,6 +3842,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 0.18,
       "family": 7,
       "id": "echeveria",
       "name": "Echeveria rosette",
@@ -3775,6 +3875,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "cactus",
+      "defaultHeightMetres": 0.95,
       "family": 7,
       "id": "yucca",
       "name": "Adams needle yucca",
@@ -3807,6 +3908,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "palm",
+      "defaultHeightMetres": 28.0,
       "family": 8,
       "id": "date-palm",
       "name": "Date palm",
@@ -3846,6 +3948,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "palm",
+      "defaultHeightMetres": 34.0,
       "family": 8,
       "id": "coconut-palm",
       "name": "Coconut palm",
@@ -3885,6 +3988,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "palm",
+      "defaultHeightMetres": 33.0,
       "family": 8,
       "id": "washingtonia",
       "name": "Mexican fan palm",
@@ -3924,6 +4028,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "palm",
+      "defaultHeightMetres": 13.0,
       "family": 8,
       "id": "chamaerops",
       "name": "European fan palm",
@@ -3963,6 +4068,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "palm",
+      "defaultHeightMetres": 38.0,
       "family": 8,
       "id": "royal-palm",
       "name": "Royal palm",
@@ -4002,6 +4108,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "palm",
+      "defaultHeightMetres": 16.0,
       "family": 8,
       "id": "rhapis",
       "name": "Lady palm",
@@ -4041,6 +4148,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "vine",
+      "defaultHeightMetres": 1.55,
       "family": 10,
       "id": "ivy",
       "name": "English ivy vine",
@@ -4075,6 +4183,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "vine",
+      "defaultHeightMetres": 1.9,
       "family": 10,
       "id": "virginia-creeper",
       "name": "Virginia creeper",
@@ -4109,6 +4218,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "vine",
+      "defaultHeightMetres": 2.1,
       "family": 10,
       "id": "climbing-vine",
       "name": "Wild grapevine",
@@ -4142,6 +4252,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "vine",
+      "defaultHeightMetres": 2.0,
       "family": 10,
       "id": "wisteria",
       "name": "Chinese wisteria",
@@ -4176,6 +4287,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "vine",
+      "defaultHeightMetres": 2.1,
       "family": 10,
       "id": "hops",
       "name": "Common hop",
@@ -4209,6 +4321,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "vine",
+      "defaultHeightMetres": 1.7,
       "family": 10,
       "id": "clematis",
       "name": "Old mans beard",
@@ -4243,6 +4356,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "bamboo",
+      "defaultHeightMetres": 21.0,
       "family": 9,
       "id": "bamboo",
       "name": "Golden bamboo grove",
@@ -4281,6 +4395,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "bamboo",
+      "defaultHeightMetres": 25.0,
       "family": 9,
       "id": "black-bamboo",
       "name": "Black bamboo",
@@ -4319,6 +4434,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "bamboo",
+      "defaultHeightMetres": 0.55,
       "family": 9,
       "id": "dwarf-bamboo",
       "name": "Dwarf bamboo",
@@ -4357,6 +4473,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "bamboo",
+      "defaultHeightMetres": 46.0,
       "family": 9,
       "id": "giant-bamboo",
       "name": "Giant bamboo",
@@ -4395,6 +4512,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "riparian",
+      "defaultHeightMetres": 1.3,
       "family": 12,
       "id": "reeds",
       "name": "Common reed stand",
@@ -4428,6 +4546,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "riparian",
+      "defaultHeightMetres": 1.4,
       "family": 12,
       "id": "cattail",
       "name": "Broadleaf cattail",
@@ -4461,6 +4580,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "riparian",
+      "defaultHeightMetres": 1.2,
       "family": 12,
       "id": "bulrush",
       "name": "Lakeshore bulrush",
@@ -4494,6 +4614,7 @@ inline constexpr const char botanicalCatalog[] = R"RBPLANT({
     },
     {
       "category": "riparian",
+      "defaultHeightMetres": 0.55,
       "family": 12,
       "id": "horsetail",
       "name": "Field horsetail",

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import struct
 import time
 from PIL import ImageGrab
 from editor_os_input import NativeInput, read_ui_json
@@ -145,6 +146,16 @@ try:
     first = plants[0]['model']
     check((data/first).read_bytes().startswith(b'INTERQUAKEMODEL') and (data/plants[0]['_reyondbroom_source']).is_file(),
           'placed plant includes its reusable IQM and editable source')
+    source=json.loads((data/plants[0]['_reyondbroom_source']).read_text())
+    check(abs(source['parameters']['height']-7.2)<.001,'Plant Brush defaults use Half-Life player scale for FTE')
+    encoded=(data/first).read_bytes();arrays,vertices,offset=struct.unpack_from('<III',encoded,44)
+    positions=[]
+    for i in range(arrays):
+        kind,flags,format,size,start=struct.unpack_from('<5I',encoded,offset+i*20)
+        if kind==0:
+            assert format==7 and size==3
+            positions=[struct.unpack_from('<3f',encoded,start+v*12)[2] for v in range(vertices)]
+    check(positions and .04<(max(positions)-min(positions))/72<.2,'painted IQM geometry has mushroom stature relative to a 72-unit player')
     select('Scots pine','pine')
     ui.click(x,y)
     plants, _ = snapshot('paint-two')
@@ -187,6 +198,9 @@ try:
     plants, _ = snapshot('paint-draft')
     check(any(json.loads((data/item['_reyondbroom_source']).read_text())['name']=='Untitled oak' for item in plants),
           'the transferred draft can be painted without saving it as a preset first')
+    check(any(json.loads((data/item['_reyondbroom_source']).read_text())['parameters']['height']==960 for item in plants
+          if json.loads((data/item['_reyondbroom_source']).read_text())['name']=='Untitled oak'),
+          'Create new plant and editor-to-brush transfer retain the FTE oak scale')
     ImageGrab.grab().save(out/'plant-brush.png')
 except Exception:
     ImageGrab.grab().save(out/'failure.png')

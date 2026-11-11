@@ -69,11 +69,24 @@ jobs:
     - name: Install build and validation tools
       run: |
         if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! command -v xclip || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h || ! test -f /usr/include/alsa/asoundlib.h || ! test -f /usr/include/X11/extensions/Xrandr.h || ! test -f /usr/include/X11/extensions/scrnsaver.h || ! test -f /usr/include/X11/Xcursor/Xcursor.h; then
+          apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          install_tools() {
+            sudo timeout 120s apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update &&
+              sudo timeout 180s apt-get "${apt_options[@]}" install -y build-essential cmake libgl-dev libegl1 libgl1-mesa-dri libasound2-dev libx11-dev libxss-dev libxrandr-dev libxcursor-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip ffmpeg libsdl2-dev ripgrep
+          }
           if test -f /etc/apt/apt-mirrors.txt; then
-            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
+            installed=false
+            for mirror in https://archive.ubuntu.com/ubuntu https://mirrors.edge.kernel.org/ubuntu https://azure.archive.ubuntu.com/ubuntu; do
+              if ! curl --silent --show-error --fail --location --connect-timeout 6 --max-time 12 --output /dev/null "$mirror/dists/noble/InRelease"; then
+                continue
+              fi
+              printf '%s/\n' "$mirror" | sudo tee /etc/apt/apt-mirrors.txt
+              if install_tools; then installed=true; break; fi
+            done
+            test "$installed" = true
+          else
+            install_tools
           fi
-          sudo timeout 180s apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=20
-          sudo timeout 180s apt-get install -y build-essential cmake libgl-dev libegl1 libgl1-mesa-dri libasound2-dev libx11-dev libxss-dev libxrandr-dev libxcursor-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip ffmpeg libsdl2-dev ripgrep
         fi
     - name: Fetch and verify compatible runtime and complete sources
       run: |

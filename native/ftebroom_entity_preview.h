@@ -6,6 +6,7 @@
 #include "ftebroom_legacy_images.h"
 #include "ftebroom_preview_raster.h"
 #include "ftebroom_stb_image.h"
+#include <filesystem>
 #include <future>
 struct EntityPreviewPart {qhandle_t image=0;std::vector<std::array<ftebroom::MdlVertex,3>> triangles;ftebroom::preview::Pixels pixels;};
 struct EntityPreview {qhandle_t image=0;int spriteWidth=0,spriteHeight=0;std::vector<EntityPreviewPart> parts;std::vector<std::pair<size_t,size_t>> order;qhandle_t thumbnail=0;unsigned long long used=0;};

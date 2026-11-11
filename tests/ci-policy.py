@@ -45,6 +45,7 @@ class ScopeTests(unittest.TestCase):
     def test_rendering_and_plant_ui_are_different_from_generator_math(self):
         self.assertTrue(planner.plan(['runtime/glsl/ftebroom_grid.glsl'])['flags']['grid'])
         self.assertFalse(planner.plan(['native/ftebroom_plant_ui.h'])['flags']['plant_core'])
+        self.assertFalse(planner.plan(['tests/plant-export-manager.cpp'])['flags']['plant_core'])
         self.assertTrue(planner.plan(['native/plant/botanical.h'])['flags']['plant_core'])
 
     def test_unknown_shared_change_fails_closed(self):

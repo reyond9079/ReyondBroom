@@ -56,6 +56,8 @@ def main():
     if suites & {'audio_ui', 'audio_archive'}:
         run('audio_archive', 'scripts/test-audio-archive.py', root, out/'audio-archive')
     if 'plant_ui' in suites:
+        run('plant_ui', 'scripts/test-plant-export-unit.py', out/'plants/export-unit', gui=False)
+        run('plant_ui', 'scripts/test-plant-ui.py', root, out/'plants/export-ui', '--export-only')
         run('plant_ui', 'scripts/test-plant-ui.py', root, out/'plants/ui')
         run('plant_ui', 'scripts/test-plant-exports.py', out/'plants/ui', gui=False)
         run('plant_ui', 'scripts/test-plant-map.py', root, out/'plants/ui', gui=False)

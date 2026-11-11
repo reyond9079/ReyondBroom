@@ -164,3 +164,16 @@ corpus was recorded from the unmodified REYON-8 baseline (9e5b30a); CI rebuilds 
 and independently inspects saved map history, source links and runtime assets.
 
 REYON-9 evidence: [visual review](qa/reyon-9/quality.md), [performance and raw measurements](qa/reyon-9/performance.md).
+# Export manager
+
+Click **Export…**, select a format, then click **Choose destination…**. The
+selected format supplies the filename extension. Quake MDL and Half-Life / GoldSrc
+MDL have separate choices because they use different encodings despite sharing
+the `.mdl` suffix. Available formats: GLB, OBJ, Quake MDL, MD2, MD3, IQM, MD5 mesh,
+and GoldSrc MDL. Export uses the selected LOD and a static pose.
+
+GLB embeds its textures. OBJ writes MTL and PNG companions; MD2 writes PCX;
+MD3, IQM and MD5 write a TGA atlas. Keep companion files beside the model.
+Legacy formats apply their model and skin limits; MD3 reports coordinates that
+exceed its range rather than silently changing the model's scale. Existing
+different files are preserved: choose another filename when a companion conflicts.

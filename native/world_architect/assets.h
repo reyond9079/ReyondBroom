@@ -7,8 +7,8 @@
 namespace ftebroom::worldArchitect {
 struct Image {unsigned width=128,height=128;std::vector<unsigned char> rgba;};
 inline Image texture(const ArtTheme& theme,int slot){
-  if(slot<0||slot>5)throw std::runtime_error("Unknown architectural material slot");
-  Image image;image.rgba.resize(size_t(image.width)*image.height*4);const auto color=theme.colors[slot];
+  if(slot<0||slot>6)throw std::runtime_error("Unknown architectural material slot");
+  Image image;image.rgba.resize(size_t(image.width)*image.height*4);const auto color=theme.colors[slot==6?3:slot];
   for(unsigned y=0;y<image.height;y++)for(unsigned x=0;x<image.width;x++){
     double noise=double(mix(uint64_t(x)+uint64_t(y)*128+hash(theme.id))%17)-8,shade=0;
     if(slot==0){bool joint=x%32<2||y%32<2;shade=joint?-25:((x/32+y/32)%2?4:-4);}
@@ -17,6 +17,7 @@ inline Image texture(const ArtTheme& theme,int slot){
     if(slot==3){shade=14*std::sin(double(x+y)*.07)-double(y%23<2)*12;}
     if(slot==4){shade=8*std::sin(x*.35)+4*std::sin(y*.09);if(x%32<3)shade-=20;}
     if(slot==5){shade=((x+y)/16)%2?-28:4;}
+    if(slot==6){shade=10*std::sin(x*.12+4*std::sin(y*.04))+6*std::cos(y*.17+x*.03);noise*=.3;}
     for(int c=0;c<3;c++)image.rgba[(size_t(y)*128+x)*4+c]=static_cast<unsigned char>(std::clamp(color[c]+noise+shade,0.,255.));image.rgba[(size_t(y)*128+x)*4+3]=255;
   }return image;
 }
@@ -29,14 +30,19 @@ inline std::map<std::string,std::string> shaderDefinitions(const WorldPlan& w){
   for(int slot=0;slot<6;slot++){
     auto id=materialId(w,slot);shaders["textures/"+id]="{\nqer_editorimage textures/"+id+".tga\n{\nmap $lightmap\nrgbgen identity\n}\n{\nmap textures/"+id+".tga\nblendfunc filter\nrgbgen identity\n}\n}\n";
   }
+  if(std::any_of(w.architecture.elements.begin(),w.architecture.elements.end(),[](const auto& e){return e.kind=="floodwater";})){
+    auto id=assetId(w,6);shaders["textures/"+id]="{\nqer_editorimage textures/"+id+".tga\nqer_trans 0.72\nsurfaceparm water\nsurfaceparm trans\nsurfaceparm nonsolid\nsurfaceparm nolightmap\n{\nmap textures/"+id+".tga\nblendfunc blend\nrgbgen identity\nalphagen const 0.72\ntcmod turb 0 0.03 0 0.1\n}\n}\n";
+  }
   shaders["textures/"+skyMaterial(w)]="{\nqer_editorimage textures/sky.tga\nsurfaceparm sky\nsurfaceparm nolightmap\nq3map_sun 1 0.88 0.7 80 120 50\nskyParms - 512 -\n{\nmap textures/sky.tga\ntcmod scale 2 2\nrgbgen identity\n}\n}\n";
   return shaders;
 }
 inline std::map<std::string,std::string> assetBundle(const WorldPlan& w,const Registry& registry,const std::string& palette){
   std::map<std::string,std::string> bundle;std::string wad;const bool hl=w.profile==4;
-  for(int slot=0;slot<6;slot++){
-    auto image=texture(registry.theme(w.theme),slot);auto name=materialId(w,slot);
-    auto indexed=quantizeFolderImage(image.rgba.data(),image.width,image.height,palette,name);
+  const bool water=std::any_of(w.architecture.elements.begin(),w.architecture.elements.end(),[](const auto& e){return e.kind=="floodwater";});
+  for(int slot=0;slot<(water?7:6);slot++){
+    auto image=texture(registry.theme(w.theme),slot);auto name=assetId(w,slot);
+    const auto wadName=slot==6?(hl?"!wa":"*wa")+w.theme.substr(0,7):name;
+    auto indexed=quantizeFolderImage(image.rgba.data(),image.width,image.height,palette,wadName);
     if(w.profile==2){PaletteQuantizer opaque(palette,224);for(size_t i=0;i<indexed.pixels.size();i++)indexed.pixels[i]=opaque.nearest(image.rgba[i*4],image.rgba[i*4+1],image.rgba[i*4+2]);}
     wad=addWadTexture(wad,std::move(indexed),palette,false,hl);
     bundle["textures/"+name+".tga"]=tga(image);

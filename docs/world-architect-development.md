@@ -12,6 +12,50 @@ use independent stable seed streams. A versioned external registry defines eight
 prototype configurations and six original material palettes. These are test
 cases, not the eight finished showcase presets required by RB-7.
 
+The next interior/site pass reserves distinct functional rooms for mission
+beats **before** brush generation. The room program expands to satisfy mission
+demand, reserved rooms receive wider openings, and physical navigation must
+visit the planned required rooms in order. Atrium/ring grammars leave real upper
+floor and roof openings with supported galleries and handrails. Parallel
+circulation has a solid divider and crossovers. A straight corridor keeps its
+floor plate; the layout choice changes structural geometry.
+
+Urban plots now come from deterministic binary subdivision with unequal
+frontage and T junctions. Partition boundaries form the road network; masses
+are inset within those plots, and each entrance has an explicit pedestrian
+connection to its frontage. The original regular grid is no longer the only
+site realization. Diagonal streets, bridge events and complete city-design
+acceptance remain open.
+
+Circulation scoring checks for an actual alternative walk separated from the
+primary polyline by at least 64 units outside endpoint landings, with an actual
+solid obstruction or floor opening between the paths. Dense edges or two
+parallel lines in a wide empty corridor do not count. This measures a limited
+same-floor property, not overall combat quality.
+
+The hospital's first structural event removes the middle of its central ground
+flight and provides two alternating exterior fire-stair flights with real
+landings and doors. Zero damage restores the central flight; a preserve mask at
+its base also suppresses this collapse. Its reception is an editable convex
+semicircular annex with arc piers, actual openings and a planned outdoor exit.
+The mission route must visit its required upper rooms before reaching that
+exit. This is the first particular ruin event, not evidence that the other
+seven showcase presets or the complete damage vocabulary are finished.
+
+The station event supplies liquid-content geometry and original water pixels,
+dry parallel platforms, upper galleries and a separate street exit. Navigation
+does not assume swimming: solid platform barriers keep its sampled routes dry;
+the liquid itself is excluded from solid collision. Compiler checks inspect
+actual water leaves in Quake BSP29/BSP2 and water-content brushes in Q3/FTE
+IBSP46, as well as checking material images and leaks. Circulation has actual
+ceiling fixtures and point lights; classic profiles receive a directional sun.
+
+An external development play check has loaded compiled hospital and metro maps
+in Ironwail 0.8.2 with existing game resources and moved the player using OS
+keyboard input. It found and corrected insufficient corridor illumination.
+This is a short physical walk check, not the specification's complete human
+review of pacing, sightlines and all eight finished presets.
+
 The native ImGui workspace generates and compares candidates, displays the real
 geometry in the existing dynamic-mesh renderer, previews floor cutaways and
 provides a grounded first-person inspection camera. Preview/generation leave the
@@ -60,10 +104,9 @@ quality. The tests must be rerun for subsequent changes in the relevant stages.
 
 ## Remaining acceptance work
 
-The full mission graph must drive spatial realization and meaningful alternate
-routes; the initial grammar currently provides a shared corridor/stair structural
-foundation. Distinct road patterns, parcel subdivision, archetype-specific
-interior families, non-box massing, hero ruin events, material/weathering detail,
+The mission-room realization needs richer gates, pacing and intentionally
+different optional branches. More road patterns, archetype-specific interior
+families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
 Stage locks, pinned-region preservation, graph/road/volume editing, painted masks,

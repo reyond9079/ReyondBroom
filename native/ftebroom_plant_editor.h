@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "plant/export.h"
+#include "ftebroom_plant_export.h"
 #include "plant/presets.h"
 #include "plant/thumbnail.h"
 #include <future>
@@ -30,6 +31,8 @@ struct PlantState {
   bool floor=true,axes=false,handles=false,qa=false,closeRequest=false,allowFteQ1=false;
   bool gamePreview=true,gameAtlasUploaded=false;
   int lod=0,display=0,selected=1,category=-1,filter=0,thumbSlot=0;
+  ftebroom::plantExport::Format exportFormat=ftebroom::plantExport::Format::Glb;
+  bool exportRequest=false;
   double yaw=135,pitch=18,zoom=1,sun=-120,nextGenerate=0,lastUpload=0;
   plants::V cameraLow{-100,-100,0},cameraHigh{100,100,260},background{.075,.09,.11};
   plants::Project doc=plants::presets().front();
@@ -309,24 +312,29 @@ static plants::Textures plantOpaqueMaps(plants::Project d,int profile,const plan
   d.p.foliageMode=2;
   return plantTextureMaps(d,plantReadTextures(d),nullptr,profile==4?128:64,photos);
 }
-static void plantExport(const std::filesystem::path& target) {
+static void plantExport(const std::filesystem::path& selected,ftebroom::plantExport::Format format) {
   auto& s=plantState;if(!plantReady())throw std::runtime_error("Wait for the current plant to finish generating");
-  auto& mesh=s.result->lods[s.lod];auto& maps=*s.result->maps;auto ext=entityLower(target.extension().u8string());
-  plants::validate(mesh);
-  if(ext==".mdl"||ext==".md2") {
-    int profile=ext==".mdl"?2:3;auto geometry=plants::targetGeometry(s.doc,mesh,profile);auto model=plants::aliasMesh(geometry,"plant");auto skin=plants::aliasSkin(s.doc.generator>=3?plantOpaqueMaps(s.doc,profile,plantPhotos()).albedo:maps.albedo);
-    if(profile==2)plantWriteNew(target,ftebroom::modelExport::mdl(model,{skin},q1Palette()));
-    else {auto image=target.stem().u8string()+".pcx";auto output=ftebroom::modelExport::md2(model,{skin},q2Palette(),image);plantWriteNew(target.parent_path()/std::filesystem::u8path(image),output.skin);plantWriteNew(target,output.model);}
-  }else if(ext==".glb")plantWriteNew(target,plants::glb(mesh,maps));
-  else if(ext==".obj") {
-    auto stem=target.stem().u8string();auto folder=target.parent_path();
-    plantWriteNew(folder/(stem+"-albedo.png"),plants::png(maps.albedo));
-    plantWriteNew(folder/(stem+"-normal.png"),plants::png(maps.normal));
-    plantWriteNew(folder/(stem+"-orm.png"),plants::png(maps.orm));
-    plantWriteNew(folder/(stem+".mtl"),"newmtl plant\nKd 1 1 1\nd 1\nmap_Kd "+stem+"-albedo.png\nmap_d "+stem+"-albedo.png\nnorm "+stem+"-normal.png\n");
-    plantWriteNew(target,plants::obj(mesh,stem+".mtl"));
-  }else throw std::runtime_error("Choose .obj / .glb for portable geometry, .mdl for Quake or .md2 for Quake II");
-  s.message="Exported "+target.filename().u8string()+" (static wind fallback)";
+  const auto target=ftebroom::plantExport::pathFor(selected,format);
+  const auto& spec=ftebroom::plantExport::choice(format);
+  auto geometry=s.result->lods[s.lod];auto maps=*s.result->maps;
+  if(spec.profile==2||spec.profile==3||spec.profile==4){
+    geometry=plants::targetGeometry(s.doc,geometry,spec.profile);
+    if(s.doc.generator>=3)maps=plantOpaqueMaps(s.doc,spec.profile,plantPhotos());
+  }
+  const auto image=target.parent_path()/(target.stem().u8string()+(spec.profile==3?".pcx":"-albedo.tga"));
+  auto material=modFileModelPath(image);if(material.empty())material=image.filename().generic_u8string();
+  auto bundle=ftebroom::plantExport::encode(format,target.filename().u8string(),geometry,maps,
+    spec.profile==2?q1Palette():spec.profile==3?q2Palette():std::string{},material);
+  // Check every companion before writing anything. Keep existing exports intact
+  // when one texture conflicts; roll back only files created by this attempt.
+  for(const auto& [name,bytes]:bundle){auto path=target.parent_path()/std::filesystem::u8path(name);
+    if(std::filesystem::exists(path)&&q1Read(path)!=bytes)throw std::runtime_error("Existing asset differs; choose a new export name: "+name);
+  }
+  std::vector<std::filesystem::path> added;
+  try{for(const auto& [name,bytes]:bundle){auto path=target.parent_path()/std::filesystem::u8path(name);
+    if(!std::filesystem::exists(path)){added.push_back(path);plantWriteNew(path,bytes);}
+  }}catch(...){std::error_code ec;for(const auto& path:added)std::filesystem::remove(path,ec);throw;}
+  s.message="Exported "+target.filename().u8string()+" (static pose)";
 }
 static void placementPublish(const std::map<std::string,std::string>& bundle);
 struct PlantRuntimeAsset {

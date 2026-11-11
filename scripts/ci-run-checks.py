@@ -39,8 +39,13 @@ def main():
             subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
         completed.append({'suite': suite, 'script': script})
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
-    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding'}:
+    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding', 'world_ui'}:
         run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
+    if 'world_core' in suites:
+        run('world_core', 'scripts/test-world-architect.py', out/'world/core', '--runtime', root,
+            '--seeds', '100' if selected['mode'] == 'full' else '3', gui=False)
+    if 'world_ui' in suites:
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/ui')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))

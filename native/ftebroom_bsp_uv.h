@@ -2,16 +2,17 @@
 #pragma once
 #include "ftebroom_bsp_atlas.h"
 #include "ftebroom_legacy_images.h"
+#include "ftebroom_mdl.h"
 namespace ftebroom::bspUV {
 using UV=std::array<float,2>;
-struct Material {std::string name;unsigned width=0,height=0;std::string image;std::vector<std::array<UV,2>> edges;};
-inline std::vector<Material> read(const std::string& source,const std::string& palette,const std::map<std::string,std::string>& wals={}){
+struct Material {std::string name;unsigned width=0,height=0;std::string image;std::vector<std::array<UV,2>> edges;std::vector<std::array<MdlVertex,3>> triangles;};
+inline std::vector<Material> read(const std::string& source,const std::string& palette,const std::map<std::string,std::string>& wals={},bool modelGeometry=false){
   using quake1::word;using quake1::range;using bspAtlas::real;using bspAtlas::u16;
   bool q2=source.substr(0,4)=="IBSP"&&word(source,4)==38,hl=source.size()>=4&&word(source,0)==30,q3=source.substr(0,4)=="IBSP"&&!q2,bsp2=source.substr(0,4)=="BSP2"||source.substr(0,4)=="2PSB";
   if((q3&&word(source,4)!=46)||(!q3&&!q2&&!hl&&!bsp2&&word(source,0)!=29))throw std::runtime_error("UV view supports BSP29, BSP2 and Quake III IBSP46.");
   unsigned header=(q3||q2)?8:4,count=q3?17:q2?19:15;range(source,header,count*8);
   std::vector<std::string> lumps(count);for(unsigned i=0;i<count;i++){auto off=word(source,header+i*8),size=word(source,header+i*8+4);range(source,off,size);lumps[i]=source.substr(off,size);}
-  std::vector<Material> result;std::map<unsigned,size_t> indices;uint64_t pixels=0,edges=0;
+  std::vector<Material> result;std::map<unsigned,size_t> indices;uint64_t pixels=0,edges=0,triangles=0;
   auto material=[&](unsigned id)->Material&{
     auto found=indices.find(id);if(found!=indices.end())return result[found->second];
     if(result.size()>=4096)throw std::runtime_error("UV material limit exceeded.");
@@ -33,7 +34,11 @@ inline std::vector<Material> read(const std::string& source,const std::string& p
     }
     indices[id]=result.size();result.push_back(std::move(m));return result.back();
   };
-  auto edge=[&](Material& m,UV a,UV b){for(float v:{a[0],a[1],b[0],b[1]})if(!std::isfinite(v)||std::abs(v)>1e7f)throw std::runtime_error("Invalid BSP UV coordinate.");if(++edges>2000000)throw std::runtime_error("UV edge limit exceeded.");m.edges.push_back({a,b});};
+  auto edge=[&](Material& m,UV a,UV b){for(float v:{a[0],a[1],b[0],b[1]})if(!std::isfinite(v)||std::abs(v)>1e7f)throw std::runtime_error("Invalid BSP UV coordinate.");if(modelGeometry)return;if(++edges>2000000)throw std::runtime_error("UV edge limit exceeded.");m.edges.push_back({a,b});};
+  auto triangle=[&](Material& m,MdlVertex a,MdlVertex b,MdlVertex c){
+    if(++triangles>131072)throw std::runtime_error("BSP model triangle limit exceeded.");
+    m.triangles.push_back({a,b,c});
+  };
   auto& surfaces=lumps[q3?13:q2?6:7];unsigned stride=q3?104:bsp2?28:20;if(surfaces.size()%stride)throw std::runtime_error("Invalid BSP face records.");
   for(size_t at=0;at<surfaces.size();at+=stride){
     if(q3){
@@ -48,15 +53,30 @@ inline std::vector<Material> read(const std::string& source,const std::string& p
         for(unsigned x=0;x<w;x++)for(unsigned y=0;y+2<h;y+=2)curve(uv(y*w+x),uv((y+1)*w+x),uv((y+2)*w+x));
       }else{
         unsigned start=word(surfaces,at+20),total=word(surfaces,at+24);if(total%3)throw std::runtime_error("Invalid BSP triangle count.");range(lumps[11],size_t(start)*4,size_t(total)*4);
-        for(unsigned i=0;i<total;i+=3){UV a=uv(word(lumps[11],size_t(start+i)*4)),b=uv(word(lumps[11],size_t(start+i+1)*4)),c=uv(word(lumps[11],size_t(start+i+2)*4));edge(m,a,b);edge(m,b,c);edge(m,c,a);}
+        for(unsigned i=0;i<total;i+=3){
+          unsigned a=word(lumps[11],size_t(start+i)*4),b=word(lumps[11],size_t(start+i+1)*4),c=word(lumps[11],size_t(start+i+2)*4);
+          const UV ta=uv(a),tb=uv(b),tc=uv(c);
+          edge(m,ta,tb);edge(m,tb,tc);edge(m,tc,ta);
+          if(modelGeometry){
+            auto vertex=[&](unsigned index,UV st){
+              const auto offset=size_t(first+index)*44;
+              return MdlVertex{{real(lumps[10],offset),real(lumps[10],offset+4),real(lumps[10],offset+8)},st[0],st[1]};
+            };
+            triangle(m,vertex(a,ta),vertex(b,tb),vertex(c,tc));
+          }
+        }
       }
     }else{
       unsigned ti=bsp2?word(surfaces,at+16):u16(surfaces,at+10),ts=q2?76:40,tl=q2?5:6,el=q2?11:12,sl=q2?12:13,vl=q2?2:3;range(lumps[tl],size_t(ti)*ts,ts);auto& m=material(q2?ti:word(lumps[tl],size_t(ti)*ts+32));
       unsigned n=bsp2?word(surfaces,at+12):u16(surfaces,at+8),first=word(surfaces,at+(bsp2?8:4));if(n>65536)throw std::runtime_error("Invalid BSP face size.");range(lumps[sl],size_t(first)*4,size_t(n)*4);std::vector<UV> points;
+      std::vector<MdlVertex> modelPoints;
       for(unsigned i=0;i<n;i++){int32_t e=int32_t(word(lumps[sl],size_t(first+i)*4));if(e==INT32_MIN)throw std::runtime_error("Invalid BSP edge.");size_t record=size_t(e<0?-e:e)*(bsp2?8:4);unsigned v=bsp2?word(lumps[el],record+(e<0?4:0)):u16(lumps[el],record+(e<0?2:0));range(lumps[vl],size_t(v)*12,12);UV p{};
-        for(int a=0;a<2;a++){p[a]=real(lumps[tl],size_t(ti)*ts+a*16+12);for(int k=0;k<3;k++)p[a]+=real(lumps[tl],size_t(ti)*ts+a*16+k*4)*real(lumps[vl],size_t(v)*12+k*4);p[a]/=a?m.height:m.width;}points.push_back(p);
+        std::array<float,3> xyz;for(int k=0;k<3;k++)xyz[k]=real(lumps[vl],size_t(v)*12+k*4);
+        for(int a=0;a<2;a++){p[a]=real(lumps[tl],size_t(ti)*ts+a*16+12);for(int k=0;k<3;k++)p[a]+=real(lumps[tl],size_t(ti)*ts+a*16+k*4)*xyz[k];p[a]/=a?m.height:m.width;}points.push_back(p);
+        if(modelGeometry)modelPoints.push_back({xyz,p[0],p[1]});
       }
       for(size_t i=0;i<points.size();i++)edge(m,points[i],points[(i+1)%points.size()]);
+      for(size_t i=2;i<modelPoints.size();i++)triangle(m,modelPoints[0],modelPoints[i-1],modelPoints[i]);
     }
   }
   return result;

@@ -285,18 +285,6 @@ static bool terrainCreateWindow;
 #include "ftebroom_shapes.h"
 #include "ftebroom_tutorial.h"
 #include "ftebroom_browser132_tests.h"
-static void gridControl(const char* label)
-{
-  const char* values[] = {
-    "0.125", "0.25", "0.5", "1", "2", "4", "8", "16", "32", "64", "128", "256"};
-  float value = cvars->GetFloat("ca_grid");
-  int selected = 0;
-  while (selected < 11 && std::ldexp(1.f, selected - 3) < value)
-    ++selected;
-  ImGui::SetNextItemWidth(76 * uiScale());
-  if (ImGui::Combo(label, &selected, values, 12))
-    cvars->SetFloat("ca_grid", std::ldexp(1.f, selected - 3));
-}
 static bool softLightGallery=false;
 static void softLightGalleryPanel(){
   if(!softLightGallery)return;
@@ -338,16 +326,13 @@ static void panel(float w, float h)
     tourPanel(w,h);uiCursorUpdate(sceneLook,uiCursorPercent/100.f);render();return;
   }
   const float menuHeight = ImGui::GetFrameHeight();
-  const auto* toolbarWindow=ImGui::FindWindowByName(uiToolbarName);
-  const float scrollbar=toolbarWindow&&toolbarWindow->ScrollbarX?ImGui::GetStyle().ScrollbarSize:0;
-  const float toolbarHeight = ImGui::GetFrameHeight() + 18 * uiScale() + scrollbar;
   const float statusHeight = ImGui::GetTextLineHeight() + std::max(16 * uiScale(),2*ImGui::GetStyle().WindowPadding.y);
   const bool softChrome=uiModern();
   const float margin=softChrome?ModernChrome::margin*uiScale():0;
   const float gap=softChrome?ModernChrome::gutter*uiScale():0;
-  const float toolbarY=menuHeight+(softChrome?6*uiScale():0);
+  const float workspaceY=menuHeight+(softChrome?6*uiScale():0);
   const float statusY=h-statusHeight-margin;
-  uiWorkspace(w,h,toolbarY,toolbarHeight,statusHeight,margin,gap);
+  uiWorkspace(w,h,workspaceY,statusHeight,margin,gap,modFilesOpen,modFilesRequestFocus);
   projectSetup();
   tourOfferPanel();
   modPreviewPanel();
@@ -503,50 +488,6 @@ static void panel(float w, float h)
     ImGui::EndMainMenuBar();
   }
   viewOptionsToolbar();
-  auto fixedPanel=[&](const char* name,ImGuiID dock,float y,float height,ImGuiWindowFlags flags=0){
-    flags|=ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove;
-    if(flags&ImGuiWindowFlags_HorizontalScrollbar)
-      flags&=~ImGuiWindowFlags_NoScrollbar;
-    if(softChrome)flags|=ImGuiWindowFlags_NoBackground;
-    ImGui::SetNextWindowDockID(dock,ImGuiCond_Always);
-    if(!dock){
-      flags|=ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoSavedSettings;
-      ImGui::SetNextWindowPos({margin,y});
-      ImGui::SetNextWindowSize({std::max(1.f,w-2*margin),height});
-    }
-    ImGui::Begin(name,nullptr,flags);
-    if(softChrome)
-      uiSoftSurface(ImGui::GetBackgroundDrawList(),ImGui::GetCurrentWindow()->Rect(),11*uiScale());
-  };
-  fixedPanel(uiToolbarName,uiToolbarDock,toolbarY,toolbarHeight,ImGuiWindowFlags_HorizontalScrollbar);
-  actionButton("Menu/Edit/Undo");
-  ImGui::SameLine();
-  actionButton("Menu/Edit/Redo");
-  ImGui::SameLine();
-  actionButton("Menu/Edit/Delete");
-  ImGui::SameLine();
-  ImGui::TextUnformatted(" | ");
-  ImGui::SameLine();
-  gridControl("Grid");
-  ImGui::SameLine();
-  int view = (int)cvars->GetFloat("ca_brush_view");
-  ImGui::SetNextItemWidth(135 * uiScale());
-  if (ImGui::Combo("View", &view, "Perspective\0YZ (side)\0XZ (front)\0XY (top)\0"))
-  {
-    cancelGesture();
-    viewTypes[viewFocus] = view;
-    viewActivate(viewFocus);
-  }
-  ImGui::SameLine();
-  int layoutChoice = viewLayout - 1;
-  ImGui::SetNextItemWidth(90 * uiScale());
-  if (ImGui::Combo("Layout", &layoutChoice, "1 view\0 2 views\0 3 views\0 4 views\0"))
-    viewSetLayout(layoutChoice + 1);
-  ImGui::SameLine();
-  ImGui::TextDisabled(
-    view ? "  View plane / hold Shift during drag: axis" : "  XY plane / Alt: Z");
-  ImGui::SameLine();
-  ImGui::End();
   uiSoftPanelBegin("Tools",nullptr,uiPanelFlags()&~ImGuiWindowFlags_HorizontalScrollbar);
   uiToolStripBegin();
   uiToolStripSurface();
@@ -554,9 +495,18 @@ static void panel(float w, float h)
   auto* toolsWindow=ImGui::GetCurrentWindow();
   const bool horizontalTools=uiToolsHorizontal(toolsWindow);
   const bool compactRail=softChrome&&!horizontalTools&&toolsArea.x<124*uiScale();
+  if(horizontalTools)
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{4*uiScale(),ImGui::GetStyle().ItemSpacing.y});
   const float toolsRight=ImGui::GetCursorScreenPos().x+toolsArea.x;
   const float toolsLeft=ImGui::GetCursorPosX();
-  const float toolHeight=(compactRail?30.f:34.f)*uiScale();
+  // A full default row fits beside the inspector at both desktop scales.
+  constexpr int defaultToolCount=28;
+  const float toolHeight=std::round((compactRail||horizontalTools?30.f:34.f)*uiScale());
+  const float singleRowWidth=(toolsArea.x-(defaultToolCount-1)*ImGui::GetStyle().ItemSpacing.x)/defaultToolCount;
+  const float toolWidth=horizontalTools
+    ? std::floor(std::clamp(singleRowWidth,36*uiScale(),48*uiScale()))
+    : toolHeight;
+  const ImVec2 toolSize{toolWidth,toolHeight};
   const ImVec2 toolPadding{ImGui::GetStyle().FramePadding.x,std::max(0.f,(toolHeight-ImGui::GetFontSize())*.5f)};
   bool toolsFirst=true;
   auto toolFlow=[&](float width){
@@ -579,14 +529,23 @@ static void panel(float w, float h)
     "Scale",
     "Shear", "Sculpt", "Bezier Bend", "Polygon Cut", "Polygon Spawn", "Spin", "Rotate Grid"};
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,toolPadding);
+  auto editTool=[&](ToolbarEditAction action){
+    toolFlow(toolWidth);
+    actionToolButton(action,toolSize);
+  };
+  for(auto edit:{ToolbarEditAction::Undo,ToolbarEditAction::Redo,ToolbarEditAction::Delete}){
+    editTool(edit);
+  }
   for (int i = 0; i < 17; i++)
   {
     if(i==11) {
-      toolFlow(toolHeight);
+      editTool(ToolbarEditAction::FlipHorizontal);
+      editTool(ToolbarEditAction::FlipVertical);
+      toolFlow(toolWidth);
       const auto direction=horizontalTools
         ? (extraToolsExpanded?ImGuiDir_Left:ImGuiDir_Right)
         : (extraToolsExpanded?ImGuiDir_Up:ImGuiDir_Down);
-      if(ImGui::ArrowButton("##extra-tools",direction))extraToolsExpanded=!extraToolsExpanded;
+      if(ImGui::ArrowButtonEx("##extra-tools",direction,toolSize))extraToolsExpanded=!extraToolsExpanded;
       runUiRecordGlobal("tools-extra-toggle");
       if(ImGui::IsItemHovered())ImGui::SetTooltip("%s Sculpt, Bezier Bend, Polygon Cut, Polygon Spawn, Spin, Rotate Grid",extraToolsExpanded?"Hide":"Show");
     }
@@ -601,8 +560,8 @@ static void panel(float w, float h)
     if (active)
       ImGui::PushStyleColor(ImGuiCol_Button, uiActiveToolColor());
     ImGui::PushID(i);
-    toolFlow(32*uiScale());
-    if (FteIcons::button("##tool",i>=15?7:i>=11?i+2:i,{32 * uiScale(), toolHeight}))
+    toolFlow(toolWidth);
+    if (FteIcons::button("##tool",i>=15?7:i>=11?i+2:i,toolSize))
     {
       sceneDrag = sceneLook = false;
       if (entry)
@@ -612,27 +571,32 @@ static void panel(float w, float h)
     }
     if (active)
       ImGui::PopStyleColor();
-    if (ImGui::IsItemHovered())
-      ImGui::SetTooltip(
-        "%s %s%s",
-        toolNames[i],
-        entry ? entry->shortcutText.c_str() : "",
-        "");
+    if(ImGui::IsItemHovered()){
+      const char* shortcut=entry?entry->shortcutText.c_str():"";
+      if(tool==0)
+        ImGui::SetTooltip("%s %s\n%s",uiTr(toolNames[i]),shortcut,uiTr("Right-click for tool settings"));
+      else ImGui::SetTooltip("%s %s",toolNames[i],shortcut);
+    }
+    if(runUiLive&&tool!=0)runUiRecordGlobal(std::string("tools/")+toolNames[i]);
+    if(tool==0&&!modEmbedded){
+      runUiRecordGlobal("tools/default-move");
+      ImGui::SetNextWindowSizeConstraints({330*uiScale(),0},{FLT_MAX,FLT_MAX});
+      if(ImGui::BeginPopupContextItem("##default-move-options")){
+        defaultMoveOptions();
+        ImGui::EndPopup();
+      }
+    }
     ImGui::PopID();
   }
-  if(horizontalTools){
-    toolFlow(1);auto p=ImGui::GetCursorScreenPos();
-    ImGui::GetWindowDrawList()->AddLine(p,{p.x,p.y+34*uiScale()},ImGui::GetColorU32(ImGuiCol_Separator));
-    ImGui::Dummy({1,34*uiScale()});
-  }else ImGui::Separator();
+  if(!horizontalTools)ImGui::Separator();
   const bool snapInteger=cvars->GetFloat("ftebroom_auto_integer_snap")!=0;
-  toolFlow(32*uiScale());
+  toolFlow(toolWidth);
   if(snapInteger)ImGui::PushStyleColor(ImGuiCol_Button,uiActiveToolColor());
-  if(ImGui::Button("##integer-snap",{32*uiScale(),toolHeight}))
+  if(ImGui::Button("##integer-snap",toolSize))
     cvars->SetFloat("ftebroom_auto_integer_snap",!snapInteger);
   if(snapInteger)ImGui::PopStyleColor();
   const auto snapButton=ImGui::GetItemRectMin();
-  const ImVec2 snapCenter{snapButton.x+16*uiScale(),snapButton.y+toolHeight*.5f};
+  const ImVec2 snapCenter{snapButton.x+toolWidth*.5f,snapButton.y+toolHeight*.5f};
   auto* snapDraw=ImGui::GetWindowDrawList();
   const auto snapColor=ImGui::GetColorU32(ImGuiCol_Text);
   const float cross=8*uiScale(),point=3.5f*uiScale(),stroke=1.5f*uiScale();
@@ -643,6 +607,7 @@ static void panel(float w, float h)
     snapDraw->AddLine({snapCenter.x+axis.x*point,snapCenter.y+axis.y*point},
       {snapCenter.x+axis.x*cross,snapCenter.y+axis.y*cross},snapColor,stroke);
   if(cvars->GetFloat("ftebroom_skip_setup"))entityTestItem("integer_snap");
+  runUiRecordGlobal("tools/Integer snap");
   if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr("Automatically snap edited brush vertices to integer coordinates"));
   for (auto name : {"ftebroom_texture_lock", "ftebroom_uv_lock"})
   {
@@ -650,9 +615,10 @@ static void panel(float w, float h)
     bool on = cvars->GetFloat(name) != 0;
     if (on)
       ImGui::PushStyleColor(ImGuiCol_Button, uiActiveToolColor());
-    toolFlow(32*uiScale());
-    if (FteIcons::button(uv ? "##UV" : "##TL",uv?12:11,{32 * uiScale(), toolHeight}))
+    toolFlow(toolWidth);
+    if (FteIcons::button(uv ? "##UV" : "##TL",uv?12:11,toolSize))
       cvars->SetFloat(name, !on);
+    runUiRecordGlobal(uv?"tools/UV Lock":"tools/Texture Lock");
     if (on)
       ImGui::PopStyleColor();
     if (ImGui::IsItemHovered())
@@ -661,27 +627,114 @@ static void panel(float w, float h)
         uv ? "UV Lock (stored preference; advanced transforms pending)"
            : "Texture Lock: keep texture attached while moving");
   }
+  auto viewportControls=[&](bool strip){
+    auto begin=[&](const char* id,const char* value,const char* compact){
+      if(!strip){
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        return uiToolDropdown([&]{return ImGui::BeginCombo(id,value);});
+      }
+      toolFlow(toolWidth);
+      return uiToolValueCombo(id,compact,toolSize);
+    };
+    auto choice=[&](const char* id,int& value,const auto& choices,const char* compact){
+      if(!begin(id,choices[value],compact))return false;
+      bool changed=false;
+      for(int i=0;i<IM_ARRAYSIZE(choices);++i){
+        const bool selected=value==i;
+        if(ImGui::Selectable(choices[i],selected)&&!selected){value=i;changed=true;}
+        if(selected)ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+      return changed;
+    };
+    const float grid=cvars->GetFloat("ca_grid");
+    char gridLabel[96]{};
+    std::snprintf(gridLabel,sizeof gridLabel,"%s %g",uiTr("Grid"),grid);
+    if(begin("##Grid",gridLabel,gridLabel)){
+      for(int i=0;i<12;++i){
+        const float step=std::ldexp(1.f,i-3);
+        char label[16]{};
+        std::snprintf(label,sizeof label,"%g",step);
+        if(ImGui::Selectable(label,grid==step))cvars->SetFloat("ca_grid",step);
+        if(grid==step)ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+    }
+    runUiRecordGlobal("tools/Grid");
+    if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",gridLabel);
+    const char* views[]={"Perspective","YZ (side)","XZ (front)","XY (top)"};
+    const char* compactViews[]={"3D","YZ","XZ","XY"};
+    int view=std::clamp(int(cvars->GetFloat("ca_brush_view")),0,3);
+    if(choice("##View",view,views,compactViews[view])){
+      cancelGesture();
+      viewTypes[viewFocus]=view;
+      viewActivate(viewFocus);
+    }
+    runUiRecordGlobal("tools/View");
+    if(ImGui::IsItemHovered())
+      ImGui::SetTooltip("%s\n%s",uiTr(views[view]),view?"View plane / hold Shift during drag: axis":"XY plane / Alt: Z");
+    const char* layouts[]={"1 view","2 views","3 views","4 views"};
+    int layoutChoice=std::clamp(viewLayout-1,0,3);
+    if(choice("##Layout",layoutChoice,layouts,uiTr(layouts[layoutChoice])))
+      viewSetLayout(layoutChoice+1);
+    runUiRecordGlobal("tools/Layout");
+    if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr(layouts[layoutChoice]));
+  };
+  if(!horizontalTools&&toolsArea.x<210*uiScale()){
+    toolFlow(toolWidth);
+    if(compileButton("Grid, View and Layout",1,true,toolSize))ImGui::OpenPopup("##viewport-controls");
+    ImGui::SetNextWindowSizeConstraints({220*uiScale(),0},{FLT_MAX,FLT_MAX});
+    if(ImGui::BeginPopup("##viewport-controls")){
+      viewportControls(false);
+      ImGui::EndPopup();
+    }
+  }else viewportControls(true);
   ImGui::PopStyleVar();
   ImGui::EndDisabled();
-  buildToolbar(horizontalTools,compactRail);
-  ImGui::BeginDisabled(modEmbedded);
   int currentTool = (int)cvars->GetFloat("ftebroom_tool");
+  buildToolbar(toolSize,toolFlow,horizontalTools,compactRail);
+  ImGui::BeginDisabled(modEmbedded);
+  if(currentTool==0&&!modEmbedded){
+    static bool shapeExpanded=false;
+    toolFlow(toolWidth);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,toolPadding);
+    const bool expanded=compactRail?ImGui::IsPopupOpen("##shape-move"):shapeExpanded;
+    if(ImGui::ArrowButtonEx("##shape-move-toggle",expanded?ImGuiDir_Up:ImGuiDir_Down,toolSize)){
+      if(compactRail)ImGui::OpenPopup("##shape-move");
+      else shapeExpanded=!shapeExpanded;
+    }
+    ImGui::PopStyleVar();
+    runUiRecordGlobal("tools-shape-toggle");
+    if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr("Shape / move"));
+    if(compactRail){
+      ImGui::SetNextWindowSizeConstraints({330*uiScale(),0},{FLT_MAX,FLT_MAX});
+      if(ImGui::BeginPopup("##shape-move")){
+        defaultMoveOptions();
+        ImGui::EndPopup();
+      }
+    }else if(shapeExpanded){
+      defaultMoveOptions(horizontalTools);
+    }
+  }
   bool optionsVisible=true;
   if(compactRail) {
     uiToolStripEnd(true);
+    optionsVisible=false;
+    if(currentTool!=0){
     ImGui::Dummy({0,8*uiScale()});
-    toolFlow(32*uiScale());
+    toolFlow(toolWidth);
     uiToolStripBegin();
     ImGui::PushStyleColor(ImGuiCol_Button,uiModernPalette().nav);
-    if(compileButton("Tool options",1,true))ImGui::OpenPopup("##rail-tool-options");
+    if(compileButton("Tool options",1,true,toolSize))ImGui::OpenPopup("##rail-tool-options");
     if(cvars->GetFloat("ftebroom_skip_setup"))entityTestItem("rail_options");
     ImGui::PopStyleColor();
     uiToolStripEnd();
     ImGui::SetNextWindowSizeConstraints({300*uiScale(),0},{390*uiScale(),std::max(100.f,h-80*uiScale())});
     optionsVisible=ImGui::BeginPopup("##rail-tool-options");
     if(optionsVisible)uiSectionHeading("Tool options");
+    }
   }
-  if(optionsVisible) {
+  if(optionsVisible&&currentTool!=0) {
   if(horizontalTools)toolFlow(190*uiScale());else ImGui::Separator();
   if (currentTool == 2)
   {
@@ -689,7 +742,7 @@ static void panel(float w, float h)
     if(horizontalTools)toolOptionFlow(200*uiScale());
     int keep = (int)cvars->GetFloat("ftebroom_clip_keep");
     ImGui::SetNextItemWidth(horizontalTools?150 * uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
-    if (ImGui::Combo(toolOptionLabel(horizontalTools,"Keep"), &keep, "Front\0Both sides\0Back\0"))
+    if (uiToolCombo(toolOptionLabel(horizontalTools,"Keep"), &keep, "Front\0Both sides\0Back\0"))
       cvars->SetFloat("ftebroom_clip_keep", keep);
     if(horizontalTools)toolOptionFlow(200*uiScale());
     if (ImGui::Button("Apply (Enter)"))
@@ -737,7 +790,7 @@ static void panel(float w, float h)
     if(horizontalTools)toolOptionFlow(200*uiScale());
     static int axis = 2;
     ImGui::SetNextItemWidth(horizontalTools?55:std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
-    ImGui::Combo(toolOptionLabel(horizontalTools,"Axis"), &axis, "X\0Y\0Z\0");
+    uiToolCombo(toolOptionLabel(horizontalTools,"Axis"), &axis, "X\0Y\0Z\0");
     if(horizontalTools)toolOptionFlow(200*uiScale());
     if (ImGui::Button("Apply"))
     {
@@ -761,37 +814,6 @@ static void panel(float w, float h)
     if (currentTool!=16 && ImGui::Checkbox("Entity angles", &properties))
       cvars->SetFloat("ftebroom_rotate_entity_properties", properties);
   }
-  else if (currentTool == 0)
-  {
-    static bool shapeExpanded=false;
-    const auto direction=horizontalTools?(shapeExpanded?ImGuiDir_Left:ImGuiDir_Right):(shapeExpanded?ImGuiDir_Up:ImGuiDir_Down);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,toolPadding);
-    if(ImGui::ArrowButton("##shape-options",direction))shapeExpanded=!shapeExpanded;
-    runUiRecordGlobal("tools-shape-toggle");
-    ImGui::SameLine();
-    if(ImGui::Button("Shape / move"))shapeExpanded=!shapeExpanded;
-    ImGui::PopStyleVar();
-    if(shapeExpanded) {
-    if(horizontalTools)toolOptionFlow(190*uiScale());
-    shapeOptions(horizontalTools);
-    if(horizontalTools)toolOptionFlow(ImGui::CalcTextSize("Move objects by:",nullptr,true).x+240*uiScale());
-    static float offset[3] = {0, 0, 0};
-    ImGui::TextWrapped("Move objects by:");
-    if(horizontalTools)toolOptionFlow(200*uiScale());
-    ImGui::SetNextItemWidth(horizontalTools?220*uiScale():ImGui::GetContentRegionAvail().x);
-    ImGui::InputFloat3(toolOptionLabel(horizontalTools,"##move-offset"), offset, "%.2f");
-    if(horizontalTools)toolOptionFlow(ImGui::CalcTextSize("Apply",nullptr,true).x+2*ImGui::GetStyle().FramePadding.x);
-    ImGui::BeginDisabled(cvars->GetFloat("ftebroom_ctx_selection") != 1);
-    if (ImGui::Button("Apply"))
-    {
-      char cmd[160];
-      std::snprintf(
-        cmd, sizeof cmd, "ftebroom_move %g %g %g\n", offset[0], offset[1], offset[2]);
-      action(cmd);
-    }
-    ImGui::EndDisabled();
-    }
-  }
   else if (currentTool == 1)
   {
     ImGui::Text("Brush | %g points", cvars->GetFloat("ftebroom_shape_points"));
@@ -807,7 +829,7 @@ static void panel(float w, float h)
     static int mode = 0;
     static float scale[3] = {1, 1, 1};
     ImGui::SetNextItemWidth(horizontalTools?110:std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
-    if (ImGui::Combo(toolOptionLabel(horizontalTools,"##scale-mode"), &mode, "By factors\0To size\0"))
+    if (uiToolCombo(toolOptionLabel(horizontalTools,"##scale-mode"), &mode, "By factors\0To size\0"))
       scale[0] = scale[1] = scale[2] = mode ? 128.f : 1.f;
     if(horizontalTools)toolOptionFlow(200*uiScale());
     ImGui::SetNextItemWidth(horizontalTools?220:std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
@@ -850,8 +872,8 @@ static void panel(float w, float h)
     if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?90*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));settings|=ImGui::DragFloat(toolOptionLabel(horizontalTools,"End scale"),&scale,.01f,.05f,8,"%.3f");
     if(settings){char cmd[128];std::snprintf(cmd,sizeof cmd,"ftebroom_spin settings %d %.9g %.9g\n",std::clamp(segments,1,64),std::clamp(flex,-1.f,1.f),std::clamp(scale,.05f,8.f));command(cmd);}
     int mode=(int)cvars->GetFloat("ftebroom_spin_mode"),component=(int)cvars->GetFloat("ftebroom_spin_component");
-    ImGui::SetNextItemWidth(horizontalTools?95*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(ImGui::Combo(toolOptionLabel(horizontalTools,"Drag"),&mode,"Move\0Scale\0Rotate\0"))cvars->SetFloat("ftebroom_spin_mode",mode);
-    if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?75*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(ImGui::Combo(toolOptionLabel(horizontalTools,"Constraint"),&component,"All\0X\0Y\0Z\0"))cvars->SetFloat("ftebroom_spin_component",component);
+    ImGui::SetNextItemWidth(horizontalTools?95*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(uiToolCombo(toolOptionLabel(horizontalTools,"Drag"),&mode,"Move\0Scale\0Rotate\0"))cvars->SetFloat("ftebroom_spin_mode",mode);
+    if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?75*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(uiToolCombo(toolOptionLabel(horizontalTools,"Constraint"),&component,"All\0X\0Y\0Z\0"))cvars->SetFloat("ftebroom_spin_component",component);
     static float values[2][3]{};const char* labels[]={"Endpoint offset","End rotation"};const char* ops[]={"point","rotation"};const char* names[2][3]={{"ftebroom_spin_x","ftebroom_spin_y","ftebroom_spin_z"},{"ftebroom_spin_rx","ftebroom_spin_ry","ftebroom_spin_rz"}};
     for(int i=0;i<2;i++){
       ImGui::SetNextItemWidth(horizontalTools?260*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));ImGui::InputFloat3(toolOptionLabel(horizontalTools,labels[i]),values[i],"%.3f");
@@ -866,14 +888,14 @@ static void panel(float w, float h)
   {
     int axis=(int)cvars->GetFloat("ftebroom_bend_axis"),segments=(int)cvars->GetFloat("ftebroom_bend_segments"),subdivisions=(int)cvars->GetFloat("ftebroom_bend_subdivisions");
     bool joints=cvars->GetFloat("ftebroom_bend_joints")!=0,settings=false;
-    ImGui::SetNextItemWidth(horizontalTools?65*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));settings|=ImGui::Combo(toolOptionLabel(horizontalTools,"Axis"),&axis,"X\0Y\0Z\0");
+    ImGui::SetNextItemWidth(horizontalTools?65*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));settings|=uiToolCombo(toolOptionLabel(horizontalTools,"Axis"),&axis,"X\0Y\0Z\0");
     if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?90*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));settings|=ImGui::InputInt(toolOptionLabel(horizontalTools,"Path segments"),&segments);
     if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?90*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));settings|=ImGui::InputInt(toolOptionLabel(horizontalTools,"Subdivisions"),&subdivisions);
     settings|=ImGui::Checkbox("Keep joints",&joints);
     if(settings){char cmd[160];std::snprintf(cmd,sizeof cmd,"ftebroom_bend settings %d %d %d %d\n",axis,std::clamp(segments,1,32),std::clamp(subdivisions,0,6),int(joints));command(cmd);}
     if(horizontalTools)toolOptionFlow(200*uiScale());int mode=(int)cvars->GetFloat("ftebroom_bend_mode"),component=(int)cvars->GetFloat("ftebroom_bend_component");
-    ImGui::SetNextItemWidth(horizontalTools?95*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(ImGui::Combo(toolOptionLabel(horizontalTools,"Drag"),&mode,"Move\0Scale\0Rotate\0"))cvars->SetFloat("ftebroom_bend_mode",mode);
-    if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?75*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(ImGui::Combo(toolOptionLabel(horizontalTools,"Constraint"),&component,"All\0X\0Y\0Z\0"))cvars->SetFloat("ftebroom_bend_component",component);
+    ImGui::SetNextItemWidth(horizontalTools?95*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(uiToolCombo(toolOptionLabel(horizontalTools,"Drag"),&mode,"Move\0Scale\0Rotate\0"))cvars->SetFloat("ftebroom_bend_mode",mode);
+    if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?75*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));if(uiToolCombo(toolOptionLabel(horizontalTools,"Constraint"),&component,"All\0X\0Y\0Z\0"))cvars->SetFloat("ftebroom_bend_component",component);
     int handle=(int)cvars->GetFloat("ftebroom_bend_handle");ImGui::SetNextItemWidth(horizontalTools?90*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
     if(ImGui::InputInt(toolOptionLabel(horizontalTools,"Control point"),&handle))command(("ftebroom_bend handle "+std::to_string(std::clamp(handle,0,segments))+"\n").c_str());
     static float values[3][3]{};const char* keys[]={"point","scale","rotation"};const char* labels[]={"Position","Scale","Rotation (degrees)"};
@@ -888,7 +910,7 @@ static void panel(float w, float h)
   {
     int mode=(int)cvars->GetFloat("ftebroom_sculpt_mode");
     ImGui::SetNextItemWidth(horizontalTools?110*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
-    if(ImGui::Combo(toolOptionLabel(horizontalTools,"Mode"),&mode,"Raise\0Lower\0Smooth\0"))cvars->SetFloat("ftebroom_sculpt_mode",mode);
+    if(uiToolCombo(toolOptionLabel(horizontalTools,"Mode"),&mode,"Raise\0Lower\0Smooth\0"))cvars->SetFloat("ftebroom_sculpt_mode",mode);
     float radius=cvars->GetFloat("ftebroom_sculpt_radius"),intensity=cvars->GetFloat("ftebroom_sculpt_intensity");
     if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?95*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
     if(ImGui::DragFloat(toolOptionLabel(horizontalTools,"Radius"),&radius,1,1,4096,"%.1f"))cvars->SetFloat("ftebroom_sculpt_radius",std::clamp(radius,1.f,4096.f));
@@ -915,7 +937,7 @@ static void panel(float w, float h)
     char path[32];cvars->GetString("ftebroom_sweep_path",path,sizeof path);
     int mode=std::string(path)=="arc"?1:(std::string(path)=="sbend"?2:0);
     if(horizontalTools)toolOptionFlow(200*uiScale());ImGui::SetNextItemWidth(horizontalTools?95*uiScale():std::max(40.f,ImGui::GetContentRegionAvail().x*.58f));
-    if(ImGui::Combo(toolOptionLabel(horizontalTools,"Path"),&mode,"Straight\0Arc\0S-bend\0")){cvars->SetString("ftebroom_sweep_path",mode==1?"arc":(mode==2?"sbend":"straight"));rebuild=true;}
+    if(uiToolCombo(toolOptionLabel(horizontalTools,"Path"),&mode,"Straight\0Arc\0S-bend\0")){cvars->SetString("ftebroom_sweep_path",mode==1?"arc":(mode==2?"sbend":"straight"));rebuild=true;}
     bool integer=cvars->GetFloat("ftebroom_sweep_integer")!=0;
     if(ImGui::Checkbox("Snap to integer grid",&integer)){cvars->SetFloat("ftebroom_sweep_integer",integer);rebuild=true;}
     if(horizontalTools)toolOptionFlow(200*uiScale());if(ImGui::Button("Reset"))command("ftebroom_sweep reset\n");
@@ -975,6 +997,7 @@ static void panel(float w, float h)
   }
   if(compactRail)ImGui::EndPopup();
   }
+  if(horizontalTools)ImGui::PopStyleVar();
   if(!compactRail)uiToolStripEnd();
   if(horizontalTools&&!toolsWindow->SkipItems){
     const float contentHeight=toolsWindow->DC.CursorMaxPos.y+toolsWindow->Scroll.y-toolsWindow->Pos.y+toolsWindow->WindowPadding.y;
@@ -997,7 +1020,6 @@ static void panel(float w, float h)
   ImGui::End();
   plantBrushPanel();
   selectMapTab = selectMaterialTab = false;
-  fixedPanel(uiStatusName,uiStatusDock,statusY,statusHeight);
   char selectionStatus[192]={}, statusText[512]={};
   cvars->GetString("ftebroom_selection_status",selectionStatus,sizeof selectionStatus);
   if(selectionStatus[0])
@@ -1010,41 +1032,23 @@ static void panel(float w, float h)
       sceneDrag?(altHeld?"Z constraint | Esc cancels":"XY constraint | Esc cancels"):
       currentTool==2?"Place 2 or 3 points | Enter applies | Ctrl+Enter changes side | Esc removes last point":
       "Click selects | Drag creates / moves | Shift+Esc exits tool");
-  const auto& style=ImGui::GetStyle();
-  const float showWidth=modFilesOpen?0:ImGui::CalcTextSize(uiTr("Show files")).x+2*style.FramePadding.x+style.ItemSpacing.x;
-  const float textWidth=ImGui::GetContentRegionAvail().x-showWidth-style.ItemSpacing.x-100*uiScale();
-  if(textWidth>0){
-    const char* end=nullptr;
-    ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(),textWidth,0,statusText,nullptr,&end);
-    if(selectionStatus[0])
-      ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().warning:ImVec4{1,.65f,.15f,1});
-    ImGui::TextUnformatted(statusText,end);
-    if(selectionStatus[0])ImGui::PopStyleColor();
-    ImGui::SameLine();
-  }
-  if(!modFilesOpen){
-    if(ImGui::SmallButton("Show files")){
-      modFilesOpen=true;
-      modFilesRequestFocus=true;
+  if(!uiStatusInFiles){
+    auto flags=ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove;
+    if(softChrome)flags|=ImGuiWindowFlags_NoBackground;
+    ImGui::SetNextWindowDockID(uiStatusDock,ImGuiCond_Always);
+    if(!uiStatusDock){
+      flags|=ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoSavedSettings;
+      ImGui::SetNextWindowPos({margin,statusY});
+      ImGui::SetNextWindowSize({std::max(1.f,w-2*margin),statusHeight});
     }
-    browserQaItem("files/show");
-    ImGui::SameLine();
+    if(ImGui::Begin(uiStatusName,nullptr,flags)){
+      if(softChrome)
+        uiSoftSurface(ImGui::GetBackgroundDrawList(),ImGui::GetCurrentWindow()->Rect(),11*uiScale());
+      browserQaWindow("files/standalone-status");
+      editorStatusLine(statusText,selectionStatus[0]!=0);
+    }
+    ImGui::End();
   }
-  ImGui::TextDisabled("%s.map%s",documentName.c_str(),cvars->GetFloat("ftebroom_dirty")?" *":"");
-  if(ImGui::IsItemHovered()){
-    ImGui::BeginTooltip();
-    if(!documentFile.empty())ImGui::TextUnformatted(documentFile.u8string().c_str());
-    char group[256]{},entity[160]{};
-    cvars->GetString("ftebroom_open_group",group,sizeof group);
-    cvars->GetString("ftebroom_selected_entity",entity,sizeof entity);
-    if(*group)ImGui::Text("Open group: %s",group);
-    if(*entity)ImGui::Text("Entity: %s",entity);
-    ImGui::Text("Selection: %d brushes, %d entities, %d faces",
-      int(cvars->GetFloat("ftebroom_selection_count")),int(cvars->GetFloat("ftebroom_entity_selection_count")),
-      int(cvars->GetFloat("ftebroom_face_count")));
-    ImGui::EndTooltip();
-  }
-  ImGui::End();
   issuesPanel();
   viewOptionsPanel();
   runPanel();
@@ -1175,7 +1179,7 @@ static void panel(float w, float h)
   tracePanel();
   terrainPanel();
   shaderPackPanel();
-  modFilesPanel();
+  modFilesPanel(statusText,selectionStatus[0]!=0);
   modelViewerPanel();bbBenchTick();plantPanel();
   plantBrushHover();
   softLightGalleryPanel();

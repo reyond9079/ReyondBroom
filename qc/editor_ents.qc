@@ -497,12 +497,15 @@ void(entedit_t *nent) editor_ents_updated =
                 else {nent->scale=stof(modelSize);nent->modelaxes='1 1 1';}
             }
 
-			string model=def->model;if(def->modelkey!="")model=nent->fields[def->modelkey];
+			string model=def->model;
+            if(def->modelkey!=""&&nent->fields[def->modelkey]!="")model=nent->fields[def->modelkey];
             for(int r=0;r<def->ruleCount;r++){fb_definition_rule_t *rule=&fb_definition_rules[def->firstRule+r];if(!fb_fgd_condition(rule->condition,nent->fields,def->classname))continue;
                 model=fb_fgd_value(rule->path,nent->fields,def->classname);nent->modelskin=stof(fb_fgd_value(rule->skin,nent->fields,def->classname));nent->modelframe=stof(fb_fgd_value(rule->frame,nent->fields,def->classname));
                 string ruleScale=fb_fgd_value(rule->scale,nent->fields,def->classname);if(ruleScale!=""){if(strstrofs(ruleScale," ",0)>=0){nent->modelaxes=stov(ruleScale);nent->scale=1;}else nent->scale=stof(ruleScale);}break;
             }if(nent->scale==0)nent->scale=1;
 			if(nent->fields["model"]!="")model=nent->fields["model"];
+            if(substring(model,0,1)==":")model=substring(model,1,-1);
+            model=strreplace("\\","/",model);
 			nent->modelindex=0;if(model!="")nent->modelindex=modelindexforname(model);
 		}
 	}

@@ -419,11 +419,12 @@ static float compileButtonWidth(const char* label)
 {
   return ImGui::CalcTextSize(label,nullptr,true).x+54*uiScale();
 }
-static bool compileButton(const char* label,int icon,bool iconOnly=false)
+static bool compileButton(const char* label,int icon,bool iconOnly=false,ImVec2 cell={})
 {
   const float u=uiScale(),size=20*u;
   const auto p=ImGui::GetCursorScreenPos();
-  const float width=iconOnly?32*u:compileButtonWidth(label),height=(iconOnly?30.f:34.f)*u;
+  const float width=cell.x>0?cell.x:(iconOnly?32*u:compileButtonWidth(label));
+  const float height=cell.y>0?cell.y:(iconOnly?30.f:34.f)*u;
   bool clicked=ImGui::Button((std::string("##compile-")+label).c_str(),{width,height});
   auto list=ImGui::GetWindowDrawList();auto color=ImGui::GetColorU32(ImGuiCol_Text);
   const float x=p.x+(iconOnly?(width-size)*.5f:12*u),y=p.y+(height-size)*.5f;
@@ -442,32 +443,29 @@ static bool compileButton(const char* label,int icon,bool iconOnly=false)
     ImGui::SetTooltip("%.*s",end?int(end-text):int(std::strlen(text)),text);
   return clicked;
 }
-static void buildToolbar(bool inlineTools=false,bool iconOnly=false)
+template<class Place>
+static void buildToolbar(ImVec2 cell,Place place,bool inlineTools,bool compactRail)
 {
-    if(inlineTools) {
-      const float width=compileButtonWidth("Compile");
-      const float right=ImGui::GetWindowPos().x+ImGui::GetWindowContentRegionMax().x;
-      if(ImGui::GetItemRectMax().x+ImGui::GetStyle().ItemSpacing.x+width<=right)ImGui::SameLine();
-    }
-    bool preview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
-    if(modEmbedded){if(iconOnly)ImGui::TextWrapped("Mod preview");else {ImGui::TextUnformatted("Mod preview");ImGui::SameLine();}
-      if(ImGui::RadioButton(iconOnly?"Camera":"Free camera",!modPlay))modSetPlay(false);if(!iconOnly)ImGui::SameLine();
-      if(ImGui::RadioButton(iconOnly?"Play":"Play mod",modPlay))modSetPlay(true);
-      if(!iconOnly)ImGui::SameLine();
-      if(iconOnly?compileButton("Back to editing",4,true):ImGui::Button("Back to editing"))modEmbedEnd();
+    const bool preview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
+    gameProfileLoad();
+    const bool canPlay=gameProfile!=0&&gameProfile!=3;
+    const char* previewLabel=preview?"Back to editing":"Show BSP";
+    if(modEmbedded){
+      if(inlineTools)place(ImGui::CalcTextSize("Mod preview").x);
+      if(compactRail)ImGui::TextWrapped("Mod preview");else {ImGui::TextUnformatted("Mod preview");ImGui::SameLine();}
+      if(ImGui::RadioButton(compactRail?"Camera":"Free camera",!modPlay))modSetPlay(false);
+      if(!compactRail)ImGui::SameLine();
+      if(ImGui::RadioButton(compactRail?"Play":"Play mod",modPlay))modSetPlay(true);
+      if(!compactRail)ImGui::SameLine();
+      if(compileButton("Back to editing",4,true,cell))modEmbedEnd();
       ImGui::TextWrapped(modPlay?(modCaptured?"Playing | Escape: release mouse":"Click viewport to play | Escape: release mouse"):"RMB: look | WASD: fly | Q/X: up/down | Shift: fast");
-      return;}
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,{14*uiScale(),9*uiScale()});
-    const float right=ImGui::GetWindowPos().x+ImGui::GetWindowContentRegionMax().x;
-    auto next=[&](const char* label){
-      if(iconOnly)return;
-      const float width=compileButtonWidth(label);
-      if(ImGui::GetItemRectMax().x+ImGui::GetStyle().ItemSpacing.x+width<=right)ImGui::SameLine();
-    };
+      return;
+    }
     auto control=[&](const char* label,int icon){
-      if(iconOnly)ImGui::SetCursorPosX(ImGui::GetCursorPosX()+
-        std::max(0.f,(ImGui::GetContentRegionAvail().x-32*uiScale())*.5f));
-      return compileButton(label,icon,iconOnly);
+      place(cell.x);
+      const bool clicked=compileButton(label,icon,true,cell);
+      runUiRecordGlobal(std::string("tools/")+label);
+      return clicked;
     };
     ImGui::BeginDisabled(runActive||buildRunning);
     ImGui::PushStyleColor(ImGuiCol_Button,uiModern()?uiModernPalette().action:uiColor(47,99,160));
@@ -475,17 +473,14 @@ static void buildToolbar(bool inlineTools=false,bool iconOnly=false)
     ImGui::PushStyleColor(ImGuiCol_Text,uiColor(255,255,255));
     const bool compile=control("Compile",0);placementRect("build/compile");
     if(compile)buildBegin();
-    ImGui::PopStyleColor(3);ImGui::EndDisabled();next("Setup compile");
+    ImGui::PopStyleColor(3);ImGui::EndDisabled();
     if(control("Setup compile",1))buildWindow=true;
-    next(preview?"Back to editing":"Show BSP");
-    if(preview){if(control("Back to editing",4))buildEdit();}
+    if(preview){if(control(previewLabel,4))buildEdit();}
     else {ImGui::BeginDisabled(buildResult.empty()||(buildResultDocument!=documentFile || buildResultProfile!=gameProfile)||buildRunning);
-      if(control("Show BSP",2))buildShow();ImGui::EndDisabled();}
-    gameProfileLoad();
-    if(gameProfile!=0&&gameProfile!=3){next("Play mod");ImGui::BeginDisabled(runActive||runExclusive||buildRunning||assetsLoading);
+      if(control(previewLabel,2))buildShow();ImGui::EndDisabled();}
+    if(canPlay){ImGui::BeginDisabled(runActive||runExclusive||buildRunning||assetsLoading);
       if(control("Play mod",3))modPreview();ImGui::EndDisabled();}
-    if(!tracePoints.empty()){next("Leak route");if(iconOnly?control("Leak route",5):ImGui::Button("Leak route"))traceWindow=true;}
-    ImGui::PopStyleVar();
+    if(!tracePoints.empty()&&control("Leak route",5))traceWindow=true;
 }
 static void buildOverlay()
 {

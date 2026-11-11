@@ -284,7 +284,52 @@ static void modFilesViewButton(bool tiles)
   }
 }
 
-static void modFilesPanel() {
+static void editorStatusLine(const char* status,bool warning,bool reserveZoom=false)
+{
+  const bool filesOpen=modFilesOpen;
+  if(ImGui::SmallButton(filesOpen?"Hide files":"Show files")){
+    modFilesOpen=!filesOpen;
+    modFilesRequestFocus=modFilesOpen;
+  }
+  browserQaItem(filesOpen?"files/hide":"files/show");
+  ImGui::SameLine();
+  const auto& style=ImGui::GetStyle();
+  const float available=ImGui::GetContentRegionAvail().x;
+  const float zoomWidth=reserveZoom?std::min(90.f,available*.28f)+ImGui::GetFrameHeight()+2*style.ItemSpacing.x:0;
+  const float textSpace=std::max(0.f,available-zoomWidth);
+  const std::string filename=documentName+".map"+(cvars->GetFloat("ftebroom_dirty")?" *":"");
+  const float filenameWidth=std::min(ImGui::CalcTextSize(filename.c_str()).x,textSpace*.34f);
+  auto drawText=[&](const char* text,float width){
+    const char* end=nullptr;
+    ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(),width,0,text,nullptr,&end);
+    ImGui::TextUnformatted(text,end);
+  };
+  if(textSpace>filenameWidth+style.ItemSpacing.x){
+    if(warning)ImGui::PushStyleColor(ImGuiCol_Text,uiModern()?uiModernPalette().warning:ImVec4{1,.65f,.15f,1});
+    drawText(status,textSpace-filenameWidth-style.ItemSpacing.x);
+    if(warning)ImGui::PopStyleColor();
+    ImGui::SameLine();
+  }
+  ImGui::PushStyleColor(ImGuiCol_Text,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+  drawText(filename.c_str(),filenameWidth+1);
+  ImGui::PopStyleColor();
+  browserQaItem("files/status-document");
+  if(ImGui::IsItemHovered()){
+    ImGui::BeginTooltip();
+    if(!documentFile.empty())ImGui::TextUnformatted(documentFile.u8string().c_str());
+    char group[256]{},entity[160]{};
+    cvars->GetString("ftebroom_open_group",group,sizeof group);
+    cvars->GetString("ftebroom_selected_entity",entity,sizeof entity);
+    if(*group)ImGui::Text("Open group: %s",group);
+    if(*entity)ImGui::Text("Entity: %s",entity);
+    ImGui::Text("Selection: %d brushes, %d entities, %d faces",
+      int(cvars->GetFloat("ftebroom_selection_count")),int(cvars->GetFloat("ftebroom_entity_selection_count")),
+      int(cvars->GetFloat("ftebroom_face_count")));
+    ImGui::EndTooltip();
+  }
+}
+
+static void modFilesPanel(const char* status,bool warning) {
   if(modFilesImageRefresh){clearFileImages();modFilesImageRefresh=false;}
   fileImagePump();
   assetToolsPanel();
@@ -295,7 +340,7 @@ static void modFilesPanel() {
   modFilesVisible=false;if(cvars->GetFloat("ftebroom_skip_setup"))modFilesTestItems.clear();if(!modFilesOpen)return;
   ImGui::SetNextWindowSize({650*uiScale(),450*uiScale()},ImGuiCond_FirstUseEver);
   if(modFilesRequestFocus){ImGui::SetNextWindowFocus();modFilesRequestFocus=false;}
-  if(uiSoftPanelBegin("Mod file manager",&modFilesOpen)) {
+  if(uiSoftPanelBegin(uiModFilesName,&modFilesOpen)) {
     modFilesVisible=true;modFilesMin=ImGui::GetWindowPos();auto sz=ImGui::GetWindowSize();modFilesMax={modFilesMin.x+sz.x,modFilesMin.y+sz.y};
     browserQaWindow("files/panel");
     ImGui::BeginChild("Mod file browser",{0,-ImGui::GetFrameHeightWithSpacing()},
@@ -446,10 +491,9 @@ static void modFilesPanel() {
       ImGui::SameLine();if(ImGui::Button("Cancel rename"))modFilesRename.clear();
     }
     ImGui::EndChild();
-    if(ImGui::Button("Hide files"))modFilesOpen=false;
-    browserQaItem("files/hide");
+    if(uiStatusInFiles)editorStatusLine(status,warning,modFilesGrid);
     if(modFilesGrid){
-      ImGui::SameLine();
+      if(uiStatusInFiles)ImGui::SameLine();
       browserThumbnailFooter("mod-thumbnail",modFilesThumbnailSize,48,180);
     }
   }ImGui::End();

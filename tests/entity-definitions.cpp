@@ -26,6 +26,10 @@ spawnflags(flags) = [ 1 : "Fast" : 1 4 : "Silent" : 0 ]
   assert(fgd.at("player").properties.at("spawnflags").value=="1");
   assert(fgd.at("player").properties.at("mode").choices.size()==2);
   assert(fgd.at("player").mins[2]==-24 && fgd.at("player").model=="models/player.md3");
+  auto prefixed=entityRead(R"(@PointClass model({{ skin -> ":models/alternate.md2", ":models/default.md2" }}) = q2_item [skin(integer) : "Skin" : 0])",".fgd");
+  assert(prefixed.at("q2_item").model=="models/default.md2");
+  assert(prefixed.at("q2_item").modelRules.front().path=="=models/alternate.md2");
+  assert(entityModelPath("progs\\monster.mdl")=="progs/monster.mdl");
   auto model=entityRead(R"(<classes><point name="sample" model="models/sample.md3" skin="2" frame="frame" scale="modelscale, modelscale_vec"/></classes>)", ".ent");
   assert(model.at("sample").modelSkin=="2" && model.at("sample").modelFrame=="frame");
   assert(model.at("sample").modelScale=="modelscale, modelscale_vec");

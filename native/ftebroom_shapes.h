@@ -29,7 +29,7 @@ static const char* toolOptionLabel(bool horizontal,const char* label)
   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
   return id.c_str();
 }
-static void shapeOptions(bool horizontal)
+static void defaultMoveOptions(bool horizontal=false)
 {
   const char* ids[] = {
     "cuboid", "cylinder", "cone", "uvsphere", "icosphere", "stairs", "arch"};
@@ -40,18 +40,17 @@ static void shapeOptions(bool horizontal)
     if (!std::strcmp(current, ids[i]))
       shape = i;
   if(!horizontal)ImGui::TextUnformatted("Shape");
-  ImGui::SetNextItemWidth(horizontal?130*uiScale():ImGui::GetContentRegionAvail().x);
-  if (
-    ImGui::Combo(
-      horizontal?"Shape":"##Shape", &shape, "Cuboid\0Cylinder\0Cone\0UV sphere\0Icosahedron\0Stairs\0Arch\0"))
+  ImGui::SetNextItemWidth(horizontal?130*uiScale():-FLT_MIN);
+  if(uiToolCombo(horizontal?"Shape":"##Shape",&shape,"Cuboid\0Cylinder\0Cone\0UV sphere\0Icosahedron\0Stairs\0Arch\0"))
     cvars->SetString("ftebroom_shape", ids[shape]);
+  runUiRecordGlobal("tools/shape-choice");
   if(horizontal)toolOptionFlow(ImGui::CalcTextSize("Shape settings",nullptr,true).x+2*ImGui::GetStyle().FramePadding.x);
-  if (ImGui::Button("Shape settings", {horizontal?0.f:ImGui::GetContentRegionAvail().x,0}))
+  if (ImGui::Button("Shape settings"))
     ImGui::OpenPopup("Shape parameters");
   if (ImGui::BeginPopup("Shape parameters"))
   {
     int axis = (int)cvars->GetFloat("ftebroom_shape_axis");
-    if (ImGui::Combo("Axis", &axis, "X\0Y\0Z\0"))
+    if (uiToolCombo("Axis", &axis, "X\0Y\0Z\0"))
       cvars->SetFloat("ftebroom_shape_axis", axis);
     int sides = (int)cvars->GetFloat("ftebroom_shape_sides");
     if (ImGui::InputInt("Sides", &sides))
@@ -60,7 +59,7 @@ static void shapeOptions(bool horizontal)
     cvars->GetString("ftebroom_shape_circle", mode, sizeof mode);
     int circle =
       !std::strcmp(mode, "scalable") ? 2 : (!std::strcmp(mode, "vertex") ? 1 : 0);
-    if (ImGui::Combo("Circle", &circle, "Edge aligned\0Vertex aligned\0Scalable (CZG)\0"))
+    if (uiToolCombo("Circle", &circle, "Edge aligned\0Vertex aligned\0Scalable (CZG)\0"))
       cvars->SetString(
         "ftebroom_shape_circle",
         circle == 2 ? "scalable" : (circle == 1 ? "vertex" : "edge"));
@@ -83,7 +82,7 @@ static void shapeOptions(bool horizontal)
     if (ImGui::InputFloat("Step height", &step))
       cvars->SetFloat("ftebroom_shape_step", std::max(1.f, step));
     int direction = (int)cvars->GetFloat("ftebroom_shape_stairdir");
-    if (ImGui::Combo("Stair direction", &direction, "+X\0-X\0+Y\0-Y\0"))
+    if (uiToolCombo("Stair direction", &direction, "+X\0-X\0+Y\0-Y\0"))
       cvars->SetFloat("ftebroom_shape_stairdir", direction);
     bool spandrel = cvars->GetFloat("ftebroom_shape_spandrel") != 0;
     if (ImGui::Checkbox("Arch spandrels", &spandrel))
@@ -94,8 +93,25 @@ static void shapeOptions(bool horizontal)
     ImGui::EndPopup();
   }
   if(horizontal)toolOptionFlow(ImGui::CalcTextSize("Replace selection",nullptr,true).x+2*ImGui::GetStyle().FramePadding.x);
+  else ImGui::SameLine();
   ImGui::BeginDisabled(cvars->GetFloat("ftebroom_selection_count") < 1);
-  if (ImGui::Button("Replace selection", {horizontal?0.f:ImGui::GetContentRegionAvail().x,0}))
+  if (ImGui::Button("Replace selection"))
     command("ftebroom_shape_apply\n");
+  ImGui::EndDisabled();
+
+  if(horizontal)toolOptionFlow(ImGui::CalcTextSize("Move objects by:",nullptr,true).x+4*uiScale());
+  else ImGui::Separator();
+  ImGui::TextUnformatted("Move objects by:");
+  static float offset[3]={};
+  if(horizontal)toolOptionFlow(200*uiScale());
+  ImGui::SetNextItemWidth(horizontal?200*uiScale():-FLT_MIN);
+  ImGui::InputFloat3("##move-offset",offset,"%.2f");
+  if(horizontal)toolOptionFlow(ImGui::CalcTextSize("Apply",nullptr,true).x+2*ImGui::GetStyle().FramePadding.x);
+  ImGui::BeginDisabled(cvars->GetFloat("ftebroom_ctx_selection")!=1);
+  if(ImGui::Button("Apply")){
+    char cmd[160]{};
+    std::snprintf(cmd,sizeof cmd,"ftebroom_move %g %g %g\n",offset[0],offset[1],offset[2]);
+    action(cmd);
+  }
   ImGui::EndDisabled();
 }

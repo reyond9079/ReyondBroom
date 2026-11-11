@@ -487,9 +487,8 @@ void fb_surfacegrid(int geometryOnly)
     }
     if(!nativeBuilt)for(int i=0;i<fb_grid_face_count;i++) {
         fb_grid_face_t *face=&fb_grid_faces[i];
-        vector gridNormal=fb_grid_direction_local(face.normal);face.u=0;face.v=1;
-        if(fabs(gridNormal_x)>fabs(gridNormal_y)&&fabs(gridNormal_x)>fabs(gridNormal_z)){face.u=1;face.v=2;}
-        else if(fabs(gridNormal_y)>fabs(gridNormal_z)){face.u=0;face.v=2;}
+        int axis=fb_grid_projection_axis(face.normal);
+        face.u=axis==0;face.v=axis==2?1:2;
         for(int j=0;j<face.count;j++) {
             for(int a=0;a<3;a++) {
                 face.vertices[j].xyz[a]=face.vertices[j+face.count].xyz[a]=face.points[j][a]+face.normal[a]*0.02;

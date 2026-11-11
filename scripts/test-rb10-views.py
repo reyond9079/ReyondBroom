@@ -99,10 +99,11 @@ try:
  check(widgets()['tools-layout']['y']<min(v['y'] for v in live()['views']),'new workspace docks horizontal Tools above the scene')
  click('tools-extra-toggle');expanded=wait(tools_fits)['height']
  check(expanded>=collapsed,'extra tools wrap without clipping or reducing the required height')
- click('tools-shape-toggle');shape=wait(lambda:(t if (t:=tools_fits()) and t['height']>collapsed else None))
+ click('tools-shape-toggle');wait(lambda:widgets().get('tools/shape-choice'))
+ shape=wait(lambda:(t if (t:=tools_fits()) and t['height']>collapsed else None))
  metrics['tools_expanded_height']=shape['height'];shot('tools-expanded')
  check(shape['height']>collapsed,'expanded shape controls automatically grow the horizontal Tools dock')
- click('tools-shape-toggle');click('tools-extra-toggle')
+ click('tools-shape-toggle');wait(lambda:'tools/shape-choice' not in widgets());click('tools-extra-toggle')
  wait(lambda:(t:=tools_fits()) and abs(t['height']-collapsed)<3)
  check(True,'collapsing Tools reclaims its original height');shot('tools-collapsed')
  open_options();display='view-options-display-region'

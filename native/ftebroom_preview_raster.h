@@ -11,7 +11,9 @@ inline std::string raster(const std::vector<Part>& parts,int size=192) {
   if(size<1||size>512)throw std::runtime_error("Invalid thumbnail size.");
   std::string out(18+size_t(size)*size*4,0);out[2]=2;out[12]=size&255;out[13]=size>>8;out[14]=size&255;out[15]=size>>8;out[16]=32;out[17]=40;
   std::vector<float> depth(size_t(size)*size,-std::numeric_limits<float>::infinity());
-  for(const auto& part:parts){const auto& skin=part.pixels;if(skin.width<=0||skin.height<=0||skin.rgba.size()!=size_t(skin.width)*skin.height*4)continue;
+  const Pixels neutral{1,1,{174,183,190,255}};
+  for(const auto& part:parts){const auto& supplied=part.pixels;
+    const auto& skin=supplied.width>0&&supplied.height>0&&supplied.rgba.size()==size_t(supplied.width)*supplied.height*4?supplied:neutral;
     for(const auto& tri:part.triangles){
       float x[3],y[3];bool valid=true;for(int i=0;i<3;i++){x[i]=tri[i].point[0]*size;y[i]=tri[i].point[1]*size;valid&=std::isfinite(x[i])&&std::isfinite(y[i])&&std::isfinite(tri[i].point[2])&&std::isfinite(tri[i].u)&&std::isfinite(tri[i].v);}if(!valid)continue;
       float area=(x[1]-x[0])*(y[2]-y[0])-(y[1]-y[0])*(x[2]-x[0]);if(std::abs(area)<1e-6f)continue;

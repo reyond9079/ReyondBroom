@@ -2,6 +2,7 @@
 #include "ftebroom_md3.h"
 #include "ftebroom_legacy_models.h"
 #include "ftebroom_sprite.h"
+#include "ftebroom_bsp_uv.h"
 #include "ftebroom_legacy_images.h"
 #include "ftebroom_preview_raster.h"
 #include "ftebroom_stb_image.h"
@@ -56,8 +57,9 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
   EntityPreview preview;
   try {
    auto bytes=modelResource(def.model);if(bytes.empty()||bytes.size()>64*1024*1024)throw std::runtime_error("Missing or oversized model");
+   const auto frame=std::max(0,std::atoi(def.modelFrame.c_str()));
    if(bytes.substr(0,4)=="IDSP"||bytes.substr(0,4)=="IDS2"){
-    auto sprite=ftebroom::readSprite(bytes,bytes.substr(0,4)=="IDSP"&&ftebroom::quake1::word(bytes,4)==1?modelResource("gfx/palette.lmp"):std::string{},std::max(0,std::atoi(def.modelFrame.c_str())));
+    auto sprite=ftebroom::readSprite(bytes,bytes.substr(0,4)=="IDSP"&&ftebroom::quake1::word(bytes,4)==1?modelResource("gfx/palette.lmp"):std::string{},frame);
     qhandle_t image=0;if(!sprite.image.empty())image=modelImage(sprite.image);
     else{auto name="ftebroom/sprite-"+std::to_string(entityDefinitionEpoch)+"-"+std::to_string(std::hash<std::string>{}(key))+".tga";draw->LoadImageData(name.c_str(),"image/tga",sprite.tga.data(),sprite.tga.size());
      if(sprite.additive){std::string shader="{\n{\nmap "+name+"\nblendfunc add\nrgbgen vertex\nalphagen vertex\n}\n}";image=draw->LoadImageShader((name+"-additive").c_str(),shader.c_str());}else image=draw->LoadImage(name.c_str());}
@@ -66,17 +68,26 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
     std::string companion;
     if(bytes.substr(0,4)=="IDST"&&bytes.size()>=244&&!ftebroom::quake1::word(bytes,180)){
       auto stem=def.model.substr(0,def.model.find_last_of('.'));companion=modelResource(stem+"t.mdl");if(companion.empty())companion=modelResource(stem+"T.mdl");}
-    auto parts=bytes.substr(0,4)=="IDP2"?ftebroom::legacyModels::md2(bytes,std::max(0,std::atoi(def.modelSkin.c_str())),std::max(0,std::atoi(def.modelFrame.c_str()))):ftebroom::legacyModels::studio(bytes,companion,std::max(0,std::atoi(def.modelSkin.c_str())));
+    auto parts=bytes.substr(0,4)=="IDP2"?ftebroom::legacyModels::md2(bytes,std::max(0,std::atoi(def.modelSkin.c_str())),frame):ftebroom::legacyModels::studio(bytes,companion,std::max(0,std::atoi(def.modelSkin.c_str())));
     for(size_t i=0;i<parts.size();i++){auto& part=parts[i];qhandle_t image=0;ftebroom::preview::Pixels pixels;
       if(!part.embedded.pixels.empty()){auto tga=ftebroom::quake1::tga(part.embedded,{});auto name="ftebroom/legacy-model-"+std::to_string(entityDefinitionEpoch)+"-"+std::to_string(std::hash<std::string>{}(key))+"-"+std::to_string(i)+".tga";draw->LoadImageData(name.c_str(),"image/tga",tga.data(),tga.size());image=draw->LoadImage(name.c_str());pixels=entityPreviewPixels(tga);}
       else image=modelImage(part.image,&pixels);preview.parts.push_back({image,std::move(part.triangles),std::move(pixels)});
     }
    }else if(bytes.compare(0,4,"IDP3")==0){
-    auto surfaces=ftebroom::readMd3(bytes);std::map<std::string,std::string> skins;
+    auto surfaces=ftebroom::readMd3(bytes,frame);std::map<std::string,std::string> skins;
     if(def.modelSkin.find(".skin")!=std::string::npos){std::istringstream input(modelResource(def.modelSkin));std::string line;while(std::getline(input,line)){auto comma=line.find(',');if(comma!=line.npos){auto value=line.substr(comma+1);value.erase(0,value.find_first_not_of(" \t"));auto end=value.find_last_not_of(" \r\t");if(end!=value.npos)value.erase(end+1);skins[line.substr(0,comma)]=value;}}}
     for(auto& surface:surfaces){auto name=skins.count(surface.name)?skins[surface.name]:surface.shader;ftebroom::preview::Pixels pixels;auto image=modelImage(name,&pixels);preview.parts.push_back({image,std::move(surface.triangles),std::move(pixels)});}
+   }else if(std::filesystem::path(def.model).extension()==".bsp"){
+    auto surfaces=ftebroom::bspUV::read(bytes,modelResource("gfx/palette.lmp"),{},true);
+    for(auto& surface:surfaces){
+     if(surface.triangles.empty())continue;
+     auto pixels=entityPreviewPixels(surface.image);
+     qhandle_t image=0;
+     if(pixels.rgba.empty())image=modelImage(surface.name,&pixels);
+     preview.parts.push_back({image,std::move(surface.triangles),std::move(pixels)});
+    }
    }else{
-    auto mdl=ftebroom::readMdl(bytes,std::atoi(def.modelSkin.c_str()));auto palette=modelResource("gfx/palette.lmp");
+    auto mdl=ftebroom::readMdl(bytes,std::atoi(def.modelSkin.c_str()),frame);auto palette=modelResource("gfx/palette.lmp");
     auto base=def.model.substr(0,def.model.find_last_of('.'));ftebroom::preview::Pixels skinPixels;auto skin=modelImage(base+"_"+(def.modelSkin.empty()?"0":def.modelSkin),&skinPixels);
     if(!skin){auto pixels=ftebroom::quake1::tga(mdl.skin,palette);auto name="ftebroom/model-"+std::to_string(entityDefinitionEpoch)+"-"+std::to_string(std::hash<std::string>{}(key))+".tga";
      draw->LoadImageData(name.c_str(),"image/tga",pixels.data(),pixels.size());skin=draw->LoadImage(name.c_str());skinPixels=entityPreviewPixels(pixels);}
@@ -98,7 +109,7 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
   }
   it=entityPreviews.emplace(key,std::move(preview)).first;
  }
- auto& p=it->second;p.used=++entityPreviewClock;if(!p.image)return false;auto list=ImGui::GetWindowDrawList();list->PushClipRect(tile,{tile.x+size,tile.y+size},true);
+ auto& p=it->second;p.used=++entityPreviewClock;if(!p.image&&!p.thumbnail)return false;auto list=ImGui::GetWindowDrawList();list->PushClipRect(tile,{tile.x+size,tile.y+size},true);
  if(p.spriteWidth>0&&p.spriteHeight>0){float scale=size*.88f/std::max(p.spriteWidth,p.spriteHeight);ImVec2 low{tile.x+(size-p.spriteWidth*scale)*.5f,tile.y+(size-p.spriteHeight*scale)*.5f};list->AddImage((ImTextureID)p.image,low,{low.x+p.spriteWidth*scale,low.y+p.spriteHeight*scale});list->PopClipRect();return true;}
  if(p.thumbnail){if(entityPreviewQuadFrame!=ImGui::GetFrameCount()){entityPreviewQuadFrame=ImGui::GetFrameCount();entityPreviewQuadCount=0;}++entityPreviewQuadCount;list->AddImage((ImTextureID)p.thumbnail,tile,{tile.x+size,tile.y+size});list->PopClipRect();return true;}
  list->PopClipRect();return false;

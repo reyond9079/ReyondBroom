@@ -10,6 +10,9 @@ static void testWorkspace()
   };
   char mode[64] = {};
   commands->Argv(1, mode, sizeof mode);
+  const std::string_view testMode=mode;
+  const bool flipHorizontal=testMode=="workspace-flip-horizontal";
+  const bool flipVertical=testMode=="workspace-flip-vertical";
   auto frame = [](float x = 640, float y = 400) { event(0, 0, 0, x, y, 1280, 800); };
   auto& io = ImGui::GetIO();
   const bool trickle = io.ConfigInputTrickleEventQueue;
@@ -21,13 +24,11 @@ static void testWorkspace()
     selectEntityTab=true;
     for(int i=0;i<5;i++)refresh();
     const auto* inspector=ImGui::FindWindowByName("Entity");
-    const auto* toolbar=ImGui::FindWindowByName(uiToolbarName);
-    const auto* status=ImGui::FindWindowByName(uiStatusName);
-    const auto* files=ImGui::FindWindowByName("Mod file manager");
-    expect(inspector&&toolbar&&status&&files&&toolbar->DockId&&status->DockId&&
-      toolbar->Rect().Max.x<=inspector->Pos.x&&status->Rect().Max.x<=inspector->Pos.x&&
-      files->Rect().Max.x<=inspector->Pos.x&&
-      std::abs(inspector->Pos.y-toolbar->Pos.y)<2&&std::abs(inspector->Rect().Max.y-status->Rect().Max.y)<2,
+    const auto* tools=ImGui::FindWindowByName("Tools");
+    const auto* files=ImGui::FindWindowByName(uiModFilesName);
+    expect(inspector&&tools&&files&&tools->DockId&&files->DockId&&uiStatusInFiles&&
+      tools->Rect().Max.x<=inspector->Pos.x&&files->Rect().Max.x<=inspector->Pos.x&&
+      std::abs(inspector->Pos.y-tools->Pos.y)<2&&std::abs(inspector->Rect().Max.y-files->Rect().Max.y)<2,
       "entity_inspector_spans_history_and_status");
     if(auto item=entityTestItems.find("value/targetname");item!=entityTestItems.end()){
       const auto point=item->second;
@@ -43,6 +44,163 @@ static void testWorkspace()
       cvars->GetString("ftebroom_property_editing",editing,sizeof editing);
       expect(std::string(editing)=="targetname","entity_inspector_existing_value_edit");
     }else expect(false,"entity_inspector_existing_value_edit");
+  }
+  else if(testMode=="entity-class-defaults"||testMode=="entity-class-create"){
+    const bool create=testMode=="entity-class-create";
+    const float doubleClickTime=io.MouseDoubleClickTime;
+    if(!create)io.MouseDoubleClickTime=0;
+    cvars->SetString("ftebroom_test_entity_filter","qa_fgd_");
+    selectEntityTab=true;
+    auto refresh=[&](ImVec2 p={0,0}){event(0,0,0,p.x,p.y,1920,1080);};
+    auto findTile=[&](const char* name){
+      entityTestItems.clear();
+      refresh();
+      refresh();
+      auto tile=entityTestItems.find(std::string("class:")+name);
+      return tile==entityTestItems.end()?ImVec2{-1,-1}:tile->second;
+    };
+    auto click=[&](ImVec2 p){
+      if(p.x<0)return false;
+      refresh(p);
+      event(1,mouseKeys[0],0,p.x,p.y,1920,1080);
+      refresh(p);
+      event(2,mouseKeys[0],0,p.x,p.y,1920,1080);
+      refresh(p);
+      refresh(p);
+      return true;
+    };
+    const auto first=findTile("qa_fgd_alpha");
+    if(create){
+      expect(click(first)&&click(first),"entity_browser_double_click");
+    }else{
+      expect(click(first)&&entityTestItems.count("class-default/shared=17")&&
+        entityTestItems.count("class-default/alpha_only=amber")&&
+        entityTestItems.count("class-default/optional=")&&
+        !entityTestItems.count("class-default/beta_only=blue"),
+        "entity_browser_first_class_defaults");
+      const auto second=findTile("qa_fgd_beta");
+      const bool clicked=click(second);
+      entityTestItems.clear();
+      refresh(second);
+      expect(clicked&&entityTestItems.count("class-default/shared=29")&&
+        entityTestItems.count("class-default/beta_only=blue")&&
+        !entityTestItems.count("class-default/alpha_only=amber")&&
+        cvars->GetFloat("ftebroom_entity_selection_count")==0,
+        "entity_browser_second_class_defaults_without_creating");
+    }
+    io.MouseDoubleClickTime=doubleClickTime;
+  }
+  else if(testMode=="workspace-controls"||testMode=="workspace-controls-default-scale"||flipHorizontal||flipVertical){
+    const bool flip=flipHorizontal||flipVertical;
+    if(!flip){
+      uiReset=true;
+      uiLocked=false;
+      uiScaleChoice=testMode=="workspace-controls"?0:uiDefaultScaleChoice;
+      modFilesOpen=false;
+      cvars->SetFloat("ftebroom_browser132_qa",1);
+    }
+    extraToolsExpanded=false;
+    runUiLive=true;
+    cvars->SetFloat("ftebroom_tool",0);
+    auto refresh=[&](ImVec2 pointer={0,0}){event(0,0,0,pointer.x,pointer.y,1920,1080);};
+    auto frames=[&]{for(int i=0;i<6;i++)refresh();};
+    auto clickAt=[&](ImVec2 p,int button){
+      refresh(p);
+      event(1,mouseKeys[button],0,p.x,p.y,1920,1080);
+      refresh(p);
+      event(2,mouseKeys[button],0,p.x,p.y,1920,1080);
+      refresh(p);
+    };
+    auto click=[&](const char* id){
+      const auto item=browserQaWidgets.find(id);
+      if(item==browserQaWidgets.end()||!item->second.visible)return false;
+      const auto& rect=item->second;
+      clickAt({(rect.min.x+rect.max.x)*.5f,(rect.min.y+rect.max.y)*.5f},0);
+      return true;
+    };
+    auto clickTool=[&](const char* id,int button){
+      if(!runUiGlobalRects.contains(id))return false;
+      const auto& rect=runUiGlobalRects[id];
+      clickAt({rect.value("x",0.f)+rect.value("width",0.f)*.5f,
+               rect.value("y",0.f)+rect.value("height",0.f)*.5f},button);
+      return true;
+    };
+    frames();
+    if(flip){
+      const bool selected=cvars->GetFloat("ftebroom_ctx_selection")==1;
+      expect(selected&&clickTool(flipHorizontal?"tools/Flip horizontal":"tools/Flip vertical",0),mode);
+      io.ConfigInputTrickleEventQueue=trickle;
+      return;
+    }
+    const auto* tools=ImGui::FindWindowByName("Tools");
+    float top=0,bottom=FLT_MAX;
+    bool fit=tools&&uiToolsHorizontal(tools);
+    bool uniform=true;
+    const auto& first=runUiGlobalRects.value("tools/Undo",nlohmann::json::object());
+    const float width=first.value("width",0.f), height=first.value("height",0.f);
+    for(const auto* key:{"tools/Undo","tools/Redo","tools/Delete","tools/default-move","tools/Brush",
+                        "tools/Clip","tools/Vertex","tools/Edge","tools/Face","tools/Control Point","tools/Rotate",
+                        "tools/Sweep","tools/Scale","tools/Shear","tools/Flip horizontal","tools/Flip vertical",
+                        "tools-extra-toggle","tools/Integer snap","tools/Texture Lock","tools/UV Lock",
+                        "tools/Grid","tools/View","tools/Layout","tools/Compile","tools/Setup compile",
+                        "tools/Show BSP","tools/Play mod","tools-shape-toggle"}){
+      if(gameClassic()&&std::string_view(key)=="tools/Control Point")continue;
+      if((gameProfile==0||gameProfile==3)&&std::string_view(key)=="tools/Play mod")continue;
+      if(!runUiGlobalRects.contains(key)){fit=false;uniform=false;continue;}
+      const auto& rect=runUiGlobalRects[key];
+      top=std::max(top,rect.value("y",0.f));
+      bottom=std::min(bottom,rect.value("y",0.f)+rect.value("height",0.f));
+      if(tools&&rect.value("x",0.f)+rect.value("width",0.f)>tools->InnerRect.Max.x)fit=false;
+      uniform=uniform&&std::abs(rect.value("width",0.f)-width)<.5f&&
+        std::abs(rect.value("height",0.f)-height)<.5f;
+    }
+    float previousEnd=0;
+    for(const auto* key:{"tools/UV Lock","tools/Grid","tools/View","tools/Layout","tools/Compile"}){
+      if(!runUiGlobalRects.contains(key)){fit=false;continue;}
+      const auto& rect=runUiGlobalRects[key];
+      const float x=rect.value("x",0.f);
+      fit=fit&&x>=previousEnd;
+      previousEnd=x+rect.value("width",0.f);
+    }
+    expect(fit&&top<bottom,"workspace_tools_single_row_1920");
+    expect(uniform&&!extraToolsExpanded,"workspace_tools_equal_size_with_flip_buttons");
+    expect(clickTool("tools/default-move",1)&&runUiGlobalRects.contains("tools/shape-choice"),
+      "workspace_default_move_settings_open_from_icon");
+    ImGui::ClosePopupsOverWindow(nullptr,false);
+    frames();
+    const bool expanded=clickTool("tools-shape-toggle",0)&&runUiGlobalRects.contains("tools/shape-choice");
+    frames();
+    const bool collapsed=clickTool("tools-shape-toggle",0)&&!runUiGlobalRects.contains("tools/shape-choice");
+    expect(expanded&&collapsed,"workspace_default_move_arrow_expands_and_collapses");
+    frames();
+    for(const auto* key:{"tools/Grid","tools/View","tools/Layout"}){
+      const bool open=clickTool(key,0)&&ImGui::IsPopupOpen(nullptr,ImGuiPopupFlags_AnyPopupId|ImGuiPopupFlags_AnyPopupLevel);
+      expect(open,(std::string("workspace_dropdown_opens_")+std::string(key).substr(6)).c_str());
+      ImGui::ClosePopupsOverWindow(nullptr,false);
+      frames();
+    }
+    expect(browserQaWidgets.count("files/standalone-status")&&click("files/show"),"workspace_show_from_status");
+    frames();
+    auto footerOwnsStatus=[&]{
+      const auto files=browserQaWidgets.find("files/panel");
+      const auto document=browserQaWidgets.find("files/status-document");
+      return files!=browserQaWidgets.end()&&document!=browserQaWidgets.end()&&
+        document->second.min.y>=files->second.min.y&&document->second.max.y<=files->second.max.y&&
+        browserQaWidgets.count("files/hide")&&!browserQaWidgets.count("files/standalone-status");
+    };
+    expect(uiStatusInFiles&&footerOwnsStatus(),"workspace_bottom_files_owns_status");
+    if(const auto* entity=ImGui::FindWindowByName("Entity")){
+      ImGui::DockBuilderDockWindow(uiModFilesName,entity->DockId);
+      ImGui::DockBuilderFinish(uiDockId);
+      modFilesRequestFocus=true;
+    }
+    frames();
+    expect(!uiStatusInFiles&&browserQaWidgets.count("files/standalone-status")&&browserQaWidgets.count("files/hide"),
+      "workspace_side_files_restores_status");
+    expect(click("files/hide"),"workspace_side_files_hide_button");
+    frames();
+    expect(!modFilesOpen&&browserQaWidgets.count("files/show")&&browserQaWidgets.count("files/standalone-status"),
+      "workspace_status_returns_after_hide");
   }
   else if(std::string(mode)=="rb10tools"){
     uiScaleChoice=0;uiLocked=false;uiReset=true;extraToolsExpanded=false;

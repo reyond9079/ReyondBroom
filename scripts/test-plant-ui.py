@@ -189,7 +189,13 @@ finally:
   (out/'last-state.json').write_text(json.dumps(live(),indent=2));ImageGrab.grab().save(out/'last-desktop.png')
   (out/'last-chooser-state.json').write_text(json.dumps(read_ui_json(data/'placement-ui-live.json'),indent=2))
  except Exception:pass
- if process.poll() is None:process.terminate();process.wait(timeout=20)
+ if process.poll() is None:
+  process.terminate()
+  try:process.wait(timeout=5)
+  except subprocess.TimeoutExpired:
+   # SDL2 may turn SIGTERM into an editor close request with an unsaved-work
+   # dialog. This process and runtime belong exclusively to this fixture.
+   process.kill();process.wait(timeout=10)
  stream.close()
  for log in root.rglob('qconsole.log'):
   try:shutil.copy2(log,out/'engine-qconsole.log');break

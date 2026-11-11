@@ -22,6 +22,7 @@ struct WorldArchitectState {
   ImGuiID gesture=0;int selected=0,tab=0,cutaway=-1;float yaw=135,pitch=35,zoom=1;
   wa::V eye{};wa::Settings settings;wa::Registry registry;wa::Json registrySource;std::optional<uint64_t> desiredSeed;
   std::future<wa::CandidateBatch> job;std::shared_ptr<WorldArchitectWork> work;
+  std::shared_ptr<wa::PrefixCache> prefixCache=std::make_shared<wa::PrefixCache>();
   wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request;
   double requestAt=0;std::filesystem::path requestPath;
   std::vector<wa::Json> undo,redo;
@@ -63,9 +64,9 @@ static void worldClaim(){
 static void worldGenerate(){
   auto& s=worldArchitect;if(s.job.valid())return;worldRegistry();if(s.settings.profile!=gameProfile)throw std::runtime_error("Project profile differs from the active map. Switch the editor profile or explicitly retarget the project.");
   wa::validate(s.settings,s.registry);s.error.clear();s.message="Generating; the current map is unchanged.";
-  s.work=std::make_shared<WorldArchitectWork>();auto settings=s.settings;auto registry=s.registry;auto work=s.work;
+  s.work=std::make_shared<WorldArchitectWork>();auto settings=s.settings;auto registry=s.registry;auto work=s.work;auto cache=s.prefixCache;
   s.pendingKey=worldInputKey();
-  s.job=std::async(std::launch::async,[settings,registry,work](){return wa::candidates(settings,registry,&work->cancel,&work->stage);});
+  s.job=std::async(std::launch::async,[settings,registry,work,cache](){return wa::candidates(settings,registry,&work->cancel,&work->stage,cache.get());});
 }
 static void worldChanged(const wa::Json& before){auto& s=worldArchitect;auto active=ImGui::GetActiveID();if(before==wa::serialize(s.settings)){if(!active)s.gesture=0;return;}if(!active||active!=s.gesture){s.undo.push_back(before);if(s.undo.size()>100)s.undo.erase(s.undo.begin());}s.gesture=active;s.redo.clear();s.error.clear();}
 static void worldUndo(bool redo=false){auto& s=worldArchitect;auto& from=redo?s.redo:s.undo;auto& to=redo?s.undo:s.redo;if(from.empty()||s.job.valid())return;to.push_back(wa::serialize(s.settings));s.settings=wa::deserialize(from.back(),s.registry);from.pop_back();s.dirty=true;}
@@ -200,14 +201,19 @@ static void worldPanel(){
   if(ImGui::Begin("World Architect — development preview",&s.open,ImGuiWindowFlags_NoDocking)){
     ImGui::TextWrapped("Development preview: mission / physical navigation foundation. AutoLevel remains available; final architecture and art acceptance is still pending.");
     auto before=wa::serialize(s.settings);bool restoredSettings=false;ImGui::BeginDisabled(s.job.valid());
-    ImGui::SetNextItemWidth(220*uiScale());bool presetsOpen=ImGui::BeginCombo("Preset",s.registry.preset(s.settings.preset).name.c_str());worldRect("preset");if(presetsOpen){for(const auto& p:s.registry.presets){if(ImGui::Selectable(p.name.c_str(),p.id==s.settings.preset)){s.settings.preset=p.id;s.settings.damage=p.damage;}worldRect("preset/"+p.id);}ImGui::EndCombo();}ImGui::SameLine();
+    const int frozen=wa::lockedThrough(s.settings);
+    ImGui::BeginDisabled(frozen>=0);ImGui::SetNextItemWidth(220*uiScale());bool presetsOpen=ImGui::BeginCombo("Preset",s.registry.preset(s.settings.preset).name.c_str());worldRect("preset");if(presetsOpen){for(const auto& p:s.registry.presets){if(ImGui::Selectable(p.name.c_str(),p.id==s.settings.preset)){s.settings.preset=p.id;s.settings.damage=p.damage;}worldRect("preset/"+p.id);}ImGui::EndCombo();}ImGui::EndDisabled();ImGui::SameLine();
     ImGui::SetNextItemWidth(150*uiScale());ImGui::InputScalar("Seed",ImGuiDataType_U64,&s.settings.seed);worldRect("seed");ImGui::SameLine();
     if(worldButton("Generate candidates","generate"))worldAction(worldGenerate);ImGui::SameLine();
     if(worldButton("Undo settings","undo-settings")){worldAction([]{worldUndo();});restoredSettings=true;}ImGui::SameLine();if(worldButton("Redo settings","redo-settings")){worldAction([]{worldUndo(true);});restoredSettings=true;}
     float scale=float(s.settings.scale),damage=float(s.settings.damage),density=float(s.settings.dressing);
-    ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Scale",&scale,.6f,1.4f))s.settings.scale=scale;worldRect("scale");ImGui::SameLine();
-    ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Damage",&damage,0,1))s.settings.damage=damage;worldRect("damage");ImGui::SameLine();
-    ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Dressing",&density,0,1))s.settings.dressing=density;worldRect("dressing");
+    ImGui::BeginDisabled(frozen>=1);ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Scale",&scale,.6f,1.4f))s.settings.scale=scale;worldRect("scale");ImGui::EndDisabled();ImGui::SameLine();
+    ImGui::BeginDisabled(frozen>=3);ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Damage",&damage,0,1))s.settings.damage=damage;worldRect("damage");ImGui::EndDisabled();ImGui::SameLine();
+    ImGui::BeginDisabled(frozen>=4);ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Dressing",&density,0,1))s.settings.dressing=density;worldRect("dressing");ImGui::EndDisabled();ImGui::SameLine();
+    const char* freezeNames[]={"None","Mission","Site","Architecture","Damage","Dressing"};ImGui::SetNextItemWidth(150*uiScale());bool freezeOpen=ImGui::BeginCombo("Freeze through",freezeNames[frozen+1]);worldRect("freeze");if(freezeOpen){
+      for(int i=0;i<6;i++){ImGui::BeginDisabled(i&&!worldSelected());if(ImGui::Selectable(freezeNames[i],frozen==i-1))worldAction([&]{s.settings=i?wa::freezeThrough(s.settings,*worldSelected(),s.registry,i-1):wa::cleanSettings(s.settings);});worldRect("freeze/"+std::to_string(i));ImGui::EndDisabled();}ImGui::EndCombo();
+    }
+    if(frozen>=0)ImGui::TextUnformatted("Frozen stages keep their selected candidate recipes; seed changes affect later stages. Navigation and export are always checked.");
     if(!restoredSettings)worldChanged(before);else s.gesture=0;ImGui::EndDisabled();
     if(s.job.valid()){ImGui::ProgressBar((s.work->stage.load()+.5f)/7,{-1,0},wa::stages[std::clamp(s.work->stage.load(),0,6)]);if(worldButton("Cancel generation","cancel"))s.work->cancel=true;}
     if(!s.batch.worlds.empty()){
@@ -219,7 +225,7 @@ static void worldPanel(){
         if(tab==0)worldAction(worldPreview);
         if(tab==1)worldAction([]{worldPlanCanvas(true);});
         if(tab==2){
-          if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms",name.c_str(),ms);for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
+          if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& stage:world->diagnostics.cachedStages)ImGui::Text("Reused frozen stage: %s",stage.c_str());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms%s",name.c_str(),ms,std::find(world->diagnostics.cachedStages.begin(),world->diagnostics.cachedStages.end(),name)!=world->diagnostics.cachedStages.end()?" (original build time)":"");for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
           for(const auto& reject:s.batch.rejects)ImGui::TextWrapped("Rejected: %s",reject.c_str());
         }
         if(tab==3){

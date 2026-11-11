@@ -82,6 +82,14 @@ try:
  check(live()['applyStatus']=='parse-failed' and planes(save('wa-invalid'))==planes(redone),'invalid staged MAP is rejected atomically')
  console('ftebroom_undo');check(planes(save('wa-after-rejections-undo'))==baseline,'rejected imports do not create extra map Undo transactions')
  console('ftebroom_redo');check(planes(save('wa-after-rejections-redo'))==planes(applied),'rejected imports preserve the previous complete Redo transaction')
+ if a.preset=='hospital':
+  site_seed=live()['world']['stageSeeds']['Site'];click('freeze');click('freeze/3');wait(lambda:all(live()['settings']['stageLocks'][:3]));seed(41);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
+  check(not live()['error'] and live()['world']['stageSeeds']['Site']==site_seed,'freezing architecture retains the selected site while later stages use a new seed')
+  previous_seed=live()['world']['seed'];seed(42);click('generate');wait(lambda:not live()['busy'] and live()['world']['seed']!=previous_seed)
+  check(set(['Mission','Site','Architecture'])<=set(live()['world']['cachedStages']),'regeneration reuses the actual frozen prefix cache')
+  locked_seed=live()['world']['seed'];locked_project=out/'locked.world.json';click('tab/3');click('save-project');choose(locked_project);wait(locked_project.exists);click('open-project');choose(locked_project);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
+  check(live()['world']['seed']==locked_seed and all(live()['settings']['stageLocks'][:3]),'saved project restores frozen stage recipes and its selected candidate')
+  click('freeze');click('freeze/0');wait(lambda:not any(live()['settings']['stageLocks']));check(planes(save('wa-frozen-preview'))==planes(applied),'freeze, regeneration and project replay leave authored map geometry unchanged')
  for path in [before,generated,applied,undone,redone]:shutil.copy2(path,out/path.name)
  (out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect UI:',len(checks),'checks passed',flush=True)
 finally:

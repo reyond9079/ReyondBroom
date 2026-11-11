@@ -12,7 +12,7 @@ int main(int argc,char** argv)try{
  check(serialize(deserialize(serialize(settings),registry))==serialize(settings),"settings roundtrip retains deterministic generation inputs");
  auto future=serialize(settings);future["schemaVersion"]=2;rejects([&]{deserialize(future,registry);},"future schemas fail explicitly");
  auto invalid=settings;invalid.scale=std::numeric_limits<double>::infinity();rejects([&]{validate(invalid,registry);},"nonfinite settings rejected");
- invalid=settings;invalid.locked[0]=true;rejects([&]{validate(invalid,registry);},"unfinished stage locks cannot silently pretend to preserve content");
+ invalid=settings;invalid.locked[0]=true;rejects([&]{validate(invalid,registry);},"stage locks require an accepted candidate's reproducible recipe");
  auto badEvent=j;for(auto& preset:badEvent["presets"])if(preset["id"]=="hospital")preset["scope"]=1;rejects([&]{readRegistry(badEvent);},"structural extension events reject incompatible urban envelopes");
  WorldPlan outside;rejects([&]{addBrush(outside,1,"outside profile",al::box({4990,0,0},{5010,32,32},"stone"));},"actual convex vertices enforce classic BSP coordinate limits");
  auto graph=mission(settings,registry.preset(settings.preset));validateMission(graph);check(!graph.nodes.empty(),"generated mission has a coherent start-to-exit traversal");
@@ -24,6 +24,18 @@ int main(int argc,char** argv)try{
  std::atomic<bool> cancel{true};rejects([&]{generate(settings,registry,&cancel);},"cancelled generation never returns a successful world");
  check(subSeed(17,"Dressing",100)==subSeed(17,"Dressing",100)&&subSeed(17,"Damage",100)!=subSeed(17,"Dressing",100)&&subSeed(17,"Dressing",100)!=subSeed(17,"Dressing",101),"stage and region streams are reproducible and independent");
  auto world=generate(settings,registry);Collision collision(world);
+ auto geometry=[](const WorldPlan& w){std::string result;for(const auto& element:w.architecture.elements)result+=element.kind+al::writeBrush(element.brush);return result;};
+ auto locked=freezeThrough(settings,world,registry,4);locked.seed=700;locked.scale=1.2;locked.damage=.9;locked.dressing=.1;PrefixCache cache;
+ auto cold=generate(locked,registry,nullptr,nullptr,&cache);check(geometry(cold)==geometry(world),"freezing all generative stages preserves exact brushes despite later seed and parameter edits");
+ locked.seed=701;auto warm=generate(locked,registry,nullptr,nullptr,&cache);check(geometry(warm)==geometry(world)&&warm.diagnostics.cachedStages.size()==5,"a warm prefix cache reuses the actual frozen outputs");
+ check(warm.seeds.at("Mission")==world.seeds.at("Mission")&&warm.seeds.at("Navigation")==subSeed(701,"Navigation"),"frozen stage seeds remain stable while navigation is regenerated");
+ auto restoredLocks=deserialize(serialize(locked),registry);auto replayLocks=generate(restoredLocks,registry);check(replayLocks.map==warm.map,"saved frozen-stage recipes replay identically without an in-memory cache");
+ auto bigPlayer=locked;bigPlayer.player.radius=32;rejects([&]{generate(bigPlayer,registry,nullptr,nullptr,&cache);},"frozen geometry cannot bypass a changed player-hull validation");
+ auto altered=locked;altered.frozen[1]["scale"]=1.1;auto changedPrefix=generate(altered,registry,nullptr,nullptr,&cache);check(changedPrefix.diagnostics.cachedStages.empty()&&geometry(changedPrefix)!=geometry(warm),"changing an upstream recipe invalidates the prefix cache");
+ auto mixed=freezeThrough(settings,world,registry,0);mixed.seed=19;auto mixedWorld=generate(mixed,registry);auto refrozen=freezeThrough(mixed,mixedWorld,registry,2);refrozen.seed=20;auto composite=generate(refrozen,registry);
+ check(composite.seeds.at("Mission")==world.seeds.at("Mission")&&composite.seeds.at("Site")==mixedWorld.seeds.at("Site"),"refreezing a composed plan preserves each stage's own original seed");
+ auto changedJson=j;changedJson["themes"][0]["colors"][0][0]=113;auto changedRegistry=readRegistry(changedJson);rejects([&]{generate(locked,changedRegistry);},"a changed registry cannot reuse a frozen recipe under an old fingerprint");
+ auto recursive=serialize(locked);recursive["frozenStageInputs"][0]["frozenStageInputs"][0]=serialize(settings);rejects([&]{deserialize(recursive,registry);},"recursive frozen-stage recipes fail before nested deserialization");
  WorldPlan programmed;programmed.mission=mission(settings,registry.preset(settings.preset));site(programmed,settings,registry.preset(settings.preset));floorplan(programmed,settings,registry.preset(settings.preset));
  check(programmed.architecture.elements.empty()&&!programmed.spatial.buildings[0].rooms.empty(),"functional room programs exist before architecture emits its first brush");
  std::set<uint64_t> reserved;for(const auto& beat:programmed.mission.nodes)if(beat.role!=Role::Start&&beat.role!=Role::Exit)check(beat.room&&reserved.insert(beat.room).second,"each indoor mission beat reserves a distinct functional room before geometry");

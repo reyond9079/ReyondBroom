@@ -63,6 +63,15 @@ map unchanged. Save/load retains generation inputs. Export writes an editable
 MAP, an editable JSON project, original TGA/WAD2 assets (WAD3 for the unverified
 GoldSrc profile), and shader definitions.
 
+`Freeze through` captures the selected candidate's actual per-stage recipes,
+including each stage's own seed when a plan combines frozen and regenerated
+stages. Mission through Dressing can be frozen with their upstream dependencies.
+Navigation and Export always run. The bounded in-memory prefix cache reuses
+matching outputs; its key includes the complete frozen recipes and registry
+fingerprint. Save/reopen can reproduce a frozen plan with an empty cache.
+Changing a recipe invalidates the cache, and changing the registry requires
+unlocking. Settings Undo/Redo covers independent edits and freezing controls.
+
 Apply uses an independent staging filename and an acknowledged QC transaction,
 with execution-time map-epoch/profile guards. Missing/invalid files and stale
 requests report errors rather than success. One Undo/Redo covers the complete
@@ -109,10 +118,10 @@ different optional branches. More road patterns, archetype-specific interior
 families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
-Stage locks, pinned-region preservation, graph/road/volume editing, painted masks,
+Pinned-region preservation, graph/road/volume editing, painted masks,
 selection-safe regional replacement, candidate comparison panes, legacy module
 migration, extension-pack validation, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.
-Unsupported lock fields fail explicitly instead of silently ignoring designer
-intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu
+Unsupported pinned-region fields fail explicitly instead of silently ignoring
+designer intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu
 entry may be retired before the complete Definition of Done is met.

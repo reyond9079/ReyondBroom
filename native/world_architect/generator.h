@@ -598,27 +598,42 @@ inline void exportMap(WorldPlan& w,const Settings& settings){
   auto roundtrip=al::parseMap(w.map);if(roundtrip.brushes.size()!=w.architecture.elements.size())throw std::runtime_error("Quantized MAP brush roundtrip failed");
   w.diagnostics.mapBytes=w.map.size();w.diagnostics.brushes=w.architecture.elements.size();
 }
-inline WorldPlan generate(const Settings& settings,const Registry& registry,const std::atomic<bool>* cancel=nullptr,std::atomic<int>* progress=nullptr){
+struct PrefixCache {std::string key;std::shared_ptr<const WorldPlan> plan;};
+inline Settings freezeThrough(Settings settings,const WorldPlan& accepted,const Registry& registry,int stage){
+  if(!accepted.diagnostics.valid||accepted.profile!=settings.profile||accepted.preset!=settings.preset||stage<0||stage>4)throw std::runtime_error("Freeze requires a current accepted candidate and a generative stage");
+  settings.locked.fill(false);settings.frozen.fill(Json(nullptr));settings.frozenRegistry=registry.fingerprint;
+  for(int i=0;i<=stage;i++){if(!accepted.stageInputs[i])throw std::runtime_error("Accepted candidate is missing its stage recipe");settings.locked[i]=true;settings.frozen[i]=serialize(cleanSettings(*accepted.stageInputs[i]));}
+  validate(settings,registry);return settings;
+}
+inline WorldPlan generate(const Settings& settings,const Registry& registry,const std::atomic<bool>* cancel=nullptr,std::atomic<int>* progress=nullptr,PrefixCache* cache=nullptr){
   validate(settings,registry);WorldPlan w;w.seed=settings.seed;w.profile=settings.profile;w.preset=settings.preset;const auto& preset=registry.preset(settings.preset);w.theme=preset.theme;
-  auto stage=[&](int n,auto action){cancelled(cancel);if(progress)progress->store(n);w.seeds[stages[n]]=subSeed(settings.seed,stages[n]);auto before=std::chrono::steady_clock::now();action();w.diagnostics.timing[stages[n]]=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count();};
-  stage(0,[&]{w.mission=mission(settings,preset);validateMission(w.mission);});
-  stage(1,[&]{site(w,settings,preset);floorplan(w,settings,preset);});
-  stage(2,[&]{shell(w);streets(w);for(auto& b:w.spatial.buildings){building(w,settings,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,settings,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,settings,b);}});
-  stage(3,[&]{damage(w,settings,cancel);});
-  stage(4,[&]{dressing(w,settings,preset,cancel);});
-  stage(5,[&]{navigation(w,settings,cancel);});
-  stage(6,[&]{exportMap(w,settings);});
+  const int last=lockedThrough(settings);std::array<Settings,7> inputs;for(int n=0;n<7;n++)inputs[n]=n<=last?deserialize(settings.frozen[n],registry):cleanSettings(settings);
+  std::string key;int first=0;
+  if(last>=0){Json recipes=Json::array();for(int n=0;n<=last;n++)recipes.push_back(settings.frozen[n]);key=std::to_string(registry.fingerprint)+recipes.dump();
+    if(cache&&cache->plan&&cache->key==key){w=*cache->plan;w.seed=settings.seed;first=last+1;for(int n=0;n<=last;n++)w.diagnostics.cachedStages.push_back(stages[n]);}
+  }
+  auto stage=[&](int n,auto action){
+    if(n<first)return;cancelled(cancel);if(progress)progress->store(n);w.seeds[stages[n]]=subSeed(inputs[n].seed,stages[n]);w.stageInputs[n]=std::make_shared<const Settings>(inputs[n]);auto before=std::chrono::steady_clock::now();action(inputs[n]);w.diagnostics.timing[stages[n]]=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count();
+    if(n==last&&cache){cache->key=key;cache->plan=std::make_shared<const WorldPlan>(w);}
+  };
+  stage(0,[&](const auto& input){w.mission=mission(input,preset);validateMission(w.mission);});
+  stage(1,[&](const auto& input){site(w,input,preset);floorplan(w,input,preset);});
+  stage(2,[&](const auto& input){shell(w);streets(w);for(auto& b:w.spatial.buildings){building(w,input,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,input,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,input,b);}});
+  stage(3,[&](const auto& input){damage(w,input,cancel);});
+  stage(4,[&](const auto& input){dressing(w,input,preset,cancel);});
+  stage(5,[&](const auto& input){navigation(w,input,cancel);});
+  stage(6,[&](const auto& input){exportMap(w,input);});
   w.diagnostics.valid=true;
   w.diagnostics.warnings.push_back("Quality scores are heuristics; visual and first-person review remains required.");
   if(settings.profile!=2&&settings.profile!=0&&settings.profile!=1)w.diagnostics.warnings.push_back("Quake II and GoldSrc compiler/play acceptance is not yet certified for this generator.");
   return w;
 }
 struct CandidateBatch {std::vector<WorldPlan> worlds;std::vector<std::string> rejects;};
-inline CandidateBatch candidates(const Settings& settings,const Registry& registry,const std::atomic<bool>* cancel=nullptr,std::atomic<int>* progress=nullptr){
-  validate(settings,registry);CandidateBatch out;
+inline CandidateBatch candidates(const Settings& settings,const Registry& registry,const std::atomic<bool>* cancel=nullptr,std::atomic<int>* progress=nullptr,PrefixCache* cache=nullptr){
+  validate(settings,registry);CandidateBatch out;PrefixCache local;if(!cache)cache=&local;
   for(int i=0;i<settings.candidates;i++){
     cancelled(cancel);auto next=settings;next.seed=i?subSeed(settings.seed,"Candidate",uint64_t(i)):settings.seed;
-    try{out.worlds.push_back(generate(next,registry,cancel,progress));}catch(const std::exception& e){cancelled(cancel);out.rejects.push_back(std::to_string(next.seed)+": "+e.what());}
+    try{out.worlds.push_back(generate(next,registry,cancel,progress,cache));}catch(const std::exception& e){cancelled(cancel);out.rejects.push_back(std::to_string(next.seed)+": "+e.what());}
   }
   std::stable_sort(out.worlds.begin(),out.worlds.end(),[](const auto& a,const auto& b){return a.diagnostics.score.at("weighted")>b.diagnostics.score.at("weighted");});
   return out;

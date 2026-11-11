@@ -8,6 +8,7 @@
 #include <functional>
 #include <numeric>
 #include <optional>
+#include <memory>
 #include <queue>
 #include <unordered_map>
 
@@ -50,7 +51,7 @@ struct DamageField {std::vector<DamageZone> zones;};
 struct AssetPlacement {uint64_t region=0;std::string rule,provenance="original procedural brush kit";V position;};
 struct NavigationNode {V feet;uint64_t region=0;bool required=false;};
 struct NavigationGraph {std::vector<NavigationNode> nodes;std::vector<std::array<size_t,2>> edges;std::vector<size_t> mainRoute;size_t reachable=0;};
-struct Diagnostics {bool valid=false;std::vector<std::string> rejects,warnings;std::map<std::string,double> timing,score;size_t brushes=0,mapBytes=0;double routeLength=0;};
+struct Diagnostics {bool valid=false;std::vector<std::string> rejects,warnings,cachedStages;std::map<std::string,double> timing,score;size_t brushes=0,mapBytes=0;double routeLength=0;};
 struct Preset {
   std::string id,name,theme,archetype,story,layout;
   Scope scope=Scope::Interior;int floors=2,rooms=6,blocks=2;
@@ -65,6 +66,7 @@ struct Settings {
   uint64_t seed=1;std::string preset="hospital";int profile=2,candidates=4;
   double scale=1,damage=.4,dressing=.5;Player player;
   std::array<bool,7> locked{};
+  std::array<Json,5> frozen;uint64_t frozenRegistry=0;
   std::vector<MissionNode> missionPins;
   std::vector<Road> roadPins;
   std::vector<uint64_t> pinnedRegions;
@@ -78,6 +80,7 @@ struct WorldPlan {
   MissionGraph mission;SpatialGraph spatial;ArchitecturePlan architecture;
   DamageField damage;std::vector<AssetPlacement> assets;NavigationGraph navigation;Diagnostics diagnostics;
   std::string map;
+  std::array<std::shared_ptr<const Settings>,7> stageInputs;
 };
 struct ProfileCapability {const char* name;bool sky,patches,models,shaders;const char* spawn;double coordinateLimit;};
 inline ProfileCapability capability(int profile){
@@ -90,13 +93,14 @@ inline ProfileCapability capability(int profile){
   if(profile<0||profile>=5)throw std::runtime_error("Unknown game profile");return profiles[profile];
 }
 struct Registry {
+  uint64_t fingerprint=0;
   std::vector<Preset> presets;std::vector<ArtTheme> themes;
   const Preset& preset(const std::string& id)const{for(const auto& p:presets)if(p.id==id)return p;throw std::runtime_error("Unknown World Architect preset: "+id);}
   const ArtTheme& theme(const std::string& id)const{for(const auto& t:themes)if(t.id==id)return t;throw std::runtime_error("Unknown World Architect theme: "+id);}
 };
 inline Registry readRegistry(const Json& j){
   if(j.at("schemaVersion")!=schemaVersion)throw std::runtime_error("Unsupported World Architect registry version");
-  Registry r;std::set<std::string> ids,materialPrefixes;
+  Registry r;r.fingerprint=hash(j.dump());std::set<std::string> ids,materialPrefixes;
   if(j.at("presets").size()>64||j.at("themes").size()>32)throw std::runtime_error("World Architect registry budget exceeded");
   for(const auto& item:j.at("themes")){
     ArtTheme t;t.id=item.at("id").get<std::string>();safeToken(t.id);if(!materialPrefixes.insert(t.id.substr(0,7)).second)throw std::runtime_error("Theme material prefixes must be unique");if(!ids.insert("theme/"+t.id).second)throw std::runtime_error("Duplicate theme");
@@ -119,10 +123,22 @@ inline Registry readRegistry(const Json& j){
   }
   if(r.presets.empty()||r.themes.empty())throw std::runtime_error("Empty World Architect registry");return r;
 }
+inline Settings deserialize(const Json& j,const Registry& r);
+inline Settings cleanSettings(Settings s){s.locked.fill(false);s.frozen.fill(Json(nullptr));s.frozenRegistry=0;return s;}
+inline int lockedThrough(const Settings& s){int last=-1;for(int i=0;i<5;i++)if(s.locked[i])last=i;return last;}
 inline void validate(const Settings& s,const Registry& r){
   r.preset(s.preset);capability(s.profile);finite(s.scale,.6,1.4,"Scale must be 0.6..1.4");finite(s.damage,0,1,"Damage must be 0..1");finite(s.dressing,0,1,"Dressing must be 0..1");finite(s.candidates,1,16,"Candidate count must be 1..16");
   finite(s.player.radius,8,32,"Player radius must be 8..32");finite(s.player.height,32,80,"Player height must be 32..80");finite(s.player.step,4,18,"Player step must be 4..18");
-  if(std::any_of(s.locked.begin(),s.locked.end(),[](bool b){return b;})||!s.pinnedRegions.empty())throw std::runtime_error("Stage / region locking is not yet supported by this development slice");
+  if(!s.pinnedRegions.empty())throw std::runtime_error("Pinned-region locking is not yet supported");
+  bool gap=false;for(int i=0;i<7;i++){if(s.locked[i]){if(gap||i>=5)throw std::runtime_error("Freeze a stage with its upstream stages; Navigation and Export are always revalidated");}else gap=true;}
+  const int last=lockedThrough(s);
+  if(last>=0&&s.frozenRegistry!=r.fingerprint)throw std::runtime_error("Locked stages require the registry snapshot from their accepted candidate");
+  for(int i=0;i<5;i++)if(!s.frozen[i].is_null()){
+    const auto& baseline=s.frozen[i];if(!baseline.is_object()||baseline.dump().size()>65536)throw std::runtime_error("Invalid locked-stage input budget");
+    if(baseline.contains("frozenStageInputs"))for(const auto& nested:baseline.at("frozenStageInputs"))if(!nested.is_null())throw std::runtime_error("Recursive locked-stage input is not allowed");
+    if(baseline.contains("stageLocks"))for(const auto& flag:baseline.at("stageLocks"))if(flag.get<bool>())throw std::runtime_error("A stage input must be a clean generation recipe");
+    auto input=deserialize(baseline,r);if(i<=last&&(input.profile!=s.profile||input.preset!=s.preset))throw std::runtime_error("Unlock stages before changing the game profile or preset");
+  }else if(i<=last)throw std::runtime_error("A stage lock has no accepted generation input");
   if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
   for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route"&&name!="circulation")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
   std::set<uint64_t> ids;for(const auto& p:s.missionPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate mission pin");for(int a=0;a<3;a++)finite(p.position[a],-30000,30000,"Invalid mission pin");}
@@ -130,7 +146,7 @@ inline void validate(const Settings& s,const Registry& r){
   for(const auto& mask:s.influences){for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing")throw std::runtime_error("Unknown influence type");}
 }
 inline Json serialize(const Settings& s){
-  Json j={{"schemaVersion",schemaVersion},{"worldSeed",s.seed},{"presetId",s.preset},{"profileId",s.profile},{"candidates",s.candidates},{"scale",s.scale},{"damage",s.damage},{"dressing",s.dressing},{"player",{{"radius",s.player.radius},{"height",s.player.height},{"step",s.player.step}}},{"stageLocks",s.locked},{"qualityWeights",s.weights},{"pinnedRegions",s.pinnedRegions}};
+  Json j={{"schemaVersion",schemaVersion},{"worldSeed",s.seed},{"presetId",s.preset},{"profileId",s.profile},{"candidates",s.candidates},{"scale",s.scale},{"damage",s.damage},{"dressing",s.dressing},{"player",{{"radius",s.player.radius},{"height",s.player.height},{"step",s.player.step}}},{"stageLocks",s.locked},{"frozenStageInputs",s.frozen},{"frozenRegistry",s.frozenRegistry},{"qualityWeights",s.weights},{"pinnedRegions",s.pinnedRegions}};
   j["missionPins"]=Json::array();for(const auto& p:s.missionPins)j["missionPins"].push_back({{"id",p.id},{"position",vector(p.position)}});
   j["roadPins"]=Json::array();for(const auto& p:s.roadPins)j["roadPins"].push_back({{"id",p.id},{"a",vector(p.a)},{"b",vector(p.b)},{"width",p.width}});
   j["regionSeeds"]=Json::array();for(const auto& [id,seed]:s.regionSeeds)j["regionSeeds"].push_back({{"region",id},{"seed",seed}});
@@ -140,6 +156,7 @@ inline Settings deserialize(const Json& j,const Registry& r){
   if(j.at("schemaVersion")!=schemaVersion)throw std::runtime_error("Unsupported World Architect project version");Settings s;
   s.seed=j.at("worldSeed");s.preset=j.at("presetId");s.profile=j.at("profileId");s.candidates=j.at("candidates");s.scale=j.at("scale");s.damage=j.at("damage");s.dressing=j.at("dressing");
   const auto& p=j.at("player");s.player={p.at("radius"),p.at("height"),p.at("step")};s.locked=j.at("stageLocks").get<std::array<bool,7>>();s.weights=j.at("qualityWeights").get<std::map<std::string,double>>();s.pinnedRegions=j.value("pinnedRegions",std::vector<uint64_t>{});
+  if(j.contains("frozenStageInputs"))s.frozen=j.at("frozenStageInputs").get<std::array<Json,5>>();s.frozenRegistry=j.value("frozenRegistry",uint64_t(0));
   for(const auto& p:j.at("missionPins")){MissionNode n;n.id=p.at("id");n.position=vector(p.at("position"));n.pinned=true;s.missionPins.push_back(n);}
   for(const auto& p:j.at("roadPins")){Road road;road.id=p.at("id");road.a=vector(p.at("a"));road.b=vector(p.at("b"));road.width=p.at("width");road.pinned=true;s.roadPins.push_back(road);}
   for(const auto& p:j.at("regionSeeds"))s.regionSeeds[p.at("region").get<uint64_t>()]=p.at("seed").get<uint64_t>();
@@ -188,7 +205,7 @@ inline void validateMission(const MissionGraph& graph){
   throw std::runtime_error("Mission cannot visit its required beats and reach the exit under its gate / direction rules");
 }
 inline Json diagnostics(const WorldPlan& world){
-  Json j={{"schemaVersion",schemaVersion},{"seed",world.seed},{"preset",world.preset},{"profile",world.profile},{"valid",world.diagnostics.valid},{"rejects",world.diagnostics.rejects},{"warnings",world.diagnostics.warnings},{"timingMs",world.diagnostics.timing},{"scores",world.diagnostics.score},{"brushes",world.diagnostics.brushes},{"mapBytes",world.diagnostics.mapBytes},{"routeLength",world.diagnostics.routeLength},{"stageSeeds",world.seeds},{"reachable",world.navigation.reachable},{"navigationNodes",world.navigation.nodes.size()}};
+  Json j={{"schemaVersion",schemaVersion},{"seed",world.seed},{"preset",world.preset},{"profile",world.profile},{"valid",world.diagnostics.valid},{"rejects",world.diagnostics.rejects},{"warnings",world.diagnostics.warnings},{"timingMs",world.diagnostics.timing},{"cachedStages",world.diagnostics.cachedStages},{"scores",world.diagnostics.score},{"brushes",world.diagnostics.brushes},{"mapBytes",world.diagnostics.mapBytes},{"routeLength",world.diagnostics.routeLength},{"stageSeeds",world.seeds},{"reachable",world.navigation.reachable},{"navigationNodes",world.navigation.nodes.size()}};
   j["missionNodes"]=Json::array();for(const auto& n:world.mission.nodes)j["missionNodes"].push_back({{"id",n.id},{"role",roleName(n.role)},{"required",n.required},{"room",n.room},{"floor",n.floor},{"position",vector(n.position)}});
   j["missionEdges"]=Json::array();for(const auto& e:world.mission.edges)j["missionEdges"].push_back({{"a",e.a},{"b",e.b},{"purpose",e.purpose},{"optional",e.optional}});return j;
 }

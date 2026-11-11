@@ -78,6 +78,18 @@ try:
   create('created-item.cfg','existing.cfg');check((folder/'created-item.cfg').is_file(),'right-click an existing item creates a file')
   click('files/item/subfolder');wait(lambda:live()['folder'].endswith('/subfolder'));click('nav/mod-folder/segment/'+folder.as_posix());wait(lambda:Path(live()['folder'])==folder);check(True,'ancestor breadcrumb navigates to its directory')
   navigate(folder/'subfolder'/'deeper');check(Path(live()['folder'])==folder/'subfolder'/'deeper','trailing blank opens editable path and Enter navigates')
+  toolbar_keys=('files/up','files/refresh','files/open-in-manager','files/view-list','files/view-tiles','nav/mod-folder/bar')
+  toolbar=[rect(key) for key in toolbar_keys]
+  check(all(item['visible'] for item in toolbar) and max(item['y'] for item in toolbar)<min(item['y']+item['height'] for item in toolbar),'file commands and breadcrumbs share one row')
+  panel=rect('files/panel');hide=rect('files/hide');contents=rect('files/grid')
+  check(contents['y']+contents['height']<=hide['y'] and hide['y']+hide['height']<=panel['y']+panel['height'],'Hide files is in the browser footer')
+  click('files/view-list');wait(lambda:not live()['filesGrid'] and 'thumbnail/mod-thumbnail' not in live()['widgets'])
+  click('files/hide');wait(lambda:'files/panel' not in live()['widgets'] and 'files/show' in live()['widgets'])
+  click('files/show');wait(lambda:'files/hide' in live()['widgets'] and 'files/show' not in live()['widgets'])
+  reopened=rect('files/panel')
+  check(abs(reopened['x']-panel['x'])<2 and abs(reopened['y']-panel['y'])<2 and Path(live()['folder'])==folder/'subfolder'/'deeper' and not live()['filesGrid'],'Show files reopens the same docked browser and preserves its folder and view')
+  click('files/view-tiles');wait(lambda:live()['filesGrid'] and 'thumbnail/mod-thumbnail' in live()['widgets'])
+  check(True,'list and tile buttons switch views and show zoom only for tiles')
  navigate(folder);wheel('files/grid','thumbnail');ImageGrab.grab().save(out/'mod-file-manager.png')
  navigate(folder/'empty');baseline=sample_frames();navigate(models);wait(lambda:live()['readyModels']>=4 and not live()['previewBusy'],120);ui.settle();warm_start=live();warm=sample_frames();warm_end=live();ImageGrab.grab().save(out/'model-heavy-folder.png')
  check(warm_end['modelQuads']>0,'model-heavy folder shows cached image previews');

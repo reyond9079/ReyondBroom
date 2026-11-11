@@ -27,5 +27,6 @@ static void browser132QaWrite(){
  }
  size_t ready=0;for(const auto& item:entityPreviews)ready+=item.second.thumbnail!=0;
  auto j=nlohmann::json{{"widgets",widgets},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"folder",modFilesFolder.generic_u8string()},{"modRoot",modFileRoot().generic_u8string()},{"error",modFilesError},{"thumbnail",modFilesThumbnailSize},{"entityThumbnail",entityThumbnailSize},{"materialThumbnail",browserQaMaterialSize},{"entityClasses",browserQaEntityClasses},{"entries",modFilesEntries.size()},{"cachedModels",entityPreviews.size()},{"readyModels",ready},{"previewBusy",entityPreviewJob.valid()},{"modelReads",entityPreviewResourceReads},{"modelBuilds",entityPreviewBuilds},{"modelQuads",entityPreviewQuadFrame==ImGui::GetFrameCount()?entityPreviewQuadCount:0},{"frameMs",ImGui::GetIO().DeltaTime*1000},{"frame",ImGui::GetFrameCount()}};
+ j["filesGrid"]=modFilesGrid;
  try{bb::atomicWrite(documentPath("browser132-live.json"),j.dump());}catch(const std::exception& e){core->Print((std::string("Browser QA: ")+e.what()+"\n").c_str());}
 }

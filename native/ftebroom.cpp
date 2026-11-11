@@ -1010,10 +1010,9 @@ static void panel(float w, float h)
       sceneDrag?(altHeld?"Z constraint | Esc cancels":"XY constraint | Esc cancels"):
       currentTool==2?"Place 2 or 3 points | Enter applies | Ctrl+Enter changes side | Esc removes last point":
       "Click selects | Drag creates / moves | Shift+Esc exits tool");
-  const char* fileLabel=modFilesOpen?"Hide files":"Show files";
   const auto& style=ImGui::GetStyle();
-  const float buttonWidth=ImGui::CalcTextSize(uiTr(fileLabel)).x+2*style.FramePadding.x;
-  const float textWidth=ImGui::GetContentRegionAvail().x-buttonWidth-style.ItemSpacing.x-100*uiScale();
+  const float showWidth=modFilesOpen?0:ImGui::CalcTextSize(uiTr("Show files")).x+2*style.FramePadding.x+style.ItemSpacing.x;
+  const float textWidth=ImGui::GetContentRegionAvail().x-showWidth-style.ItemSpacing.x-100*uiScale();
   if(textWidth>0){
     const char* end=nullptr;
     ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(),textWidth,0,statusText,nullptr,&end);
@@ -1023,8 +1022,14 @@ static void panel(float w, float h)
     if(selectionStatus[0])ImGui::PopStyleColor();
     ImGui::SameLine();
   }
-  if(ImGui::SmallButton(fileLabel))modFilesOpen=!modFilesOpen;
-  ImGui::SameLine();
+  if(!modFilesOpen){
+    if(ImGui::SmallButton("Show files")){
+      modFilesOpen=true;
+      modFilesRequestFocus=true;
+    }
+    browserQaItem("files/show");
+    ImGui::SameLine();
+  }
   ImGui::TextDisabled("%s.map%s",documentName.c_str(),cvars->GetFloat("ftebroom_dirty")?" *":"");
   if(ImGui::IsItemHovered()){
     ImGui::BeginTooltip();

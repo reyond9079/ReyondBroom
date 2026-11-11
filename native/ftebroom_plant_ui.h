@@ -146,7 +146,7 @@ static void plantProperties() {
     if(s.result)for(int i=0;i<3;i++)ImGui::Text("LOD%i: %zu triangles",i,s.result->lods[i].faces.size());
   }
   if(ImGui::CollapsingHeader("Export / target")) {
-    ImGui::TextWrapped("OBJ + PNG / GLB retain portable full-detail geometry. Export also accepts .mdl (Quake) and .md2 (Quake II). Add to Map / Save use the active game's native model format.");
+    ImGui::TextWrapped("OBJ + PNG / GLB retain portable full-detail geometry. Export offers Quake MDL, Quake II MD2, Quake III MD3, IQM, MD5 mesh and GoldSrc MDL. Add to Map / Save use the active game's native model format.");
     if(gameProfile==0)ImGui::TextWrapped("Quake III: MD3 with alpha-cutout material, baked by q3map2 when compiling.");
     if(gameProfile==1)ImGui::TextWrapped("FTE: MD3 with alpha-coverage mipmaps, so distant foliage stays visible.");
     if(gameProfile==2)ImGui::TextWrapped(q1UseLibre
@@ -478,12 +478,33 @@ static void plantWriteQa() {
     }
   }
   auto j=plants::Json{{"frame_stats",plantQaPerf()},{"generation_ms",s.result?s.result->milliseconds:0.},{"frame_ms",ImGui::GetIO().DeltaTime*1000},{"mesh_cache_bytes",meshBytes},{"texture_bytes",textureBytes},{"open",s.open},{"busy",plantBusy()},{"ready",plantReady()},{"widgets",s.widgets},{"project",plants::serialize(s.doc)},
-    {"lods",counts},{"selected",s.selected},{"selectedBranch",s.selectedBranch},{"branchProbes",branchProbes},{"error",s.error},{"message",s.message},{"path",s.file.u8string()},{"model",s.lastModel.u8string()},
+    {"exportFormat",int(s.exportFormat)},{"lods",counts},{"selected",s.selected},{"selectedBranch",s.selectedBranch},{"branchProbes",branchProbes},{"error",s.error},{"message",s.message},{"path",s.file.u8string()},{"model",s.lastModel.u8string()},
     {"camera",{s.yaw,s.pitch,s.zoom}},{"cameraLow",s.cameraLow},{"cameraHigh",s.cameraHigh},{"undo",s.undo.size()},{"redo",s.redo.size()},
     {"gamePreview",{{"active",s.gamePreview},{"current",plantGameCurrent()},{"triangles",s.gameResult.triangles},{"vertices",s.gameResult.vertices},{"trees",s.gameResult.trees},{"error",s.gameResult.error}}},
     {"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"theme",uiTheme},{"profile",gameProfile},{"settingsDir",settingsPath().parent_path().u8string()},
     {"assetSource",std::string(baseq3)},{"assetRuntime",gameRuntime()}};
   plantAction([&](){bb::atomicWrite(documentPath("plant-ui-live.json"),j.dump());});
+}
+static void plantExportDialog() {
+  auto& s=plantState;
+  if(s.exportRequest){ImGui::OpenPopup("Export plant model");s.exportRequest=false;}
+  if(ImGui::BeginPopupModal("Export plant model",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){
+    ImGui::TextUnformatted("Choose a format, then choose where to save.");
+    for(const auto& item:ftebroom::plantExport::choices){
+      if(ImGui::RadioButton(item.label,s.exportFormat==item.format))s.exportFormat=item.format;
+      plantRect("export-format/"+std::to_string(int(item.format)));
+    }
+    const auto& spec=ftebroom::plantExport::choice(s.exportFormat);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX()+450*uiScale());ImGui::TextWrapped("%s",spec.hint);ImGui::PopTextWrapPos();
+    if(plantButton("Choose destination...","export-destination")){
+      const auto format=s.exportFormat;
+      ImGui::CloseCurrentPopup();
+      runUiChoose((plantFolder()/(plants::assetId(plantState.doc,plantState.lod)+ftebroom::plantExport::choice(format).extension)).u8string(),
+        [format](const std::string& path){plantExport(std::filesystem::u8path(path),format);},true);
+    }
+    ImGui::SameLine();if(plantButton("Cancel","export-cancel"))ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+  }
 }
 static void plantPanel() {
   PlantQaMainScope qaMainScope;
@@ -503,7 +524,7 @@ static void plantPanel() {
     if(plantButton("Save","save"))plantAction([](){plantAskSave();});ImGui::SameLine();
     if(plantButton("Save as...","save-as"))plantAction([](){plantAskSave({},true);});ImGui::SameLine();
     ImGui::BeginDisabled(!plantReady());
-    if(plantButton("Export...","export"))runUiChoose((plantFolder()/(plants::assetId(s.doc,s.lod)+".glb")).u8string(),[](const std::string& path){plantExport(std::filesystem::u8path(path));},true);ImGui::SameLine();
+    if(plantButton("Export...","export"))s.exportRequest=true;ImGui::SameLine();
     if(plantButton("Add to Map","add-map"))plantAction(plantAddToMap);
     ImGui::EndDisabled();if(ImGui::GetWindowWidth()>=850*u)ImGui::SameLine();if(plantButton("Generate","generate"))plantSchedule(true);ImGui::SameLine();
     ImGui::BeginDisabled(s.undo.empty());if(plantButton("Undo","undo"))plantUndo();ImGui::EndDisabled();ImGui::SameLine();
@@ -528,7 +549,7 @@ static void plantPanel() {
     }ImGui::EndChild();plantAssets();
     if(plantBusy()) {static const char* stages[]={"Growing branches","Building LOD1","Building LOD2","Baking botanical textures"};int stage=s.work?s.work->stage.load():0;ImGui::ProgressBar((stage+.5f)/4,{-1,0},stages[std::clamp(stage,0,3)]);}
     else if(!s.error.empty())ImGui::TextColored({1,.38f,.28f,1},"%s",s.error.c_str());else ImGui::TextDisabled("%s",s.message.c_str());
-    plantConfirmSwitch();
+    plantConfirmSwitch();plantExportDialog();
     if(plantFocused()&&!ImGui::GetIO().WantTextInput) {
       if(ImGui::Shortcut(ImGuiMod_Ctrl|ImGuiKey_Z))plantUndo(ImGui::GetIO().KeyShift);
       if(ImGui::Shortcut(ImGuiMod_Ctrl|ImGuiKey_Y))plantUndo(true);

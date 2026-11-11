@@ -88,6 +88,8 @@ def plan(paths, full=False, release=False):
         matched = set()
         if infrastructure_only:
             matched = {'ci'}
+        elif path == 'tests/plant-export-manager.cpp':
+            matched = {'plant_ui'}
         else:
             for patterns, groups in RULES:
                 if any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns):

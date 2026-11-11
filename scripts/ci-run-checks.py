@@ -46,6 +46,7 @@ def main():
             '--seeds', '100' if selected['mode'] == 'full' else '3', gui=False)
     if 'world_ui' in suites:
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/ui')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/metro-ui', '--preset', 'metro')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))

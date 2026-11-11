@@ -5,7 +5,8 @@
 namespace ftebroom::worldArchitect {
 inline std::string vectorText(V p){std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<p.x<<' '<<p.y<<' '<<p.z;return out.str();}
 inline void cancelled(const std::atomic<bool>* flag){if(flag&&flag->load())throw std::runtime_error("Generation cancelled");}
-inline std::string materialId(const WorldPlan& w,int slot){return "wa_"+w.theme.substr(0,7)+std::to_string(slot);}
+inline std::string assetId(const WorldPlan& w,int slot){return slot==6?"wa_water_"+w.theme.substr(0,7):"wa_"+w.theme.substr(0,7)+std::to_string(slot);}
+inline std::string materialId(const WorldPlan& w,int slot){return slot==6&&w.profile>=2?(w.profile==4?"!wa":"*wa")+w.theme.substr(0,7):assetId(w,slot);}
 inline std::string material(const WorldPlan& w,int slot){return materialId(w,slot);}
 inline std::string skyMaterial(const WorldPlan& w){return w.profile<2?"wa_sky_"+w.theme:"skywa"+w.theme.substr(0,7);}
 inline bool inside(V p,V lo,V hi){return p.x>=lo.x&&p.y>=lo.y&&p.z>=lo.z&&p.x<=hi.x&&p.y<=hi.y&&p.z<=hi.z;}
@@ -29,6 +30,7 @@ public:
   explicit Collision(const WorldPlan& w){
     solids.reserve(w.architecture.elements.size());
     for(const auto& element:w.architecture.elements){
+      if(element.kind=="floodwater")continue; // Liquid contents are not a solid hull.
       auto poly=al::polyhedron(element.brush);Solid solid;solid.low=poly.min;solid.high=poly.max;
       auto axis=[&](V direction){
         if(al::length(direction)<1e-8)return;direction=al::unit(direction);
@@ -90,33 +92,103 @@ public:
 inline void site(WorldPlan& w,const Settings& s,const Preset& preset){
   Random rng(subSeed(s.seed,"Site"));const bool interior=preset.scope==Scope::Interior||preset.scope==Scope::Arena;
   int count=interior?1:preset.blocks;
-  const double factor=s.scale*(interior?1:.66),plotW=preset.width*factor+256,plotD=preset.depth*factor+256,street=preset.street;
-  int cols=count>1?2:1,rows=(count+cols-1)/cols;
-  const double totalW=cols*plotW+(cols+1)*street,totalD=rows*plotD+(rows+1)*street;
+  const double factor=s.scale*(interior?1:.66),street=preset.street;
+  const int cols=count>1?2:1,rows=(count+cols-1)/cols;
+  const double totalW=cols*(preset.width*factor+256)+(cols+1)*street,totalD=rows*(preset.depth*factor+256)+(rows+1)*street;
+  struct Parcel {V low,high;};std::vector<Parcel> parcels;
+  if(interior)parcels.push_back({{-preset.width*factor/2-128,-preset.depth*factor/2-128,0},{preset.width*factor/2+128,preset.depth*factor/2+128,0}});
+  else{
+    // Recursive binary parcel subdivision produces real T junctions and unequal
+    // frontage/depth. Roads are the partition boundaries, not lines painted
+    // through masses laid out on an unrelated regular grid.
+    uint64_t roadId=1000;V low{-totalW/2+street/2,-totalD/2+street/2,0},high{totalW/2-street/2,totalD/2-street/2,0};
+    auto road=[&](V a,V b,const char* hierarchy){w.spatial.roads.push_back({roadId++,a,b,street,hierarchy,false});};
+    road(low,{high.x,low.y,0},"secondary");road({high.x,low.y,0},high,"secondary");road(high,{low.x,high.y,0},"secondary");road({low.x,high.y,0},low,"secondary");
+    std::function<void(Parcel,int,int)> divide=[&](Parcel parcel,int leaves,int level){
+      if(leaves==1){parcels.push_back(parcel);return;}
+      int axis;
+      if(!level)axis=preset.layout=="spine"?0:preset.layout=="courtyard"?1:0;
+      else axis=(parcel.high.x-parcel.low.x)/(preset.width*factor+street)>(parcel.high.y-parcel.low.y)/(preset.depth*factor+street)?0:1;
+      const int first=leaves/2;double fraction=.5+rng.between(-.035,.035);
+      double cut=parcel.low[axis]+(parcel.high[axis]-parcel.low[axis])*fraction;
+      auto left=parcel,right=parcel;left.high[axis]=right.low[axis]=cut;
+      if(axis==0)road({cut,parcel.low.y,0},{cut,parcel.high.y,0},level?"local":"primary");
+      else road({parcel.low.x,cut,0},{parcel.high.x,cut,0},level?"local":"primary");
+      divide(left,first,level+1);divide(right,leaves-first,level+1);
+    };
+    divide({low,high},count,0);
+  }
   double high=0;
-  for(int i=0;i<count;i++){
-    uint64_t id=100+uint64_t(i);Random local(regionSeed(s,id,"Site"));
-    double width=preset.width*factor,depth=preset.depth*factor;
-    if(!interior){width*=local.between(.85,1.07);depth*=local.between(.86,1.04);}
-    // A genuine site hierarchy: roads define plots; masses are inset inside
-    // those plots, with independent frontage, depth and height variation.
-    double x=interior?0:-totalW/2+street+(i%cols)*(plotW+street)+plotW/2;
-    double y=interior?0:-totalD/2+street+(i/cols)*(plotD+street)+plotD/2;
+  for(size_t i=0;i<parcels.size();i++){
+    uint64_t id=100+i;Random local(regionSeed(s,id,"Site"));auto parcel=parcels[i];
+    const double setback=interior?128:street/2+72;
+    double width=std::min(preset.width*factor,(parcel.high.x-parcel.low.x)-2*setback),depth=std::min(preset.depth*factor,(parcel.high.y-parcel.low.y)-2*setback);
+    if(!interior){width*=local.between(.92,1.);depth*=local.between(.9,1.);}
+    if(width<672||depth<320)throw std::runtime_error("Parcel cannot fit the requested room/stair program; increase generation scale");
+    double x=(parcel.low.x+parcel.high.x)/2,y=(parcel.low.y+parcel.high.y)/2;
     Building b;b.id=id;b.low={x-width/2,y-depth/2,0};b.high={x+width/2,y+depth/2,double(preset.floors*256)};b.floors=preset.floors;b.archetype=preset.archetype;
     if(!interior)b.floors=std::max(1,preset.floors+local.integer(-1,0));b.high.z=b.floors*256;
     b.pinned=std::find(s.pinnedRegions.begin(),s.pinnedRegions.end(),id)!=s.pinnedRegions.end();
-    w.spatial.lots.push_back({id,{x-plotW/2,y-plotD/2,0},{x+plotW/2,y+plotD/2,b.high.z},preset.archetype});
+    w.spatial.lots.push_back({id,parcel.low+V{interior?0:street/2,interior?0:street/2,0},V{parcel.high.x-(interior?0:street/2),parcel.high.y-(interior?0:street/2),b.high.z},preset.archetype});
     w.spatial.buildings.push_back(b);high=std::max(high,b.high.z);
+    if(!interior)w.spatial.roads.push_back({2000+uint64_t(i),{parcel.low.x,y,0},{b.low.x-56,y,0},80,"pedestrian frontage",false});
   }
-  if(interior){w.low={-preset.width*factor/2-160,-preset.depth*factor/2-160,-64};w.high={-w.low.x,-w.low.y,high+256};}
+  if(interior){w.low={-preset.width*factor/2-160,-preset.depth*factor/2-160,-64};w.high={-w.low.x,-w.low.y,high+256};if(preset.ruinEvent=="collapsed-stair"){w.low.x-=192;w.high.x+=192;}}
   else{
     w.low={-totalW/2-street/2,-totalD/2-street/2,-64};w.high={totalW/2+street/2,totalD/2+street/2,high+384};
-    for(int x=0;x<=cols;x++){double at=-totalW/2+street/2+x*(plotW+street);w.spatial.roads.push_back({1000+uint64_t(x),{at,-totalD/2,0},{at,totalD/2,0},street,x==1?"primary":"secondary",false});}
-    for(int y=0;y<=rows;y++){double at=-totalD/2+street/2+y*(plotD+street);w.spatial.roads.push_back({1100+uint64_t(y),{-totalW/2,at,0},{totalW/2,at,0},street,y==1?"primary":"secondary",false});}
     for(const auto& pin:s.roadPins){bool found=false;for(auto& road:w.spatial.roads)if(road.id==pin.id){road=pin;found=true;}if(!found)w.spatial.roads.push_back(pin);}
   }
   for(int a=0;a<3;a++)if(std::max(std::abs(w.low[a]),std::abs(w.high[a]))>capability(s.profile).coordinateLimit)throw std::runtime_error("World exceeds the selected classic BSP profile bounds; reduce scale or choose FTE / Quake III");
   for(const auto& mask:s.influences)if(mask.kind=="avoid")for(const auto& b:w.spatial.buildings)if(overlap(b.low,b.high,mask.low,mask.high))throw std::runtime_error("Building overlaps a designer keep-out volume; move it or reduce the generation scope");
+}
+// Establish room programs before producing any brushes. Mission beats reserve
+// real rooms and determine occupied-room/opening requirements; navigation subsequently
+// proves those planned locations instead of assigning tags to an arbitrary path.
+inline void floorplan(WorldPlan& w,const Settings& s,const Preset& preset){
+  std::vector<Room*> rooms;
+  for(auto& b:w.spatial.buildings){
+    b.atrium=preset.layout=="atrium"||preset.layout=="ring"||preset.ruinEvent=="flooded-platform";
+    b.parallel=preset.layout=="parallel";
+    b.hall=std::max(s.player.radius*2+24,preset.hallHalfWidth);
+    Random rng(regionSeed(s,b.id,"Floorplan"));
+    const double end=b.high.x-480;
+    const int minimum=int(std::ceil(double(w.mission.nodes.size())/std::max(1,int(w.spatial.buildings.size())*b.floors*2)));
+    const int pairs=std::clamp(std::max(preset.rooms/2,minimum),2,std::max(2,int((end-b.low.x)/128)));
+    b.bays={b.low.x};for(int i=1;i<pairs;i++)b.bays.push_back(b.low.x+(end-b.low.x)*(i+rng.between(-.18,.18))/pairs);b.bays.push_back(end);
+    for(int floor=0;floor<b.floors;floor++)for(int side=0;side<2;side++)for(int i=0;i<pairs;i++){
+      double x0=b.bays[i],x1=b.bays[i+1],cy=(b.low.y+b.high.y)/2;
+      double y0=side?cy+b.hall:b.low.y,y1=side?b.high.y:cy-b.hall;
+      if(y1-y0<96)throw std::runtime_error("Room program leaves insufficient occupied depth; increase scale or reduce gallery width");
+      Room room;room.id=b.id*10000+floor*100+side*pairs+i;room.low={x0+8,y0+8,floor*256.};room.high={x1-8,y1-8,floor*256.+240};room.floor=floor;room.entry={(x0+x1)/2,side?y0:y1,floor*256.+1};
+      const auto& functions=preset.roomFunctions;
+      room.function=functions[(floor*pairs*2+side*pairs+i)%functions.size()];b.rooms.push_back(room);
+    }
+  }
+  // Vectors are complete before taking pointers: no later room append may
+  // invalidate a mission reservation.
+  for(auto& b:w.spatial.buildings)for(auto& r:b.rooms)rooms.push_back(&r);
+  if(rooms.size()+1<w.mission.nodes.size())throw std::runtime_error("Mission needs more distinct functional rooms than this site can provide");
+  std::vector<Room*> available=rooms;
+  std::stable_sort(available.begin(),available.end(),[](auto a,auto b){return std::tie(a->floor,a->id)<std::tie(b->floor,b->id);});
+  std::vector<MissionNode*> required;for(auto& node:w.mission.nodes)if(node.role!=Role::Start&&node.required)required.push_back(&node);
+  for(size_t i=0;i<required.size();i++){
+    auto* node=required[i];size_t index=std::min(available.size()-1,i*(available.size()-1)/std::max(size_t(1),required.size()-1));
+    auto* room=available[index];room->mission=node->id;node->room=room->id;node->floor=room->floor;
+    if(!node->pinned)node->position={(room->low.x+room->high.x)/2,(room->low.y+room->high.y)/2,room->low.z+1};
+  }
+  for(auto& node:w.mission.nodes){
+    if(node.role==Role::Start){const auto& b=w.spatial.buildings.front();if(!node.pinned)node.position={b.low.x-56,(b.low.y+b.high.y)/2,1};continue;}
+    if(node.required)continue;
+    auto found=std::find_if(available.rbegin(),available.rend(),[](auto r){return !r->mission;});if(found==available.rend())throw std::runtime_error("Optional mission branch has no unreserved room");
+    auto* room=*found;room->mission=node.id;node.room=room->id;node.floor=room->floor;room->required=false;
+    if(!node.pinned)node.position={(room->low.x+room->high.x)/2,(room->low.y+room->high.y)/2,room->low.z+1};
+  }
+  if(preset.ruinEvent=="collapsed-stair")for(auto& node:w.mission.nodes)if(node.role==Role::Exit&&!node.pinned){
+    for(auto room:rooms)if(room->mission==node.id)room->mission=0;const auto& b=w.spatial.buildings.front();node.room=0;node.floor=0;node.position={b.high.x+296,(b.low.y+b.high.y)/2,1};
+  }
+  if(preset.ruinEvent=="flooded-platform")for(auto& node:w.mission.nodes)if(node.role==Role::Exit&&!node.pinned){
+    for(auto room:rooms)if(room->mission==node.id)room->mission=0;const auto& b=w.spatial.buildings.front();node.room=0;node.floor=0;node.position={b.high.x+56,(b.low.y+b.high.y)/2,1};
+  }
 }
 // Wall bays with actual openings and lintels. Damage and windows remove solid
 // geometry; there is no hidden collision sheet behind an apparent hole.
@@ -147,11 +219,14 @@ inline void shell(WorldPlan& w){
     auto brush=al::box(a,b,skyMaterial(w));addBrush(w,0,"sealed sky boundary",brush);
   }addBrush(w,0,"sealed sky ceiling",al::box({lo.x-32,lo.y-32,hi.z},{hi.x+32,hi.y+32,hi.z+32},skyMaterial(w)));
 }
+inline double influence(const Settings& settings,V p,const std::string& kind,double fallback);
 inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Building& b,const std::atomic<bool>* cancel){
-  const auto low=b.low,high=b.high;const double cy=(low.y+high.y)/2,hall=std::max(72.,s.player.radius*2+24),stairX=high.x-320;
+  const auto low=b.low,high=b.high;const double cy=(low.y+high.y)/2,hall=b.hall,stairX=high.x-320,returnOffset=std::max(144.,hall+64);
+  const bool collapsed=preset.ruinEvent=="collapsed-stair"&&influence(s,{stairX,cy,0},"damage",s.damage)>.2&&influence(s,{stairX,cy,0},"preserve",0)==0;
   Random rng(regionSeed(s,b.id,"Architecture"));
-  const int roomPairs=std::max(2,preset.rooms/2);const double roomEnd=stairX-160;
-  std::vector<double> splits{low.x};for(int i=1;i<roomPairs;i++)splits.push_back(low.x+(roomEnd-low.x)*(i+rng.between(-.18,.18))/roomPairs);splits.push_back(roomEnd);
+  const auto& splits=b.bays;const int roomPairs=int(splits.size())-1;const double roomEnd=splits.back();
+  const double voidX0=low.x+144,voidX1=roomEnd-128,voidY0=cy-hall+64,voidY1=cy+hall-64;
+  const bool openCourt=b.atrium&&voidX1-voidX0>160;
   std::vector<size_t> halls;
   for(int floor=0;floor<b.floors;floor++){
     cancelled(cancel);double z=floor*256.;
@@ -159,7 +234,16 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
     // central corridor are actual connected floor plates.
     if(!floor)box(w,b.id,"floor plate",{low.x,low.y,-16},{high.x,high.y,0},0);
     else{
-      box(w,b.id,"floor plate",{low.x,low.y,z-16},{stairX,high.y,z},0);
+      if(openCourt){
+        box(w,b.id,"atrium entry landing",{low.x,low.y,z-16},{voidX0,high.y,z},0);
+        box(w,b.id,"atrium exit landing",{voidX1,low.y,z-16},{stairX,high.y,z},0);
+        box(w,b.id,"atrium gallery",{voidX0,low.y,z-16},{voidX1,voidY0,z},0);
+        box(w,b.id,"atrium gallery",{voidX0,voidY1,z-16},{voidX1,high.y,z},0);
+        for(double y:{voidY0,voidY1}){
+          box(w,b.id,"gallery handrail",{voidX0,y-3,z+36},{voidX1,y+3,z+44},2);
+          for(double x=voidX0;x<=voidX1;x+=96)box(w,b.id,"gallery baluster",{x-3,y-3,z},{x+3,y+3,z+40},2);
+        }
+      }else box(w,b.id,"floor plate",{low.x,low.y,z-16},{stairX,high.y,z},0);
       box(w,b.id,"stair side landing",{stairX,low.y,z-16},{high.x,cy-80,z},0);
       box(w,b.id,"stair side landing",{stairX,cy+80,z-16},{high.x,high.y,z},0);
       box(w,b.id,"stair end landing",{high.x-48,cy-80,z-16},{high.x,cy+80,z},0);
@@ -178,18 +262,35 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
     std::vector<std::array<double,4>> entrance{{depth/2-48,depth/2+48,z,z+112}};
     wall(w,b.id,{low.x,low.y,0},{low.x,high.y,0},z,z+240,16,1,entrance);
     wall(w,b.id,{high.x,low.y,0},{high.x,high.y,0},z,z+240,16,1,floor?std::vector<std::array<double,4>>{}:entrance);
-    const auto hallLeft=navNode(w,{low.x+40,cy,z+1},b.id),hallRight=navNode(w,{stairX-40,cy,z+1},b.id);navEdge(w,hallLeft,hallRight);halls.push_back(hallRight);
+    const auto hallLeft=navNode(w,{low.x+40,cy,z+1},b.id),hallRight=navNode(w,{stairX-40,cy,z+1},b.id);
+    if(!floor||!openCourt)navEdge(w,hallLeft,hallRight);halls.push_back(hallRight);
+    std::array<size_t,2> laneLeft{},laneRight{};
+    for(int side=0;side<2;side++){
+      double lane=cy+(side?1:-1)*(hall-32);
+      laneLeft[side]=navNode(w,{low.x+40,lane,z+1},b.id);laneRight[side]=navNode(w,{stairX-40,lane,z+1},b.id);
+      navEdge(w,hallLeft,laneLeft[side]);navEdge(w,laneLeft[side],laneRight[side]);navEdge(w,laneRight[side],hallRight);
+      for(double x=low.x+96;x<stairX-32;x+=192){
+        box(w,b.id,"circulation light fixture",{x-24,lane-20,z+208},{x+24,lane+20,z+240},2);
+        al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({x,lane,z+192})},{"light","320"},{"_color",side?"0.82 0.9 1":"1 0.9 0.72"}};if(s.profile==4)light.fields["_light"]="255 235 205 320";w.architecture.entities.push_back(light);
+      }
+    }
+    if(b.parallel&&preset.ruinEvent!="flooded-platform"){
+      double length=roomEnd-low.x-176;
+      wall(w,b.id,{low.x+112,cy,0},{roomEnd-64,cy,0},z,z+240,12,3,{{length/2-48,length/2+48,z,z+112}});
+      auto crossing=navNode(w,{(low.x+112+roomEnd-64)/2,cy,z+1},b.id);navEdge(w,crossing,laneLeft[0]);navEdge(w,crossing,laneLeft[1]);
+    }
     if(!floor){auto outside=navNode(w,{low.x-56,cy,1},b.id);navEdge(w,outside,hallLeft);}
     for(int side=0;side<2;side++)for(int i=0;i<roomPairs;i++){
       double x0=splits[i],x1=splits[i+1],door=(x0+x1)/2;
       double y0=side?cy+hall:low.y,y1=side?high.y:cy-hall,inner=side?y0:y1;
       if(i)wall(w,b.id,{x0,y0,0},{x0,y1,0},z,z+240,12,1);
-      wall(w,b.id,{x0,inner,0},{x1,inner,0},z,z+240,12,1,{{door-x0-48,door-x0+48,z,z+112}});
-      Room room;room.id=b.id*10000+floor*100+side*roomPairs+i;room.low={x0+8,y0+8,z};room.high={x1-8,y1-8,z+240};room.floor=floor;room.entry={door,inner,z+1};
-      static const char* functions[]={"reception","ward","service","storage","treatment","utility","waiting","workshop"};room.function=functions[(i+side*2+floor)%8];
-      b.rooms.push_back(room);
-      const auto corridor=navNode(w,{door,cy,z+1},b.id),entry=navNode(w,room.entry,b.id),center=navNode(w,{door,(y0+y1)/2,z+1},b.id);
-      navEdge(w,hallLeft,corridor);navEdge(w,corridor,hallRight);navEdge(w,corridor,entry);navEdge(w,entry,center);
+      auto& room=b.rooms.at(size_t(floor*roomPairs*2+side*roomPairs+i));
+      double halfDoor=std::min((x1-x0-32)/2,room.mission?56.:40.);
+      if(halfDoor<s.player.radius+8)throw std::runtime_error("Functional room door does not clear the configured player hull");
+      wall(w,b.id,{x0,inner,0},{x1,inner,0},z,z+240,12,1,{{door-x0-halfDoor,door-x0+halfDoor,z,z+112}});
+      const double lane=cy+(side?1:-1)*(hall-32);
+      const auto corridor=navNode(w,{door,lane,z+1},b.id),entry=navNode(w,room.entry,b.id),center=navNode(w,{door,(y0+y1)/2,z+1},b.id);
+      navEdge(w,laneLeft[side],corridor);navEdge(w,corridor,laneRight[side]);navEdge(w,corridor,entry);navEdge(w,entry,center);
       // Lighting follows the room function, with warmer public spaces and
       // cooler service rooms. No game-specific enemy/entity vocabulary.
       al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(y0+y1)/2,z+192})},{"light",preset.archetype=="station"?"180":"240"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 240";w.architecture.entities.push_back(light);
@@ -200,13 +301,19 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
     wall(w,b.id,{roomEnd,cy+hall,0},{roomEnd,high.y,0},z,z+240,12,1);
     for(int side:{-1,1})box(w,b.id,"structural column",{stairX-18,cy+side*(hall+24)-12,z},{stairX+2,cy+side*(hall+24)+12,z+240},2);
     if(floor+1<b.floors){
+      if(!floor&&collapsed){
+        // The missing central flight is visible geometry, not a fake blocked
+        // graph edge. Its upper floors are reached by the exterior fire stair.
+        for(int step=0;step<16;step++)if(step<4||step>12){double x=stairX+step*16;box(w,b.id,"broken stair remnant",{x,cy-68,z},{x+16,cy-12,z+(step+1)*16},2);}
+        continue;
+      }
       // An enclosed switchback flight: every 16-unit riser is a real brush.
       // Walk nodes are sampled on the actual treads and tested with step-up
       // hull sweeps; a logical graph edge alone never proves stairs playable.
       const bool reverse=floor%2;const double lane=cy+(reverse?40:-40);
       size_t previous=hallRight;
       if(reverse){
-        auto back=navNode(w,{stairX-40,cy-144,z+1},b.id),turn=navNode(w,{high.x-24,cy-144,z+1},b.id);
+        auto back=navNode(w,{stairX-40,cy-returnOffset,z+1},b.id),turn=navNode(w,{high.x-24,cy-returnOffset,z+1},b.id);
         navEdge(w,previous,back);navEdge(w,back,turn);previous=turn;
       }
       auto before=navNode(w,{reverse?stairX+276:stairX-20,lane,z+1},b.id);navEdge(w,previous,before);previous=before;
@@ -217,7 +324,7 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
       }
       auto end=navNode(w,{reverse?stairX-20:stairX+276,lane,z+257},b.id);navEdge(w,previous,end);
       if(!reverse){
-        const auto turn=navNode(w,{high.x-24,cy-144,z+257},b.id),back=navNode(w,{stairX-40,cy-144,z+257},b.id),center=navNode(w,{stairX-40,cy,z+257},b.id);
+        const auto turn=navNode(w,{high.x-24,cy-returnOffset,z+257},b.id),back=navNode(w,{stairX-40,cy-returnOffset,z+257},b.id),center=navNode(w,{stairX-40,cy,z+257},b.id);
         navEdge(w,end,turn);navEdge(w,turn,back);navEdge(w,back,center);
       }else{
         auto center=navNode(w,{stairX-40,cy,z+257},b.id);navEdge(w,end,center);
@@ -226,12 +333,40 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
     }
   }
   // A roof with a retained frame. Later damage may open it to the sealed sky.
-  box(w,b.id,"roof plate",{low.x-16,low.y-16,high.z-16},{high.x+16,high.y+16,high.z},2);
+  if(openCourt){
+    box(w,b.id,"atrium roof frame",{low.x-16,low.y-16,high.z-16},{voidX0,high.y+16,high.z},2);
+    box(w,b.id,"atrium roof frame",{voidX1,low.y-16,high.z-16},{high.x+16,high.y+16,high.z},2);
+    box(w,b.id,"atrium roof frame",{voidX0,low.y-16,high.z-16},{voidX1,voidY0,high.z},2);
+    box(w,b.id,"atrium roof frame",{voidX0,voidY1,high.z-16},{voidX1,high.y+16,high.z},2);
+  }else box(w,b.id,"roof plate",{low.x-16,low.y-16,high.z-16},{high.x+16,high.y+16,high.z},2);
   for(int side:{-1,1})box(w,b.id,"roof parapet",{low.x-16,side<0?low.y-16:high.y,high.z},{high.x+16,side<0?low.y:high.y+16,high.z+48},1);
   // Vertical bays, deep entrance canopy and corner pilasters give the mass an
   // architectural hierarchy rather than identical solid cells.
   for(double x:{low.x,high.x})for(double y:{low.y,high.y})box(w,b.id,"corner pilaster",{x-18,y-18,0},{x+18,y+18,high.z+20},2);
-  box(w,b.id,"entrance canopy",{low.x-96,cy-80,120},{low.x+8,cy+80,136},2);
+  if(preset.ruinEvent!="collapsed-stair")box(w,b.id,"entrance canopy",{low.x-96,cy-80,120},{low.x+8,cy+80,136},2);
+  else{
+    // Two lanes alternate between floors, preserving headroom above the
+    // lower flight. A separate wall-side gallery joins every existing door.
+    const double halfWidth=std::max(28.,s.player.radius+8);
+    for(int floor=1;floor<b.floors;floor++){
+      double z=floor*256.;
+      box(w,b.id,"fire-stair wall gallery",{low.x-80,cy-176,z-16},{low.x+8,cy+176,z},2);
+      for(int sign:{-1,1})box(w,b.id,"fire-stair end landing",{low.x-240,cy+sign*152-24,z-16},{low.x+8,cy+sign*152+24,z},2);
+      auto center=navNode(w,{low.x-40,cy,z+1},b.id),inside=navNode(w,{low.x+40,cy,z+1},b.id);navEdge(w,center,inside);
+    }
+    for(int floor=0;floor+1<b.floors;floor++){
+      const bool reverse=floor%2;double z=floor*256.,x=low.x-(reverse?192:112),startY=cy+(reverse?148:-148),endY=cy+(reverse?-148:148);
+      auto door=navNode(w,{low.x-40,cy,z+1},b.id),turn=navNode(w,{low.x-40,startY,z+1},b.id),previous=navNode(w,{x,startY,z+1},b.id);
+      navEdge(w,door,turn);navEdge(w,turn,previous);
+      for(int step=0;step<16;step++){
+        double y=cy-128+(reverse?15-step:step)*16;
+        box(w,b.id,"exterior fire stair",{x-halfWidth,y,z},{x+halfWidth,y+16,z+(step+1)*16},2);
+        auto at=navNode(w,{x,y+(reverse?24:-8),z+(step+1)*16+1},b.id);navEdge(w,previous,at);previous=at;
+      }
+      auto end=navNode(w,{x,endY,z+257},b.id),back=navNode(w,{low.x-40,endY,z+257},b.id),upper=navNode(w,{low.x-40,cy,z+257},b.id);
+      navEdge(w,previous,end);navEdge(w,end,back);navEdge(w,back,upper);
+    }
+  }
 }
 inline al::Brush prism(const std::vector<V>& polygon,double bottom,double top,const std::string& texture){
   if(polygon.size()<3||polygon.size()>24||top-bottom<1)throw std::runtime_error("Invalid convex extrusion");
@@ -245,6 +380,37 @@ inline al::Brush prism(const std::vector<V>& polygon,double bottom,double top,co
 inline al::Brush bevel(V lo,V hi,const std::string& texture,double amount){
   auto brush=al::box(lo,hi,texture);V n=al::unit({1,1,.4});al::Brush clipped;
   if(al::clipBrush(brush,n,al::dot(n,hi)-amount,clipped))brush=std::move(clipped);return brush;
+}
+inline void receptionAnnex(WorldPlan& w,const Settings& s,const Building& b){
+  const double x=b.high.x,cy=(b.low.y+b.high.y)/2,radius=256;
+  std::vector<V> polygon;
+  for(int i=0;i<=16;i++){double angle=-1.5707963267948966+i*3.141592653589793/16;polygon.push_back({x+radius*std::cos(angle),cy+radius*std::sin(angle),0});}
+  addBrush(w,b.id,"semicircular reception floor",prism(polygon,0,16,material(w,0)));
+  addBrush(w,b.id,"semicircular reception roof",prism(polygon,240,256,material(w,2)));
+  for(int i=0;i<16;i++){
+    auto a=polygon[i],c=polygon[i+1];double length=al::length(c-a);bool exit=i==7||i==8;
+    wall(w,b.id,a,c,16,240,16,1,{{0,length,exit?16.:80.,exit?128.:176.}});
+    if(!exit)wall(w,b.id,a,c,72,80,24,2);
+  }
+  for(size_t i=0;i<polygon.size();i++)if(i!=8){auto p=polygon[i];box(w,b.id,"reception arc pier",{p.x-8,p.y-8,16},{p.x+8,p.y+8,240},2);}
+  // The arc is structural, editable convex MAP geometry. Its public hall
+  // opens through the existing rear door and into an actual exit courtyard.
+  double turnY=cy+std::max(144.,b.hall+64);
+  auto hall=navNode(w,{x-360,cy,1},b.id),turn=navNode(w,{x-360,turnY,1},b.id),back=navNode(w,{x-24,turnY,1},b.id),inner=navNode(w,{x-24,cy,1},b.id),entry=navNode(w,{x+24,cy,17},b.id),center=navNode(w,{x+128,cy,17},b.id),door=navNode(w,{x+216,cy,17},b.id),outside=navNode(w,{x+296,cy,1},b.id);
+  for(auto edge:std::vector<std::array<size_t,2>>{{hall,turn},{turn,back},{back,inner},{inner,entry},{entry,center},{center,door},{door,outside}})navEdge(w,edge[0],edge[1]);
+  al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({x+128,cy,192})},{"light","320"},{"_color","1 0.85 0.64"}};w.architecture.entities.push_back(light);
+}
+inline void floodedPlatform(WorldPlan& w,const Settings& s,const Building& b){
+  const double cy=(b.low.y+b.high.y)/2,x0=b.low.x+144,x1=b.bays.back()-128;
+  if(x1-x0<160)throw std::runtime_error("Flooded station requires a longer platform envelope");
+  box(w,b.id,"floodwater",{x0,cy-56,0},{x1,cy+56,24},6);
+  // The critical route uses either dry platform. Physical curb walls keep
+  // navigation out of the flood rather than assuming swimming capabilities.
+  for(int sign:{-1,1})box(w,b.id,"platform flood barrier",{x0-8,cy+sign*64-8,0},{x1+8,cy+sign*64+8,32},5);
+  for(double x:{x0,x1})box(w,b.id,"platform flood end",{x-8,cy-56,0},{x+8,cy+56,32},2);
+  double x=b.high.x,turnY=cy+std::max(144.,b.hall+64);
+  auto hall=navNode(w,{x-360,cy,1},b.id),turn=navNode(w,{x-360,turnY,1},b.id),back=navNode(w,{x-24,turnY,1},b.id),inner=navNode(w,{x-24,cy,1},b.id),outside=navNode(w,{x+56,cy,1},b.id);
+  for(auto edge:std::vector<std::array<size_t,2>>{{hall,turn},{turn,back},{back,inner},{inner,outside}})navEdge(w,edge[0],edge[1]);
 }
 inline double distanceToSegment(V p,V a,V b){V d=b-a;double den=al::dot(d,d);return al::length(p-(a+d*(den>0?std::clamp(al::dot(p-a,d)/den,0.,1.):0)));}
 inline bool protectedRoute(const WorldPlan& w,V p,double radius){
@@ -343,33 +509,83 @@ inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<b
   }
   nav.edges=std::move(verified);if(nav.nodes.empty())throw std::runtime_error("No physical navigation nodes");
   std::vector<std::vector<size_t>> adjacency(nav.nodes.size());for(auto e:nav.edges){adjacency[e[0]].push_back(e[1]);adjacency[e[1]].push_back(e[0]);}
-  std::vector<int> visited(nav.nodes.size(),-1);std::deque<size_t> queue{0};visited[0]=0;
+  auto nearest=[&](V point){size_t result=SIZE_MAX;double distance=48;for(size_t i=0;i<nav.nodes.size();i++){double d=al::length(point-nav.nodes[i].feet);if(d<distance&&!collision.blocked(nav.nodes[i].feet,nav.nodes[i].feet,settings.player)){distance=d;result=i;}}return result;};
+  std::map<uint64_t,size_t> beats;size_t start=SIZE_MAX;
+  for(auto& beat:w.mission.nodes){
+    size_t at=nearest(beat.position);if(at==SIZE_MAX)throw std::runtime_error("Planned mission room has no collision-free player anchor: "+beat.name);
+    beats[beat.id]=at;beat.position=nav.nodes[at].feet;if(beat.role==Role::Start)start=at;
+  }
+  if(start==SIZE_MAX)throw std::runtime_error("No physically realized mission start");
+  std::vector<int> visited(nav.nodes.size(),-1);std::deque<size_t> queue{start};visited[start]=int(start);
   while(!queue.empty()){size_t n=queue.front();queue.pop_front();for(auto next:adjacency[n])if(visited[next]<0){visited[next]=int(n);queue.push_back(next);}}
   nav.reachable=std::count_if(visited.begin(),visited.end(),[](int n){return n>=0;});
   for(size_t i=0;i<nav.nodes.size();i++)if(nav.nodes[i].required&&visited[i]<0)throw std::runtime_error("Physical navigation rejected disconnected room, street or stair at "+vectorText(nav.nodes[i].feet));
-  // Use graph distance for the destination, so a visually distant room behind
-  // a wall cannot masquerade as the end of a playable journey.
-  std::vector<double> distance(nav.nodes.size(),-1);distance[0]=0;queue={0};
-  while(!queue.empty()){auto a=queue.front();queue.pop_front();for(auto b:adjacency[a]){double d=distance[a]+al::length(nav.nodes[b].feet-nav.nodes[a].feet);if(distance[b]<0||d<distance[b]-.01){distance[b]=d;visited[b]=int(a);queue.push_back(b);}}}
-  size_t end=size_t(std::max_element(distance.begin(),distance.end())-distance.begin());
-  for(size_t n=end,count=0;count++<=nav.nodes.size();n=size_t(visited[n])){nav.mainRoute.push_back(n);if(!n)break;}
-  std::reverse(nav.mainRoute.begin(),nav.mainRoute.end());w.diagnostics.routeLength=distance[end];
-  for(size_t i=0;i<w.mission.nodes.size();i++){
-    auto& node=w.mission.nodes[i];size_t index=std::min(nav.mainRoute.size()-1,i*nav.mainRoute.size()/w.mission.nodes.size());
-    if(node.role==Role::Exit)index=nav.mainRoute.size()-1;
-    if(node.pinned){auto nearest=nav.nodes.size();double distance=32;for(size_t n=0;n<nav.nodes.size();n++){double d=al::length(node.position-nav.nodes[n].feet);if(d<distance&&visited[n]>=0){distance=d;nearest=n;}}if(nearest==nav.nodes.size())throw std::runtime_error("Pinned mission beat has no reachable collision-free player position");node.position=nav.nodes[nearest].feet;}
-    else node.position=nav.nodes[nav.mainRoute[index]].feet;
+  for(const auto& beat:w.mission.nodes)if(visited[beats.at(beat.id)]<0)throw std::runtime_error("Planned mission beat is unreachable: "+beat.name);
+  auto path=[&](size_t from,size_t to){
+    std::vector<double> distance(nav.nodes.size(),std::numeric_limits<double>::infinity());std::vector<size_t> parent(nav.nodes.size(),SIZE_MAX);
+    using Item=std::pair<double,size_t>;std::priority_queue<Item,std::vector<Item>,std::greater<Item>> pending;distance[from]=0;pending.push({0,from});
+    while(!pending.empty()){
+      auto [length,at]=pending.top();pending.pop();if(length>distance[at]+.001)continue;if(at==to)break;
+      for(size_t next:adjacency[at]){double d=length+al::length(nav.nodes[at].feet-nav.nodes[next].feet);if(d<distance[next]-.001){distance[next]=d;parent[next]=at;pending.push({d,next});}}
+    }
+    if(!std::isfinite(distance[to]))throw std::runtime_error("Mission edge has no walkable spatial realization");
+    std::vector<size_t> result;for(size_t at=to;;at=parent[at]){result.push_back(at);if(at==from)break;if(parent[at]==SIZE_MAX)throw std::runtime_error("Broken mission path predecessor");}std::reverse(result.begin(),result.end());return result;
+  };
+  nav.mainRoute={start};
+  for(const auto& beat:w.mission.nodes)if(beat.required&&beat.role!=Role::Start){
+    auto leg=path(nav.mainRoute.back(),beats.at(beat.id));for(size_t i=1;i<leg.size();i++){w.diagnostics.routeLength+=al::length(nav.nodes[leg[i]].feet-nav.nodes[leg[i-1]].feet);nav.mainRoute.push_back(leg[i]);}
+  }
+  // Count a circulation alternative only if it stays spatially separated
+  // from the complete primary polyline. Dense links along one corridor do
+  // not count as loops; the alternative must walk around a different side.
+  int alternatives=0;
+  for(const auto& b:w.spatial.buildings)for(int floor=0;floor<b.floors;floor++){
+    double cy=(b.low.y+b.high.y)/2,z=floor*256.+1;
+    size_t left=nearest({b.low.x+40,cy,z}),right=nearest({b.high.x-360,cy,z});if(left==SIZE_MAX||right==SIZE_MAX)continue;
+    auto primary=path(left,right);std::set<size_t> reached{left};std::deque<size_t> pending{left};std::map<size_t,size_t> parent;
+    auto allowed=[&](V point){
+      if(std::abs(point.z-z)>1||point.x<b.low.x||point.x>b.high.x||point.y<b.low.y||point.y>b.high.y)return false;
+      if(al::length(point-nav.nodes[left].feet)<128||al::length(point-nav.nodes[right].feet)<128)return true;
+      for(size_t i=1;i<primary.size();i++)if(distanceToSegment(point,nav.nodes[primary[i-1]].feet,nav.nodes[primary[i]].feet)<64)return false;return true;
+    };
+    while(!pending.empty()&&!reached.count(right)){
+      size_t at=pending.front();pending.pop_front();for(size_t next:adjacency[at]){
+        if(reached.count(next))continue;V a=nav.nodes[at].feet,delta=nav.nodes[next].feet-a;bool valid=true;int samples=std::max(1,int(al::length(delta)/24));
+        for(int i=0;i<=samples;i++)if(!allowed(a+delta*(double(i)/samples))){valid=false;break;}
+        if(valid){reached.insert(next);parent[next]=at;pending.push_back(next);}
+      }
+    }
+    if(reached.count(right)){
+      bool separated=false;
+      for(size_t at=right;at!=left&&!separated;at=parent.at(at)){
+        auto a=nav.nodes[at].feet,b=nav.nodes[parent.at(at)].feet;int samples=std::max(1,int(al::length(b-a)/48));
+        for(int i=0;i<=samples&&!separated;i++){
+          auto point=a+(b-a)*(double(i)/samples);if(al::length(point-nav.nodes[left].feet)<128||al::length(point-nav.nodes[right].feet)<128)continue;
+          V closest{};double distance=1e30;
+          for(size_t p=1;p<primary.size();p++){
+            V from=nav.nodes[primary[p-1]].feet,delta=nav.nodes[primary[p]].feet-from;double length=al::dot(delta,delta);
+            auto q=from+delta*(length?std::clamp(al::dot(point-from,delta)/length,0.,1.):0.);double d=al::length(q-point);if(d<distance){distance=d;closest=q;}
+          }
+          if(distance<64)continue;
+          separated=!collision.walk(point,closest,settings.player);
+          for(int p=1;p<8&&!separated;p++)if(!collision.supported(point+(closest-point)*(p/8.),settings.player))separated=true;
+        }
+      }
+      if(separated)alternatives++;
+    }
   }
   auto& scores=w.diagnostics.score;
   scores["route"]=std::min(1.,w.diagnostics.routeLength/2500);
   std::set<int> areas;for(const auto& b:w.spatial.buildings)for(const auto& r:b.rooms)areas.insert(int((r.high.x-r.low.x)*(r.high.y-r.low.y)/8192));
   scores["variety"]=std::min(1.,areas.size()/6.);
-  w.diagnostics.warnings.push_back("This slice scores route length and room-area variation only. Meaningful loops, sightlines, landmarks and narrative quality are not yet scored.");
+  scores["circulation"]=std::min(1.,double(alternatives));scores["separatedRoutes"]=alternatives;
+  w.diagnostics.warnings.push_back("Circulation counts same-floor alternatives separated by at least 64 units and a physical obstruction or floor opening outside endpoint landings. Sightlines, landmarks and narrative quality are not yet scored.");
   double sum=0,weight=0;for(auto [name,value]:settings.weights){auto it=scores.find(name);if(it!=scores.end()){sum+=it->second*value;weight+=value;}}scores["weighted"]=weight?sum/weight:0;
 }
 inline void exportMap(WorldPlan& w,const Settings& settings){
   if(w.navigation.mainRoute.empty())throw std::runtime_error("Cannot export without validated player route");
   std::ostringstream out;out.imbue(std::locale::classic());out<<"{\n\"classname\" \"worldspawn\"\n\"_wa_schema\" \"1\"\n\"_wa_seed\" \""<<w.seed<<"\"\n\"_wa_preset\" \""<<w.preset<<"\"\n";
+  if(settings.profile>=2)out<<"\"_sunlight\" \"110\"\n\"_sunlight_color\" \"1 0.9 0.75\"\n\"_sun_mangle\" \"120 -50 0\"\n";
   for(const auto& element:w.architecture.elements)out<<al::writeBrush(element.brush);out<<"}\n";
   for(const auto& entity:w.architecture.entities)out<<al::writeEntity(entity);
   auto spawn=w.navigation.nodes[w.navigation.mainRoute.front()].feet+V{0,0,24};
@@ -384,8 +600,8 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
   validate(settings,registry);WorldPlan w;w.seed=settings.seed;w.profile=settings.profile;w.preset=settings.preset;const auto& preset=registry.preset(settings.preset);w.theme=preset.theme;
   auto stage=[&](int n,auto action){cancelled(cancel);if(progress)progress->store(n);w.seeds[stages[n]]=subSeed(settings.seed,stages[n]);auto before=std::chrono::steady_clock::now();action();w.diagnostics.timing[stages[n]]=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count();};
   stage(0,[&]{w.mission=mission(settings,preset);validateMission(w.mission);});
-  stage(1,[&]{site(w,settings,preset);});
-  stage(2,[&]{shell(w);streets(w);for(auto& b:w.spatial.buildings)building(w,settings,preset,b,cancel);});
+  stage(1,[&]{site(w,settings,preset);floorplan(w,settings,preset);});
+  stage(2,[&]{shell(w);streets(w);for(auto& b:w.spatial.buildings){building(w,settings,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,settings,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,settings,b);}});
   stage(3,[&]{damage(w,settings,cancel);});
   stage(4,[&]{dressing(w,settings,preset,cancel);});
   stage(5,[&]{navigation(w,settings,cancel);});

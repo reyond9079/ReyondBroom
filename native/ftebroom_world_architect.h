@@ -129,7 +129,7 @@ static std::string worldPreviewBuffer(const wa::WorldPlan& world,int cutaway){
     for(size_t f=0;f<poly.polygons.size();f++){const auto& polygon=poly.polygons[f];for(size_t i=1;i+1<polygon.size();i++)batches[element.brush.faces[f].material].push_back({polygon[0],polygon[i],polygon[i+1]});}
   }
   unsigned count=0;for(const auto& [name,tris]:batches)count+=unsigned((tris.size()+21844)/21845);std::string out="RBB1";bb::word(out,count);
-  for(const auto& [name,tris]:batches)for(size_t start=0;start<tris.size();start+=21845){size_t n=std::min<size_t>(21845,tris.size()-start);bb::word(out,unsigned(n*3));bb::word(out,unsigned(n*3));auto texture="bbtex/"+name+".tga";out+=texture;out.append(128-texture.size(),0);
+  for(const auto& [name,tris]:batches)for(size_t start=0;start<tris.size();start+=21845){size_t n=std::min<size_t>(21845,tris.size()-start);bb::word(out,unsigned(n*3));bb::word(out,unsigned(n*3));auto texture="bbtex/"+(name==wa::materialId(world,6)?wa::assetId(world,6):name)+".tga";out+=texture;out.append(128-texture.size(),0);
     for(size_t i=start;i<start+n;i++){
       const auto& triangle=tris[i];auto normal=al::unit(al::cross(triangle[1]-triangle[0],triangle[2]-triangle[0]));float shade=float(.52+.48*std::max(0.,al::dot(normal,al::unit(wa::V{-.4,-.6,1}))));
       for(auto p:triangle){float vertex[9]={float(p.x),float(p.y),float(p.z),float((std::abs(normal.z)>.5?p.x:p.x+p.y)/128.),float((std::abs(normal.z)>.5?p.y:-p.z)/128.),shade,shade,shade,1};out.append(reinterpret_cast<char*>(vertex),sizeof vertex);}
@@ -142,7 +142,8 @@ static void worldPreview(){
   if(!s.owner){ImGui::TextUnformatted("Another authoring tool owns the preview.");if(worldButton("Resume world preview","resume-preview"))worldClaim();return;}
   auto api=bbAPI();auto images=bbImageAPI();if(!api||!images){ImGui::TextUnformatted("Dynamic preview interface unavailable");return;}
   if(s.dirty){
-    for(int slot=0;slot<6;slot++){auto image=wa::texture(s.registry.theme(world->theme),slot);images->upload(("bbtex/"+wa::material(*world,slot)+".tga").c_str(),image.rgba.data(),image.width,image.height);}
+    bool water=std::any_of(world->architecture.elements.begin(),world->architecture.elements.end(),[](const auto& e){return e.kind=="floodwater";});
+    for(int slot=0;slot<(water?7:6);slot++){auto image=wa::texture(s.registry.theme(world->theme),slot);images->upload(("bbtex/"+wa::assetId(*world,slot)+".tga").c_str(),image.rgba.data(),image.width,image.height);}
     auto buffer=worldPreviewBuffer(*world,s.cutaway);if(!api->upload(buffer.data(),buffer.size()))throw std::runtime_error("Engine rejected World Architect preview geometry");s.dirty=false;
   }
   if(worldButton(s.walk?"Orbit view":"Walk from spawn","walk")){s.walk=!s.walk;if(s.walk){s.eye=world->navigation.nodes[world->navigation.mainRoute.front()].feet;s.yaw=0;s.pitch=0;}}ImGui::SameLine();ImGui::Checkbox("Top view",&s.ortho);worldRect("top-view");
@@ -192,7 +193,7 @@ static void worldPanel(){
   if(ImGui::Begin("World Architect — development preview",&s.open,ImGuiWindowFlags_NoDocking)){
     ImGui::TextWrapped("Development preview: mission / physical navigation foundation. AutoLevel remains available; final architecture and art acceptance is still pending.");
     auto before=wa::serialize(s.settings);ImGui::BeginDisabled(s.job.valid());
-    ImGui::SetNextItemWidth(220*uiScale());if(ImGui::BeginCombo("Preset",s.registry.preset(s.settings.preset).name.c_str())){for(const auto& p:s.registry.presets)if(ImGui::Selectable(p.name.c_str(),p.id==s.settings.preset)){s.settings.preset=p.id;s.settings.damage=p.damage;}ImGui::EndCombo();}worldRect("preset");ImGui::SameLine();
+    ImGui::SetNextItemWidth(220*uiScale());bool presetsOpen=ImGui::BeginCombo("Preset",s.registry.preset(s.settings.preset).name.c_str());worldRect("preset");if(presetsOpen){for(const auto& p:s.registry.presets){if(ImGui::Selectable(p.name.c_str(),p.id==s.settings.preset)){s.settings.preset=p.id;s.settings.damage=p.damage;}worldRect("preset/"+p.id);}ImGui::EndCombo();}ImGui::SameLine();
     ImGui::SetNextItemWidth(150*uiScale());ImGui::InputScalar("Seed",ImGuiDataType_U64,&s.settings.seed);worldRect("seed");ImGui::SameLine();
     if(worldButton("Generate candidates","generate"))worldAction(worldGenerate);ImGui::SameLine();
     if(worldButton("Undo settings","undo-settings"))worldAction([]{worldUndo();});ImGui::SameLine();if(worldButton("Redo settings","redo-settings"))worldAction([]{worldUndo(true);});
@@ -211,7 +212,7 @@ static void worldPanel(){
         if(tab==0)worldAction(worldPreview);
         if(tab==1)worldAction([]{worldPlanCanvas(true);});
         if(tab==2){
-          if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit shortest start-to-destination route",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms",name.c_str(),ms);for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
+          if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms",name.c_str(),ms);for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
           for(const auto& reject:s.batch.rejects)ImGui::TextWrapped("Rejected: %s",reject.c_str());
         }
         if(tab==3){

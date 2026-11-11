@@ -35,13 +35,13 @@ enum class Role {Start,Introduction,Challenge,Reveal,Landmark,Reward,Exit,Transi
 inline const char* roleName(Role r){static const char* names[]={"Start","Introduction","Challenge","Reveal","Landmark","Reward","Exit","Transition"};return names[int(r)];}
 struct Player {double radius=16,height=56,step=18;};
 struct Experience {int beats=7,branches=2,loops=1;double verticality=.5,openness=.5;};
-struct MissionNode {uint64_t id=0;Role role=Role::Challenge;std::string name;V position;bool required=true,pinned=false;int floor=0;};
+struct MissionNode {uint64_t id=0;Role role=Role::Challenge;std::string name;V position;bool required=true,pinned=false;int floor=0;uint64_t room=0;};
 struct MissionEdge {uint64_t a=0,b=0;bool optional=false,oneWay=false;std::string purpose;uint64_t prerequisite=0;};
 struct MissionGraph {std::vector<MissionNode> nodes;std::vector<MissionEdge> edges;};
 struct Road {uint64_t id=0;V a,b;double width=160;std::string hierarchy="local";bool pinned=false;};
 struct Lot {uint64_t id=0;V low,high;std::string zone;};
-struct Room {uint64_t id=0;V low,high,entry;std::string function;int floor=0;bool required=true;};
-struct Building {uint64_t id=0;V low,high;int floors=1;std::string archetype;bool pinned=false;std::vector<Room> rooms;};
+struct Room {uint64_t id=0;V low,high,entry;std::string function;int floor=0;bool required=true;uint64_t mission=0;};
+struct Building {uint64_t id=0;V low,high;int floors=1;std::string archetype;bool pinned=false;std::vector<Room> rooms;double hall=72;bool atrium=false,parallel=false;std::vector<double> bays;};
 struct SpatialGraph {std::vector<Road> roads;std::vector<Lot> lots;std::vector<Building> buildings;};
 struct ArchitectureElement {uint64_t region=0;std::string kind;al::Brush brush;};
 struct ArchitecturePlan {std::vector<ArchitectureElement> elements;std::vector<al::PointEntity> entities;};
@@ -55,6 +55,8 @@ struct Preset {
   std::string id,name,theme,archetype,story,layout;
   Scope scope=Scope::Interior;int floors=2,rooms=6,blocks=2;
   double width=1408,depth=832,street=192,damage=.4;
+  double hallHalfWidth=72;std::vector<std::string> roomFunctions{"public","service","storage"};
+  std::string ruinEvent;
   Experience experience;
 };
 struct ArtTheme {std::string id;std::array<std::array<unsigned char,3>,6> colors;};
@@ -68,7 +70,7 @@ struct Settings {
   std::vector<uint64_t> pinnedRegions;
   std::map<uint64_t,uint64_t> regionSeeds;
   std::vector<Influence> influences;
-  std::map<std::string,double> weights{{"variety",1},{"route",1}};
+  std::map<std::string,double> weights{{"variety",1},{"route",1},{"circulation",1}};
 };
 struct WorldPlan {
   int schema=schemaVersion;uint64_t seed=0;int profile=2;std::string preset,theme,sourceRevision;
@@ -104,6 +106,10 @@ inline Registry readRegistry(const Json& j){
   for(const auto& item:j.at("presets")){
     Preset p;p.id=item.at("id");p.name=item.at("name");p.theme=item.at("theme");p.archetype=item.at("archetype");p.story=item.at("story");p.layout=item.at("layout");
     safeToken(p.id);safeToken(p.theme);safeToken(p.archetype);safeToken(p.layout);r.theme(p.theme);
+    if(p.layout!="spine"&&p.layout!="ring"&&p.layout!="parallel"&&p.layout!="atrium"&&p.layout!="courtyard"&&p.layout!="offset"&&p.layout!="branched")throw std::runtime_error("Unknown architectural / site grammar");
+    p.hallHalfWidth=item.value("hallHalfWidth",(p.layout=="atrium"||p.layout=="ring"||p.layout=="parallel")?128.:72.);finite(p.hallHalfWidth,64,224,"Gallery / corridor half-width must be 64..224");
+    p.roomFunctions=item.value("roomFunctions",p.roomFunctions);if(p.roomFunctions.empty()||p.roomFunctions.size()>24)throw std::runtime_error("A room program needs 1..24 named functions");for(const auto& function:p.roomFunctions)safeToken(function);
+    p.ruinEvent=item.value("ruinEvent",std::string{});if(!p.ruinEvent.empty()&&p.ruinEvent!="collapsed-stair"&&p.ruinEvent!="flooded-platform")throw std::runtime_error("Unsupported structural ruin event");
     if(!ids.insert("preset/"+p.id).second)throw std::runtime_error("Duplicate preset");
     auto scope=item.at("scope").get<int>();finite(scope,0,3,"Invalid scope");p.scope=Scope(scope);
     p.floors=item.at("floors");p.rooms=item.at("rooms");p.blocks=item.at("blocks");p.width=item.at("width");p.depth=item.at("depth");p.street=item.at("street");p.damage=item.at("damage");
@@ -117,7 +123,7 @@ inline void validate(const Settings& s,const Registry& r){
   finite(s.player.radius,8,32,"Player radius must be 8..32");finite(s.player.height,32,80,"Player height must be 32..80");finite(s.player.step,4,18,"Player step must be 4..18");
   if(std::any_of(s.locked.begin(),s.locked.end(),[](bool b){return b;})||!s.pinnedRegions.empty())throw std::runtime_error("Stage / region locking is not yet supported by this development slice");
   if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
-  for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
+  for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route"&&name!="circulation")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
   std::set<uint64_t> ids;for(const auto& p:s.missionPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate mission pin");for(int a=0;a<3;a++)finite(p.position[a],-30000,30000,"Invalid mission pin");}
   ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}finite(p.width,96,512,"Invalid road width");if(al::length(p.a-p.b)<128)throw std::runtime_error("Road pin is too short");}
   for(const auto& mask:s.influences){for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing")throw std::runtime_error("Unknown influence type");}
@@ -182,7 +188,7 @@ inline void validateMission(const MissionGraph& graph){
 }
 inline Json diagnostics(const WorldPlan& world){
   Json j={{"schemaVersion",schemaVersion},{"seed",world.seed},{"preset",world.preset},{"profile",world.profile},{"valid",world.diagnostics.valid},{"rejects",world.diagnostics.rejects},{"warnings",world.diagnostics.warnings},{"timingMs",world.diagnostics.timing},{"scores",world.diagnostics.score},{"brushes",world.diagnostics.brushes},{"mapBytes",world.diagnostics.mapBytes},{"routeLength",world.diagnostics.routeLength},{"stageSeeds",world.seeds},{"reachable",world.navigation.reachable},{"navigationNodes",world.navigation.nodes.size()}};
-  j["missionNodes"]=Json::array();for(const auto& n:world.mission.nodes)j["missionNodes"].push_back({{"id",n.id},{"role",roleName(n.role)},{"required",n.required},{"position",vector(n.position)}});
+  j["missionNodes"]=Json::array();for(const auto& n:world.mission.nodes)j["missionNodes"].push_back({{"id",n.id},{"role",roleName(n.role)},{"required",n.required},{"room",n.room},{"floor",n.floor},{"position",vector(n.position)}});
   j["missionEdges"]=Json::array();for(const auto& e:world.mission.edges)j["missionEdges"].push_back({{"a",e.a},{"b",e.b},{"purpose",e.purpose},{"optional",e.optional}});return j;
 }
 }

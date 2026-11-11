@@ -165,7 +165,10 @@ try:
     ui.console('ftebroom_undo');check(len(snapshot('undo-erase-all')[0])==1,'erase is a single Undo step')
     ui.console('ftebroom_undo');check(len(snapshot('undo-erase-filter')[0])==2,'filtered erase is a single Undo step')
     click('plant-brush/paint');select('Fly agaric','amanita')
-    drag(x-view['width']*.22,y,view['width']*.13)
+    # Start on the near half of the fixture floor. At the click-test height
+    # the left part of the viewport can be sky, depending on its aspect ratio.
+    view = live()['views'][0]
+    drag(view['x']+view['width']*.38,view['y']+view['height']*.76,view['width']*.13)
     check(len(snapshot('paint-drag')[0])>3,'a single drag places plants along its path')
     ui.move(x-view['width']*.10,y)
     ui.settle()

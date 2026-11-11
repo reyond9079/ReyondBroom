@@ -43,19 +43,35 @@ static void q1FindWads(bool strict=false){
   while(std::getline(input,line)){if(!line.empty()&&line.back()=='\r')line.pop_back();if(line.empty())continue;auto path=std::filesystem::u8path(line);if(path.is_relative())path=std::filesystem::u8path(q1Authoring())/path;sources.push_back(path);}
   ftebroom::quake1::prioritizeMapWads(sources,q1MapWads);
   char writable[4096]={};if(!files->NativePath("ftebroom.cfg",(fs_relative)5,writable,sizeof writable))throw std::runtime_error("No writable editor cache.");auto cache=std::filesystem::u8path(writable).parent_path()/"cache/wads";std::filesystem::create_directories(cache);
-  std::set<std::filesystem::path> seen;
+  std::set<std::filesystem::path> seen, availableNames;
   for(const auto& source:sources){if(!seen.insert(source.lexically_normal()).second)continue;
     if(!ftebroom::pak::exists(source)){if(std::find(q1MissingWads.begin(),q1MissingWads.end(),source)==q1MissingWads.end())q1MissingWads.push_back(source);continue;}
-    std::filesystem::path archive;std::string member;if(ftebroom::pak::split(source,archive,member)){
-      auto bytes=q1Read(source);ftebroom::quake1::wad(bytes);auto id=std::to_string(std::hash<std::string>{}(source.generic_u8string()));auto target=cache/(id+"-"+source.filename().u8string());
+    std::filesystem::path archive;
+    std::string member, bytes;
+    const bool packed=ftebroom::pak::split(source,archive,member);
+    if(packed)bytes=q1Read(source);
+    if(gameProfile==2){
+      // A Quake mod folder can also contain GoldSrc decals or unrelated WADs.
+      // Filter discovery before indexing materials or staging compiler input.
+      char magic[4];
+      const bool wad2=packed?bytes.compare(0,4,"WAD2")==0:
+        std::ifstream(source,std::ios::binary).read(magic,sizeof magic) && std::string(magic,sizeof magic)=="WAD2";
+      if(!wad2){
+        core->Print(("ReyondBroom: skipped non-WAD2 archive for Quake 1: "+source.u8string()+"\n").c_str());
+        continue;
+      }
+    }
+    if(packed){
+      ftebroom::quake1::wad(bytes);auto id=std::to_string(std::hash<std::string>{}(source.generic_u8string()));auto target=cache/(id+"-"+source.filename().u8string());
       bool unchanged=false;try{unchanged=std::filesystem::exists(target)&&q1Read(target)==bytes;}catch(...){}
       if(!unchanged){std::ofstream out(target,std::ios::binary);out.write(bytes.data(),bytes.size());out.close();if(!out)throw std::runtime_error("Cannot cache packed WAD.");}
       q1ResolvedWads.push_back(target);q1WadLabels[target.u8string()]=archive.filename().u8string()+"/"+member;
     }else q1ResolvedWads.push_back(source);
+    availableNames.insert(source.filename());
   }
   // A user can reconnect a relocated archive without editing the original MAP.
   q1MissingWads.erase(std::remove_if(q1MissingWads.begin(),q1MissingWads.end(),[&](const auto& missing){
-    return std::any_of(sources.begin(),sources.end(),[&](const auto& present){return missing.filename()==present.filename() && ftebroom::pak::exists(present);});
+    return availableNames.count(missing.filename())!=0;
   }),q1MissingWads.end());
   for(const auto& path:q1MissingWads)core->Print(("ReyondBroom: missing WAD archive: "+path.u8string()+"\n").c_str());
   if(strict && !q1MissingWads.empty())throw std::runtime_error("Missing WAD archive: "+q1MissingWads.front().u8string()+". Reconnect the archive in Material / Add WAD(s) before compiling.");
@@ -108,7 +124,6 @@ static void q1IndexAssets() {
   static ftebroom::quake1::WadImageCache images;images.prune();
   for(const auto& path:q1WadPaths()){
     auto archive=decoded.load(path,q1Read);
-    if(gameProfile==2&&!archive->empty()&&!archive->front().palette.empty())throw std::runtime_error("Quake 1 requires WAD2 textures: "+path.u8string());
     for(size_t i=0;i<archive->size();i++){
       const auto& tex=(*archive)[i];
       q1MaterialWad[tex.name]=q1WadLabels.count(path.u8string())?q1WadLabels[path.u8string()]:path.filename().u8string();

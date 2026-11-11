@@ -39,10 +39,18 @@ int main(int argc,char** argv) try {
     write(output/(d.preset+".png"),png(image));
     report.push_back({{"preset",d.preset},{"family",familyName(d.family)},{"triangles",{lod[0].faces.size(),lod[1].faces.size(),lod[2].faces.size()}},{"generation_ms",ms}});
     if(d.preset=="oak"||d.preset=="pine"||d.preset=="amanita"||d.preset=="daisy") {
-      auto encoded=md3(lod[0],"textures/reyond-plugins/plant-test");auto decoded=ftebroom::readMd3(encoded);size_t triangles=0;double error=0;
-      size_t at=0;for(auto& surface:decoded)for(auto& triangle:surface.triangles){auto face=lod[0].faces[at++];for(int i=0;i<3;i++)for(int a=0;a<3;a++)error=std::max(error,std::abs(double(triangle[i].point[a])-lod[0].vertices[face.i[i]].p[a]));triangles++;}
+      auto encoded=md3(lod[0],"textures/reyond-plugins/plant-test");auto decoded=ftebroom::readMd3(encoded);size_t triangles=0;double error=0,uvError=0;
+      // Quake formats store clockwise fronts; source meshes, OBJ and glTF
+      // are counterclockwise. Compare the corresponding corners and UVs.
+      constexpr int sourceCorner[]={0,2,1};
+      size_t at=0;for(auto& surface:decoded)for(auto& triangle:surface.triangles){auto face=lod[0].faces[at++];for(int i=0;i<3;i++){
+        const auto& source=lod[0].vertices[face.i[sourceCorner[i]]];
+        for(int a=0;a<3;a++)error=std::max(error,std::abs(double(triangle[i].point[a])-source.p[a]));
+        uvError=std::max({uvError,std::abs(triangle[i].u-source.uv[0]),std::abs(triangle[i].v-source.uv[1])});
+      }triangles++;}
       std::cout<<"MD3 "<<d.preset<<" triangles="<<triangles<<" max_position_error="<<std::setprecision(12)<<error<<'\n';
       expect(triangles==lod[0].faces.size()&&error<=1./128.+2e-5,d.preset+" production MD3 decoder roundtrip");
+      expect(uvError<1e-6,d.preset+" MD3 corner UV correspondence");
       write(output/(d.preset+".md3"),encoded);
       auto objText=obj(lod[0],d.preset+".mtl");auto albedo=png(maps.albedo);auto mtl="newmtl plant\nmap_Kd "+d.preset+"-atlas.png\n";
       auto imported=ftebroom::bb::importObj(objText,[&](const std::string& name){return name==d.preset+".mtl"?mtl:albedo;});

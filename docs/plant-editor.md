@@ -6,6 +6,14 @@ plant generators or a second rendering framework.
 
 ## Authoring
 
+Built-in presets use nominal dimensions in metres, converted to the selected
+game's standing player hull (56 units for Quake/Quake II/Quake III, 72 for
+Half-Life and FTE-specific games), using a 1.8 m human reference. Trees, shrubs,
+grass and mushrooms retain their different natural statures. The Height control
+shows the ratio to player height. Plant Brush and New use these same defaults.
+Saved projects, user presets, placed plants and their exports keep their explicit
+dimensions; opening them does not silently rescale authored work.
+
 Choose a species in the searchable library. 121 original botanical presets cover
 broadleaf trees, conifers, shrubs, grasses, ferns, flowers, mushrooms, cacti,
 palms, bamboo, riparian plants and climbing vines. Search also matches Latin names, IDs and habitat tags. The machine-readable offline catalogue is `ftebroom/plants/builtin/catalog.json`. Library thumbnails are rendered from the

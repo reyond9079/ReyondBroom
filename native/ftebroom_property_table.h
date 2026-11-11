@@ -4,6 +4,33 @@ struct PropertyRow
   std::string key, value;
   bool explicitValue = false, complete = true, mixed = false, internal = false;
 };
+static bool entityPublicProperty(std::string_view key)
+{
+  return key.rfind("_tb_",0)!=0 && key.rfind("_ftebroom_",0)!=0;
+}
+static void entityClassDefaults(const ftebroom::EntityDefinition& definition)
+{
+  uiSectionHeading(definition.name.c_str());
+  ImGui::TextDisabled("Class defaults");
+  if(!ImGui::BeginTable("Class properties",2,
+       ImGuiTableFlags_Resizable|ImGuiTableFlags_BordersInner|ImGuiTableFlags_RowBg))return;
+  ImGui::TableSetupColumn("Key",ImGuiTableColumnFlags_WidthStretch,.4f);
+  ImGui::TableSetupColumn("Value",ImGuiTableColumnFlags_WidthStretch,.6f);
+  ImGui::TableHeadersRow();
+  const bool testing=cvars->GetFloat("ftebroom_skip_setup")!=0;
+  for(const auto& [key,property]:definition.properties){
+    if(!entityPublicProperty(key))continue;
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::TextUnformatted(key.c_str());
+    if(!property.description.empty()&&ImGui::IsItemHovered())
+      ImGui::SetTooltip("%s",property.description.c_str());
+    ImGui::TableSetColumnIndex(1);
+    ImGui::TextUnformatted(property.value.c_str());
+    if(testing)entityTestItem("class-default/"+key+"="+property.value);
+  }
+  ImGui::EndTable();
+}
 static std::set<std::string> protectedPropertyKeys(const std::map<std::string,std::string>& fields)
 {
   std::set<std::string> result;
@@ -52,7 +79,7 @@ static void entityPropertyTable()
   }
   for (const auto& key : keys)
   {
-    if (key.rfind("_tb_", 0) == 0 || key.rfind("_ftebroom_",0)==0)
+    if (!entityPublicProperty(key))
       continue;
     PropertyRow row;
     row.key = key;

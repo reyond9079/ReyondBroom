@@ -89,14 +89,22 @@ static void definitionsLoadCommand()
   char argument[4096]{};
   commands->Argv(1, argument, sizeof argument);
   std::string path = argument;
-  if (path.empty())
-    path = gameClassic() ? std::string{} : definitionMapPath;
+  const bool mapOverride = path.empty() && !definitionMapPath.empty();
+  if (mapOverride)
+    path = definitionMapPath;
   if (path.rfind("external:", 0) == 0)
     path = path.substr(9);
   if (path.rfind("builtin:", 0) == 0)
     path.clear();
   try
   {
+    // A shared MAP may refer to a definitions file on its author's computer.
+    if (mapOverride && gameClassic() && !path.empty())
+    {
+      std::string probe;
+      if (!definitionsReadSource(path, probe))
+        path.clear();
+    }
     if (path.empty())
     {
       path=gameDefinitionPath();
@@ -164,7 +172,7 @@ static void definitionsLoadCommand()
     int written=files->Write(cacheFile,cache.data(),static_cast<int>(cache.size()));files->Close(cacheFile);
     if(written!=static_cast<int>(cache.size()))throw std::runtime_error("Incomplete entity definition cache");
     entityDefinitions = std::move(loaded);
-    if(changed)++entityDefinitionEpoch;
+    ++entityDefinitionEpoch;
     definitionSource = path;
     definitionError.clear();
     // A map can start its CSQC after the notification command has been sent.
@@ -252,9 +260,8 @@ static void entitySelectionLoad()
       colors.insert(key);
     if (kind == 'u' && row >> std::quoted(key))
       usage[key]++;
-    if (kind == 'd' && row >> std::quoted(path))
-    {
-    }
+    if (kind == 'd')
+      row >> std::quoted(path);
   }
   entityProperties = std::move(properties);
   selectedEntityClasses.clear();
@@ -440,26 +447,50 @@ static void entityPanel()
   {
     static bool hadSelection=false;
     static int lastSelectionEpoch=-1,lastMapEpoch=-1;
+    static std::string chosen, classPreview, pendingPreview;
+    static double previewAfter=0;
+    static bool openProperties=false;
     const bool hasSelection=cvars->GetFloat("ftebroom_selection_count")>0 ||
       cvars->GetFloat("ftebroom_entity_selection_count")>0;
     if(hasSelection!=hadSelection || organizationMapEpoch!=lastMapEpoch ||
        (hasSelection&&entitySelectionEpoch!=lastSelectionEpoch))
+    {
+      classPreview.clear();
+      pendingPreview.clear();
+      if(organizationMapEpoch!=lastMapEpoch)chosen.clear();
       ImGui::SetNextItemOpen(hasSelection,ImGuiCond_Always);
+    }
     hadSelection=hasSelection;
     lastSelectionEpoch=entitySelectionEpoch;
     lastMapEpoch=organizationMapEpoch;
+    const bool previewChanged=!pendingPreview.empty()&&ImGui::GetTime()>=previewAfter;
+    if(previewChanged){
+      classPreview=std::exchange(pendingPreview,{});
+      openProperties=true;
+    }
+    if(std::exchange(openProperties,false))
+      ImGui::SetNextItemOpen(true,ImGuiCond_Always);
+    const auto preview=entityDefinitions.find(classPreview);
+    if(!classPreview.empty()&&preview==entityDefinitions.end()){
+      classPreview.clear();
+      ImGui::SetNextItemOpen(hasSelection,ImGuiCond_Always);
+    }
     if(cvars->GetFloat("ftebroom_skip_setup")&&cvars->GetFloat("ftebroom_test_model_previews"))ImGui::SetNextItemOpen(false);
     if (uiInspectorFold("Properties",0))
     {
       const float maxHeight=std::max(32.f,ImGui::GetContentRegionAvail().y-148*uiScale());
       ImGui::SetNextWindowSizeConstraints({0,0},{FLT_MAX,maxHeight});
+      if(previewChanged)ImGui::SetNextWindowScroll({-1,0});
       ImGui::BeginChild("Entity properties",{0,0},ImGuiChildFlags_AutoResizeY|ImGuiChildFlags_AlwaysAutoResize);
-      ImGui::Text(
-        "Editing %u entit%s",
-        (unsigned)entityProperties.size(),
-        entityProperties.size() == 1 ? "y" : "ies");
-      entityPropertyTable();
-      entitySoundPreview();
+      if(preview!=entityDefinitions.end())entityClassDefaults(preview->second);
+      else{
+        ImGui::Text(
+          "Editing %u entit%s",
+          (unsigned)entityProperties.size(),
+          entityProperties.size() == 1 ? "y" : "ies");
+        entityPropertyTable();
+        entitySoundPreview();
+      }
       ImGui::EndChild();
     }
     ImGui::Separator();
@@ -522,7 +553,6 @@ static void entityPanel()
       float size=entityThumbnailSize*uiScale(),rowTop=ImGui::GetCursorPosY();
       float cellWidth=size+12*uiScale(),cellHeight=size+ImGui::GetTextLineHeightWithSpacing()+8*uiScale();
       int columns=std::max(1,int(ImGui::GetContentRegionAvail().x/cellWidth));
-      static std::string chosen;
       for (const auto* def : classes)
       {
         auto prefix=def->name.substr(0,def->name.find('_'));
@@ -533,7 +563,8 @@ static void entityPanel()
         ImGui::SetCursorPos({8+column*cellWidth,rowTop});ImGui::PushID(def->name.c_str());
         ImVec2 tile=ImGui::GetCursorScreenPos();
         bool selected=chosen==def->name || selectedEntityClasses.count(def->name)!=0;
-        if(ImGui::InvisibleButton("tile",{size,cellHeight-4})) {
+        if(ImGui::InvisibleButton("tile",{size,cellHeight-4},
+             ImGuiButtonFlags_PressedOnClickRelease|ImGuiButtonFlags_PressedOnDoubleClick)) {
           chosen=def->name;
           bool hasEntity=false,compatible=true;
           for(const auto& e:entityProperties)if(e.first>0) {
@@ -542,10 +573,21 @@ static void entityPanel()
             auto groupType=e.second.find("_tb_type");
             if(brush!=def->brush || groupType!=e.second.end())compatible=false;
           }
-          if(hasEntity && compatible)
-            command(("ftebroom_entity_property set classname "+organizationQuote(def->name)+"\n").c_str());
-          else if(hasEntity)cvars->SetString("ftebroom_selection_status","Choose a compatible point/brush entity class; groups cannot be reclassified.");
-          else if(ImGui::IsMouseDoubleClicked(0))entityCreate(*def,position);
+          if(hasEntity && compatible){
+            pendingPreview.clear();
+            classPreview.clear();
+            openProperties=true;
+            if(selectedEntityClasses.size()!=1 || !selectedEntityClasses.count(def->name))
+              command(("ftebroom_entity_property set classname "+organizationQuote(def->name)+"\n").c_str());
+          }else if(!hasEntity&&ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)){
+            pendingPreview.clear();
+            entityCreate(*def,position);
+          }else{
+            // Keep the tile in place until a possible double-click has finished.
+            pendingPreview=def->name;
+            previewAfter=ImGui::GetTime()+(hasEntity?0:ImGui::GetIO().MouseDoubleClickTime);
+            if(hasEntity)cvars->SetString("ftebroom_selection_status","Choose a compatible point/brush entity class; groups cannot be reclassified.");
+          }
         }
         entityTestItem("class:"+def->name);
         if(!def->brush && ImGui::BeginDragDropSource()) {

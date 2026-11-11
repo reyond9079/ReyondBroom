@@ -44,6 +44,12 @@ float fb_grid_testcommand()
         fb_grid_expect(fabs(fb_offset_x-rint(fb_offset_x))>0.001 || fabs(fb_offset_y-rint(fb_offset_y))>0.001,"fractional_mouse_offset");
     } else if(mode=="flags") {
         fb_grid_expect(cvar("ftebroom_grid_visible")==stof(argv(2)) && cvar("ftebroom_grid_snap")==stof(argv(3)),argv(4));
+    } else if(mode=="preview") {
+        int brush=fb_createbox('0 0 64','128 96 128');
+        int captured=fb_transform_capture();
+        fb_transform_delta='96 0 0';
+        fb_transform_preview=captured;
+        fb_grid_expect(brush && captured && fb_preview_replaces(1,brush),"preview_replaces_source_brush");
     }
     return TRUE;
 }

@@ -408,15 +408,51 @@ static bool dispatchAction(int key, bool down, bool inScene, int targetView=-1)
   return chosen != nullptr;
 }
 static std::string historyActionLabel(const Action& a);
-static void actionButton(const char* id)
+enum class ToolbarEditAction { Undo, Redo, Delete, FlipHorizontal, FlipVertical };
+static void actionToolButton(ToolbarEditAction tool,ImVec2 size)
 {
+  const char* ids[]={"Menu/Edit/Undo","Menu/Edit/Redo","Menu/Edit/Delete",
+    "Menu/Transform/Flip horizontal","Menu/Transform/Flip vertical"};
+  const char* id=ids[static_cast<int>(tool)];
   initActions();
   for (auto& a : actions)
-    if (std::string(a.id) == id)
+    if (std::string_view(a.id) == id)
     {
       ImGui::BeginDisabled(!actionAvailable(a));
-      if (ImGui::Button(historyActionLabel(a).c_str()))
-        executeAction(a);
+      ImGui::PushID(id);
+      if(ImGui::Button("##icon",size))executeAction(a);
+      const auto origin=ImGui::GetItemRectMin();
+      const float extent=std::min(size.x,size.y);
+      const auto point=[&](float x,float y){
+        if(tool==ToolbarEditAction::Redo)x=1-x;
+        if(tool==ToolbarEditAction::FlipVertical)std::swap(x,y);
+        return ImVec2{origin.x+(size.x-extent)*.5f+x*extent,
+                      origin.y+(size.y-extent)*.5f+y*extent};
+      };
+      auto* draw=ImGui::GetWindowDrawList();
+      const auto color=ImGui::GetColorU32(ImGuiCol_Text);
+      const float stroke=std::max(1.f,extent*.058f);
+      if(tool==ToolbarEditAction::Delete){
+        draw->AddLine(point(.24f,.34f),point(.76f,.34f),color,stroke);
+        draw->AddLine(point(.42f,.24f),point(.58f,.24f),color,stroke);
+        const ImVec2 body[]={point(.30f,.34f),point(.36f,.76f),point(.64f,.76f),point(.70f,.34f)};
+        draw->AddPolyline(body,IM_ARRAYSIZE(body),color,0,stroke);
+      }else if(tool==ToolbarEditAction::FlipHorizontal||tool==ToolbarEditAction::FlipVertical){
+        draw->AddTriangle(point(.17f,.24f),point(.37f,.73f),point(.17f,.73f),color,stroke);
+        draw->AddTriangle(point(.83f,.24f),point(.63f,.73f),point(.83f,.73f),color,stroke);
+        for(float y:{.22f,.45f,.68f})
+          draw->AddLine(point(.50f,y),point(.50f,y+.10f),color,stroke);
+      }else{
+        draw->PathLineTo(point(.25f,.42f));
+        draw->PathBezierCubicCurveTo(point(.56f,.32f),point(.75f,.39f),point(.75f,.71f));
+        draw->PathStroke(color,0,stroke);
+        const ImVec2 arrow[]={point(.42f,.24f),point(.25f,.42f),point(.42f,.55f)};
+        draw->AddPolyline(arrow,IM_ARRAYSIZE(arrow),color,0,stroke);
+      }
+      runUiRecordGlobal(std::string("tools/")+a.label);
+      if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s%s%s",uiTr(historyActionLabel(a).c_str()),a.shortcutText.empty()?"":"  ",a.shortcutText.c_str());
+      ImGui::PopID();
       ImGui::EndDisabled();
       return;
     }

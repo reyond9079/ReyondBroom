@@ -24,6 +24,41 @@ float fb_grid()
     if(cvar("ca_grid")!=size) cvar_set("ca_grid",ftos(size));
     return size;
 }
+int fb_grid_projection_axis(vector normal)
+{
+    normal=fb_grid_direction_local(normal);
+    if(fabs(normal_x)>fabs(normal_y)&&fabs(normal_x)>fabs(normal_z))return 0;
+    if(fabs(normal_y)>fabs(normal_z))return 1;
+    return 2;
+}
+int fb_sky_material(string material);
+float fb_preview_grid_alpha()
+{
+    if(cvar("ca_brush_view")||!cvar("ftebroom_grid_visible"))return 0;
+    float opacity=bound(0,cvar("ftebroom_grid_alpha"),1);
+    if(opacity)
+        shaderforname("ftebroom/previewgrid","{\ncull none\nsort additive\nprogram ftebroom_grid\n{\nmap textures/ftebroom/overlay.tga\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
+    return opacity;
+}
+void fb_preview_face_grid(brushface_t *face,int points,float spacing,float opacity)
+{
+    if(points<3)return;
+    vector normal=face->planenormal;
+    // Translucent previews don't write depth. Omit the back faces so their
+    // grid cannot appear through the visible side of the brush.
+    if((getproperty(VF_ORIGIN)-facepoints[0])*normal< -0.01)return;
+    if(!cvar("ftebroom_sky_overlays")&&((face->surfaceflags&4)||fb_sky_material(face->shadername)))return;
+    int hidden=cvar("ftebroom_hidden_tags");
+    if(hidden && (fb_filter_face_tags(face,0)&hidden))return;
+    int axis=fb_grid_projection_axis(normal),u=axis==0,v=axis==2?1:2;
+    R_BeginPolygon("ftebroom/previewgrid",3);
+    for(int point=0;point<points;point++) {
+        vector coordinates=fb_grid_local(facepoints[point]);
+        R_PolygonVertex(facepoints[point]+normal*0.02,[coordinates[u]/spacing,coordinates[v]/spacing,0],
+            autocvar_ftebroom_grid_color,opacity);
+    }
+    R_EndPolygon();
+}
 float fb_snap_scalar(float value) {return cvar("ftebroom_grid_snap")?rint(value/fb_grid())*fb_grid():value;}
 float fb_snap_up(float value) {return cvar("ftebroom_grid_snap")?ceil(value/fb_grid())*fb_grid():value;}
 float fb_snap_down(float value) {return cvar("ftebroom_grid_snap")?floor(value/fb_grid())*fb_grid():value;}

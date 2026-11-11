@@ -40,6 +40,12 @@ inline std::string entityTrim(std::string s)
   auto first = s.find_first_not_of(" \t\r\n"), last = s.find_last_not_of(" \t\r\n");
   return first == std::string::npos ? "" : s.substr(first, last - first + 1);
 }
+inline std::string entityModelPath(std::string path)
+{
+  if(!path.empty()&&path.front()==':')path.erase(0,1);
+  std::replace(path.begin(),path.end(),'\\','/');
+  return path;
+}
 inline std::vector<float> entityNumbers(std::string s)
 {
   for (auto& c : s)
@@ -663,6 +669,9 @@ inline EntityDefinitions entityResolve(EntityDefinitions definitions)
     if(d.model.empty()&&!d.modelKey.empty()){auto p=d.properties.find(d.modelKey);if(p!=d.properties.end())d.model=p->second.value;}
     if(!d.modelRules.empty()){std::map<std::string,std::string> defaults;for(auto& p:d.properties)defaults[p.first]=p.second.value;
       for(auto& rule:d.modelRules)if(fgdCondition(rule.condition,defaults)){d.model=fgdValue(rule.path,defaults);d.modelSkin=fgdValue(rule.skin,defaults);d.modelFrame=fgdValue(rule.frame,defaults);d.modelScale=fgdValue(rule.scale,defaults);if(!rule.path.empty()&&rule.path[0]=='$')d.modelKey=rule.path.substr(1);break;}}
+    d.model=entityModelPath(std::move(d.model));
+    for(auto& rule:d.modelRules)
+      if(!rule.path.empty()&&rule.path.front()=='=')rule.path="="+entityModelPath(rule.path.substr(1));
     visiting.erase(name);
     done.insert(name);
     for (int a = 0; a < 3; a++)

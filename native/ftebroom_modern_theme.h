@@ -12,23 +12,29 @@ struct Palette {
   ImVec4 workspace, dock, panel, inset, field, elevated;
   ImVec4 ink, secondary, border, hover, active, teal, focus, danger, warning;
   ImVec4 nav, navText, navMuted, navHover, navActive, navInput, navTop;
+  ImVec4 navInputHover, navInputBorder;
+  ImVec4 navRecess, navRecessHover, navRecessEdge, navRecessLight;
   ImVec4 scrollbar, scrollbarHover, edgeHover, resize, shadow, dim;
   ImVec4 action, actionHover, tileOutline;
 };
 
 constexpr Palette light{
-  color(0xE9EBE8),color(0xECEEEB),color(0xF7F8F6),color(0xEDF0ED),color(0xF0F2EF),color(0xFFFFFF),
-  color(0x252729),color(0x626B66),color(0xDCE1DC),color(0xE5EAE6),color(0xDFE7E4),
+  color(0xD3D5D7),color(0xDADCDE),color(0xE0E2E4),color(0xD7DADC),color(0xE7E9EB),color(0xEBEDEF),
+  color(0x282B30),color(0x53585E),color(0xBEC2C6),color(0xD3D8DC),color(0xC8D4D2),
   color(0x4E817A),color(0x396A63),color(0x913D3B),color(0x705820),
-  color(0x252729),color(0xF3F5F3),color(0xB2B9B5),color(0x393F40),color(0x4C5654),color(0x303638),color(0x2A2D2F),
+  color(0xCDD1D5),color(0x282B30),color(0x53585E),color(0xBFC5CB),color(0xB3CBC5),color(0xEFF1F3),color(0xD6DADD),
+  color(0xE1E8EC),color(0x9DA4AD),
+  color(0xBFC5CB),color(0xCBD1D6),color(0xA4ABB2),color(0xEBEDF0,.74f),
   color(0x414141,.25f),color(0x414141,.42f),color(0x454745,.50f),color(0x343434),color(0x252729),color(0x252729),
   color(0x396A63),color(0x4E817A),color(0xFFFFFF,.48f)
 };
 constexpr Palette dark{
-  color(0x191C1D),color(0x1E2223),color(0x272C2D),color(0x1F2324),color(0x212627),color(0x303637),
-  color(0xEDF1EE),color(0xAAB6B1),color(0x414B4B),color(0x374345),color(0x394C49),
+  color(0x2D2F32),color(0x34363A),color(0x393C40),color(0x323438),color(0x33363A),color(0x42454A),
+  color(0xEDF0F2),color(0xBFC3C8),color(0x55595E),color(0x484C52),color(0x455452),
   color(0x75B3A7),color(0xA1D5C9),color(0xF7A59B),color(0xE9C788),
-  color(0xEEE9D8),color(0x292D2B),color(0x62675E),color(0xDFD9C7),color(0xBCD2C7),color(0xF8F5E9),color(0xFFFFF0),
+  color(0x34373C),color(0xEDF0F2),color(0xB1B6BD),color(0x464A51),color(0x49635F),color(0x51565E),color(0x3B3E43),
+  color(0x5D646D),color(0x777D86),
+  color(0x26292D),color(0x30353B),color(0x191C20),color(0x626972,.62f),
   color(0xCBD7D2,.24f),color(0xCBD7D2,.43f),color(0xCBD7D2,.40f),color(0xCBD7D2),color(0x000000),color(0x080A0A),
   color(0x30564F),color(0x39685E),color(0xA1D5C9,.70f)
 };
@@ -155,6 +161,67 @@ static ImU32 uiChrome(ImU32 legacy, UiTone role) {
   return uiModern()?ImGui::GetColorU32(uiTone(role)):legacy;
 }
 static ImVec4 uiActiveToolColor(){return uiModern()?uiModernPalette().navActive:uiColor(62,112,205);}
+template<class Draw>
+static bool uiToolDropdown(Draw draw)
+{
+  if(!uiModern())return draw();
+  const auto& palette=uiModernPalette();
+  ImGui::PushStyleColor(ImGuiCol_FrameBg,palette.navInput);
+  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,palette.navInputHover);
+  ImGui::PushStyleColor(ImGuiCol_Button,palette.navInput);
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,palette.navInputHover);
+  ImGui::PushStyleColor(ImGuiCol_Border,palette.navInputBorder);
+  ImGui::PushStyleColor(ImGuiCol_BorderShadow,ModernChrome::transparent);
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,uiScale());
+  const bool result=draw();
+  ImGui::PopStyleVar();
+  ImGui::PopStyleColor(6);
+  return result;
+}
+template<class... Args>
+static bool uiToolCombo(Args&&... args)
+{
+  return uiToolDropdown([&]{return ImGui::Combo(std::forward<Args>(args)...);});
+}
+static bool uiToolValueCombo(const char* id,const char* value,ImVec2 cell)
+{
+  const float scale=uiScale();
+  const auto min=ImGui::GetCursorScreenPos();
+  const ImVec2 max{min.x+cell.x,min.y+cell.y};
+  const bool visible=ImGui::IsRectVisible(min,max);
+  auto* draw=ImGui::GetWindowDrawList();
+  auto* font=ImGui::GetFont();
+  const float fontSize=ImGui::GetFontSize();
+  const auto ink=ImGui::GetColorU32(ImGuiCol_Text);
+  const float radius=ImGui::GetStyle().FrameRounding;
+  const bool modern=uiModern();
+  const auto& palette=uiModernPalette();
+  if(modern){
+    ImGui::PushStyleColor(ImGuiCol_FrameBg,palette.navRecess);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,palette.navRecessHover);
+  }
+  ImGui::SetNextItemWidth(cell.x);
+  ImGui::SetNextWindowSizeConstraints({128*scale,0},{FLT_MAX,FLT_MAX});
+  const bool open=ImGui::BeginCombo(id,"",ImGuiComboFlags_NoArrowButton);
+  if(modern)ImGui::PopStyleColor(2);
+  if(!visible)return open;
+  if(modern){
+    draw->AddRect(min,max,ImGui::GetColorU32(palette.navRecessEdge),radius);
+    draw->AddLine({min.x+radius,max.y-scale},{max.x-radius,max.y-scale},
+      ImGui::GetColorU32(palette.navRecessLight),scale);
+  }
+  const auto text=font->CalcTextSizeA(fontSize,FLT_MAX,0,value);
+  const float fit=std::min(1.f,(cell.x-6*scale)/std::max(1.f,text.x));
+  const float centerX=min.x+cell.x*.5f;
+  draw->AddText(font,fontSize*fit,
+    {std::floor(centerX-text.x*fit*.5f),std::floor(min.y+cell.y*.39f-text.y*fit*.5f)},
+    ink,value);
+  const float arrowY=min.y+cell.y*.75f;
+  const ImVec2 arrow[]={{centerX-3.4f*scale,arrowY-1.5f*scale},
+    {centerX,arrowY+1.8f*scale},{centerX+3.4f*scale,arrowY-1.5f*scale}};
+  draw->AddPolyline(arrow,IM_ARRAYSIZE(arrow),ink,0,1.3f*scale);
+  return open;
+}
 // This scope only surrounds Tools. Other widgets use the workspace palette.
 static void uiToolStripBegin() {
   if(!uiModern())return;

@@ -3,6 +3,9 @@ vector fb_material_image_size(string source);
 float fb_surface_shade(vector normal);
 float fb_surface_opacity(string source,int tags);
 int fb_filter_face_tags(brushface_t *face,int contents);
+float fb_preview_grid_alpha();
+float fb_grid();
+void fb_preview_face_grid(brushface_t *face,int points,float spacing,float opacity);
 vector fb_visual_current_wire;
 void(int mod, int id) DrawEngineBrushWireframe =
 {
@@ -124,6 +127,8 @@ void(brushface_t *faces, int numfaces, string shader, vector col, float alpha) D
 {
 	int f;
 	int point, points;
+	float gridAlpha=fb_preview_grid_alpha(),spacing=0;
+	if(gridAlpha)spacing=fb_grid();
 	for(f = 0; f < numfaces;)
 	{
 		points = brush_calcfacepoints(++f, faces, numfaces, facepoints, MAX_FACEPOINTS);
@@ -133,12 +138,15 @@ void(brushface_t *faces, int numfaces, string shader, vector col, float alpha) D
 		for (point = 0; point < points; point++)
 			R_PolygonVertex(facepoints[point], '0 0', col, alpha);
 		R_EndPolygon();
+		if(gridAlpha)fb_preview_face_grid(&faces[f-1],points,spacing,gridAlpha);
 	}
 };
 void(brushface_t *faces, int numfaces, vector col, float alpha) DrawQCBrushTextured =
 {
 	int f;
 	int point, points;
+	float gridAlpha=fb_preview_grid_alpha(),spacing=0;
+	if(gridAlpha)spacing=fb_grid();
 	for(f = 0; f < numfaces; f++)
 	{
 		points = brush_calcfacepoints(1+f, faces, numfaces, facepoints, MAX_FACEPOINTS);
@@ -156,6 +164,7 @@ void(brushface_t *faces, int numfaces, vector col, float alpha) DrawQCBrushTextu
 			for (point = 0; point < points; point++)
 				R_PolygonVertex(facepoints[point], [(facepoints[point] * faces[f].sdir + faces[f].sbias)/sz_x, (facepoints[point] * faces[f].tdir + faces[f].tbias)/sz_y], faceColor, faceAlpha);
 			R_EndPolygon();
+			if(gridAlpha)fb_preview_face_grid(&faces[f],points,spacing,gridAlpha);
 		}
 	}
 };

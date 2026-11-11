@@ -15,7 +15,9 @@ inline uint64_t regionSeed(const Settings& s,uint64_t id,const char* stage){auto
 inline size_t navNode(WorldPlan& w,V p,uint64_t region,bool required=true){if(w.navigation.nodes.size()>=4096)throw std::runtime_error("World Architect navigation exceeds 4096 nodes");w.navigation.nodes.push_back({p,region,required});return w.navigation.nodes.size()-1;}
 inline void navEdge(WorldPlan& w,size_t a,size_t b){if(a!=b)w.navigation.edges.push_back({a,b});}
 inline void addBrush(WorldPlan& w,uint64_t region,const std::string& kind,al::Brush brush){
-  if(w.architecture.elements.size()>=16000)throw std::runtime_error("World Architect exceeds the 16000 brush budget");al::validateBrush(brush);w.architecture.elements.push_back({region,kind,std::move(brush)});
+  if(w.architecture.elements.size()>=16000)throw std::runtime_error("World Architect exceeds the 16000 brush budget");al::validateBrush(brush);
+  const auto poly=al::polyhedron(brush);const double limit=capability(w.profile).coordinateLimit;for(int axis=0;axis<3;axis++)if(poly.min[axis]<-limit||poly.max[axis]>limit)throw std::runtime_error("Architectural brush exceeds profile coordinate limits");
+  w.architecture.elements.push_back({region,kind,std::move(brush)});
 }
 inline void box(WorldPlan& w,uint64_t region,const std::string& kind,V lo,V hi,int slot){
   if(hi.x-lo.x<.5||hi.y-lo.y<.5||hi.z-lo.z<.5)return;

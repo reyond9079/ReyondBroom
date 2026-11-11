@@ -38,7 +38,18 @@ def choose(path):
  text=path.as_posix();r=wait(lambda:live()['widgets'].get('file-path'));ui.click(r['x']+r['width']*.4,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(text)
  wait(lambda:read_ui_json(data/'placement-ui-live.json')['browsePath']==text);ui.key('enter');click('file-choose');wait(lambda:'file-path' not in live()['widgets'])
 try:
- wait(lambda:live()['open'] and 'generate' in live()['widgets']);ui.position();before=save('wa-before');baseline=planes(before)
+ wait(lambda:live()['open'] and 'generate' in live()['widgets']);ui.position()
+ # Xvfb has no window manager to transfer focus after an external engine exits.
+ # Acquire actual OS keyboard focus before the first console shortcut.
+ if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
+ before=save('wa-before');baseline=planes(before)
+ if a.preset=='hospital':
+  def seed(value):
+   click('seed');ui.key('a',('ctrl',));ui.text(str(value));ui.key('enter');wait(lambda:live()['settings']['worldSeed']==value)
+  seed(17);seed(29);click('undo-settings');wait(lambda:live()['settings']['worldSeed']==17);check(True,'settings Undo restores the previous independent seed edit')
+  click('undo-settings');wait(lambda:live()['settings']['worldSeed']==1);check(True,'a second settings Undo restores the original seed')
+  click('redo-settings');wait(lambda:live()['settings']['worldSeed']==17);click('redo-settings');wait(lambda:live()['settings']['worldSeed']==29);check(True,'settings Redo survives the Undo button action and restores both edits')
+  click('undo-settings');wait(lambda:live()['settings']['worldSeed']==17);click('undo-settings');wait(lambda:live()['settings']['worldSeed']==1)
  if a.preset!='hospital':click('preset');click('preset/'+a.preset);wait(lambda:live()['settings']['presetId']==a.preset)
  click('generate');wait(lambda:live()['candidates'] and not live()['busy']);check(not live()['error'],'actual UI generates accepted candidates without mutating the scene')
  generated=save('wa-generated');check(planes(generated)==baseline,'candidate generation and preview leave authored brushes unchanged')

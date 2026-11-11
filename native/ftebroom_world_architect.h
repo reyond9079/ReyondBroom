@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#ifdef near
+// Win32's legacy memory-model macro collides with al::near in the brush
+// kernel. Confine the override to this integration header and restore it below.
+#pragma push_macro("near")
+#undef near
+#define FTEBROOM_WORLD_RESTORE_NEAR
+#endif
 #include "world_architect/assets.h"
 #ifndef _WIN32
 #include <unistd.h>
@@ -60,7 +67,7 @@ static void worldGenerate(){
   s.pendingKey=worldInputKey();
   s.job=std::async(std::launch::async,[settings,registry,work](){return wa::candidates(settings,registry,&work->cancel,&work->stage);});
 }
-static void worldChanged(const wa::Json& before){auto& s=worldArchitect;if(before==wa::serialize(s.settings))return;auto active=ImGui::GetActiveID();if(!active||active!=s.gesture){s.undo.push_back(before);if(s.undo.size()>100)s.undo.erase(s.undo.begin());}s.gesture=active;s.redo.clear();s.error.clear();}
+static void worldChanged(const wa::Json& before){auto& s=worldArchitect;auto active=ImGui::GetActiveID();if(before==wa::serialize(s.settings)){if(!active)s.gesture=0;return;}if(!active||active!=s.gesture){s.undo.push_back(before);if(s.undo.size()>100)s.undo.erase(s.undo.begin());}s.gesture=active;s.redo.clear();s.error.clear();}
 static void worldUndo(bool redo=false){auto& s=worldArchitect;auto& from=redo?s.redo:s.undo;auto& to=redo?s.undo:s.redo;if(from.empty()||s.job.valid())return;to.push_back(wa::serialize(s.settings));s.settings=wa::deserialize(from.back(),s.registry);from.pop_back();s.dirty=true;}
 static void worldPublish(const std::filesystem::path& root,const std::map<std::string,std::string>& bundle){
   for(const auto& [name,bytes]:bundle){auto target=root/std::filesystem::u8path(name);if(std::filesystem::exists(target)&&q1Read(target)!=bytes)throw std::runtime_error("Existing World Architect asset differs: "+target.u8string());}
@@ -192,16 +199,16 @@ static void worldPanel(){
   if(s.focusRequest){ImGui::SetNextWindowFocus();s.focusRequest=false;}
   if(ImGui::Begin("World Architect — development preview",&s.open,ImGuiWindowFlags_NoDocking)){
     ImGui::TextWrapped("Development preview: mission / physical navigation foundation. AutoLevel remains available; final architecture and art acceptance is still pending.");
-    auto before=wa::serialize(s.settings);ImGui::BeginDisabled(s.job.valid());
+    auto before=wa::serialize(s.settings);bool restoredSettings=false;ImGui::BeginDisabled(s.job.valid());
     ImGui::SetNextItemWidth(220*uiScale());bool presetsOpen=ImGui::BeginCombo("Preset",s.registry.preset(s.settings.preset).name.c_str());worldRect("preset");if(presetsOpen){for(const auto& p:s.registry.presets){if(ImGui::Selectable(p.name.c_str(),p.id==s.settings.preset)){s.settings.preset=p.id;s.settings.damage=p.damage;}worldRect("preset/"+p.id);}ImGui::EndCombo();}ImGui::SameLine();
     ImGui::SetNextItemWidth(150*uiScale());ImGui::InputScalar("Seed",ImGuiDataType_U64,&s.settings.seed);worldRect("seed");ImGui::SameLine();
     if(worldButton("Generate candidates","generate"))worldAction(worldGenerate);ImGui::SameLine();
-    if(worldButton("Undo settings","undo-settings"))worldAction([]{worldUndo();});ImGui::SameLine();if(worldButton("Redo settings","redo-settings"))worldAction([]{worldUndo(true);});
+    if(worldButton("Undo settings","undo-settings")){worldAction([]{worldUndo();});restoredSettings=true;}ImGui::SameLine();if(worldButton("Redo settings","redo-settings")){worldAction([]{worldUndo(true);});restoredSettings=true;}
     float scale=float(s.settings.scale),damage=float(s.settings.damage),density=float(s.settings.dressing);
     ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Scale",&scale,.6f,1.4f))s.settings.scale=scale;worldRect("scale");ImGui::SameLine();
     ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Damage",&damage,0,1))s.settings.damage=damage;worldRect("damage");ImGui::SameLine();
     ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Dressing",&density,0,1))s.settings.dressing=density;worldRect("dressing");
-    worldChanged(before);ImGui::EndDisabled();
+    if(!restoredSettings)worldChanged(before);else s.gesture=0;ImGui::EndDisabled();
     if(s.job.valid()){ImGui::ProgressBar((s.work->stage.load()+.5f)/7,{-1,0},wa::stages[std::clamp(s.work->stage.load(),0,6)]);if(worldButton("Cancel generation","cancel"))s.work->cancel=true;}
     if(!s.batch.worlds.empty()){
       ImGui::TextUnformatted("Validated candidates:");ImGui::SameLine();for(size_t i=0;i<s.batch.worlds.size();i++){ImGui::PushID(int(i));auto label=std::to_string(i+1)+" / "+std::to_string(s.batch.worlds[i].seed);if(ImGui::RadioButton(label.c_str(),s.selected==int(i))){s.selected=int(i);s.dirty=true;}worldRect("candidate/"+std::to_string(i));ImGui::SameLine();ImGui::PopID();}ImGui::NewLine();
@@ -246,3 +253,7 @@ static void QDECL worldCommand(){
   }
   worldAction([]{worldRegistry();auto& s=worldArchitect;s.open=true;s.focusRequest=true;char action[256]={};commands->Argv(1,action,sizeof action);if(std::string(action)=="qa")s.qa=true;else if(std::string(action)=="generate")worldGenerate();else if(*action){s.registry.preset(action);s.settings.preset=action;worldGenerate();}});
 }
+#ifdef FTEBROOM_WORLD_RESTORE_NEAR
+#pragma pop_macro("near")
+#undef FTEBROOM_WORLD_RESTORE_NEAR
+#endif

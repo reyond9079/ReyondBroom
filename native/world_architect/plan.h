@@ -112,6 +112,7 @@ inline Registry readRegistry(const Json& j){
     p.ruinEvent=item.value("ruinEvent",std::string{});if(!p.ruinEvent.empty()&&p.ruinEvent!="collapsed-stair"&&p.ruinEvent!="flooded-platform")throw std::runtime_error("Unsupported structural ruin event");
     if(!ids.insert("preset/"+p.id).second)throw std::runtime_error("Duplicate preset");
     auto scope=item.at("scope").get<int>();finite(scope,0,3,"Invalid scope");p.scope=Scope(scope);
+    if(!p.ruinEvent.empty()&&p.scope!=Scope::Interior)throw std::runtime_error("This structural event requires an interior envelope");
     p.floors=item.at("floors");p.rooms=item.at("rooms");p.blocks=item.at("blocks");p.width=item.at("width");p.depth=item.at("depth");p.street=item.at("street");p.damage=item.at("damage");
     finite(p.floors,1,4,"Floors must be 1..4");finite(p.rooms,2,16,"Rooms must be 2..16");finite(p.blocks,1,4,"Blocks must be 1..4");finite(p.width,768,2560,"Invalid building width");finite(p.depth,448,1536,"Invalid building depth");finite(p.street,128,384,"Invalid street width");finite(p.damage,0,1,"Invalid ruin amount");
     p.experience.beats=item.value("beats",7);p.experience.branches=item.value("branches",2);p.experience.loops=item.value("loops",1);finite(p.experience.beats,4,16,"Invalid mission size");finite(p.experience.branches,1,4,"Invalid branch count");finite(p.experience.loops,1,4,"Invalid loop count");r.presets.push_back(p);

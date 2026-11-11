@@ -54,6 +54,16 @@ for phase in ('initial', 'selected', 'undone', 'redone', 'reopened'):
         (folder/('rb134-'+phase+'-resource.txt')).write_text(label+' resource winner\n')
 mapfile = source_dir/'customer_lighting.map'
 wad = fixture/'id1/test textures.wad'
+# A mixed Quake/GoldSrc folder can contain both loose and packed WAD3 files.
+quake_wad = wad.read_bytes()
+directory = struct.unpack_from('<I', quake_wad, 8)[0]
+lump = quake_wad[12:directory] + struct.pack('<H', 256) + bytes(768)
+decals = (struct.pack('<4sII', b'WAD3', 1, 12+len(lump)) + lump +
+          struct.pack('<3I4B16s', 12, len(lump), len(lump), 67, 0, 0, 0, lump[:16]))
+(mod/'decals.wad').write_bytes(decals)
+(mod/'pak7.pak').write_bytes(struct.pack('<4sII', b'PACK', 12+len(decals), 64) +
+    decals + struct.pack('<56sII', b'packed-decals.wad', 12, len(decals)))
+missing_wad = mod/'decals2.wad'
 scene = (fixture/'editor/ftebroom/maps/build-fixture.map').read_text()
 scene = scene.replace('"classname" "worldspawn"', '"classname" "worldspawn"\n"wad" '+json.dumps(wad.as_posix()), 1)
 scene = scene.replace('"classname" "light"', '"classname" "light"\n"_color" "1 0.2 0.1"', 1)
@@ -62,7 +72,8 @@ mapfile.write_text('// ReyondBroom profile=quake1 format=quake-standard\n'+scene
 for parent in (root, data):
     (parent/'ftebroom-project.txt').write_text(mod.as_posix())
     (parent/'ftebroom-game-profile.txt').write_text('2 0 "" "" "" "" 1 5 "" 1 1\n')
-    (parent/'ftebroom-quake1.txt').write_text('"" '+json.dumps(mod.as_posix())+' "" "" 0 0 "" 0\n')
+    (parent/'ftebroom-quake1.txt').write_text('"" '+json.dumps(mod.as_posix())+' '+
+        json.dumps(missing_wad.as_posix())+' "" 0 0 "" 0\n')
 customer_file = repo/'tests/fixtures/CompilationProfiles-original.cfg'
 profile = json.loads(customer_file.read_text())['profiles'][0]
 profile['trenchBroom'] = True
@@ -156,6 +167,18 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def mixed_wad_diagnostics():
+    for log in (data/'qconsole.log', root/'qconsole.log', out/'editor.log'):
+        if not log.is_file():
+            continue
+        lines = log.read_text(errors='replace').splitlines()
+        skipped = {line.replace('\\', '/').rsplit('/', 1)[-1] for line in lines
+                   if 'skipped non-WAD2 archive for Quake 1:' in line}
+        missing = any('missing WAD archive:' in line and line.endswith('decals2.wad') for line in lines)
+        if {'decals.wad', 'packed-decals.wad'} <= skipped and missing:
+            return True
+
+
 def embedded_test_textures(bsp):
     offset, length = struct.unpack_from('<II',bsp,4+2*8)
     textures = bsp[offset:offset+length]
@@ -204,6 +227,7 @@ try:
     check(mods_live()['base'] == 'id1' and 'id1' not in mods_live()['mods'],
           'inherited_id1_is_separate_from_editable_enabled_mods')
     check_resource('selected', mod)
+    check(wait(mixed_wad_diagnostics), 'Quake1_skips_loose_and_packed_WAD3_and_reports_missing_WAD')
     ImageGrab.grab().save(out/'selected-ad-mod.png')
     ui.console('ftebroom_undo')
     wait(lambda:mods_live()['mods'] == [] and not mods_live()['loading'])

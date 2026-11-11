@@ -11,7 +11,7 @@ import time
 from PIL import Image,ImageGrab
 from editor_os_input import NativeInput,read_ui_json
 
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--scene-only',action='store_true',help='Focus OS input on installed model visibility and map lifecycle');a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--scene-only',action='store_true',help='Focus OS input on installed model visibility and map lifecycle');p.add_argument('--export-only',action='store_true',help='Only exercise format selection, encoding and cancellation');a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom'
 for file in out.glob('ui-plant*'):
  if file.is_file():file.unlink()
@@ -67,6 +67,9 @@ def edit(name,text,scalar=False):
  ui.key('enter');time.sleep(.2)
 def choose(target):
  wait(lambda:'file-path' in live()['widgets']);edit('file-path',str(target).replace('\\','/'));click('file-choose');wait(lambda:'file-path' not in live()['widgets'])
+def export(target,format):
+ click('export');wait(lambda:'export-destination' in live()['widgets'])
+ click('export-format/'+str(format));click('export-destination');choose(target)
 def screenshot(name):
  ui.settle();ImageGrab.grab().save(out/(name+'.png'))
 def visible_foliage(path):
@@ -79,6 +82,34 @@ def console(command):ui.console(command);time.sleep(.25)
 try:
  ready();ui.position();expect(live()['open'] and len(live()['lods'])==3,'native Plant Editor opens with three real LODs')
  expect(live()['lods'][0]['triangles']>live()['lods'][1]['triangles']>live()['lods'][2]['triangles'],'live LOD statistics show real reduction')
+ if a.export_only:
+  click('export');wait(lambda:'export-destination' in live()['widgets']);screenshot('plant-export-formats')
+  expect(all('export-format/'+str(i) in live()['widgets'] for i in range(8)), 'all eight available formats are visible before destination selection')
+  expect(not ('file-path' in live()['widgets']), 'Export opens the format picker before the file picker')
+  click('export-cancel');wait(lambda:'export-destination' not in live()['widgets'])
+  click('export');click('export-format/4');click('export-destination');wait(lambda:'file-path' in live()['widgets'])
+  expect(read_ui_json(data/'placement-ui-live.json')['browsePath'].endswith('.md3'), 'destination defaults to the selected MD3 extension')
+  click('file-cancel');wait(lambda:'file-path' not in live()['widgets'])
+  # Small existing fern is sufficient to test every serializer; no catalogue,
+  # generator matrix or scene placement is needed for this export-only change.
+  edit('search','Common bracken');click('preset/bracken');ready()
+  for format,ext,magic in [(0,'.glb',b'glTF'),(1,'.obj',b'#'),(2,'.mdl',b'IDPO'),(3,'.md2',b'IDP2'),(4,'.md3',b'IDP3'),(5,'.iqm',b'INTERQUAKEMODEL'),(6,'.md5mesh',b'MD5Version'),(7,'.mdl',b'IDST')]:
+   dest=out/('ui-plant-format-'+str(format)+ext);dest.unlink(missing_ok=True)
+   export(dest,format);wait(lambda:dest.exists())
+   encoded=dest.read_bytes()
+   expect((b'v ' in encoded and b'f ' in encoded) if format==1 else encoded.startswith(magic),'selected format '+str(format)+' writes its actual encoding')
+  expect((out/'ui-plant-format-3.pcx').exists(),'MD2 exports its companion PCX')
+  expect(all((out/('ui-plant-format-'+str(i)+'-albedo.tga')).exists() for i in [4,5,6]),'MD3, IQM and MD5 export their referenced atlas')
+  expect((out/'ui-plant-format-1.mtl').exists() and (out/'ui-plant-format-1-albedo.png').exists(),'OBJ exports its MTL and PNG companions')
+  renamed=out/'ui-plant-selected.obj';renamed.unlink(missing_ok=True)
+  export(out/'ui-plant-selected.glb',1);wait(lambda:renamed.exists())
+  expect(not (out/'ui-plant-selected.glb').exists(),'format selection determines the extension even when destination text has another suffix')
+  conflict=out/'ui-plant-conflict-albedo.png';conflict.write_bytes(b'preserve previous texture')
+  click('export');click('export-format/1');click('export-destination')
+  wait(lambda:'file-path' in live()['widgets']);edit('file-path',str(out/'ui-plant-conflict.obj'));click('file-choose');time.sleep(.5)
+  expect('file-path' in live()['widgets'] and conflict.read_bytes()==b'preserve previous texture' and not (out/'ui-plant-conflict.obj').exists() and not (out/'ui-plant-conflict.mtl').exists(),'companion conflict preserves prior data and produces no partial model')
+  click('file-cancel');screenshot('plant-export-complete');print('Plant export UI:',len(checks),'checks passed',flush=True)
+  raise SystemExit(0)
  source=None
  if not a.scene_only:
   old_seed=live()['project']['seed'];click('randomize');ready();expect(live()['project']['seed']!=old_seed,'Randomize changes the generated seed')
@@ -91,8 +122,8 @@ try:
   click('redo');ready();expect(live()['project']['parameters']['height']==180,'Plant Redo restores the generated change')
   click('new');click('confirm-discard');ready();expect(live()['project']['name']=='Untitled oak','New respects the unsaved-project confirmation')
   click('open');click('confirm-discard');choose(source);ready();expect(live()['project']==saved,'Open restores parameters, hierarchy, seed and saved variations')
-  exported=out/'ui-plant.glb';exported.unlink(missing_ok=True);click('export');choose(exported);wait(lambda:exported.exists());expect(exported.read_bytes()[:4]==b'glTF','Export writes a real embedded GLB')
-  obj=out/'ui-plant.obj';obj.unlink(missing_ok=True);click('export');choose(obj);wait(lambda:obj.exists());expect((out/'ui-plant.mtl').is_file() and (out/'ui-plant-albedo.png').is_file(),'OBJ export writes its real MTL and PNG dependencies')
+  exported=out/'ui-plant.glb';exported.unlink(missing_ok=True);export(exported,0);wait(lambda:exported.exists());expect(exported.read_bytes()[:4]==b'glTF','Export writes a real embedded GLB')
+  obj=out/'ui-plant.obj';obj.unlink(missing_ok=True);export(obj,1);wait(lambda:obj.exists());expect((out/'ui-plant.mtl').is_file() and (out/'ui-plant-albedo.png').is_file(),'OBJ export writes its real MTL and PNG dependencies')
   edit('Plant name','QA woodland');ready();click('save-preset');ready()
   user_id=live()['project']['preset'];user_file=data/'plants/presets'/user_id.removeprefix('user:');expect(user_id.startswith('user:') and user_file.exists() and json.loads(user_file.read_text())==live()['project'],'Save preset creates a versioned editable user preset')
   click('favorite');expect(''==live()['error'],'Favorite persists without model errors')
@@ -106,8 +137,8 @@ try:
   edit('search','English oak');click('preset/oak');ready();click('advanced');expect('node/trunk' in live()['widgets'],'Advanced mode exposes the editable structure')
  else:
   click('advanced');click('keep-variation');ready()
-  click('export');choose(out/'ui-plant.glb');wait(lambda:(out/'ui-plant.glb').exists())
-  click('export');choose(out/'ui-plant.obj');wait(lambda:(out/'ui-plant.obj').exists())
+  export(out/'ui-plant.glb',0);wait(lambda:(out/'ui-plant.glb').exists())
+  export(out/'ui-plant.obj',1);wait(lambda:(out/'ui-plant.obj').exists())
  before=live()['lods'][0]['triangles'];click('node-visible/leaves');ready();expect(live()['lods'][0]['triangles']<before,'hiding Leaves removes actual geometry')
  click('undo');ready();expect(live()['lods'][0]['triangles']==before,'hierarchy visibility participates in Undo')
  # This profile is Quake III or FTE in the disposable fixture.

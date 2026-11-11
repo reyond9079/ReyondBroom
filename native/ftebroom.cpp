@@ -271,10 +271,12 @@ static bool terrainCreateWindow;
 #include "ftebroom_array.h"
 #include "ftebroom_spawn_master.h"
 #include "ftebroom_unity.h"
+static void worldOpen();
 #include "ftebroom_plugins.h"
 #include "ftebroom_plant_editor.h"
 #include "ftebroom_placement.h"
 #include "ftebroom_plant_brush.h"
+#include "ftebroom_world_architect.h"
 #include "ftebroom_texture_folders.h"
 #include "ftebroom_prefabs.h"
 #include "ftebroom_entity_list.h"
@@ -315,7 +317,7 @@ static void panel(float w, float h)
   linuxPlatformPump(ctrlHeld);
   io.MouseDrawCursor = false;
 #endif
-  if(runUiNavigation()||plantFocused())io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
+  if(runUiNavigation()||plantFocused()||worldArchitectFocused())io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::NewFrame();
   placementWidgets=nlohmann::json::object();
   browser132QaBegin();
@@ -1180,7 +1182,7 @@ static void panel(float w, float h)
   terrainPanel();
   shaderPackPanel();
   modFilesPanel(statusText,selectionStatus[0]!=0);
-  modelViewerPanel();bbBenchTick();plantPanel();
+  modelViewerPanel();bbBenchTick();plantPanel();worldPanel();
   plantBrushHover();
   softLightGalleryPanel();
   pluginsPanel();pluginPreviewDraw();
@@ -1533,7 +1535,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    if (!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()))) dispatchAction(key, down, inScene, hit);
+    if (!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()))) dispatchAction(key, down, inScene, hit);
   }
   return qtrue;
 }
@@ -2037,6 +2039,7 @@ static void shutdownEditor()
   modEmbedEnd();
   if(runActive)runStop();
   plantShutdown();
+  if(worldArchitect.work)worldArchitect.work->cancel=true;worldRelease();
   pluginsShutdown();
   settleCancel=true;if(settleJob.valid())settleJob.wait();
   textureFolderCancel=true;if(textureFolderJob.valid())textureFolderJob.wait();
@@ -2155,6 +2158,7 @@ extern "C" qboolean NATIVEEXPORT FTEPlug_Init(plugcorefuncs_t* api)
   commands->AddCommand("ftebroom_test_mod_controls",testModControls,"Test embedded controls menu.");
   commands->AddCommand("ftebroom_test_uv_input", testUVInput, "Test UV canvas pointer routing.");
   commands->AddCommand("ftebroom_test_run", testRunProfiles, "Test run profiles in disposable runs.");
+  commands->AddCommand("ftebroom_world_architect",worldCommand,"Open the World Architect development preview.");
   commands->AddCommand("ftebroom_plant",plantCommand,"Open the native Plant Editor or select a plant preset.");
   commands->AddCommand("ftebroom_test_desktop",testDesktop,"Test desktop integration in disposable installations.");
 #ifndef _WIN32

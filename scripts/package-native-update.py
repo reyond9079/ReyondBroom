@@ -90,6 +90,7 @@ subprocess.run(['strip', str(root / module_name)], check=True)
 shutil.copy2(src / 'runtime/fonts/FTEBroom-CJK.otf', root / 'ftebroom/fonts/FTEBroom-CJK.otf')
 shutil.copytree(src / 'docs', root / 'docs', dirs_exist_ok=True)
 shutil.copytree(src / 'runtime/plants', root / 'ftebroom/plants', dirs_exist_ok=True)
+shutil.copytree(src / 'runtime/world-architect', root / 'ftebroom/world-architect', dirs_exist_ok=True)
 shutil.copytree(src / 'runtime/glsl', root / 'ftebroom/glsl', dirs_exist_ok=True)
 shutil.copy2(src / 'runtime/scripts/ftebroom.shader', root / 'ftebroom/scripts/ftebroom.shader')
 if windows:

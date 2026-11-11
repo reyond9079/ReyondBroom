@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""Exercise the developing World Architect through actual OS input in a private runtime."""
+import argparse,json,os,shutil,subprocess,time
+from pathlib import Path
+from PIL import ImageGrab
+from editor_os_input import NativeInput,read_ui_json
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
+root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
+for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
+(data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
+engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');stream=(out/'editor.log').open('wb');render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
+proc=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','world-qa.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
+checks=[]
+def live():return read_ui_json(state)
+def wait(fn,timeout=60):
+ end=time.monotonic()+timeout
+ while time.monotonic()<end:
+  assert proc.poll() is None,'Editor exited; inspect '+str(out/'editor.log')
+  try:
+   if result:=fn():return result
+  except (OSError,ValueError,KeyError):pass
+  time.sleep(.08)
+ raise AssertionError('World UI timeout '+str(live())[:1500])
+def check(value,name):
+ assert value,name
+ checks.append(name);(out/'results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
+ui=NativeInput(proc,state,live,wait,out,focus_required=True)
+def click(key):
+ r=wait(lambda:live()['widgets'].get(key));ui.click(r['x']+r['width']/2,r['y']+r['height']/2)
+def console(text):ui.console(text);time.sleep(.2)
+def save(name):
+ dest=data/'maps'/(name+'.map');dest.unlink(missing_ok=True);console('mod_terrain_save "" '+name);wait(dest.exists);return dest
+# Source brush plane signatures survive map pathname and editor metadata changes.
+def planes(path):return sorted(line.strip() for line in path.read_text(errors='replace').splitlines() if line.lstrip().startswith('( '))
+def choose(path):
+ r=wait(lambda:live()['widgets'].get('file-path'));ui.click(r['x']+r['width']*.4,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(str(path));ui.key('enter');click('file-choose');wait(lambda:'file-path' not in live()['widgets'])
+try:
+ wait(lambda:live()['open'] and 'generate' in live()['widgets']);ui.position();before=save('wa-before');baseline=planes(before)
+ click('generate');wait(lambda:live()['candidates'] and not live()['busy']);check(not live()['error'],'actual UI generates accepted candidates without mutating the scene')
+ generated=save('wa-generated');check(planes(generated)==baseline,'candidate generation and preview leave authored brushes unchanged')
+ check(live()['world']['valid'] and live()['world']['reachable']==live()['world']['navigationNodes'],'chosen candidate passes the physical hull navigation oracle')
+ click('tab/0');time.sleep(1);ImageGrab.grab().save(out/'world-preview.png')
+ click('tab/1');time.sleep(.5);ImageGrab.grab().save(out/'world-site-plan.png')
+ click('tab/2');time.sleep(.5);ImageGrab.grab().save(out/'world-quality.png')
+ click('tab/4');exported=out/'exported/world.map';exported.parent.mkdir(exist_ok=True);click('export');choose(exported);wait(exported.exists)
+ check('"worldspawn"' in exported.read_text() and (exported.parent/'world.world.json').exists(),'export writes actual brush MAP and a versioned editable project')
+ theme=live()['world']['preset'];check(any(exported.parent.glob('world-architect-*.wad')) and any((exported.parent/'textures').glob('*.tga')),'portable export includes real original WAD and texture assets')
+ click('apply');wait(lambda:'One map Undo' in live()['message']);check(not live()['request'],'Apply waits for an executed QC map transaction acknowledgment')
+ applied=save('wa-applied');check(len(planes(applied))>len(baseline)+100,'Apply inserts editable generated brushes')
+ check(all(line in planes(applied) for line in baseline),'Apply retains every original authored brush plane')
+ console('ftebroom_undo');undone=save('wa-undone');check(planes(undone)==baseline,'one Undo restores the original scene')
+ console('ftebroom_redo');redone=save('wa-redone');check(planes(redone)==planes(applied),'one Redo restores the complete generated world')
+ for path in [before,generated,applied,undone,redone]:shutil.copy2(path,out/path.name)
+ (out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect UI:',len(checks),'checks passed',flush=True)
+finally:
+ try:ImageGrab.grab().save(out/'last-desktop.png');(out/'last-state.json').write_text(json.dumps(live(),indent=2))
+ except Exception:pass
+ if proc.poll() is None:
+  proc.terminate()
+  try:proc.wait(timeout=5)
+  except subprocess.TimeoutExpired:proc.kill();proc.wait(timeout=10)
+ stream.close()

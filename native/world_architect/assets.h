@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+#include "generator.h"
+#include "../ftebroom_wad_import.h"
+#include "../ftebroom_quake_palette.h"
+
+namespace ftebroom::worldArchitect {
+struct Image {unsigned width=128,height=128;std::vector<unsigned char> rgba;};
+inline Image texture(const ArtTheme& theme,int slot){
+  if(slot<0||slot>5)throw std::runtime_error("Unknown architectural material slot");
+  Image image;image.rgba.resize(size_t(image.width)*image.height*4);const auto color=theme.colors[slot];
+  for(unsigned y=0;y<image.height;y++)for(unsigned x=0;x<image.width;x++){
+    double noise=double(mix(uint64_t(x)+uint64_t(y)*128+hash(theme.id))%17)-8,shade=0;
+    if(slot==0){bool joint=x%32<2||y%32<2;shade=joint?-25:((x/32+y/32)%2?4:-4);}
+    if(slot==1){int row=y/16;bool mortar=y%16<2||(x+unsigned(row%2)*32)%64<2;shade=mortar?-24:((mix(uint64_t(row*4+x/32))%7)-3.);}
+    if(slot==2){shade=y%32<2?-18:3*std::sin(double(x)*.1);}
+    if(slot==3){shade=14*std::sin(double(x+y)*.07)-double(y%23<2)*12;}
+    if(slot==4){shade=8*std::sin(x*.35)+4*std::sin(y*.09);if(x%32<3)shade-=20;}
+    if(slot==5){shade=((x+y)/16)%2?-28:4;}
+    for(int c=0;c<3;c++)image.rgba[(size_t(y)*128+x)*4+c]=static_cast<unsigned char>(std::clamp(color[c]+noise+shade,0.,255.));image.rgba[(size_t(y)*128+x)*4+3]=255;
+  }return image;
+}
+inline std::string tga(const Image& image){
+  std::string out(18,0);out[2]=2;out[12]=char(image.width);out[13]=char(image.width>>8);out[14]=char(image.height);out[15]=char(image.height>>8);out[16]=32;out[17]=0x28;
+  for(size_t i=0;i<image.rgba.size();i+=4){out+=char(image.rgba[i+2]);out+=char(image.rgba[i+1]);out+=char(image.rgba[i]);out+=char(image.rgba[i+3]);}return out;
+}
+inline std::map<std::string,std::string> assetBundle(const WorldPlan& w,const Registry& registry,const std::string& palette){
+  std::map<std::string,std::string> bundle;std::string wad;const bool hl=w.profile==4;
+  for(int slot=0;slot<6;slot++){
+    auto image=texture(registry.theme(w.theme),slot);auto name=materialId(w,slot);
+    auto indexed=quantizeFolderImage(image.rgba.data(),image.width,image.height,palette,name);
+    if(w.profile==2){PaletteQuantizer opaque(palette,224);for(size_t i=0;i<indexed.pixels.size();i++)indexed.pixels[i]=opaque.nearest(image.rgba[i*4],image.rgba[i*4+1],image.rgba[i*4+2]);}
+    wad=addWadTexture(wad,std::move(indexed),palette,false,hl);
+    bundle["textures/"+name+".tga"]=tga(image);
+  }
+  // Original sky pixels are deliberately included in the WAD: real qbsp/light
+  // validation must not depend on the user's installed texture packs.
+  Image sky;sky.width=256;sky.height=128;sky.rgba.resize(256*128*4,255);
+  for(unsigned y=0;y<128;y++)for(unsigned x=0;x<256;x++)for(int c=0;c<3;c++)sky.rgba[(y*256+x)*4+c]=static_cast<unsigned char>(40+c*10+y/8+(mix(x+y*256)%11));
+  wad=addWadTexture(wad,quantizeFolderImage(sky.rgba.data(),sky.width,sky.height,palette,"skywa"+w.theme.substr(0,7)),palette,false,hl);
+  bundle["textures/sky.tga"]=tga(sky);bundle["world-architect-"+w.theme+".wad"]=std::move(wad);
+  std::string shaders;
+  for(int slot=0;slot<6;slot++){auto name=material(w,slot),id=materialId(w,slot);shaders+="textures/"+name+"\n{\nqer_editorimage textures/"+id+".tga\n{\nmap textures/"+id+".tga\nrgbgen identity\n}\n}\n";}
+  bundle["scripts/world-architect-"+w.theme+".shader"]=shaders+"textures/"+skyMaterial(w)+"\n{\nqer_editorimage textures/sky.tga\nsurfaceparm sky\nsurfaceparm nolightmap\nq3map_sun 1 0.88 0.7 80 120 50\nskyParms - 512 -\n}\n";
+  bundle["WORLD-ARCHITECT-ASSETS.txt"]="Original ReyondBroom World Architect procedural masonry, concrete, floor, metal, wood and sky. GPL-3.0-or-later. No external asset packs required.\n";return bundle;
+}
+inline std::string withWad(std::string map,const WorldPlan& w,const std::string& path){
+  if(path.find_first_of("\"\r\n")!=path.npos)throw std::runtime_error("Unsafe WAD path");
+  if(w.profile==2||w.profile==4){auto at=map.find("\"worldspawn\"\n");if(at==map.npos)throw std::runtime_error("Missing generated worldspawn");map.insert(at+13,"\"wad\" \""+path+"\"\n");}return map;
+}
+}

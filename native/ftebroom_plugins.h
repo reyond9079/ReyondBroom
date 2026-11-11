@@ -201,6 +201,7 @@ static void pluginsTick(){
 }
 static void pluginsMenu(){
   if(ImGui::BeginMenu("Plugins")){
+    if(ImGui::MenuItem("World Architect (development preview)..."))worldOpen();
     if(ImGui::MenuItem("Manage plugins..."))pluginManagerOpen=true;
     for(auto& p:editorPlugins)if(p.api)if(ImGui::MenuItem(p.name.c_str()))p.open=true;
     ImGui::EndMenu();

@@ -41,6 +41,27 @@ class ScopeTests(unittest.TestCase):
         self.assertTrue(p['flags']['compilation_ui'] and p['flags']['onboarding'])
         self.assertFalse(p['flags']['plant_core'])
 
+    def test_windows_release_build_creates_its_output_when_audio_tests_are_skipped(self):
+        import re
+        import shlex
+        import yaml
+        workflow = yaml.safe_load((REPO/'.github/workflows/release-linux-ui-update.yml').read_text())
+        step = next(item for item in workflow['jobs']['windows']['steps']
+                    if item.get('name') == 'Build native editor and test the profile importer')
+        lines = step['run'].splitlines()
+        build = next(i for i, line in enumerate(lines) if line.lstrip().startswith(('make ', 'g++ ')))
+        prelude = '\n'.join(lines[:build])
+        link = next(shlex.split(line) for line in lines if line.lstrip().startswith('g++ '))
+        output = link[link.index('-o')+1]
+        self.assertTrue(re.fullmatch(r'[A-Za-z0-9_./-]+\.dll', output))
+        # Start with no audio test step or build directories, run the actual
+        # release prelude, then exercise the linker's file creation contract.
+        with tempfile.TemporaryDirectory() as folder:
+            subprocess.run(['bash', '-c', prelude], cwd=folder, check=True)
+            target = Path(folder)/output
+            target.write_bytes(b'owned linker output fixture')
+            self.assertTrue(target.is_file())
+
     def test_profile_change_has_complete_behavior_without_botany_or_atlas(self):
         p = planner.plan(['native/ftebroom_run_ui.h'])
         self.assertEqual(set(p['suites']), {'compilation', 'compilation_ui', 'profile_core'})

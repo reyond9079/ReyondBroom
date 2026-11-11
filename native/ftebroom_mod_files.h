@@ -255,6 +255,35 @@ static void modFilesTree(const std::filesystem::path& folder,std::filesystem::pa
     }
   }catch(const std::exception& e){ImGui::TextDisabled("%s",e.what());}
 }
+static void modFilesViewButton(bool tiles)
+{
+  const bool selected=modFilesGrid==tiles;
+  if(selected){
+    ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_Header));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
+  }
+  const float height=ImGui::GetFrameHeight();
+  if(ImGui::Button(tiles?"##tiles":"##list",{height,height}))modFilesGrid=tiles;
+  if(selected)ImGui::PopStyleColor(2);
+  browserQaItem(tiles?"files/view-tiles":"files/view-list");
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr(tiles?"Tile view":"List view"));
+  const auto origin=ImGui::GetItemRectMin();
+  const auto point=[&](float x,float y){return ImVec2{origin.x+x*height,origin.y+y*height};};
+  auto* draw=ImGui::GetWindowDrawList();
+  const auto color=ImGui::GetColorU32(ImGuiCol_Text);
+  const float line=std::max(1.f,height*.055f);
+  if(tiles){
+    for(float y:{.24f,.54f})
+      for(float x:{.24f,.54f})
+        draw->AddRect(point(x,y),point(x+.22f,y+.22f),color,1,0,line);
+  }else{
+    for(float y:{.29f,.5f,.71f}){
+      draw->AddCircleFilled(point(.25f,y),line*.65f,color,8);
+      draw->AddLine(point(.39f,y),point(.77f,y),color,line);
+    }
+  }
+}
+
 static void modFilesPanel() {
   if(modFilesImageRefresh){clearFileImages();modFilesImageRefresh=false;}
   fileImagePump();
@@ -268,14 +297,33 @@ static void modFilesPanel() {
   if(modFilesRequestFocus){ImGui::SetNextWindowFocus();modFilesRequestFocus=false;}
   if(uiSoftPanelBegin("Mod file manager",&modFilesOpen)) {
     modFilesVisible=true;modFilesMin=ImGui::GetWindowPos();auto sz=ImGui::GetWindowSize();modFilesMax={modFilesMin.x+sz.x,modFilesMin.y+sz.y};
+    browserQaWindow("files/panel");
+    ImGui::BeginChild("Mod file browser",{0,-ImGui::GetFrameHeightWithSpacing()},
+      ImGuiChildFlags_None,ImGuiWindowFlags_HorizontalScrollbar);
     try {
       if(gameProfile!=1)modFilesSources=false;
       auto root=gameProfile==1 && (modFilesSources||modFileRoot().empty()||!std::filesystem::is_directory(modFileRoot()))?std::filesystem::u8path(baseq3):modFileRoot();modFileValidate(root);
       if(root!=modFilesRoot){modFilesRoot=root;modFilesFolder=root;modFilesRefresh=true;modFilesError.clear();}
-      if(browserNavigationButton(true)&&modFilesFolder!=root){modFilesFolder=modFilesFolder.parent_path();modFilesRefresh=true;}modFilesTarget(modFilesFolder.parent_path());
-      ImGui::SameLine();if(browserNavigationButton(false)){modFilesRefresh=true;clearEntityPreviews();}ImGui::SameLine();if(ImGui::Button("Open in file manager"))modFilesExplorer();
-      ImGui::SameLine();ImGui::Checkbox("Thumbnail view",&modFilesGrid);
-      if(auto chosen=browserNavigation("mod-folder",modFilesNavigation,modFilesFolder)){
+      if(browserNavigationButton(true)&&modFilesFolder!=root){modFilesFolder=modFilesFolder.parent_path();modFilesRefresh=true;}
+      browserQaItem("files/up");modFilesTarget(modFilesFolder.parent_path());
+      ImGui::SameLine();
+      if(browserNavigationButton(false)){modFilesRefresh=true;clearEntityPreviews();}
+      browserQaItem("files/refresh");
+      ImGui::SameLine();
+      const auto& style=ImGui::GetStyle();
+      const float height=ImGui::GetFrameHeight();
+      const float explorerWidth=ImGui::CalcTextSize(uiTr("Open in file manager")).x+2*style.FramePadding.x;
+      if(ImGui::GetContentRegionAvail().x<explorerWidth+5*height+3*style.ItemSpacing.x){
+        if(ImGui::Button("##open-in-file-manager",{height,height}))modFilesExplorer();
+        const auto pos=ImGui::GetItemRectMin();
+        modFileIcon({pos.x+height*.16f,pos.y+height*.14f},height*.68f,true);
+        if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr("Open in file manager"));
+      }else if(ImGui::Button("Open in file manager"))modFilesExplorer();
+      browserQaItem("files/open-in-manager");
+      ImGui::SameLine();modFilesViewButton(false);
+      ImGui::SameLine();modFilesViewButton(true);
+      ImGui::SameLine();
+      if(auto chosen=browserNavigation("mod-folder",modFilesNavigation,modFilesFolder,true)){
         modFileValidate(*chosen);
         if(!wadBrowseFolder(*chosen)&&!modFilePacked(*chosen)&&!std::filesystem::is_directory(*chosen))throw std::runtime_error("Choose an existing folder or archive.");
         modFilesFolder=*chosen;modFilesRefresh=true;
@@ -284,7 +332,8 @@ static void modFilesPanel() {
       if(modFilePacked(modFilesFolder))ImGui::Checkbox("Replace matching files on import (backup)",&modFilesReplacePacked);
       if(!modFilesError.empty())ImGui::TextWrapped("%s",modFilesError.c_str());
       ImGui::Separator();std::filesystem::path navigate;
-      const float contentsHeight=std::max(60.f,ImGui::GetContentRegionAvail().y-ImGui::GetFrameHeightWithSpacing());
+      const float renameHeight=modFilesRename.empty()?0:ImGui::GetTextLineHeightWithSpacing()+2*ImGui::GetFrameHeightWithSpacing();
+      const float contentsHeight=std::max(1.f,ImGui::GetContentRegionAvail().y-renameHeight);
       ImGui::BeginChild("Folder hierarchy",{std::min(230.f,ImGui::GetContentRegionAvail().x*.35f),contentsHeight},ImGuiChildFlags_Borders|ImGuiChildFlags_ResizeX);
       int treeBudget=4000;
       if(gameProfile==1) {
@@ -364,7 +413,6 @@ static void modFilesPanel() {
         if(ImGui::MenuItem("Open this directory in OS file manager"))modFilesExplorer();ImGui::EndPopup();
       }
       ImGui::EndChild();
-      if(modFilesGrid)browserThumbnailFooter("mod-thumbnail",modFilesThumbnailSize,48,180);
       if(!navigate.empty()){
         modFileValidate(navigate);
         if(gameProfile==1){auto sourceRoot=std::filesystem::u8path(baseq3);auto relative=navigate.lexically_relative(sourceRoot);modFilesSources=!relative.empty()&&!relative.is_absolute()&&*relative.begin()!="..";modFilesRoot=modFilesSources?sourceRoot:modFileRoot();}
@@ -396,6 +444,13 @@ static void modFilesPanel() {
         if(modFileMember(modFilesRename))ftebroom::pak::rename(modFilesRename,target);else std::filesystem::rename(modFilesRename,target);modFilesRename.clear();modFilesRefresh=true;
       }catch(const std::exception& e){modFilesError=e.what();}
       ImGui::SameLine();if(ImGui::Button("Cancel rename"))modFilesRename.clear();
+    }
+    ImGui::EndChild();
+    if(ImGui::Button("Hide files"))modFilesOpen=false;
+    browserQaItem("files/hide");
+    if(modFilesGrid){
+      ImGui::SameLine();
+      browserThumbnailFooter("mod-thumbnail",modFilesThumbnailSize,48,180);
     }
   }ImGui::End();
 }

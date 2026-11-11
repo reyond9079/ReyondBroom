@@ -45,14 +45,15 @@ static bool browserNavigationButton(bool up) {
 // The caller validates disk roots / archive folders. Navigation itself is shared
 // by the map picker and mod browser, including virtual PAK and PK3 paths.
 struct BrowserNavigationState {bool editing=false,focus=false;char text[4096]{};};
-static std::optional<std::filesystem::path> browserNavigation(const char* id,BrowserNavigationState& state,const std::filesystem::path& folder) {
+static std::optional<std::filesystem::path> browserNavigation(const char* id,BrowserNavigationState& state,const std::filesystem::path& folder,bool compact=false) {
   std::optional<std::filesystem::path> navigate;
   ImGui::PushID(id);
   ImGui::PushStyleColor(ImGuiCol_ChildBg,ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(8,5));
-  const float height=ImGui::GetFrameHeight()+12;
-  ImGui::BeginChild("path",{0,height},ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
-  ImGui::SetWindowFontScale(1.08f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,compact?ImVec2(6,2):ImVec2(8,5));
+  const float frameHeight=ImGui::GetFrameHeight();
+  const float width=compact?std::max(ImGui::GetContentRegionAvail().x,frameHeight*3):0;
+  ImGui::BeginChild("path",{width,frameHeight+(compact?4.f:12.f)},ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
+  if(!compact)ImGui::SetWindowFontScale(1.08f);
   if(state.editing){
     if(state.focus){ImGui::SetKeyboardFocusHere();state.focus=false;}
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -89,7 +90,10 @@ static std::optional<std::filesystem::path> browserNavigation(const char* id,Bro
     browserQaItem(std::string("nav/")+id+"/edit");
     if(ImGui::IsItemHovered())ImGui::SetTooltip("Edit folder path");
   }
-  ImGui::SetWindowFontScale(1);ImGui::EndChild();ImGui::PopStyleVar();ImGui::PopStyleColor();ImGui::PopID();return navigate;
+  if(!compact)ImGui::SetWindowFontScale(1);
+  ImGui::EndChild();
+  browserQaItem(std::string("nav/")+id+"/bar");
+  ImGui::PopStyleVar();ImGui::PopStyleColor();ImGui::PopID();return navigate;
 }
 // Plain wheel scrolls the tile child; Ctrl+wheel changes only thumbnail size.
 static void browserHoverZoom(int& size,int low,int high) {

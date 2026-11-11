@@ -27,7 +27,7 @@ struct Random {
   int integer(int lo,int hi){return lo+int(next()%uint64_t(hi-lo+1));}
 };
 inline void finite(double value,double lo,double hi,const char* message){if(!std::isfinite(value)||value<lo||value>hi)throw std::runtime_error(message);}
-inline void safeToken(const std::string& text){if(text.empty()||text.size()>120||text.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-/.")!=text.npos||text.find("..")!=text.npos)throw std::runtime_error("Unsafe World Architect identifier or material");}
+inline void safeToken(const std::string& text){if(text.empty()||text.size()>120||text.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.")!=text.npos||text.find("..")!=text.npos)throw std::runtime_error("Unsafe World Architect identifier or material");}
 inline Json vector(V p){return Json::array({p.x,p.y,p.z});}
 inline V vector(const Json& j){if(!j.is_array()||j.size()!=3)throw std::runtime_error("Expected three coordinates");V v;for(int k=0;k<3;k++){v[k]=j.at(k).get<double>();finite(v[k],-30000,30000,"Coordinate outside World Architect bounds");}return v;}
 enum class Scope {Interior,City,Mixed,Arena};
@@ -94,10 +94,10 @@ struct Registry {
 };
 inline Registry readRegistry(const Json& j){
   if(j.at("schemaVersion")!=schemaVersion)throw std::runtime_error("Unsupported World Architect registry version");
-  Registry r;std::set<std::string> ids;
+  Registry r;std::set<std::string> ids,materialPrefixes;
   if(j.at("presets").size()>64||j.at("themes").size()>32)throw std::runtime_error("World Architect registry budget exceeded");
   for(const auto& item:j.at("themes")){
-    ArtTheme t;t.id=item.at("id").get<std::string>();safeToken(t.id);if(!ids.insert("theme/"+t.id).second)throw std::runtime_error("Duplicate theme");
+    ArtTheme t;t.id=item.at("id").get<std::string>();safeToken(t.id);if(!materialPrefixes.insert(t.id.substr(0,7)).second)throw std::runtime_error("Theme material prefixes must be unique");if(!ids.insert("theme/"+t.id).second)throw std::runtime_error("Duplicate theme");
     const auto& colors=item.at("colors");if(colors.size()!=6)throw std::runtime_error("Theme needs six material colors");
     for(int a=0;a<6;a++)for(int c=0;c<3;c++){int n=colors.at(a).at(c);finite(n,0,255,"Invalid theme color");t.colors[a][c]=static_cast<unsigned char>(n);}r.themes.push_back(t);
   }
@@ -117,7 +117,7 @@ inline void validate(const Settings& s,const Registry& r){
   finite(s.player.radius,8,32,"Player radius must be 8..32");finite(s.player.height,32,80,"Player height must be 32..80");finite(s.player.step,4,18,"Player step must be 4..18");
   if(std::any_of(s.locked.begin(),s.locked.end(),[](bool b){return b;})||!s.pinnedRegions.empty())throw std::runtime_error("Stage / region locking is not yet supported by this development slice");
   if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
-  for(auto& [name,weight]:s.weights){safeToken(name);finite(weight,0,10,"Score weight must be 0..10");}
+  for(auto& [name,weight]:s.weights){safeToken(name);if(name!="loops"&&name!="choice"&&name!="variety"&&name!="route"&&name!="landmarks")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
   std::set<uint64_t> ids;for(const auto& p:s.missionPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate mission pin");for(int a=0;a<3;a++)finite(p.position[a],-30000,30000,"Invalid mission pin");}
   ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}finite(p.width,96,512,"Invalid road width");if(al::length(p.a-p.b)<128)throw std::runtime_error("Road pin is too short");}
   for(const auto& mask:s.influences){for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing")throw std::runtime_error("Unknown influence type");}

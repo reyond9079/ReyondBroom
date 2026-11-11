@@ -8,11 +8,11 @@
 namespace wa=ftebroom::worldArchitect;
 struct WorldArchitectWork {std::atomic<bool> cancel{false};std::atomic<int> stage{0};};
 struct WorldArchitectState {
-  bool open=false,owner=false,dirty=true,qa=false,walk=false,ortho=false;
+  bool open=false,owner=false,dirty=true,qa=false,walk=false,ortho=false,focusRequest=false;
   ImGuiID gesture=0;int selected=0,tab=0,cutaway=-1;float yaw=135,pitch=35,zoom=1;
   wa::V eye{};wa::Settings settings;wa::Registry registry;wa::Json registrySource;std::optional<uint64_t> desiredSeed;
   std::future<wa::CandidateBatch> job;std::shared_ptr<WorldArchitectWork> work;
-  wa::CandidateBatch batch;std::string generated,error,message,request;
+  wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request;
   double requestAt=0;std::filesystem::path requestPath;
   std::vector<wa::Json> undo,redo;
   wa::Json widgets=wa::Json::object();
@@ -50,7 +50,7 @@ static void worldGenerate(){
   auto& s=worldArchitect;if(s.job.valid())return;worldRegistry();if(s.settings.profile!=gameProfile)throw std::runtime_error("Project profile differs from the active map. Switch the editor profile or explicitly retarget the project.");
   wa::validate(s.settings,s.registry);s.error.clear();s.message="Generating; the current map is unchanged.";
   s.work=std::make_shared<WorldArchitectWork>();auto settings=s.settings;auto registry=s.registry;auto work=s.work;
-  s.generated=worldInputKey();
+  s.pendingKey=worldInputKey();
   s.job=std::async(std::launch::async,[settings,registry,work](){return wa::candidates(settings,registry,&work->cancel,&work->stage);});
 }
 static void worldChanged(const wa::Json& before){auto& s=worldArchitect;if(before==wa::serialize(s.settings))return;auto active=ImGui::GetActiveID();if(!active||active!=s.gesture){s.undo.push_back(before);if(s.undo.size()>100)s.undo.erase(s.undo.begin());}s.gesture=active;s.redo.clear();s.error.clear();}
@@ -94,7 +94,7 @@ static void worldApply(){
 static void worldTick(){
   auto& s=worldArchitect;
   if(s.job.valid()&&s.job.wait_for(std::chrono::seconds(0))==std::future_status::ready){
-    worldAction([&]{s.batch=s.job.get();s.selected=0;s.dirty=true;if(s.desiredSeed){for(size_t i=0;i<s.batch.worlds.size();i++)if(s.batch.worlds[i].seed==*s.desiredSeed)s.selected=int(i);s.desiredSeed.reset();}if(s.batch.worlds.empty())s.error=s.batch.rejects.empty()?"No accepted candidate":"No accepted candidate: "+s.batch.rejects.front();else{s.message=std::to_string(s.batch.worlds.size())+" candidates passed physical validation; "+std::to_string(s.batch.rejects.size())+" rejected.";worldClaim();}});
+    worldAction([&]{s.batch=s.job.get();s.generated=s.pendingKey;s.selected=0;s.dirty=true;if(s.desiredSeed){for(size_t i=0;i<s.batch.worlds.size();i++)if(s.batch.worlds[i].seed==*s.desiredSeed)s.selected=int(i);s.desiredSeed.reset();}if(s.batch.worlds.empty())s.error=s.batch.rejects.empty()?"No accepted candidate":"No accepted candidate: "+s.batch.rejects.front();else{s.message=std::to_string(s.batch.worlds.size())+" candidates passed physical validation; "+std::to_string(s.batch.rejects.size())+" rejected.";worldClaim();}});
   }
   if(!s.request.empty()){
     char ack[128]={},status[128]={};cvars->GetString("ftebroom_world_apply_ack",ack,sizeof ack);cvars->GetString("ftebroom_world_apply_status",status,sizeof status);
@@ -162,13 +162,14 @@ static void worldPlanCanvas(bool roads){
 }
 static void worldQa(){
   auto& s=worldArchitect;if(!s.qa)return;if(runUiBrowseOpen)for(auto it=runUiBrowseRects.begin();it!=runUiBrowseRects.end();++it)s.widgets[it.key()]=it.value();
-  wa::Json j={{"open",s.open},{"busy",s.job.valid()},{"settings",wa::serialize(s.settings)},{"widgets",s.widgets},{"error",s.error},{"message",s.message},{"selected",s.selected},{"request",s.request},{"candidates",s.batch.worlds.size()}};
+  wa::Json j={{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"open",s.open},{"busy",s.job.valid()},{"settings",wa::serialize(s.settings)},{"widgets",s.widgets},{"error",s.error},{"message",s.message},{"selected",s.selected},{"request",s.request},{"candidates",s.batch.worlds.size()}};
   if(auto world=worldSelected())j["world"]=wa::diagnostics(*world);worldAction([&]{bb::atomicWrite(documentPath("world-architect-ui-live.json"),j.dump());});
 }
 static void worldPanel(){
   auto& s=worldArchitect;worldTick();if(!s.open){worldRelease();worldQa();return;}s.widgets=wa::Json::object();
   worldAction(worldRegistry);if(s.registry.presets.empty())return;
   ImGui::SetNextWindowSize({1500*uiScale(),900*uiScale()},ImGuiCond_FirstUseEver);
+  if(s.focusRequest){ImGui::SetNextWindowFocus();s.focusRequest=false;}
   if(ImGui::Begin("World Architect — development preview",&s.open,ImGuiWindowFlags_NoDocking)){
     ImGui::TextWrapped("Development preview: mission / physical navigation foundation. AutoLevel remains available; final architecture and art acceptance is still pending.");
     auto before=wa::serialize(s.settings);ImGui::BeginDisabled(s.job.valid());
@@ -214,7 +215,7 @@ static void worldPanel(){
     if(!s.generated.empty()&&s.generated!=worldInputKey())ImGui::TextUnformatted("Settings changed: regenerate to apply them to a candidate.");
   }ImGui::End();worldQa();
 }
-static void worldOpen(){worldAction([]{worldRegistry();worldArchitect.open=true;});}
+static void worldOpen(){worldAction([]{worldRegistry();worldArchitect.open=true;worldArchitect.focusRequest=true;});}
 static void QDECL worldCommand(){
-  worldAction([]{worldRegistry();auto& s=worldArchitect;s.open=true;char action[256]={};commands->Argv(1,action,sizeof action);if(std::string(action)=="qa")s.qa=true;else if(std::string(action)=="generate")worldGenerate();else if(*action){s.settings.preset=action;s.registry.preset(s.settings.preset);worldGenerate();}});
+  worldAction([]{worldRegistry();auto& s=worldArchitect;s.open=true;s.focusRequest=true;char action[256]={};commands->Argv(1,action,sizeof action);if(std::string(action)=="qa")s.qa=true;else if(std::string(action)=="generate")worldGenerate();else if(*action){s.settings.preset=action;s.registry.preset(s.settings.preset);worldGenerate();}});
 }

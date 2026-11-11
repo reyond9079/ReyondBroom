@@ -27,6 +27,20 @@ planner, cache, runner, smoke = [module(n) for n in ('plan', 'dependency', 'run-
 
 
 class ScopeTests(unittest.TestCase):
+    def test_world_core_routes_its_editor_consumers_without_botany(self):
+        p = planner.plan(['native/world_architect/generator.h'])
+        self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'placement'})
+
+    def test_world_host_registration_and_focus_guards_are_classified_by_code(self):
+        before = 'void frame(){modelViewerPanel();bbBenchTick();plantPanel();}\nif(runUiNavigation()||plantFocused())capture();\n'
+        after = 'static void worldOpen();\n'+before.replace('plantPanel();', 'plantPanel();worldPanel();').replace('plantFocused()', 'plantFocused()||worldArchitectFocused()')
+        groups = planner.world_host_scope('native/ftebroom.cpp', before, after)
+        self.assertEqual(groups, {'world_ui', 'input'})
+        self.assertIsNone(planner.world_host_scope('native/ftebroom.cpp', before, after.replace('capture();', 'cameraMove();')))
+        p = planner.plan(['native/ftebroom.cpp'], semantic={'native/ftebroom.cpp': groups})
+        self.assertTrue(p['flags']['compilation_ui'] and p['flags']['onboarding'])
+        self.assertFalse(p['flags']['plant_core'])
+
     def test_profile_change_has_complete_behavior_without_botany_or_atlas(self):
         p = planner.plan(['native/ftebroom_run_ui.h'])
         self.assertEqual(set(p['suites']), {'compilation', 'compilation_ui', 'profile_core'})

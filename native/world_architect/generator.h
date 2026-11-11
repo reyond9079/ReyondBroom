@@ -11,7 +11,7 @@ inline std::string skyMaterial(const WorldPlan& w){return w.profile<2?"wa_sky_"+
 inline bool inside(V p,V lo,V hi){return p.x>=lo.x&&p.y>=lo.y&&p.z>=lo.z&&p.x<=hi.x&&p.y<=hi.y&&p.z<=hi.z;}
 inline bool overlap(V lo,V hi,V otherLo,V otherHi,double gap=0){return lo.x<otherHi.x+gap&&hi.x>otherLo.x-gap&&lo.y<otherHi.y+gap&&hi.y>otherLo.y-gap&&lo.z<otherHi.z+gap&&hi.z>otherLo.z-gap;}
 inline uint64_t regionSeed(const Settings& s,uint64_t id,const char* stage){auto it=s.regionSeeds.find(id);return subSeed(it==s.regionSeeds.end()?s.seed:it->second,stage,id);}
-inline size_t navNode(WorldPlan& w,V p,uint64_t region,bool required=true){w.navigation.nodes.push_back({p,region,required});return w.navigation.nodes.size()-1;}
+inline size_t navNode(WorldPlan& w,V p,uint64_t region,bool required=true){if(w.navigation.nodes.size()>=4096)throw std::runtime_error("World Architect navigation exceeds 4096 nodes");w.navigation.nodes.push_back({p,region,required});return w.navigation.nodes.size()-1;}
 inline void navEdge(WorldPlan& w,size_t a,size_t b){if(a!=b)w.navigation.edges.push_back({a,b});}
 inline void addBrush(WorldPlan& w,uint64_t region,const std::string& kind,al::Brush brush){
   if(w.architecture.elements.size()>=16000)throw std::runtime_error("World Architect exceeds the 16000 brush budget");al::validateBrush(brush);w.architecture.elements.push_back({region,kind,std::move(brush)});
@@ -356,6 +356,7 @@ inline void exportMap(WorldPlan& w,const Settings& settings){
   // Markers are editor metadata; they do not invent unsupported game entities.
   for(const auto& beat:w.mission.nodes)out<<al::writeEntity({{{"classname","info_null"},{"origin",vectorText(beat.position+V{0,0,32})},{"_wa_role",roleName(beat.role)},{"_wa_id",std::to_string(beat.id)}}});
   w.map=out.str();if(w.map.size()>16*1024*1024)throw std::runtime_error("Generated MAP exceeds the 16 MiB import budget");
+  auto roundtrip=al::parseMap(w.map);if(roundtrip.brushes.size()!=w.architecture.elements.size())throw std::runtime_error("Quantized MAP brush roundtrip failed");
   w.diagnostics.mapBytes=w.map.size();w.diagnostics.brushes=w.architecture.elements.size();
 }
 inline WorldPlan generate(const Settings& settings,const Registry& registry,const std::atomic<bool>* cancel=nullptr,std::atomic<int>* progress=nullptr){

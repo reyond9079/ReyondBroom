@@ -17,7 +17,7 @@ geometry in the existing dynamic-mesh renderer, previews floor cutaways and
 provides a grounded first-person inspection camera. Preview/generation leave the
 map unchanged. Save/load retains generation inputs. Export writes an editable
 MAP, an editable JSON project, original TGA/WAD2 assets (WAD3 for the unverified
-GoldSrc profile), and shader definitions. Quake MDL/sound/tools are unrelated.
+GoldSrc profile), and shader definitions.
 
 Apply uses an independent staging filename and an acknowledged QC transaction,
 with execution-time map-epoch/profile guards. Missing/invalid files and stale

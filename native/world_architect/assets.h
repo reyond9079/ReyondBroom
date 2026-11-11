@@ -24,6 +24,14 @@ inline std::string tga(const Image& image){
   std::string out(18,0);out[2]=2;out[12]=char(image.width);out[13]=char(image.width>>8);out[14]=char(image.height);out[15]=char(image.height>>8);out[16]=32;out[17]=0x28;
   for(size_t i=0;i<image.rgba.size();i+=4){out+=char(image.rgba[i+2]);out+=char(image.rgba[i+1]);out+=char(image.rgba[i]);out+=char(image.rgba[i+3]);}return out;
 }
+inline std::map<std::string,std::string> shaderDefinitions(const WorldPlan& w){
+  std::map<std::string,std::string> shaders;
+  for(int slot=0;slot<6;slot++){
+    auto id=materialId(w,slot);shaders["textures/"+id]="{\nqer_editorimage textures/"+id+".tga\n{\nmap $lightmap\nrgbgen identity\n}\n{\nmap textures/"+id+".tga\nblendfunc filter\nrgbgen identity\n}\n}\n";
+  }
+  shaders["textures/"+skyMaterial(w)]="{\nqer_editorimage textures/sky.tga\nsurfaceparm sky\nsurfaceparm nolightmap\nq3map_sun 1 0.88 0.7 80 120 50\nskyParms - 512 -\n{\nmap textures/sky.tga\ntcmod scale 2 2\nrgbgen identity\n}\n}\n";
+  return shaders;
+}
 inline std::map<std::string,std::string> assetBundle(const WorldPlan& w,const Registry& registry,const std::string& palette){
   std::map<std::string,std::string> bundle;std::string wad;const bool hl=w.profile==4;
   for(int slot=0;slot<6;slot++){
@@ -39,9 +47,8 @@ inline std::map<std::string,std::string> assetBundle(const WorldPlan& w,const Re
   for(unsigned y=0;y<128;y++)for(unsigned x=0;x<256;x++)for(int c=0;c<3;c++)sky.rgba[(y*256+x)*4+c]=static_cast<unsigned char>(40+c*10+y/8+(mix(x+y*256)%11));
   wad=addWadTexture(wad,quantizeFolderImage(sky.rgba.data(),sky.width,sky.height,palette,"skywa"+w.theme.substr(0,7)),palette,false,hl);
   bundle["textures/sky.tga"]=tga(sky);bundle["world-architect-"+w.theme+".wad"]=std::move(wad);
-  std::string shaders;
-  for(int slot=0;slot<6;slot++){auto name=material(w,slot),id=materialId(w,slot);shaders+="textures/"+name+"\n{\nqer_editorimage textures/"+id+".tga\n{\nmap textures/"+id+".tga\nrgbgen identity\n}\n}\n";}
-  bundle["scripts/world-architect-"+w.theme+".shader"]=shaders+"textures/"+skyMaterial(w)+"\n{\nqer_editorimage textures/sky.tga\nsurfaceparm sky\nsurfaceparm nolightmap\nq3map_sun 1 0.88 0.7 80 120 50\nskyParms - 512 -\n}\n";
+  std::string shaders;for(const auto& [name,body]:shaderDefinitions(w))shaders+=name+"\n"+body;
+  bundle["scripts/world-architect-"+w.theme+".shader"]=std::move(shaders);
   bundle["WORLD-ARCHITECT-ASSETS.txt"]="Original ReyondBroom World Architect procedural masonry, concrete, floor, metal, wood and sky. GPL-3.0-or-later. No external asset packs required.\n";return bundle;
 }
 inline std::string withWad(std::string map,const WorldPlan& w,const std::string& path){

@@ -26,7 +26,29 @@ class Collision {
   struct Solid {V low,high;std::vector<std::pair<V,double>> planes;};
   std::vector<Solid> solids;
 public:
-  explicit Collision(const WorldPlan& w){solids.reserve(w.architecture.elements.size());for(const auto& e:w.architecture.elements){auto p=al::polyhedron(e.brush);Solid s;s.low=p.min;s.high=p.max;for(const auto& f:e.brush.faces)s.planes.push_back({f.normal(),f.distance()});solids.push_back(std::move(s));}}
+  explicit Collision(const WorldPlan& w){
+    solids.reserve(w.architecture.elements.size());
+    for(const auto& element:w.architecture.elements){
+      auto poly=al::polyhedron(element.brush);Solid solid;solid.low=poly.min;solid.high=poly.max;
+      auto axis=[&](V direction){
+        if(al::length(direction)<1e-8)return;direction=al::unit(direction);
+        if(std::any_of(solid.planes.begin(),solid.planes.end(),[&](const auto& plane){return al::near(plane.first,direction,1e-7);}))return;
+        if(solid.planes.size()>=256)throw std::runtime_error("Convex collision axis budget exceeded");
+        double distance=-1e30;for(auto p:poly.vertices)distance=std::max(distance,al::dot(direction,p));solid.planes.push_back({direction,distance});
+      };
+      for(const auto& face:element.brush.faces)axis(face.normal());
+      const V boxAxes[]={{1,0,0},{0,1,0},{0,0,1}};for(auto direction:boxAxes){axis(direction);axis(direction*-1);}
+      std::vector<V> directions;
+      for(const auto& polygon:poly.polygons)for(size_t i=0;i<polygon.size();i++){
+        auto edge=polygon[(i+1)%polygon.size()]-polygon[i];if(al::length(edge)<1e-8)continue;edge=al::unit(edge);
+        if(std::any_of(directions.begin(),directions.end(),[&](V other){return std::abs(al::dot(edge,other))>1-1e-8;}))continue;directions.push_back(edge);
+        // Face normals alone over-expand angled corners. Box face normals and
+        // brush-edge x box-edge axes complete the exact convex Minkowski hull.
+        for(auto direction:boxAxes){auto normal=al::cross(edge,direction);axis(normal);axis(normal*-1);}
+      }
+      solids.push_back(std::move(solid));
+    }
+  }
   bool blocked(V start,V end,const Player& player)const{
     const V lo{std::min(start.x,end.x)-player.radius,std::min(start.y,end.y)-player.radius,std::min(start.z,end.z)},hi{std::max(start.x,end.x)+player.radius,std::max(start.y,end.y)+player.radius,std::max(start.z,end.z)+player.height};
     for(const auto& s:solids){if(!overlap(lo,hi,s.low,s.high,-.01))continue;double enter=0,leave=1;bool hit=true;
@@ -101,7 +123,7 @@ inline void site(WorldPlan& w,const Settings& s,const Preset& preset){
 inline void wall(WorldPlan& w,uint64_t id,V a,V b,double bottom,double top,double thickness,int slot,
                  std::vector<std::array<double,4>> openings={}){
   V direction=b-a;double length=al::length(direction);if(length<1)return;direction=direction/length;
-  if(std::abs(direction.z)>.001)throw std::runtime_error("Wall baseline must be horizontal");V side=al::cross(direction,{0,0,1});
+  if(std::abs(direction.z)>.001)throw std::runtime_error("Wall baseline must be horizontal");V side=al::cross({0,0,1},direction);
   auto span=[&](double lo,double hi,double z0,double z1){if(hi-lo<1||z1-z0<1)return;auto p=a+direction*lo,q=a+direction*hi;V low{std::min(p.x,q.x),std::min(p.y,q.y),z0},high{std::max(p.x,q.x),std::max(p.y,q.y),z1};
     if(std::abs(direction.x)<.001||std::abs(direction.y)<.001){low=low-V{std::abs(side.x)*thickness/2,std::abs(side.y)*thickness/2,0};high=high+V{std::abs(side.x)*thickness/2,std::abs(side.y)*thickness/2,0};box(w,id,"wall bay",low,high,slot);}
     else{
@@ -338,12 +360,11 @@ inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<b
     if(node.pinned){auto nearest=nav.nodes.size();double distance=32;for(size_t n=0;n<nav.nodes.size();n++){double d=al::length(node.position-nav.nodes[n].feet);if(d<distance&&visited[n]>=0){distance=d;nearest=n;}}if(nearest==nav.nodes.size())throw std::runtime_error("Pinned mission beat has no reachable collision-free player position");node.position=nav.nodes[nearest].feet;}
     else node.position=nav.nodes[nav.mainRoute[index]].feet;
   }
-  const double loops=std::max(0.,double(nav.edges.size())-double(nav.reachable)+1);
   auto& scores=w.diagnostics.score;
-  scores["loops"]=std::min(1.,loops/12);scores["route"]=std::min(1.,w.diagnostics.routeLength/2500);
-  scores["choice"]=std::min(1.,std::count_if(adjacency.begin(),adjacency.end(),[](const auto& a){return a.size()>2;})/20.);
+  scores["route"]=std::min(1.,w.diagnostics.routeLength/2500);
   std::set<int> areas;for(const auto& b:w.spatial.buildings)for(const auto& r:b.rooms)areas.insert(int((r.high.x-r.low.x)*(r.high.y-r.low.y)/8192));
-  scores["variety"]=std::min(1.,areas.size()/6.);scores["landmarks"]=std::any_of(w.mission.nodes.begin(),w.mission.nodes.end(),[](const auto& n){return n.role==Role::Landmark;})?1:0;
+  scores["variety"]=std::min(1.,areas.size()/6.);
+  w.diagnostics.warnings.push_back("This slice scores route length and room-area variation only. Meaningful loops, sightlines, landmarks and narrative quality are not yet scored.");
   double sum=0,weight=0;for(auto [name,value]:settings.weights){auto it=scores.find(name);if(it!=scores.end()){sum+=it->second*value;weight+=value;}}scores["weighted"]=weight?sum/weight:0;
 }
 inline void exportMap(WorldPlan& w,const Settings& settings){

@@ -27,5 +27,11 @@ int main(int argc,char** argv)try{
  auto origin=world.navigation.nodes[0].feet;WorldPlan floor;floor.architecture.elements.push_back({0,"floor",al::box({-100,-100,-16},{100,100,0},"ground")});floor.architecture.elements.push_back({0,"step",al::box({10,-40,0},{50,40,16},"step")});Collision steps(floor);Player player;
  auto foot=V{-20,0,1};for(int i=0;i<70;i++){auto next=steps.move(foot,foot+V{1,0,0},player);check(bool(next),"preview movement follows grounded step-up / step-down physics");foot=*next;}
  check(foot.z>=16&&foot.z<=18,"preview walk raises the camera feet onto the real stair tread");
+ WorldPlan triangle;triangle.architecture.elements.push_back({0,"angled test hull",prism({{0,0,0},{100,0,0},{0,100,0}},0,64,"stone")});Collision corners(triangle);
+ check(!corners.blocked({120,-15,1},{140,-15,1},player),"exact convex/box sweep does not invent collision outside an angled corner");
+ check(corners.blocked({120,-15,1},{80,-10,1},player),"exact convex/box sweep catches a true angled corner intersection");
+ check(!corners.supported({120,-15,65},player),"an expanded angled corner cannot provide fictitious player support");
+ WorldPlan angled;angled.theme="medical";wall(angled,1,{0,0,0},{100,100,0},0,16,32,0);
+ check(angled.architecture.elements.size()==1&&std::abs(al::polyhedron(angled.architecture.elements[0].brush).volume-std::sqrt(20000.)*16*32)<.01,"rotated road/wall extrusion preserves outward planes and positive volume");
  std::cout<<count<<" World Architect contracts passed\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

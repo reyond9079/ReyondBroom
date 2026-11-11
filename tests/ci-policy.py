@@ -27,6 +27,12 @@ planner, cache, runner, smoke = [module(n) for n in ('plan', 'dependency', 'run-
 
 
 class ScopeTests(unittest.TestCase):
+    def test_windows_release_build_creates_its_output_when_audio_tests_are_skipped(self):
+        workflow = (REPO/'.github/workflows/release-linux-ui-update.yml').read_text()
+        step = workflow.split('    - name: Build native editor and test the profile importer\n', 1)[1].split('    - name:', 1)[0]
+        self.assertIn('mkdir -p audio-qa', step)
+        self.assertLess(step.index('mkdir -p audio-qa'), step.index('-o audio-qa/fteplug_ftebroom_x64.dll'))
+
     def test_profile_change_has_complete_behavior_without_botany_or_atlas(self):
         p = planner.plan(['native/ftebroom_run_ui.h'])
         self.assertEqual(set(p['suites']), {'compilation', 'compilation_ui', 'profile_core'})

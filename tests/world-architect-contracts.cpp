@@ -13,6 +13,8 @@ int main(int argc,char** argv)try{
  auto future=serialize(settings);future["schemaVersion"]=2;rejects([&]{deserialize(future,registry);},"future schemas fail explicitly");
  auto invalid=settings;invalid.scale=std::numeric_limits<double>::infinity();rejects([&]{validate(invalid,registry);},"nonfinite settings rejected");
  invalid=settings;invalid.locked[0]=true;rejects([&]{validate(invalid,registry);},"unfinished stage locks cannot silently pretend to preserve content");
+ auto badEvent=j;for(auto& preset:badEvent["presets"])if(preset["id"]=="hospital")preset["scope"]=1;rejects([&]{readRegistry(badEvent);},"structural extension events reject incompatible urban envelopes");
+ WorldPlan outside;rejects([&]{addBrush(outside,1,"outside profile",al::box({4990,0,0},{5010,32,32},"stone"));},"actual convex vertices enforce classic BSP coordinate limits");
  auto graph=mission(settings,registry.preset(settings.preset));validateMission(graph);check(!graph.nodes.empty(),"generated mission has a coherent start-to-exit traversal");
  graph.edges.clear();rejects([&]{validateMission(graph);},"disconnected required mission rejected");
  graph.nodes={{1,Role::Start,"start",{},true},{2,Role::Reward,"key",{},false},{3,Role::Exit,"exit",{},true}};

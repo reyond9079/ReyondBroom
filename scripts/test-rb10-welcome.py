@@ -10,11 +10,12 @@ import argparse,hashlib,io,json,os,re,shutil,subprocess,tarfile,threading,time,z
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
-from PIL import ImageGrab
+from PIL import Image,ImageGrab
 from editor_os_input import NativeInput,read_ui_json
 
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path)
 p.add_argument('--width',type=int,default=1280);p.add_argument('--height',type=int,default=800);p.add_argument('--powershell',default='powershell.exe')
+p.add_argument('--require-splash',action='store_true')
 a=p.parse_args();original,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 assert original!=out and original not in out.parents,'Keep QA output outside the source runtime'
 windows=os.name=='nt';engine_name='bin/fteqw64.exe' if windows and (original/'bin/fteqw64.exe').exists() else 'fteqw64.exe' if windows else 'fteqw-gl64'
@@ -46,10 +47,12 @@ else:
 payload=buffer.getvalue();digest=hashlib.sha256(payload).hexdigest();api='https://api.github.com/repos/reyond9079/ReyondBroom/releases';browser='https://github.com/reyond9079/ReyondBroom/releases/download/v'+latest+'/'
 assets=[dict(name=n,size=len(d),url=api+'/assets/'+str(i),browser_download_url=browser+n,digest='sha256:'+hashlib.sha256(d).hexdigest()) for i,n,d in ((1,name,payload),(2,name+'.sha256',(digest+'  '+name+'\n').encode()))]
 release=[dict(tag_name='v'+latest,draft=False,assets=assets)];requests=[]
+release_gate=threading.Event();release_gate.set()
 class Handler(BaseHTTPRequestHandler):
  def log_message(self,*args):pass
  def do_GET(self):
   path=urlsplit(self.path).path;requests.append(path)
+  if path.endswith('/releases'):release_gate.wait(25)
   data=json.dumps(release).encode() if path.endswith('/releases') else ((digest+'  '+name+'\n').encode() if path.endswith('/2') else payload)
   self.send_response(200);self.send_header('Content-Length',str(len(data)));self.end_headers()
   try:
@@ -82,6 +85,10 @@ def click(key,global_=False,final=False):
 
 def shot(name):
  ui.settle();ImageGrab.grab().save(caseout/(name+'.png'));(caseout/(name+'.json')).write_text(json.dumps(live(),indent=2))
+def splash(label):
+ if not a.require_splash:return
+ r=wait(lambda:live()['widgets'].get('update/splash'));w,h=Image.open(original/'ftebroom/ui/update-splash.png').size
+ check(r['width']>50 and r['height']>50 and abs(r['width']/r['height']-w/h)<.005,'uncropped original splash remains visible '+label)
 def start(label):
  global process,stream,ui,root,data,state,caseout
  caseout=out/label;caseout.mkdir(exist_ok=True);root=caseout/'editor-runtime'
@@ -130,6 +137,13 @@ def wait_installed(restart):
 
 try:
  start('restart')
+ if a.require_splash:
+  splash('when an update is offered')
+  release_gate.clear()
+  try:
+   ui.console('ftebroom_test_desktop welcome132updates');wait(lambda:live()['stage']=='checking');splash('through the pending update check');shot('00-checking-splash')
+  finally:release_gate.set()
+  wait(lambda:live()['stage']=='available' and 'update/start' in live()['widgets'])
  check(live()['currentVersion']==current and live()['availableVersion']==latest,'welcome clearly reports current and available versions')
  ui.console('ftebroom_test_desktop welcome132protocol');wait(lambda:'welcome132_verified_ready_status' in (data/'qconsole.log').read_text(errors='replace'))
  check('FTEBROOM_DESKTOP_FAIL welcome132' not in (data/'qconsole.log').read_text(errors='replace'),'malformed, stale and foreign updater records cannot change welcome state')
@@ -151,6 +165,7 @@ try:
  wait(lambda:live()['windowOpen'] and live()['welcomeStage']=='updates' and 'update/start' in live()['widgets'])
  check('update/skip' not in live()['widgets'],'Help > Updates opens a focused manual update window')
  click('update/start');wait(lambda:live()['committed'] and live()['stage']=='downloading')
+ splash('during downloading')
  progress=[];deadline=time.monotonic()+35
  while time.monotonic()<deadline:
   value=live();progress.append(value['received'])
@@ -159,6 +174,7 @@ try:
  else:raise AssertionError('Update did not become ready')
  check(len(set(progress))>1 and max(progress)>0,'Update and continue displays actual advancing download bytes')
  check(live()['committed'] and live()['received']==live()['total'] and 'update/skip' not in live()['widgets'],'verified update requires Restart and provides no skip control')
+ splash('after verification until restart')
  click('menu/File',True);click('Menu/File/Open...',True)
  check(live()['welcomeStage']=='updates' and not live()['mapFilesOpen'],'File > Open cannot bypass a committed update')
  (caseout/'progress.json').write_text(json.dumps(progress));shot('05-restart-required')
@@ -192,6 +208,6 @@ except BaseException:
  except Exception:pass
  raise
 finally:
- stop();server.shutdown();server.server_close();thread.join()
+ release_gate.set();stop();server.shutdown();server.server_close();thread.join()
  (out/'requests.json').write_text(json.dumps(requests,indent=2))
  (out/'provenance.json').write_text(json.dumps(dict(build_info=(original/'build-info.txt').read_text(),module_sha256=original_hashes[module_name],method='Real OS input; unmodified updater logic with HTTP-only redirection; installs into disposable runtime copies',window=[a.width,a.height],platform=platform),indent=2))

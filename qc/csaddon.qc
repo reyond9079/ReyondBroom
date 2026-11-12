@@ -262,11 +262,7 @@ void() wrap_renderscene =
         if(selectedbrushcount){vector bounds113[2];brush_getfacepoints(selectedbrushes[0].model,selectedbrushes[0].id,0,bounds113,2);anchor113=(bounds113[0]+bounds113[1])*.5;if(step113==4)anchor113_z=bounds113[1][2];}
         vector screen113=project(anchor113);
         cvar_set("ftebroom_tour_anchor",sprintf("%g %g",screen113_x,screen113_y));
-        if(step113==7){
-            // Points on the top face of the 96 x 96 x 64 lesson brush.
-            vector clipStart=project('16 -32 64'),clipEnd=project('16 32 64');
-            cvar_set("ftebroom_tour_clip_pixels",sprintf("%g %g %g %g",clipStart_x,clipStart_y,clipEnd_x,clipEnd_y));
-        }
+        fb_tutorial_project();
     }
     float profileTime=gettime(1);
     if(!fb_build_preview_active){
@@ -807,7 +803,8 @@ float(string cmd) CSQC_ConsoleCommand =
     if (fb_grid_testcommand()) return TRUE;
     if (fb_transaction_testcommand()) return TRUE;
     if (ftebroom_testcommand()) return TRUE;
-	if (ftebroom_command()) return TRUE;
+    int tutorialHistory=history;
+    if(ftebroom_command()){fb_tutorial_observe(tutorialHistory);return TRUE;}
 	return editor_brushes_command();
 };
 

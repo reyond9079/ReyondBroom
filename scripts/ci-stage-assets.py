@@ -8,7 +8,7 @@ p = argparse.ArgumentParser(description=__doc__); p.add_argument('runtime', type
 repo = Path(__file__).resolve().parents[1]; data = a.runtime/'ftebroom'
 assert (data/'csaddon.dat').is_file(), 'Stage only a built disposable source runtime'
 for name in ('ftebroom.cfg', 'quake1.ent', 'update-ftebroom.py', 'update-ftebroom.ps1',
-             'fonts/FTEBroom-CJK.otf', 'scripts/ftebroom.shader'):
+             'fonts/FTEBroom-CJK.otf', 'scripts/ftebroom.shader', 'ui/update-splash.png'):
     target = data/name; target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(repo/'runtime'/name, target)
 for name in ('glsl', 'plants', 'world-architect'):

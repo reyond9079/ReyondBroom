@@ -1,0 +1,7 @@
+{
+  "sdk": "v0.5.0-alpha.154",
+  "native_compiler": "g++ 14, -O1 (local validation build)",
+  "module_sha256": "31f2697b215e34b59497aab400008a321c90b228a35cf569f985d2065f1ad81e",
+  "csaddon_sha256": "5ce722056864eef75bcaac5ef27a7e0ca4c3ebd556556e6455954d8f7912ae94",
+  "update_window_artwork": "Synthetic portrait fixture in disposable test runtimes; user-supplied original is still required."
+}

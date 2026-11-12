@@ -23,12 +23,44 @@ void fb_tutorial_prepare(int step)
         fb_delete_geometry();
     }
     fb_tx_commit();fb_selection_clear();
-    // Creation and the final tools page are empty; Clip starts with one selected brush.
-    if(step==0 || (step>=2 && step<=7))fb_createbox('0 0 32','96 96 64');
-    if(step==0 || step==5 || step==6)fb_selection_clear();
+    // One isolated target; creation and the final tools page are empty.
+    cvar_set("ca_newbrushtexture","ftebroom/qa_blue");
+    if(step==0 || (step>=2 && step<=11))fb_createbox('0 0 32','96 96 64');
+    if(step==0 || step==5 || step==6 || step==10 || step==11)fb_selection_clear();
+    if(step==9)fb_tool_activate(FB_TOOL_VERTEX);
     cvar_set("ftebroom_tour_fixture_ready",ftos(step+1));
     fb_tutorial_checkpoint=history;
     if(cvar("ftebroom_skip_setup") && cvar("ftebroom_followup133_qa"))fb_tutorial_stage_check();
+}
+void fb_tutorial_project()
+{
+    int step=cvar("ftebroom_tour_step");
+    vector a,b;
+    if(step==7){
+        // Separate points across screen width, not along the foreshortened
+        // depth axis: the second click must not grab the first point's handle.
+        a=project('-32 0 64');b=project('32 0 64');
+        cvar_set("ftebroom_tour_clip_pixels",sprintf("%g %g %g %g",a_x,a_y,b_x,b_y));
+    }
+    if(step==9){
+        a=project('48 -48 64');b=project('80 -48 64');
+        cvar_set("ftebroom_tour_vertex_pixels",sprintf("%g %g %g %g",a_x,a_y,b_x,b_y));
+    }
+    if(step==10 || step==11){
+        vector p=project('0 -48 32');
+        cvar_set("ftebroom_tour_face_pixel",sprintf("%g %g",p_x,p_y));
+    }
+}
+void fb_tutorial_observe(int previousHistory)
+{
+    if(!cvar("ftebroom_tour_active"))return;
+    int step=cvar("ftebroom_tour_step");
+    if(cvar("ftebroom_skip_setup") && cvar("ftebroom_followup133_qa") && history>previousHistory && (step==9 || step==10))
+        print(sprintf("FTEBROOM_TUTORIAL_EDIT step=%i demo=%g command=%s\n",step,cvar("ftebroom_tour_demo"),argv(0)));
+    if(cvar("ftebroom_tour_demo"))return;
+    if(step==9 && argv(0)=="ftebroom_pointer" && argv(1)=="up" && cvar("ftebroom_tool")==FB_TOOL_VERTEX && history>previousHistory)fb_tour_signal(9);
+    if(step==10 && argv(0)=="ftebroom_material" && history>previousHistory && selectedbrushcount==1 && selbrush_whole(&selectedbrushes[0]))fb_tour_signal(10);
+    if(step==11 && argv(0)=="ftebroom_pointer" && argv(1)=="up" && selectedbrushcount==1 && !selbrush_whole(&selectedbrushes[0]) && fb_faces_count()==1)fb_tour_signal(11);
 }
 void fb_tutorial_restore()
 {

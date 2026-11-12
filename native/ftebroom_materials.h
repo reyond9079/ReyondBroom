@@ -309,12 +309,15 @@ static bool materialMatches(const std::string& name, const char* query)
   return true;
 }
 #include "ftebroom_uv_editor.h"
-static void materialBrowser()
+static void materialBrowser(bool lesson=false)
 {
+  materialTestItems.clear();
   materialDropTarget();
   const float scale=uiScale();
   const float room=ImGui::GetContentRegionAvail().y;
   static float propertiesHeight=std::min(448*scale,room*.55f);
+  const float savedPropertiesHeight=propertiesHeight;
+  if(lesson)propertiesHeight=std::min(180*scale,room*.32f);
   uiInspectorTopBegin("Face properties",propertiesHeight);
   if(uiTheme==0){
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,1.f*scale);
@@ -391,6 +394,7 @@ static void materialBrowser()
   }
   if(uiTheme==0){ImGui::PopStyleColor(4);ImGui::PopStyleVar();}
   uiInspectorTopEnd("Material browser divider",propertiesHeight);
+  if(lesson)propertiesHeight=savedPropertiesHeight;
   collectionsLoad();
   static unsigned folderRevision=~0u;static size_t folderCount=0;
   if(folderRevision!=materialDataRevision || folderCount!=materials.size()) {
@@ -469,7 +473,7 @@ static void materialBrowser()
   static std::string cachedQuery;static std::map<std::string,bool> cachedFolders;static std::set<std::string> cachedRemoved;
   static unsigned cachedRevision=~0u,cachedUsage=~0u;static size_t cachedCount=0;static bool pendingDimensions=false;
   static unsigned tileRevision=0;
-  auto query=std::string(filter)+":"+std::to_string(usedOnly)+":"+std::to_string(byUsage)+":"+std::to_string(grouped)+":"+std::to_string(advanced);
+  auto query=std::to_string(lesson)+":"+std::string(filter)+":"+std::to_string(usedOnly)+":"+std::to_string(byUsage)+":"+std::to_string(grouped)+":"+std::to_string(advanced);
   for(auto values:{widths,heights})for(int i=0;i<2;i++)query+=":"+std::to_string(values[i]);
   if(cachedRevision!=materialDataRevision || cachedCount!=materials.size() || cachedQuery!=query || cachedFolders!=materialFolders || cachedRemoved!=removedCollections || ((usedOnly||byUsage)&&cachedUsage!=materialUsageRevision) || pendingDimensions) {
     ++tileRevision;
@@ -477,8 +481,9 @@ static void materialBrowser()
   visible.clear();
   for (auto& pair : materials)
     if (
-      !removedCollections.count(materialFolder(pair.first)) && materialFolders[materialFolder(pair.first)] && materialMatches(pair.first, filter)
-      && (!usedOnly || materialUsage[materialCanonical(pair.first)] > 0) && dimensionsMatch(pair.first))
+      (lesson && (pair.first=="textures/ftebroom/qa_blue"||pair.first=="textures/ftebroom/qa_green"||pair.first=="textures/ftebroom/qa_red")) ||
+      (!lesson && !removedCollections.count(materialFolder(pair.first)) && materialFolders[materialFolder(pair.first)] && materialMatches(pair.first, filter)
+      && (!usedOnly || materialUsage[materialCanonical(pair.first)] > 0) && dimensionsMatch(pair.first)))
       visible.push_back(&pair.second);
   std::stable_sort(visible.begin(), visible.end(), [&](const auto* a, const auto* b) {
     if (grouped && materialFolder(a->name) != materialFolder(b->name))
@@ -547,6 +552,7 @@ static void materialBrowser()
         auto p = ImGui::GetCursorScreenPos();
         bool selected=selectedMaterial==mat.name||mat.name==name;
         if(ImGui::InvisibleButton("tile",{float(size+6),rowHeight-caption-4}))chooseMaterial(mat.name);
+        materialTestItems["tile/"+mat.name]={(ImGui::GetItemRectMin().x+ImGui::GetItemRectMax().x)*.5f,(ImGui::GetItemRectMin().y+ImGui::GetItemRectMax().y)*.5f};
         const bool hovered=ImGui::IsItemHovered();
         if(ImGui::BeginDragDropSource()) {
           ImGui::SetDragDropPayload("FTEBROOM_MATERIAL",mat.name.c_str(),mat.name.size()+1);

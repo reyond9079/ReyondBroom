@@ -12,6 +12,7 @@ static std::optional<wa::V> worldVectorInput(const char* label,wa::V value,int d
   bool commit=ImGui::IsItemDeactivatedAfterEdit();draft.second=ImGui::IsItemActive();if(commit)return wa::V{draft.first[0],draft.first[1],dimensions==2?value.z:draft.first[2]};return {};
 }
 static void worldImportModules(const std::vector<wa::AuthoredModule>& modules){
+  if(worldArchitect.job.valid()||worldArchitect.settings.locked[4])throw std::runtime_error("Finish generation and unlock Dressing before importing modules");
   worldEdit([&](auto& next){for(const auto& module:modules){auto found=std::find_if(next.modules.begin(),next.modules.end(),[&](const auto& m){return m.id==module.id;});if(found==next.modules.end())next.modules.push_back(module);else if(wa::moduleJson(*found)!=wa::moduleJson(module))throw std::runtime_error("An imported module with this ID already has different source bytes; use a distinct ID");}});
 }
 static void worldCandidateComparison(){
@@ -32,11 +33,20 @@ static void worldCandidateComparison(){
       for(const auto& b:w.spatial.buildings){drawList->AddRectFilled(point(b.low),point(b.high),IM_COL32(102,112,94,220));for(const auto& room:b.rooms)if(!room.floor)drawList->AddRect(point(room.low),point(room.high),IM_COL32(180,180,160,255));}
       for(size_t n=1;n<w.navigation.mainRoute.size();n++)drawList->AddLine(point(w.navigation.nodes[w.navigation.mainRoute[n-1]].feet),point(w.navigation.nodes[w.navigation.mainRoute[n]].feet),IM_COL32(250,190,70,255),1.5f);
       ImGui::Text("%zu brushes / %.0f route units",w.diagnostics.brushes,w.diagnostics.routeLength);
-      for(const auto& [name,value]:w.diagnostics.score)ImGui::Text("%s: %.2f",name.c_str(),value);
+      for(const auto* name:{"weighted","variety","route","circulation","visibility","cover","verticality"}){auto found=w.diagnostics.score.find(name);if(found!=w.diagnostics.score.end())ImGui::Text("%s: %.2f",name,found->second);}
+      if(ImGui::TreeNode("All measurements")){for(const auto& [name,value]:w.diagnostics.score)ImGui::Text("%s: %.2f",name.c_str(),value);ImGui::TreePop();}
       ImGui::PopID();
     }
     ImGui::EndTable();
   }
+}
+static void worldQualityControls(){
+  auto& s=worldArchitect;bool show=ImGui::CollapsingHeader("Candidate count and quality weights");worldRect("quality-controls");if(!show)return;
+  auto before=wa::serialize(s.settings);ImGui::BeginDisabled(s.job.valid());ImGui::SetNextItemWidth(180*uiScale());ImGui::SliderInt("Candidates per batch",&s.settings.candidates,1,16,"%d",ImGuiSliderFlags_AlwaysClamp);worldRect("candidate-count");
+  for(const auto* name:{"variety","route","circulation","visibility","cover","verticality"}){float value=float(s.settings.weights.count(name)?s.settings.weights.at(name):0);ImGui::SetNextItemWidth(220*uiScale());if(ImGui::SliderFloat(name,&value,0,10,"%.2f",ImGuiSliderFlags_AlwaysClamp))s.settings.weights[name]=value;worldRect(std::string("quality-weight/")+name);}
+  ImGui::EndDisabled();worldChanged(before);
+  ImGui::TextWrapped("Weights rank accepted candidates; they never relax collision, support, route or export validity. Existing projects retain their stored weights. Regenerate after changing weights.");
+  ImGui::BeginDisabled(s.batch.worlds.empty()||s.generated!=worldInputKey());if(worldButton("Select best accepted candidate","select-best")){s.selected=0;s.dirty=true;}ImGui::EndDisabled();
 }
 static void worldLegacyPanel(){
   auto& s=worldArchitect;bool show=ImGui::CollapsingHeader("Legacy AutoLevel migration");worldRect("legacy-panel");if(!show)return;
@@ -127,7 +137,7 @@ static void worldMissionPanel(){
 }
 static void worldRoadPanel(){
   auto& s=worldArchitect;auto* world=worldSelected();if(!world)return;
-  ImGui::TextWrapped("Road segments create real street/curb brushes and navigation links. The generator rejects intersections with building envelopes, disconnected routes and roads outside the sealed site.");
+  ImGui::TextWrapped("Drag in empty plan space to sketch a pedestrian road; drag an endpoint or blue Bezier control to edit a segment. Blue lines show edited recipes; Generate validates and builds their street/curb brushes and navigation. Building intersections, disconnected routes and edits outside the sealed site are rejected.");
   ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=1);
   if(!world->spatial.roads.empty()){
     auto selected=std::find_if(world->spatial.roads.begin(),world->spatial.roads.end(),[&](const auto& r){return r.id==s.roadSelection;});if(selected==world->spatial.roads.end()){s.roadSelection=world->spatial.roads.front().id;selected=world->spatial.roads.begin();}

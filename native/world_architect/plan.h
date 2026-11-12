@@ -112,7 +112,7 @@ struct Settings {
   uint64_t pinnedRegistry=0;
   std::map<uint64_t,uint64_t> regionSeeds,roomSeeds;
   std::vector<Influence> influences;
-  std::map<std::string,double> weights{{"variety",1},{"route",1},{"circulation",1}};
+  std::map<std::string,double> weights{{"variety",1},{"route",1},{"circulation",1},{"visibility",1},{"cover",.5},{"verticality",.5}};
 };
 struct WorldPlan {
   int schema=schemaVersion;uint64_t seed=0,registryFingerprint=0;int profile=2;std::string preset,theme,assetKey,sourceRevision;
@@ -216,7 +216,7 @@ inline void validate(const Settings& s,const Registry& r,bool recipe=false){
     auto input=deserialize(baseline,r,true);if(i<=last&&(input.profile!=s.profile||input.preset!=s.preset))throw std::runtime_error("Unlock stages before changing the game profile or preset");
   }else if(i<=last)throw std::runtime_error("A stage lock has no accepted generation input");
   if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.roomSeeds.size()>256||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
-  for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route"&&name!="circulation")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
+  for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route"&&name!="circulation"&&name!="visibility"&&name!="cover"&&name!="verticality")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
   std::set<uint64_t> ids;for(const auto& p:s.missionPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate mission pin");for(int a=0;a<3;a++)finite(p.position[a],-30000,30000,"Invalid mission pin");}
   ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}if(p.control){for(int a=0;a<3;a++)finite((*p.control)[a],-30000,30000,"Invalid road curve control");if(p.control->z!=0)throw std::runtime_error("Road curve controls must stay on the ground plane");}finite(p.width,48,512,"Invalid road width");if(al::length(p.a-p.b)<48||p.a.z!=0||p.b.z!=0)throw std::runtime_error("Road pins require a ground-plane segment of at least 48 units");}
   for(const auto& mask:s.influences){for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing")throw std::runtime_error("Unknown influence type");}

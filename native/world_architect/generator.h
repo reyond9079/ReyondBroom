@@ -528,6 +528,7 @@ inline void streets(WorldPlan& w){
     }
   }
 }
+#include "quality.h"
 inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<bool>* cancel){
   auto& nav=w.navigation;Collision collision(w);std::vector<std::array<size_t,2>> verified;
   for(auto& node:nav.nodes)if(collision.blocked(node.feet,node.feet,settings.player)){
@@ -621,7 +622,8 @@ inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<b
   std::set<int> areas;for(const auto& b:w.spatial.buildings)for(const auto& r:b.rooms)areas.insert(int((r.high.x-r.low.x)*(r.high.y-r.low.y)/8192));
   scores["variety"]=std::min(1.,areas.size()/6.);
   scores["circulation"]=std::min(1.,double(alternatives));scores["separatedRoutes"]=alternatives;
-  w.diagnostics.warnings.push_back("Circulation counts same-floor alternatives separated by at least 64 units and a physical obstruction or floor opening outside endpoint landings. Sightlines, landmarks and narrative quality are not yet scored.");
+  w.diagnostics.warnings.push_back("Circulation counts same-floor alternatives separated by at least 64 units and a physical obstruction or floor opening outside endpoint landings.");
+  spatialQuality(w,settings,collision,adjacency);
   double sum=0,weight=0;for(auto [name,value]:settings.weights){auto it=scores.find(name);if(it!=scores.end()){sum+=it->second*value;weight+=value;}}scores["weighted"]=weight?sum/weight:0;
 }
 inline void exportMap(WorldPlan& w,const Settings& settings){

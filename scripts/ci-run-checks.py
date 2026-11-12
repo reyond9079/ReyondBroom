@@ -61,6 +61,7 @@ def main():
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/themes-ui', '--themes-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/scenarios-ui', '--scenarios-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/local-ui', '--local-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/quality-ui', '--quality-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/modules-ui', '--modules-only', '--module-fixtures', out/'world/modules')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),

@@ -28,6 +28,7 @@ struct WorldArchitectState {
   wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request;
   std::string project,requestMode,requestRegion;uint64_t detailRegion=0,detailSeed=1;
   uint64_t missionNode=0,dragMission=0,roadSelection=0,detailRoom=0;int missionEdge=0,planFloor=0,maskSelection=-1,legacyModule=0,legacyMaterial=1;
+  int roadDragKind=-1;uint64_t roadDragId=0;wa::V roadDragStart{};
   bool painting=false;wa::V paintStart{};float paintStrength=1;int paintType=0;
   std::optional<wa::LegacyMigration> legacy;bool legacySaved=false;
   double requestAt=0;std::filesystem::path requestPath;
@@ -208,6 +209,26 @@ static void worldPlanCanvas(bool roads){
   for(const auto& e:graph.edges){const auto find=[&](uint64_t id)->const wa::MissionNode&{for(const auto& n:graph.nodes)if(n.id==id)return n;throw std::runtime_error("Missing mission node");};drawList->AddLine(point(find(e.a).position),point(find(e.b).position),e.optional?IM_COL32(140,150,230,255):IM_COL32(240,180,70,255),2);}
   for(const auto& node:graph.nodes){auto p=point(node.position);drawList->AddCircleFilled(p,node.id==s.missionNode?8.f:5.f,node.pinned?IM_COL32(100,220,180,255):IM_COL32(240,180,70,255));if(node.floor==s.planFloor)drawList->AddText({p.x+7,p.y-8},IM_COL32(240,240,225,255),node.name.c_str());}
   for(const auto& mask:s.settings.influences){if(mask.high.z<s.planFloor*256||mask.low.z>(s.planFloor+1)*256)continue;auto color=mask.kind=="preserve"?IM_COL32(80,220,160,180):mask.kind=="avoid"?IM_COL32(250,80,80,180):IM_COL32(220,140,60,180);drawList->AddRect(point(mask.low),point(mask.high),color,0,0,2);}
+  if(roads&&s.tab==2){
+    for(const auto& pin:s.settings.roadPins){auto points=wa::roadPoints(pin);for(size_t i=1;i<points.size();i++)drawList->AddLine(point(points[i-1]),point(points[i]),IM_COL32(100,210,240,255),2);}
+    if(!s.settings.locked[1]&&!s.job.valid()){
+      auto mouse=ImGui::GetIO().MousePos;auto target=wa::V{world->low.x+(mouse.x-pos.x-16)/scale,world->low.y+(mouse.y-pos.y-16)/scale,0};
+      auto handles=world->spatial.roads;for(const auto& pin:s.settings.roadPins){auto found=std::find_if(handles.begin(),handles.end(),[&](const auto& r){return r.id==pin.id;});if(found==handles.end())handles.push_back(pin);else *found=pin;}
+      for(const auto& road:handles){drawList->AddCircleFilled(point(road.a),4,IM_COL32(180,225,240,255));drawList->AddCircleFilled(point(road.b),4,IM_COL32(180,225,240,255));if(road.control)drawList->AddCircleFilled(point(*road.control),5,IM_COL32(100,210,240,255));}
+      if(ImGui::IsItemHovered()&&ImGui::IsMouseClicked(0)){
+        s.roadDragKind=3;s.roadDragId=0;s.roadDragStart=target;double distance=8;
+        for(const auto& road:handles)for(int kind=0;kind<(road.control?3:2);kind++){auto p=point(kind==0?road.a:kind==1?road.b:*road.control);double d=std::hypot(mouse.x-p.x,mouse.y-p.y);if(d<distance){distance=d;s.roadDragId=road.id;s.roadDragKind=kind;s.roadSelection=road.id;}}
+      }
+      if(s.roadDragKind>=0){drawList->AddCircle(point(target),6,IM_COL32(100,210,240,255),0,2);if(s.roadDragKind==3)drawList->AddLine(point(s.roadDragStart),point(target),IM_COL32(100,210,240,255),3);}
+      if(s.roadDragKind>=0&&ImGui::IsMouseReleased(0)){
+        int kind=s.roadDragKind;s.roadDragKind=-1;if(ImGui::IsItemHovered()&&ImGui::IsMouseDragPastThreshold(0))worldAction([&]{auto next=s.settings;wa::Road road;
+          if(kind==3){road.id=9000;for(const auto& r:handles)road.id=std::max(road.id,r.id+1);road.a=s.roadDragStart;road.b=target;road.width=80;road.hierarchy="designer pedestrian";}
+          else{auto found=std::find_if(handles.begin(),handles.end(),[&](const auto& r){return r.id==s.roadDragId;});if(found==handles.end())throw std::runtime_error("Dragged road no longer exists");road=*found;if(kind==0)road.a=target;else if(kind==1)road.b=target;else road.control=target;}
+          road.pinned=true;auto found=std::find_if(next.roadPins.begin(),next.roadPins.end(),[&](const auto& r){return r.id==road.id;});if(found==next.roadPins.end())next.roadPins.push_back(road);else *found=road;wa::validate(next,s.registry);auto before=wa::serialize(s.settings);s.settings=std::move(next);s.roadSelection=road.id;worldChanged(before);
+        });
+      }
+    }else s.roadDragKind=-1;
+  }
   if(!roads&&!s.settings.locked[0]&&!s.job.valid()){
     auto mouse=ImGui::GetIO().MousePos;
     if(ImGui::IsItemHovered()&&ImGui::IsMouseClicked(0)){double distance=15;for(const auto& node:graph.nodes){if(node.floor!=s.planFloor)continue;auto p=point(node.position);double d=std::hypot(mouse.x-p.x,mouse.y-p.y);if(d<distance){distance=d;s.dragMission=s.missionNode=node.id;}}}
@@ -280,7 +301,7 @@ static void worldPanel(){
         if(tab==5)worldAction([]{worldInfluencePanel(false);});
         if(tab==6)worldAction([]{auto& s=worldArchitect;auto before=wa::serialize(s.settings);auto p=wa::stagePreset(s.settings,s.registry);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());bool themesOpen=ImGui::BeginCombo("Art theme",p.theme.c_str());worldRect("art-theme");if(themesOpen){for(const auto& theme:s.registry.themes){if(ImGui::Selectable(theme.id.c_str(),p.theme==theme.id))s.settings.theme=theme.id;worldRect("art-theme/"+theme.id);}ImGui::EndCombo();}ImGui::EndDisabled();worldChanged(before);worldRoomDressingPanel();worldModulePanel();worldInfluencePanel(true);});
         if(tab==7){
-          worldCandidateComparison();
+          worldQualityControls();worldCandidateComparison();
           if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& stage:world->diagnostics.cachedStages)ImGui::Text("Reused frozen stage: %s",stage.c_str());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms%s",name.c_str(),ms,std::find(world->diagnostics.cachedStages.begin(),world->diagnostics.cachedStages.end(),name)!=world->diagnostics.cachedStages.end()?" (original build time)":"");for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
           for(const auto& reject:s.batch.rejects)ImGui::TextWrapped("Rejected: %s",reject.c_str());
         }

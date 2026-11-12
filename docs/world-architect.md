@@ -191,3 +191,9 @@ rejected without changing the saved settings; a successful edit is one Undo.
 
 Authored brush packs and explicitly migrated legacy modules can be
 assigned to functional rooms; see [module format and workflow](world-architect-modules.md).
+
+In **Site & Roads**, drag empty plan space to sketch a pedestrian road. Drag an
+endpoint or blue Bezier control to edit the recipe. Blue paths show edits;
+Generate validates their bounds, building clearance and physical navigation.
+In **Quality**, expand **Candidate count and quality weights** to tune accepted
+candidate ranking. These weights never relax hard geometry or route checks.

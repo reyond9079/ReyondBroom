@@ -59,7 +59,7 @@ inline void semanticProp(WorldPlan& w,const Building& b,const Room& room,const A
     part("bed frame",{-20,-28,12},{20,28,20},4);part("bed mattress",{-19,-27,20},{19,27,28},2);for(int x:{-1,1})for(int y:{-1,1})part("bed leg",{x*16.-2,y*23.-2,0},{x*16.+2,y*23.+2,14},4);part("bed headboard",{-22,24,12},{22,30,44},4);rule="sleeping / treatment";
   }else if(function=="production"||function=="machine-shop"||(theme.grammar=="industrial"&&function=="maintenance")){
     part("machine plinth",{-28,-22,0},{28,22,12},2);for(int x:{-1,1})part("press upright",{x*21.-5,-16,12},{x*21.+5,16,80},3);part("press crosshead",{-30,-20,72},{30,20,84},3);part("press work table",{-20,-18,32},{20,18,40},2);tube(w,b.id,"press piston",p+V{0,0,40},p+V{0,0,72},8,3);rule="production machine";
-  }else if(function=="office"||function=="control"||function=="dispatch"||function=="security"||theme.grammar=="civic"){
+  }else if(function=="office"||function=="control"||function=="dispatch"||function=="security"||(theme.grammar=="civic"&&function=="public")){
     part("office desk",{-27,-18,30},{27,18,36},4);for(int x:{-1,1})for(int y:{-1,1})part("desk leg",{x*23.-2,y*14.-2,0},{x*23.+2,y*14.+2,32},3);part("abandoned terminal",{-12,0,36},{12,12,56},3);part("terminal screen",{-10,-1,40},{10,1,54},5);rule="work / control desk";
   }else if(function=="pharmacy"||function=="records"||function=="stockroom"||function=="stores"||function=="storage"){
     for(int side:{-1,1})part("shelving upright",{side*23.-2,-18,0},{side*23.+2,18,88},3);for(int shelf=0;shelf<4;shelf++){part("shelf",{-26,-20,shelf*24.},{26,20,shelf*24.+5},4);part("stored supplies",{-17,-14,shelf*24.+5},{17,12,shelf*24.+18},2);}rule="organized supplies / archive";

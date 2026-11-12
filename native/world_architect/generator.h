@@ -12,6 +12,9 @@ inline std::string skyMaterial(const WorldPlan& w){return w.profile<2?"wa_sky_"+
 inline bool inside(V p,V lo,V hi){return p.x>=lo.x&&p.y>=lo.y&&p.z>=lo.z&&p.x<=hi.x&&p.y<=hi.y&&p.z<=hi.z;}
 inline bool overlap(V lo,V hi,V otherLo,V otherHi,double gap=0){return lo.x<otherHi.x+gap&&hi.x>otherLo.x-gap&&lo.y<otherHi.y+gap&&hi.y>otherLo.y-gap&&lo.z<otherHi.z+gap&&hi.z>otherLo.z-gap;}
 inline uint64_t regionSeed(const Settings& s,uint64_t id,const char* stage){auto it=s.regionSeeds.find(id);return subSeed(it==s.regionSeeds.end()?s.seed:it->second,stage,id);}
+inline Settings regionInput(const Settings& s,uint64_t id,int stage,const Registry& registry){
+  auto found=s.regionRecipes.find(id);return found==s.regionRecipes.end()?s:deserialize(found->second.at(size_t(stage-2)),registry,true);
+}
 inline size_t navNode(WorldPlan& w,V p,uint64_t region,bool required=true){if(w.navigation.nodes.size()>=4096)throw std::runtime_error("World Architect navigation exceeds 4096 nodes");w.navigation.nodes.push_back({p,region,required});return w.navigation.nodes.size()-1;}
 inline void navEdge(WorldPlan& w,size_t a,size_t b){if(a!=b)w.navigation.edges.push_back({a,b});}
 inline void addBrush(WorldPlan& w,uint64_t region,const std::string& kind,al::Brush brush){
@@ -421,8 +424,9 @@ inline bool protectedRoute(const WorldPlan& w,V p,double radius){
 inline double influence(const Settings& settings,V p,const std::string& kind,double fallback){
   double result=fallback;for(const auto& mask:settings.influences)if(mask.kind==kind&&inside(p,mask.low,mask.high))result=mask.strength;return result;
 }
-inline void damage(WorldPlan& w,const Settings& s,const std::atomic<bool>* cancel){
+inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* cancel,const Registry& registry){
   for(const auto& building:w.spatial.buildings){
+    const auto s=regionInput(input,building.id,3,registry);
     cancelled(cancel);Random rng(regionSeed(s,building.id,"Damage"));
     const V origin{rng.between(building.low.x+96,building.high.x-96),building.high.y,building.high.z*.65};
     double amount=influence(s,origin,"damage",s.damage);
@@ -451,8 +455,9 @@ inline void damage(WorldPlan& w,const Settings& s,const std::atomic<bool>* cance
     }
   }
 }
-inline void dressing(WorldPlan& w,const Settings& s,const Preset& preset,const std::atomic<bool>* cancel){
+inline void dressing(WorldPlan& w,const Settings& input,const Preset& preset,const std::atomic<bool>* cancel,const Registry& registry){
   for(const auto& building:w.spatial.buildings){
+    const auto s=regionInput(input,building.id,4,registry);
     cancelled(cancel);Random rng(regionSeed(s,building.id,"Dressing"));
     for(const auto& room:building.rooms){
       const double density=influence(s,room.low,"dressing",s.dressing);if(density<.01)continue;
@@ -621,22 +626,40 @@ inline std::string groupedMap(const WorldPlan& w,const std::string& project,std:
 }
 struct PrefixCache {std::array<std::string,5> keys;std::array<std::shared_ptr<const WorldPlan>,5> plans;};
 inline Settings freezeThrough(Settings settings,const WorldPlan& accepted,const Registry& registry,int stage){
-  if(!accepted.diagnostics.valid||accepted.profile!=settings.profile||accepted.preset!=settings.preset||stage<0||stage>4)throw std::runtime_error("Freeze requires a current accepted candidate and a generative stage");
+  if(!accepted.diagnostics.valid||accepted.registryFingerprint!=registry.fingerprint||accepted.profile!=settings.profile||accepted.preset!=settings.preset||stage<0||stage>4)throw std::runtime_error("Freeze requires a current accepted candidate from this registry and a generative stage");
   settings.locked.fill(false);settings.frozen.fill(Json(nullptr));settings.frozenRegistry=registry.fingerprint;
   for(int i=0;i<=stage;i++){if(!accepted.stageInputs[i])throw std::runtime_error("Accepted candidate is missing its stage recipe");settings.locked[i]=true;settings.frozen[i]=serialize(cleanSettings(*accepted.stageInputs[i]));}
   validate(settings,registry);return settings;
 }
 inline Settings regenerateDetails(Settings settings,const WorldPlan& accepted,const Registry& registry,uint64_t region,uint64_t seed){
+  if(settings.regionRecipes.count(region))throw std::runtime_error("Unpin this building before regenerating its details");
   if(std::none_of(accepted.spatial.buildings.begin(),accepted.spatial.buildings.end(),[&](const auto& b){return b.id==region;}))throw std::runtime_error("Select an existing building for detail regeneration");
   settings=freezeThrough(settings,accepted,registry,4);settings.seed=accepted.seed;settings.candidates=1;
   // Only the requested building's Damage/Dressing streams change. Every
   // upstream recipe and every other region's original stream remain intact.
-  for(int stage=3;stage<=4;stage++){auto input=deserialize(settings.frozen[stage],registry);input.regionSeeds[region]=seed;settings.frozen[stage]=serialize(cleanSettings(input));}
+  for(int stage=3;stage<=4;stage++){auto input=deserialize(settings.frozen[stage],registry,true);input.regionSeeds[region]=seed;settings.frozen[stage]=serialize(cleanSettings(input));}
   validate(settings,registry);return settings;
 }
+inline Settings pinBuilding(Settings settings,const WorldPlan& accepted,const Registry& registry,uint64_t region){
+  if(settings.regionRecipes.count(region))throw std::runtime_error("This building is already pinned");
+  if(std::none_of(accepted.spatial.buildings.begin(),accepted.spatial.buildings.end(),[&](const auto& b){return b.id==region;}))throw std::runtime_error("Select an existing building to pin");
+  settings=freezeThrough(settings,accepted,registry,1);
+  std::array<Json,3> recipes;for(int n=2;n<=4;n++){
+    if(!accepted.stageInputs[n])throw std::runtime_error("Accepted building is missing its generation recipe");
+    recipes[n-2]=serialize(unpinnedSettings(regionInput(*accepted.stageInputs[n],region,n,registry)));
+  }
+  settings.pinnedRegions.push_back(region);settings.regionRecipes.emplace(region,std::move(recipes));settings.pinnedRegistry=registry.fingerprint;validate(settings,registry);return settings;
+}
+inline Settings unpinBuilding(Settings settings,uint64_t region){
+  settings.regionRecipes.erase(region);settings.pinnedRegions.erase(std::remove(settings.pinnedRegions.begin(),settings.pinnedRegions.end(),region),settings.pinnedRegions.end());
+  if(settings.pinnedRegions.empty())settings.pinnedRegistry=0;
+  // Older frozen Architecture/Damage/Dressing inputs may themselves contain
+  // the removed pin. Keep only the shared Mission/Site baseline on unpin.
+  for(int n=2;n<5;n++){settings.locked[n]=false;settings.frozen[n]=nullptr;}return settings;
+}
 inline WorldPlan generate(const Settings& settings,const Registry& registry,const std::atomic<bool>* cancel=nullptr,std::atomic<int>* progress=nullptr,PrefixCache* cache=nullptr){
-  validate(settings,registry);WorldPlan w;w.seed=settings.seed;w.profile=settings.profile;w.preset=settings.preset;const auto& preset=registry.preset(settings.preset);w.theme=preset.theme;
-  const int last=lockedThrough(settings);std::array<Settings,7> inputs;for(int n=0;n<7;n++)inputs[n]=n<=last?deserialize(settings.frozen[n],registry):cleanSettings(settings);
+  validate(settings,registry);WorldPlan w;w.seed=settings.seed;w.registryFingerprint=registry.fingerprint;w.profile=settings.profile;w.preset=settings.preset;const auto& preset=registry.preset(settings.preset);w.theme=preset.theme;
+  const int last=lockedThrough(settings);std::array<Settings,7> inputs;for(int n=0;n<7;n++)inputs[n]=n<=last?deserialize(settings.frozen[n],registry,true):cleanSettings(settings);
   std::array<std::string,5> keys;int first=0;
   if(last>=0){Json recipes=Json::array();for(int n=0;n<=last;n++){recipes.push_back(settings.frozen[n]);keys[n]=std::to_string(registry.fingerprint)+recipes.dump();}
     if(cache)for(int n=last;n>=0;n--)if(cache->plans[n]&&cache->keys[n]==keys[n]){w=*cache->plans[n];w.seed=settings.seed;w.diagnostics.cachedStages.clear();first=n+1;for(int i=0;i<=n;i++)w.diagnostics.cachedStages.push_back(stages[i]);break;}
@@ -647,11 +670,12 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
   };
   stage(0,[&](const auto& input){w.mission=mission(input,preset);validateMission(w.mission);});
   stage(1,[&](const auto& input){site(w,input,preset);floorplan(w,input,preset);});
-  stage(2,[&](const auto& input){shell(w);streets(w);for(auto& b:w.spatial.buildings){building(w,input,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,input,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,input,b);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
-  stage(3,[&](const auto& input){damage(w,input,cancel);});
-  stage(4,[&](const auto& input){dressing(w,input,preset,cancel);});
+  stage(2,[&](const auto& input){shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);building(w,local,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
+  stage(3,[&](const auto& input){damage(w,input,cancel,registry);});
+  stage(4,[&](const auto& input){dressing(w,input,preset,cancel,registry);});
   stage(5,[&](const auto& input){navigation(w,input,cancel);});
   stage(6,[&](const auto& input){exportMap(w,input);});
+  for(auto& b:w.spatial.buildings)b.pinned=settings.regionRecipes.count(b.id)!=0;
   w.diagnostics.valid=true;
   w.diagnostics.warnings.push_back("Quality scores are heuristics; visual and first-person review remains required.");
   if(settings.profile!=2&&settings.profile!=0&&settings.profile!=1)w.diagnostics.warnings.push_back("Quake II and GoldSrc compiler/play acceptance is not yet certified for this generator.");

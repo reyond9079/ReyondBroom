@@ -50,6 +50,7 @@ def main():
         run('world_ui', 'scripts/test-world-applied.py', root/'tools/q3map2'/('q3map2.exe' if os.name=='nt' else 'q3map2'),
             out/'world/metro-ui', '--fixture-texture', root/'ftebroom/textures/ftebroom/qa_blue.tga', gui=False)
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/regions-ui', '--preset', 'evacuation', '--regions-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/pins-ui', '--preset', 'evacuation', '--pins-only')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))

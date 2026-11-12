@@ -269,3 +269,21 @@ See [module format and workflow](world-architect-modules.md).
 
 Ten actual SDL2 legacy migration checks also pass, including explicit import of
 the byte-exact extracted brushes into the module library after backup verification.
+
+## Physical quality measurements and plan road gestures
+
+Quality now measures eye-height sightline distributions/diversity, low cover,
+reachable height, grouped navigation directions, landmark visibility, furnished
+room coverage and indoor/outdoor route transitions. Static-brush sampling is
+bounded and its limits are shown in diagnostics; these are preference heuristics,
+not enemy AI, lighting evaluation or human gameplay acceptance. The candidate
+budget, six ranking weights and Select best are functional native controls.
+Stored older projects retain their own ranking weights. Civic theming also
+preserves semantic retail counters instead of replacing every room with a desk.
+
+The Site & Roads canvas can sketch a pedestrian road and drag road endpoints or
+Bezier controls. Edited recipes are blue; Generate builds and validates the same
+path. The active map remains unchanged until explicit Apply/update.
+
+This slice passed 377 core contracts, seven actual SDL2 quality control/selection/
+reopen checks and nine actual SDL2 room/road-sketch/volume/history checks.

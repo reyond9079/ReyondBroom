@@ -165,5 +165,12 @@ int main(int argc,char** argv)try{
  check(!corners.supported({120,-15,65},player),"an expanded angled corner cannot provide fictitious player support");
  WorldPlan angled;angled.theme="medical";wall(angled,1,{0,0,0},{100,100,0},0,16,32,0);
  check(angled.architecture.elements.size()==1&&std::abs(al::polyhedron(angled.architecture.elements[0].brush).volume-std::sqrt(20000.)*16*32)<.01,"rotated road/wall extrusion preserves outward planes and positive volume");
+ for(const char* metric:{"visibility","cover","verticality","landmarkVisibility","roomAssetCoverage","spawnExposure"})check(std::isfinite(world.diagnostics.score.at(metric))&&world.diagnostics.score.at(metric)>=0&&world.diagnostics.score.at(metric)<=1,"physical quality preferences are bounded finite measurements");
+ check(std::abs(world.diagnostics.score.at("shortSightlines")+world.diagnostics.score.at("mediumSightlines")+world.diagnostics.score.at("longSightlines")-1)<1e-9,"eye-height sightline bins cover the actual bounded ray samples");
+ WorldPlan coverScene;coverScene.navigation.nodes.push_back({{0,0,1},0,true});coverScene.navigation.mainRoute={0};coverScene.architecture.elements.push_back({0,"low cover",al::box({32,-32,0},{64,32,36},"cover")});Collision lowCover(coverScene);spatialQuality(coverScene,settings,lowCover,{{}});
+ check(coverScene.diagnostics.score.at("cover")==1,"low geometry with a clear eye-height view is measured as cover");
+ coverScene.architecture.elements[0].brush=al::box({32,-32,0},{64,32,96},"wall");Collision tallCover(coverScene);spatialQuality(coverScene,settings,tallCover,{{}});
+ check(coverScene.diagnostics.score.at("cover")==0&&coverScene.diagnostics.score.at("visibility")>0,"a tall occluder is distinguished from usable low cover and changes the sightline distribution");
+ auto mallDressing=settings;mallDressing.preset="mall";mallDressing.dressing=1;auto retail=generate(mallDressing,registry);check(countKind(retail,"service counter")>0,"civic theming retains semantic retail counters rather than replacing every program with office desks");
  std::cout<<count<<" World Architect contracts passed\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

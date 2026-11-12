@@ -73,6 +73,13 @@ public:
   bool supported(V feet,const Player& player)const{
     Player foot{player.radius,.1,player.step};return blocked(feet,feet-V{0,0,player.step+2},foot);
   }
+  bool routeSupported(V feet,const Player& player)const{
+    // A hull may touch a landing with its outer corner while its centre is
+    // above a stair shaft. Do not route through that transient edge contact:
+    // an actual walking player can fall before reaching the adjacent floor.
+    auto footing=player;footing.radius=std::min(player.radius,2.);
+    return supported(feet,footing);
+  }
   bool walk(V a,V b,const Player& p)const{
     if(blocked(a,a,p)||blocked(b,b,p))return false;
     double dz=b.z-a.z;
@@ -603,19 +610,22 @@ inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<b
     auto base=node.feet;for(int rise=1;rise<=int(settings.player.step);rise++){node.feet=base+V{0,0,double(rise)};if(!collision.blocked(node.feet,node.feet,settings.player)&&collision.supported(node.feet,settings.player))break;}
   }
   std::set<std::array<size_t,2>> unique;
-  auto edge=[&](size_t a,size_t b){if(a>b)std::swap(a,b);if(a==b||!unique.insert({a,b}).second)return;
+  auto edge=[&](size_t a,size_t b,bool shortcut=false){if(a>b)std::swap(a,b);if(a==b||!unique.insert({a,b}).second)return;
     auto p=nav.nodes[a].feet,q=nav.nodes[b].feet;
     if(!collision.walk(p,q,settings.player))return;
     // Test the supporting surface throughout long links. A clear hull sweep
     // across an open stairwell is not a walkable connection.
-    int samples=std::max(1,int(al::length(q-p)/16));for(int i=0;i<=samples;i++)if(!collision.supported(p+(q-p)*(double(i)/samples),settings.player))return;
+    int samples=std::max(1,int(std::ceil(al::length(q-p)/(shortcut?8:16))));for(int i=0;i<=samples;i++){
+      auto feet=p+(q-p)*(double(i)/samples);
+      if(!(shortcut?collision.routeSupported(feet,settings.player):collision.supported(feet,settings.player)))return;
+    }
     verified.push_back({a,b});
   };
   auto proposed=nav.edges;for(auto e:proposed)edge(e[0],e[1]);
   for(size_t a=0;a<nav.nodes.size();a++){
     cancelled(cancel);for(size_t b=a+1;b<nav.nodes.size();b++){
       auto p=nav.nodes[a].feet,q=nav.nodes[b].feet;
-      if(std::abs(p.z-q.z)<=settings.player.step&&al::length(p-q)<384)edge(a,b);
+      if(std::abs(p.z-q.z)<=settings.player.step&&al::length(p-q)<384)edge(a,b,true);
     }
   }
   nav.edges=std::move(verified);if(nav.nodes.empty())throw std::runtime_error("No physical navigation nodes");

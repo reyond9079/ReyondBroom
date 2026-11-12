@@ -328,12 +328,12 @@ class RunnerTests(unittest.TestCase):
 
 
 class PackageGateTests(unittest.TestCase):
-    def fixture(self, root, platform):
+    def fixture(self, root, platform, source_splash=b'splash'):
         version = 'ci-test'; windows = platform == 'Windows-x64'
         root_name = 'ReyondBroom-'+('Windows-x64' if windows else 'Linux-x64')
         revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
         info = f'ReyondBroom {version}\nPlatform: {platform}\nEditor revision: {revision}\n'
-        files = {'ftebroom/csaddon.dat': b'qc', 'build-info.txt': info.encode(),
+        files = {'ftebroom/csaddon.dat': b'qc', 'ftebroom/ui/update-splash.png': b'splash', 'build-info.txt': info.encode(),
                  'bin/fteqw64.exe' if windows else 'fteqw-gl64': b'engine',
                  'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so': b'plugin'}
         files['distribution-manifest.json'] = json.dumps({n:hashlib.sha256(b).hexdigest() for n,b in files.items()}).encode()
@@ -352,9 +352,16 @@ class PackageGateTests(unittest.TestCase):
             z.writestr('RELEASE-BUILD.txt', info)
             for name in ('sources/fteqw-source.zip', 'sources/bullet-source.zip', 'sources/imgui-source.zip', 'sources/ftebroom/native/ftebroom.cpp'):
                 z.writestr(name, 'fixture')
+            z.writestr('sources/ftebroom/runtime/ui/update-splash.png',source_splash)
         for p in (archive, source):
             p.with_name(p.name+'.sha256').write_text(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n')
         return version, archive
+
+    def test_different_packaged_and_source_splash_is_rejected(self):
+        for platform in ('Linux-x64','Linux-SDL2-x64','Windows-x64'):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as folder:
+                root=Path(folder);version,_=self.fixture(root,platform,source_splash=b'stale artwork')
+                with self.assertRaisesRegex(AssertionError,'Splash artwork differs'):smoke.verify(root,platform,version)
 
     def test_each_platform_archive_and_source_gate_rejects_tampering(self):
         for platform in ('Linux-x64', 'Linux-SDL2-x64', 'Windows-x64'):

@@ -286,6 +286,16 @@ inline std::vector<std::array<double,2>> facadeGaps(const Building& b,int floor,
 inline void facadeStrip(WorldPlan& w,const Building& b,const std::string& kind,int floor,int side,double bottom,double top,double depth,int slot,double overhang=0){
   double y=side?b.high.y:b.low.y,cursor=b.low.x-overhang;for(auto gap:facadeGaps(b,floor,side)){box(w,b.id,kind,{cursor,y-depth,bottom},{gap[0],y+depth,top},slot);cursor=gap[1];}box(w,b.id,kind,{cursor,y-depth,bottom},{b.high.x+overhang,y+depth,top},slot);
 }
+// Local safety lighting keeps the required exterior traversal legible even
+// on the face shaded by the directional sun. These point entities do not
+// modify geometry, collision, room assignment or navigation streams.
+inline void exteriorTraversalLights(WorldPlan& w,const Building& b,int flights){
+  double cy=(b.low.y+b.high.y)/2;for(int floor=0;floor<flights;floor++)for(int lamp=0;lamp<2;lamp++){
+    V origin{b.low.x-264,cy+(lamp?64:-64),floor*256.+(lamp?320:128)};
+    if(!inside(origin,w.low,w.high))throw std::runtime_error("Exterior stair light leaves the sealed site");
+    al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText(origin)},{"light","320"},{"_color","0.72 0.84 1"},{"_wa_light_role","exterior-traversal"}};if(w.profile==4)light.fields["_light"]="184 214 255 320";w.architecture.entities.push_back({b.id,std::move(light)});
+  }
+}
 inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Building& b,const std::atomic<bool>* cancel){
   const auto low=b.low,high=b.high;const double cy=(low.y+high.y)/2,hall=b.hall,stairX=high.x-320,returnOffset=std::max(144.,hall+64);
   const bool collapsed=preset.ruinEvent=="collapsed-stair"&&influence(s,{stairX,cy,0},"damage",s.damage)>.2&&influence(s,{stairX,cy,0},"preserve",0)==0;
@@ -423,6 +433,7 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
   else{
     // Two lanes alternate between floors, preserving headroom above the
     // lower flight. A separate wall-side gallery joins every existing door.
+    exteriorTraversalLights(w,b,b.floors-1);
     const double halfWidth=std::max(28.,s.player.radius+8);
     for(int floor=1;floor<b.floors;floor++){
       double z=floor*256.;
@@ -454,8 +465,15 @@ inline al::Brush prism(const std::vector<V>& polygon,double bottom,double top,co
   auto a=polygon[0],b=polygon[1],c=polygon[2];face({a.x,a.y,bottom},{b.x,b.y,bottom},{c.x,c.y,bottom});face({a.x,a.y,top},{b.x,b.y,top},{c.x,c.y,top});al::validateBrush(brush);return brush;
 }
 inline al::Brush bevel(V lo,V hi,const std::string& texture,double amount){
-  auto brush=al::box(lo,hi,texture);V n=al::unit({1,1,.4});al::Brush clipped;
-  if(al::clipBrush(brush,n,al::dot(n,hi)-amount,clipped))brush=std::move(clipped);return brush;
+  auto brush=al::box(lo,hi,texture);V n=al::unit({1,1,.4});al::Brush clipped;double cut=al::dot(n,hi)-amount;
+  // Avoid tiny edges at a box corner: the engine winding clipper treats
+  // distances below 0.1 as on-plane, while manifold validation merges at 1/32.
+  // Preserve a one-unit margin before MAP quantization instead of weakening it.
+  for(int attempt=0;attempt<16;attempt++){
+    bool nearCorner=false;for(int corner=0;corner<8;corner++){V p{corner&1?hi.x:lo.x,corner&2?hi.y:lo.y,corner&4?hi.z:lo.z};if(std::abs(al::dot(n,p)-cut)<1)nearCorner=true;}
+    if(!nearCorner){if(al::clipBrush(brush,n,cut,clipped))return clipped;return brush;}cut+=1.25;
+  }
+  return brush;
 }
 inline void receptionAnnex(WorldPlan& w,const Settings& s,const Building& b){
   const double x=b.high.x,cy=(b.low.y+b.high.y)/2,radius=256;

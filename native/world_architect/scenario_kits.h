@@ -27,6 +27,7 @@ inline void rearApproach(WorldPlan& w,const Building& b,double z){
   double cy=(b.low.y+b.high.y)/2,y=cy+std::max(144.,b.hall+64);std::array<V,4> points{{{b.high.x-360,cy,z+1},{b.high.x-360,y,z+1},{b.high.x-24,y,z+1},{b.high.x-24,cy,z+1}}};size_t last=SIZE_MAX;for(auto p:points){auto n=navNode(w,p,b.id);if(last!=SIZE_MAX)navEdge(w,last,n);last=n;}
 }
 inline void roofStair(WorldPlan& w,const Settings& settings,const Building& b){
+  exteriorTraversalLights(w,b,b.floors);
   const double cy=(b.low.y+b.high.y)/2,half=std::max(28.,settings.player.radius+8);
   for(int floor=1;floor<=b.floors;floor++){
     double z=floor*256.;box(w,b.id,"roof escape gallery",{b.low.x-80,cy-176,z-16},{b.low.x+8,cy+176,z},2);

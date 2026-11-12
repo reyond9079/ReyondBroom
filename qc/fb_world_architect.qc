@@ -206,7 +206,7 @@ void fb_world_architect_apply()
 {
     string request=strzone(argv(1));int epoch=stoi(argv(2)),profile=stoi(argv(3));
     string owner=strzone(argv(4)),region=strzone(argv(5)),mode=strzone(argv(6));
-    string status="invalid";
+    string status="invalid";cvar_set("ftebroom_world_apply_detail","");
     int safe=strlen(request)>0 && strlen(request)<=24;
     for(int i=0;i<strlen(request)&&safe;i++){int ch=str2chr(request,i);if(ch<48||ch>57)safe=FALSE;}
     if(owner!=""&&(!fb_world_identifier(owner)||(mode!="add"&&mode!="replace")||(region!="all"&&(region!=itos(stoi(region))||stoi(region)<0))))safe=FALSE;
@@ -224,7 +224,10 @@ void fb_world_architect_apply()
                     int valid=fb_map_parse(text);strunzone(text);
                     if(valid && profile>=2)for(int i=0;i<fb_map_count;i++)if(fb_map_items[i].kind==FB_NODE_PATCH)valid=FALSE;
                     if(valid)status=owner!=""?fb_world_owned_insert(owner,region,mode):(fb_clip_insert('0 0 0')?"ok":"insert-failed");
-                    else status="parse-failed";
+                    else {
+                        status="parse-failed";string detail=strcat(fb_map_error,"; geometry: ",fb_geom_error,"; object ",itos(fb_map_count),"; byte ",itos(fb_map_cursor));
+                        cvar_set("ftebroom_world_apply_detail",detail);print("World Architect import: ",detail,"\n");
+                    }
                     fb_map_clear();
                 } else fclose(file);
             } else status="missing";

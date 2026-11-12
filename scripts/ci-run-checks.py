@@ -65,6 +65,7 @@ def main():
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/local-ui', '--local-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/quality-ui', '--quality-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/planning-ui', '--planning-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/exterior-light-ui', '--exterior-light-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/gates-ui', '--gates-only', '--gate-fixtures', out/'world/gates')
         run('world_ui', 'scripts/test-world-gates.py', root, out/'world/gates-applied', '--applied', out/'world/gates-ui', '--fixture-texture', root/'ftebroom/textures/ftebroom/qa_blue.tga', gui=False)
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/modules-ui', '--modules-only', '--module-fixtures', out/'world/modules')

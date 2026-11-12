@@ -145,7 +145,7 @@ static void worldTick(){
       else if(s.request==ack&&std::string(status)=="locked")s.error="A generated region is hidden or locked. Nothing was replaced.";
       else if(s.request==ack&&std::string(status)=="exists")s.error="This project's regions are already on the map. Use Update instead of adding a duplicate.";
       else if(s.request==ack&&std::string(status)=="structure-changed")s.error="The preview has different architecture. Update the complete project first, or reopen its applied project before updating building details.";
-      else s.error=s.request==ack?std::string("Apply was rejected: ")+status:"Apply acknowledgment timed out; inspect the map before retrying.";
+      else {s.error=s.request==ack?std::string("Apply was rejected: ")+status:"Apply acknowledgment timed out; inspect the map before retrying.";if(s.request==ack&&std::string(status)=="parse-failed"){char detail[512]={};cvars->GetString("ftebroom_world_apply_detail",detail,sizeof detail);if(*detail)s.error+=" ("+std::string(detail)+")";}}
       s.request.clear();std::error_code ec;std::filesystem::remove(s.requestPath,ec);
     }
   }

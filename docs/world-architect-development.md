@@ -333,3 +333,36 @@ contracts and 20 actual SDL planning UI checks passed. Authored-module and
 physical-door MAPs each compiled/lit under all three certified formats again.
 The 100-seed/preset/profile corpus and final representative walkthroughs are
 running. This checkpoint still does not claim final human art/play acceptance.
+
+### Exterior lighting and an actual Apply regression
+
+The 100-seed corpus completed for all eight presets and all three formats:
+2400 accepted batches, 9600 candidate attempts, 63 candidate rejections, no
+empty batch, and 24 representative BSP/light builds. Each preset had 100
+structurally distinct room/architecture results; urban presets also had 100
+massing/street variants. These are pre-bevel-repair baseline results.
+
+A real Ironwail OS-input walkthrough completed all 108 hospital route points
+and all 60 metro points without setpos or noclip. The hospital's sun-shaded fire
+stairs were too dark. Local point lights improve that traversal; 900 selected
+seed plans/navigation results and nine compiled collision-lump comparisons
+proved the lighting-only revision left collision unchanged. A controlled
+same-pose game capture confirmed improved stair visibility. This is automated
+review evidence, not the specification's required human acceptance.
+
+A focused SDL Apply test then found a separate, real import failure on the
+best hospital candidate. An oblique rubble cut passed 0.027 units from a box
+corner. The engine winding clipper's 0.1 on-plane tolerance and the validator's
+1/32 vertex merge produced an open edge. Expanding plane anchors did not solve
+it. An actual isolated import rejected the original seven-face brush and
+accepted the safely displaced cut. Bevel construction now keeps a one-unit
+corner separation before serialization. The shared editor geometry validator
+is unchanged; temporary diagnostic instrumentation was removed.
+
+410 core contracts and eight real SDL lighting/export/Apply/Undo checks passed
+after the repair. The affected best hospital candidate now imports atomically,
+retains light properties and restores the authored scene with one Undo. World
+Apply errors also expose parser/geometry context rather than only parse-failed.
+Filtered profile/preset options let interrupted or focused corpora run without
+repeating unchanged completed cases. Final post-repair corpus/CI acceptance is
+still pending; AutoLevel remains the default.

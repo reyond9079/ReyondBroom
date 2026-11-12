@@ -1,0 +1,432 @@
+# World Architect development status
+
+The current implementation and acceptance results are described in the
+[user guide](world-architect.md) and [acceptance report](world-architect-acceptance.md).
+The user accepted the demonstrated environment style after reviewing actual
+hospital, metro and city game captures. World Architect is now the primary
+Plugins entry; AutoLevel is retained under Legacy generators. Final platform, merge and release outcomes are recorded in PR45.
+
+The following sections are a chronological engineering journal. Statements
+about incomplete phases describe those earlier checkpoints, not current status.
+
+The current vertical slice contains an engine-independent typed WorldPlan,
+mission and spatial graphs, convex architectural elements, damage fields,
+asset placements, navigation graph and diagnostics. Seven addressable passes
+use independent stable seed streams. A versioned external registry defines eight
+prototype configurations and six original material palettes. These are test
+cases, not the eight finished showcase presets required by RB-7.
+
+The next interior/site pass reserves distinct functional rooms for mission
+beats **before** brush generation. The room program expands to satisfy mission
+demand, reserved rooms receive wider openings, and physical navigation must
+visit the planned required rooms in order. Atrium/ring grammars leave real upper
+floor and roof openings with supported galleries and handrails. Parallel
+circulation has a solid divider and crossovers. A straight corridor keeps its
+floor plate; the layout choice changes structural geometry.
+
+Urban plots now come from deterministic binary subdivision with unequal
+frontage and T junctions. Partition boundaries form the road network; masses
+are inset within those plots, and each entrance has an explicit pedestrian
+connection to its frontage. The original regular grid is no longer the only
+site realization. Diagonal streets, bridge events and complete city-design
+acceptance remain open.
+
+Circulation scoring checks for an actual alternative walk separated from the
+primary polyline by at least 64 units outside endpoint landings, with an actual
+solid obstruction or floor opening between the paths. Dense edges or two
+parallel lines in a wide empty corridor do not count. This measures a limited
+same-floor property, not overall combat quality.
+
+The hospital's first structural event removes the middle of its central ground
+flight and provides two alternating exterior fire-stair flights with real
+landings and doors. Zero damage restores the central flight; a preserve mask at
+its base also suppresses this collapse. Its reception is an editable convex
+semicircular annex with arc piers, actual openings and a planned outdoor exit.
+The mission route must visit its required upper rooms before reaching that
+exit. This is the first particular ruin event, not evidence that the other
+seven showcase presets or the complete damage vocabulary are finished.
+
+The station event supplies liquid-content geometry and original water pixels,
+dry parallel platforms, upper galleries and a separate street exit. Navigation
+does not assume swimming: solid platform barriers keep its sampled routes dry;
+the liquid itself is excluded from solid collision. Compiler checks inspect
+actual water leaves in Quake BSP29/BSP2 and water-content brushes in Q3/FTE
+IBSP46, as well as checking material images and leaks. Circulation has actual
+ceiling fixtures and point lights; classic profiles receive a directional sun.
+
+An external development play check has loaded compiled hospital and metro maps
+in Ironwail 0.8.2 with existing game resources and moved the player using OS
+keyboard input. It found and corrected insufficient corridor illumination.
+This is a short physical walk check, not the specification's complete human
+review of pacing, sightlines and all eight finished presets.
+
+The native ImGui workspace generates and compares candidates, displays the real
+geometry in the existing dynamic-mesh renderer, previews floor cutaways and
+provides a grounded first-person inspection camera. Preview/generation leave the
+map unchanged. Save/load retains generation inputs. Export writes an editable
+MAP, an editable JSON project, original TGA/WAD2 assets (WAD3 for the unverified
+GoldSrc profile), and shader definitions.
+
+`Freeze through` captures the selected candidate's actual per-stage recipes,
+including each stage's own seed when a plan combines frozen and regenerated
+stages. Mission through Dressing can be frozen with their upstream dependencies.
+Navigation and Export always run. The bounded in-memory prefix cache reuses
+matching outputs; its key includes the complete frozen recipes and registry
+fingerprint. Save/reopen can reproduce a frozen plan with an empty cache.
+Changing a recipe invalidates the cache, and changing the registry requires
+unlocking. Settings Undo/Redo covers independent edits and freezing controls.
+
+Apply uses an independent staging filename and an acknowledged QC transaction,
+with execution-time map-epoch/profile guards. Missing/invalid files and stale
+requests report errors rather than success. One Undo/Redo covers the complete
+insertion; existing authored geometry is retained. Building detail regeneration
+now retains all upstream recipes and other regions' streams. Owned groups allow
+atomic regional or whole-project replacement, including save/reopen, one
+Undo/Redo, and preflight rejection of manual edits, hidden/locked groups,
+duplicate insertion and incompatible architecture. Portable numerical snapshots
+inside group properties distinguish MAP float reconstruction error from edits.
+Entity-slot reuse is scoped to this import path; ordinary clipboard behavior
+retains its existing allocation path.
+
+Complete building pins now capture the accepted per-region Architecture, Damage
+and Dressing recipes, including composed stage seeds and influence fields.
+Shared Mission/Site recipes stay frozen while pins exist; every other building
+can still vary under new downstream seeds. Clean bounded recipes are portable
+in project JSON, registry/profile mismatches and recursive payloads are rejected,
+and pin/unpin participates in settings Undo/Redo. Unpinning drops stale later
+stage freezes while retaining other pins. Building-level preservation is separate
+from the broader designer toolkit described below.
+
+The authoring slice adds the nine requested primary panels. Architecture inputs
+override actual per-stage floor programs and dimensions rather than editing the
+global registry. A frozen stage retains its own overrides and art palette.
+Authored mission topology, directed transitions and room-position pins are saved
+in project JSON. Pins reserve rooms before geometry, and the physical route now
+follows a valid prerequisite-aware logical traversal rather than node-list order.
+Road endpoint/width overrides alter street/curb geometry and navigation; edits
+crossing building envelopes or leaving the sealed site are rejected.
+
+Destruction/Dressing support bounded rectangular field painting and full-building
+preserve volumes. Preserve affects structural stair events, masonry damage and
+semantic room props. These controls do not claim the complete spline/volume
+toolkit, engine gate entities or room-level replacement.
+
+The art slice now adds six configurable facade grammars, material patterns,
+weathering and semantic prop families. Masonry arches, concrete buttresses,
+industrial risers/flanges, clinical bands/louvres, concourse vaults and civic
+piers change actual convex geometry. Room functions select corresponding beds,
+presses, shelves, counters, desks, benches and cabinets. Density samples use
+stable room streams, spatial exclusion and protected navigation clearance.
+These are original brush kits; finished showcase composition and final art
+acceptance remain pending.
+
+Art dependency identities version material/shader names and profile/palette WAD
+files so new packs coexist with prior files. Classic names fit 15 bytes. A real
+metro compiler regression exposed a sky-volume flood path for seed
+9949357162622361994: changing names, disabling liquid contents or removing the
+new vaults did not fix it; opaque backing around the classic sky enclosure did.
+The seed now has a dedicated real BSP/light regression. Current checks pass 339
+generator contracts, eight asset coexistence contracts, 72 three-profile input
+batches and 12 representative BSP/light cases. FTE output was resumed after a
+workspace disk-capacity failure, verifying every compiled-source hash first;
+completed profile artifacts remain preserved in verified archives.
+All six grammars also rendered in the actual SDL2 editor. A separate four-case
+native export check verifies coexistence of old/new versions of one theme and
+unchanged prior files. Twenty metro UI cases pass with the new art resources;
+the executed Apply/production ExportMap snapshot passes real BSP/light and
+binary liquid-content inspection. Full showcase composition remains open.
+
+Explicit legacy migration now reads version 1 AutoLevel repositories, builders
+and editor settings using the existing storage codec. It produces a byte-exact
+source backup, canonical legacy data, unchanged authored module MAPs, material
+dependency inventory and an explicit unsupported-feature report. It never
+silently replaces WFC layout/connection semantics with unrelated controls.
+Builder seed transfer requires a saved/verified bundle and uses settings Undo.
+The active map and original files are retained; geometry inspection is bounded.
+Fifteen migration contracts, the original AutoLevel storage test and nine actual
+SDL2 migration scenarios pass. Migration has its own dependency-selected CI
+suite; a codec-only change does not run the generator corpus or botanical tests.
+
+Physical checks sweep the configured player hull against expanded convex brush
+planes, verify support along links, handle stair risers, and require all generated
+navigation anchors to be reachable. Logical mission validation searches actual
+(position, acquired-prerequisites, visited-required-beats) states, including
+one-way traps. Failed candidates are retained as rejection diagnostics and never
+become successful levels. Scoring remains a heuristic, not proof of enjoyable
+level design.
+
+## Reproduce the focused checks
+
+```sh
+g++ -std=c++17 -O1 tests/world-architect-contracts.cpp -o /tmp/wa-contracts
+/tmp/wa-contracts runtime/world-architect/registry.json
+g++ -std=c++17 -O2 tests/world-architect.cpp -o /tmp/wa-corpus
+/tmp/wa-corpus runtime/world-architect/registry.json /tmp/wa-maps '*' 100
+python3 scripts/test-world-architect-ui.py /path/to/disposable/runtime /tmp/wa-ui
+```
+
+The corpus tests 100 input seeds per configuration, generates four candidates
+per input, records every rejected attempt, replays the selected seed exactly,
+checks JSON roundtrip and reparses every accepted MAP through the production
+brush parser. Only the first representative MAP/assets per configuration are
+written; the complete metrics/rejections are in `results.json`. An optional sixth
+CLI argument selects the game profile (0 Q3, 1 FTE, 2 Q1, 3 Q2, 4 GoldSrc).
+
+An earlier foundation corpus (external QA folder, not a public release)
+recorded 800/800 input batches with at least one accepted candidate, 6 rejected
+attempts out of 3200, and a real Quake 1 hospital `qbsp`/`light` run with no leak
+and no empty lightmaps. Real UI generation/export, Apply acknowledgment,
+authored-content preservation and one Undo/Redo have passed on native Linux.
+That corpus predates subsequent architecture and regional work. The regional
+slice has passed 322 contracts, 24 regional SDL2 scenarios and eight focused
+actual SDL2 pin scenarios, including manual
+edit protection, save/reopen, parent preservation and whole-project changes.
+The executed metro Apply also passes its production ExportMap snapshot through
+real BSP/lighting compilation; binary inspection confirms liquid brush contents.
+The subsequent authoring slice passed 334 contracts, ten actual SDL2 designer
+scenarios and four focused SDL2 painting scenarios. The designer cases check
+changed exported planes, dimension Undo, dragging a beat into its real room,
+directed mission authoring, preserve fields and exact save/reopen replay. Six
+authored interior/road MAPs compiled and lit across Quake 1, Quake III and FTE;
+the dimension case was also rerun with a width distinct from the preset.
+These checks do not certify the complete eight-preset acceptance or final art
+quality. Rerun the relevant stages after changes, and the final corpus before
+replacing AutoLevel.
+
+## Remaining acceptance work
+
+The mission-room realization needs richer gates, pacing and intentionally
+different optional branches. More road patterns, archetype-specific interior
+families, non-box massing, hero ruin events, material/weathering detail,
+and the eight finished presets still need implementation and visual evaluation.
+
+More complete spline/volume constraint semantics,
+broader authored-module shell/socket semantics, collision/gameplay metrics beyond the
+existing measurements, and complete three-profile compile/play evidence remain open.
+Malformed or incompatible pin recipes fail explicitly instead of silently ignoring
+designer intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu
+entry may be retired before the complete Definition of Done is met.
+
+## Scenario geometry and candidate comparison
+
+The six remaining scenario configurations now add their own physical structures:
+checkpoint booth/barricade and roof overlook; factory presses, gantry, fractured
+roof and brush ivy; residential garages and roof stairs; two broken overpass
+decks with building detours; mall retail signs and a continuous lit service
+corridor; evacuation portico and rooftop beacon. Scenario landmarks move before
+architecture to their actual roof/gallery anchor. Roof markers use building
+ownership during regional replacement even without a room ID. Garage facade
+ornaments respect the full door opening. Mall room partitions end before the
+service corridor, which is reserved against subsequent rubble placement.
+
+Quality compares up to four actual candidate site/room/route plans alongside
+per-candidate measurements. Selection changes the same world used by 3D preview,
+export and Apply; it is not an illustrative mockup. There is a focused actual-OS
+`--scenarios-only` UI check and physical scenario contracts. The core suite now
+compiles all eight representative presets on the three certified profiles;
+this is scoped to World Architect changes and does not enable unrelated suites.
+These additions alone do not satisfy final visual/gameplay acceptance.
+
+The scenario slice passed 359 core contracts, 20 actual SDL2 input/render/
+comparison checks, and 72 accepted input batches across Quake 1, Quake III and
+FTE (three input seeds per preset/profile). All six new representative scenarios
+compiled and lit on each profile: 18 actual BSP/light runs. The full 100-seed
+acceptance and compiled first-person review remain separate final gates.
+
+## Local authoring slice
+
+Quadratic Bezier road controls are stored with road recipes. Validation samples
+the complete bounded curve against the sealed site and buildings; geometry,
+curbs, navigation and both plan/comparison renderers share its tessellation.
+Straight legacy recipes retain their original geometry. Room furnishing overrides
+change only the chosen functional room's stream in the accepted Dressing recipe;
+unknown rooms and pinned buildings fail explicitly. Exact XYZ field bounds can
+be edited and undone atomically. This slice passed 367 core contracts and actual
+curved-road BSP/light compilation on Quake 1, Quake III and FTE.
+
+The native ImGui version prohibits EnterReturnsTrue on numeric scalar/vector
+inputs. Vector controls retain a local draft and commit on deactivation instead;
+this also avoids validating incomplete digit sequences as full site coordinates.
+
+Eight focused actual SDL2 input checks passed for room furnishing, exact project
+reopen, numeric Bezier controls, volume height and single-transaction Undo, with
+the active authored map unchanged.
+
+## Authored brush packs
+
+Versioned source-embedded packs now assign authored convex brush compositions to
+functional rooms. Profile/program, room dimensions, material aliases and reserved
+player hull routes are checked; shapes are translated without clipping/scaling.
+Raw MAP source, declared license/attribution and aliases are exported under
+content-versioned filenames. Saved projects and building pin recipes retain the
+actual module source. Compatible extracted legacy modules can be explicitly
+added to the same library after verified migration backup; WFC semantics remain
+in the legacy report/source instead of being silently reinterpreted.
+
+This slice passed 13 authored-module contracts, the existing 367 generator
+contracts, three real module BSP/light profile builds and seven actual SDL2
+pack-import/assignment/export/Undo/reopen checks. Imported modules currently
+support light and semantic points, explicit portable theme aliases and furnishing
+compositions inside generated rooms. Arbitrary runtime entity behavior, whole
+shell replacement and WFC/socket assembly are not certified by this slice.
+See [module format and workflow](world-architect-modules.md).
+
+Ten actual SDL2 legacy migration checks also pass, including explicit import of
+the byte-exact extracted brushes into the module library after backup verification.
+
+## Physical quality measurements and plan road gestures
+
+Quality now measures eye-height sightline distributions/diversity, low cover,
+reachable height, grouped navigation directions, landmark visibility, furnished
+room coverage and indoor/outdoor route transitions. Static-brush sampling is
+bounded and its limits are shown in diagnostics; these are preference heuristics,
+not enemy AI, lighting evaluation or human gameplay acceptance. The candidate
+budget, six ranking weights and Select best are functional native controls.
+Stored older projects retain their own ranking weights. Civic theming also
+preserves semantic retail counters instead of replacing every room with a desk.
+
+The Site & Roads canvas can sketch a pedestrian road and drag road endpoints or
+Bezier controls. Edited recipes are blue; Generate builds and validates the same
+path. The active map remains unchanged until explicit Apply/update.
+
+This slice passed 377 core contracts, seven actual SDL2 quality control/selection/
+reopen checks and nine actual SDL2 room/road-sketch/volume/history checks.
+
+## Physical gate realization and owned brush models
+
+Typed brush entities now represent real target-linked doors and one-shot
+activation zones. Prerequisites lock the destination across all graph edges;
+optional gated destinations are also checked for a possible activation route.
+Protected room lining prevents window/damage/roof bypasses. Standard entities
+are profile-aware and unknown FTE game code uses semantic metadata by default.
+Native walk preview uses closed-door collision and actual activation overlap.
+
+The owned importer validates only the supported brush-entity classes. Regional
+replacement copies their nested brushes with remapped source parents. Snapshots
+compare actual geometry and authored properties while excluding generated model
+bookkeeping names. Trigger solid bookkeeping is canonicalized before stamping,
+matching the ordinary MAP loader; other contents/properties remain strict.
+
+Seventeen gate contracts and real three-profile BSP/light/model inspection pass.
+The actual Ironwail server blocks a player at the closed door and allows OS
+keyboard movement through it after activating the trigger. Console setpos is
+used only for controlled setup; its automatic noclip mode is explicitly disabled
+before collision/activation checks. Thirteen actual SDL2 gate controls/Apply/
+update/history/reopen/manual-edit checks pass. Four additional UI checks capture
+the production ExportMap after executed Apply; that unchanged snapshot compiles
+and lights with both actual brush models. Twenty-eight CI policy tests verify
+scope and fixture-only preparation for UI-only changes.
+
+### Experience, planning volumes and street patterns
+
+Checkpoint `f9c3b6d` adds saved experience modes, target route scoring, required
+route/vertical/empty volumes and roof return geometry. The physical roof test
+removes exterior and interior vertical circulation independently and requires
+both remaining routes to reach the landmark. It found and fixed a rear guard
+that clipped the last odd-floor stair return. 393 core contracts passed.
+
+The following street-pattern revision adds real curved/hybrid sweeps and radial
+parcel placement with a convex octagonal plaza. Generated roads now undergo the
+same sampled envelope/site checks as authored roads. 399 core contracts passed
+with the new per-preset defaults; 17 actual SDL UI checks passed for modes, patterns, painted required routes, history and reopen; nine pattern BSP/light checks passed across Quake 1, Quake III and FTE.
+
+The subsequent composition revision adds explicit main-beat/branch/shortcut
+counts, per-room usable ceiling heights with actual suspended-ceiling brushes,
+lights below those ceilings, and closer initial orbit framing. 402 core
+contracts and 20 actual SDL planning UI checks passed. Authored-module and
+physical-door MAPs each compiled/lit under all three certified formats again.
+The 100-seed/preset/profile corpus and final representative walkthroughs are
+running. This checkpoint still does not claim final human art/play acceptance.
+
+### Exterior lighting and an actual Apply regression
+
+The 100-seed corpus completed for all eight presets and all three formats:
+2400 accepted batches, 9600 candidate attempts, 63 candidate rejections, no
+empty batch, and 24 representative BSP/light builds. Each preset had 100
+structurally distinct room/architecture results; urban presets also had 100
+massing/street variants. These are pre-bevel-repair baseline results.
+
+A real Ironwail OS-input walkthrough completed all 108 hospital route points
+and all 60 metro points without setpos or noclip. The hospital's sun-shaded fire
+stairs were too dark. Local point lights improve that traversal; 900 selected
+seed plans/navigation results and nine compiled collision-lump comparisons
+proved the lighting-only revision left collision unchanged. A controlled
+same-pose game capture confirmed improved stair visibility. This is automated
+review evidence, not the specification's required human acceptance.
+
+A focused SDL Apply test then found a separate, real import failure on the
+best hospital candidate. An oblique rubble cut passed 0.027 units from a box
+corner. The engine winding clipper's 0.1 on-plane tolerance and the validator's
+1/32 vertex merge produced an open edge. Expanding plane anchors did not solve
+it. An actual isolated import rejected the original seven-face brush and
+accepted the safely displaced cut. Bevel construction now keeps a one-unit
+corner separation before serialization. The shared editor geometry validator
+is unchanged; temporary diagnostic instrumentation was removed.
+
+410 core contracts and eight real SDL lighting/export/Apply/Undo checks passed
+after the repair. The affected best hospital candidate now imports atomically,
+retains light properties and restores the authored scene with one Undo. World
+Apply errors also expose parser/geometry context rather than only parse-failed.
+Filtered profile/preset options let interrupted or focused corpora run without
+repeating unchanged completed cases. Final post-repair corpus/CI acceptance is
+still pending; AutoLevel remains the default.
+
+### Focused Windows input reproduction
+
+The `f46537e` Linux/SDL2 jobs passed. Windows passed generation, actual Apply,
+metro, regional updates, pins, designer controls, themes and all scenario
+previews, then stopped in the road-sketch test. Its sampled radial-road arc produced a 4.94-pixel drag at Windows font/canvas
+sizes, below ImGui's six-pixel threshold. The fixture now draws through empty central space and checks pixel
+clearance/drag distance before sending input. Nine actual SDL local-authoring
+checks passed with the replacement gesture.
+
+Prepared Windows reproduction supports separate `local` and `remaining` World
+Architect cases. Reuse checks the complete native/CSQC/engine inputs and both
+normal build job recipes, including compiler flags and dependency actions.
+Portable gate/module fixture source hashes must match before reuse. Test-driver
+changes therefore do not require rebuilding an unchanged editor; changed build
+inputs explicitly reject reuse. Thirty CI policy contracts pass. These focused
+runs complement the production revision's Linux/SDL2 and earlier Windows checks;
+they are not a replacement for the mandatory packaged release gates.
+
+The first prepared reproduction also exposed a test-machine setup difference:
+its desktop stayed at 1024×768, clipping the planned 1920×1080 input canvas.
+Prepared World cases now set the same desktop size as the normal Windows job.
+Fixture-source verification permits exact bytes or LF-normalized text; the
+actual Windows artifact confirmed CRLF checkout differences from Linux's Git
+blob hashes. Changed source content and compiler recipes still reject reuse.
+
+
+### Final navigation repair and complete city walkthrough
+
+`88cce47` rejects automatic proximity links whose centre has no floor support,
+using eight-unit samples while retaining deliberate short stair/landing paths.
+A controlled game reproduction proved the former diagonal could fall into a
+stair shaft despite touching the adjacent landing with the hull corner. The
+new 169-point city route traverses the side landing and completed in Ironwail
+from the real spawn with OS input and no teleport/noclip. Hospital (108) and
+metro (60) complete route evidence is retained; the earlier checkpoint attempt
+is still explicitly partial.
+
+414 final contracts passed, including the actual city long-link regression.
+All eight best candidates passed executed editable Apply/Undo again (25 checks).
+The final repeated corpus accepted 2400 batches / 9600 attempts / 63 candidate
+rejections with no empty batch and 24 BSP/light builds across three formats.
+Independent old/new generator binaries produced byte-identical MAPs for 48
+fixed inputs, isolating the navigation repair from geometry/export. The first
+corpus pipeline began before the additional city regression was added; final
+414-contract evidence is independent and current. Complete measurements,
+source hashes, actual game receipts and screenshots are linked in the
+[acceptance report](world-architect-acceptance.md).
+
+
+### Windows source preservation fixture
+
+The final full Windows run reached authored modules after the previous World
+scenarios passed. Artifact inspection proved exported MAP bytes equal the
+actual JSON payload; only the separately written C++ text fixture had acquired
+32 CRLF bytes. The UI assertion now checks the actual input payload directly,
+without relaxing byte preservation. A prepared `finish` continuation runs only
+modules and the still-unexecuted single placement case on identical binaries.
+There is no production or compiler-recipe change. Final source/package and
+continuation outcomes are recorded in PR45.

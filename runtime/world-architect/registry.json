@@ -1,0 +1,501 @@
+{
+  "schemaVersion": 1,
+  "themes": [
+    {
+      "id": "brick",
+      "colors": [
+        [
+          112,
+          83,
+          63
+        ],
+        [
+          105,
+          57,
+          43
+        ],
+        [
+          142,
+          128,
+          105
+        ],
+        [
+          72,
+          76,
+          62
+        ],
+        [
+          60,
+          48,
+          35
+        ],
+        [
+          178,
+          150,
+          91
+        ]
+      ],
+      "grammar": "masonry",
+      "weathering": 0.65,
+      "baySpacing": 192,
+      "lightColor": [
+        1,
+        0.76,
+        0.52
+      ]
+    },
+    {
+      "id": "concrete",
+      "colors": [
+        [
+          103,
+          106,
+          102
+        ],
+        [
+          123,
+          124,
+          111
+        ],
+        [
+          152,
+          157,
+          148
+        ],
+        [
+          74,
+          83,
+          71
+        ],
+        [
+          67,
+          60,
+          48
+        ],
+        [
+          171,
+          118,
+          69
+        ]
+      ],
+      "grammar": "brutalist",
+      "weathering": 0.5,
+      "baySpacing": 256,
+      "lightColor": [
+        0.8,
+        0.86,
+        0.92
+      ]
+    },
+    {
+      "id": "industrial",
+      "colors": [
+        [
+          75,
+          81,
+          76
+        ],
+        [
+          115,
+          67,
+          43
+        ],
+        [
+          136,
+          130,
+          109
+        ],
+        [
+          56,
+          75,
+          57
+        ],
+        [
+          63,
+          53,
+          38
+        ],
+        [
+          203,
+          154,
+          67
+        ]
+      ],
+      "grammar": "industrial",
+      "weathering": 0.8,
+      "baySpacing": 192,
+      "lightColor": [
+        1,
+        0.58,
+        0.3
+      ]
+    },
+    {
+      "id": "medical",
+      "colors": [
+        [
+          109,
+          115,
+          100
+        ],
+        [
+          157,
+          171,
+          153
+        ],
+        [
+          182,
+          181,
+          162
+        ],
+        [
+          73,
+          95,
+          79
+        ],
+        [
+          84,
+          71,
+          56
+        ],
+        [
+          169,
+          135,
+          98
+        ]
+      ],
+      "grammar": "clinical",
+      "weathering": 0.35,
+      "baySpacing": 160,
+      "lightColor": [
+        0.66,
+        0.84,
+        1
+      ]
+    },
+    {
+      "id": "metro",
+      "colors": [
+        [
+          77,
+          84,
+          87
+        ],
+        [
+          110,
+          131,
+          134
+        ],
+        [
+          129,
+          136,
+          129
+        ],
+        [
+          51,
+          73,
+          75
+        ],
+        [
+          61,
+          46,
+          32
+        ],
+        [
+          191,
+          153,
+          78
+        ]
+      ],
+      "grammar": "subterranean",
+      "weathering": 0.75,
+      "baySpacing": 256,
+      "lightColor": [
+        0.55,
+        0.85,
+        0.7
+      ]
+    },
+    {
+      "id": "downtown",
+      "colors": [
+        [
+          109,
+          107,
+          99
+        ],
+        [
+          139,
+          130,
+          119
+        ],
+        [
+          164,
+          167,
+          160
+        ],
+        [
+          66,
+          84,
+          75
+        ],
+        [
+          71,
+          53,
+          37
+        ],
+        [
+          207,
+          172,
+          106
+        ]
+      ],
+      "grammar": "civic",
+      "weathering": 0.6,
+      "baySpacing": 144,
+      "lightColor": [
+        0.7,
+        0.76,
+        1
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "checkpoint",
+      "name": "The Last Checkpoint",
+      "theme": "brick",
+      "archetype": "shop",
+      "story": "Evacuation bottleneck and shop flank",
+      "layout": "spine",
+      "scope": 2,
+      "floors": 2,
+      "rooms": 5,
+      "blocks": 2,
+      "width": 1344,
+      "depth": 704,
+      "street": 192,
+      "damage": 0.45,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "retail",
+        "stockroom",
+        "office",
+        "service"
+      ],
+      "hallHalfWidth": 72,
+      "scenario": "checkpoint",
+      "roadPattern": "organic"
+    },
+    {
+      "id": "hospital",
+      "name": "Abandoned Hospital",
+      "theme": "medical",
+      "archetype": "hospital",
+      "story": "Field triage beside a collapsed stair",
+      "layout": "ring",
+      "scope": 0,
+      "floors": 3,
+      "rooms": 8,
+      "blocks": 1,
+      "width": 1664,
+      "depth": 960,
+      "street": 160,
+      "damage": 0.35,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "reception",
+        "ward",
+        "treatment",
+        "pharmacy",
+        "surgery",
+        "staff"
+      ],
+      "hallHalfWidth": 128,
+      "ruinEvent": "collapsed-stair",
+      "roadPattern": "grid"
+    },
+    {
+      "id": "metro",
+      "name": "Flooded Metro",
+      "theme": "metro",
+      "archetype": "station",
+      "story": "Service tunnel bypasses the flooded platform",
+      "layout": "parallel",
+      "scope": 0,
+      "floors": 2,
+      "rooms": 6,
+      "blocks": 1,
+      "width": 2048,
+      "depth": 896,
+      "street": 160,
+      "damage": 0.4,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "ticket-office",
+        "platform-access",
+        "control",
+        "electrical",
+        "maintenance",
+        "service-tunnel"
+      ],
+      "hallHalfWidth": 128,
+      "ruinEvent": "flooded-platform",
+      "roadPattern": "grid"
+    },
+    {
+      "id": "factory",
+      "name": "Overgrown Factory",
+      "theme": "industrial",
+      "archetype": "factory",
+      "story": "Loading yard to production hall and gantry",
+      "layout": "atrium",
+      "scope": 2,
+      "floors": 2,
+      "rooms": 5,
+      "blocks": 2,
+      "width": 1792,
+      "depth": 960,
+      "street": 224,
+      "damage": 0.55,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "loading",
+        "production",
+        "machine-shop",
+        "stores",
+        "control",
+        "maintenance"
+      ],
+      "hallHalfWidth": 128,
+      "scenario": "factory",
+      "roadPattern": "organic"
+    },
+    {
+      "id": "courtyard",
+      "name": "Residential Courtyard",
+      "theme": "concrete",
+      "archetype": "apartments",
+      "story": "Survivor barricades between residential wings",
+      "layout": "courtyard",
+      "scope": 1,
+      "floors": 3,
+      "rooms": 8,
+      "blocks": 3,
+      "width": 1280,
+      "depth": 896,
+      "street": 160,
+      "damage": 0.3,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "living",
+        "kitchen",
+        "bedroom",
+        "bathroom",
+        "utility",
+        "stair-lobby"
+      ],
+      "hallHalfWidth": 72,
+      "scenario": "courtyard",
+      "roadPattern": "hybrid"
+    },
+    {
+      "id": "overpass",
+      "name": "Collapsed Overpass",
+      "theme": "concrete",
+      "archetype": "warehouse",
+      "story": "Broken bridge forces an indoor upper route",
+      "layout": "offset",
+      "scope": 2,
+      "floors": 3,
+      "rooms": 5,
+      "blocks": 3,
+      "width": 1536,
+      "depth": 832,
+      "street": 224,
+      "damage": 0.65,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "loading",
+        "storage",
+        "dispatch",
+        "maintenance"
+      ],
+      "hallHalfWidth": 72,
+      "scenario": "overpass",
+      "roadPattern": "hybrid"
+    },
+    {
+      "id": "mall",
+      "name": "Dead Mall",
+      "theme": "downtown",
+      "archetype": "mall",
+      "story": "Evacuation atrium with upper retail walkways",
+      "layout": "atrium",
+      "scope": 0,
+      "floors": 2,
+      "rooms": 10,
+      "blocks": 1,
+      "width": 2048,
+      "depth": 1152,
+      "street": 192,
+      "damage": 0.4,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "retail",
+        "food-court",
+        "anchor-store",
+        "stockroom",
+        "security",
+        "retail"
+      ],
+      "hallHalfWidth": 192,
+      "scenario": "mall",
+      "roadPattern": "grid"
+    },
+    {
+      "id": "evacuation",
+      "name": "Evacuation District",
+      "theme": "downtown",
+      "archetype": "civic",
+      "story": "Street journey to an abandoned public shelter",
+      "layout": "branched",
+      "scope": 1,
+      "floors": 2,
+      "rooms": 6,
+      "blocks": 4,
+      "width": 1408,
+      "depth": 832,
+      "street": 256,
+      "damage": 0.45,
+      "beats": 7,
+      "branches": 2,
+      "loops": 1,
+      "roomFunctions": [
+        "assembly",
+        "reception",
+        "records",
+        "office",
+        "shelter",
+        "utility"
+      ],
+      "hallHalfWidth": 72,
+      "scenario": "evacuation",
+      "roadPattern": "radial"
+    }
+  ]
+}

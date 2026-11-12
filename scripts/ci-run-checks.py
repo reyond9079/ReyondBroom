@@ -39,8 +39,36 @@ def main():
             subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
         completed.append({'suite': suite, 'script': script})
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
-    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding'}:
+    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding', 'world_ui', 'world_legacy'}:
         run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
+    if 'world_legacy' in suites:
+        run('world_legacy', 'scripts/test-world-legacy.py', out/'world/legacy-core', gui=False)
+        run('world_legacy', 'scripts/test-world-architect-ui.py', root, out/'world/legacy-ui', '--legacy-only', '--legacy-fixtures', out/'world/legacy-core')
+    if 'world_core' in suites:
+        run('world_core', 'scripts/test-world-architect.py', out/'world/core', '--runtime', root,
+            '--seeds', '100' if selected['mode'] == 'full' else '3', gui=False)
+        run('world_core', 'scripts/test-world-designer.py', root, out/'world/designer-core', gui=False)
+    if suites & {'world_core', 'world_ui'}:
+        fixture_args = () if 'world_core' in suites else ('--fixtures-only',)
+        run('world_core' if 'world_core' in suites else 'world_ui', 'scripts/test-world-modules.py', root, out/'world/modules', *fixture_args, gui=False)
+        run('world_core' if 'world_core' in suites else 'world_ui', 'scripts/test-world-gates.py', root, out/'world/gates', *fixture_args, gui=False)
+    if 'world_ui' in suites:
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/ui')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/metro-ui', '--preset', 'metro')
+        run('world_ui', 'scripts/test-world-applied.py', root/'tools/q3map2'/('q3map2.exe' if os.name=='nt' else 'q3map2'),
+            out/'world/metro-ui', '--fixture-texture', root/'ftebroom/textures/ftebroom/qa_blue.tga', gui=False)
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/regions-ui', '--preset', 'evacuation', '--regions-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/pins-ui', '--preset', 'evacuation', '--pins-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/designer-ui', '--designer-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/themes-ui', '--themes-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/scenarios-ui', '--scenarios-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/local-ui', '--local-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/quality-ui', '--quality-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/planning-ui', '--planning-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/exterior-light-ui', '--exterior-light-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/gates-ui', '--gates-only', '--gate-fixtures', out/'world/gates')
+        run('world_ui', 'scripts/test-world-gates.py', root, out/'world/gates-applied', '--applied', out/'world/gates-ui', '--fixture-texture', root/'ftebroom/textures/ftebroom/qa_blue.tga', gui=False)
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/modules-ui', '--modules-only', '--module-fixtures', out/'world/modules')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))

@@ -106,7 +106,20 @@ class NativeInput:
    size=self.live()['display'];self.scale=(rect.right/size[0],rect.bottom/size[1]);return point.x,point.y
   for w in self.d.screen().root.query_tree().children:
    if (w.get_wm_name() or '').startswith('ReyondBroom:'):
-    self.window=w;point=self.d.screen().root.translate_coords(w,0,0);return point.x,point.y
+    self.window=w
+    focus=self.d.get_input_focus().focus
+    if getattr(focus,'id',focus)!=w.id:
+     w.set_input_focus(self.X.RevertToParent,self.X.CurrentTime);self.d.sync()
+    # FocusIn and console-close cursor restoration are queued by the engine.
+    # Observe fresh engine ticks before moving, as on Windows, so a pending
+    # restoration cannot warp the first test motion back to the old position.
+    state=self.focus_state()
+    if state is not None:
+     for _ in range(2):
+      sequence=state['sequence']
+      state=self.wait(lambda:(s if (s:=self.read_focus()) and s['sequence']!=sequence else None))
+    else:self.settle()
+    point=self.d.screen().root.translate_coords(w,0,0);return point.x,point.y
   raise AssertionError('Editor window missing')
 
  def windows_focus(self):
@@ -184,7 +197,10 @@ class NativeInput:
  def move(self,x,y):
   ox,oy=self.position()
   if os.name=='nt':self.user.SetCursorPos(int(ox+x*self.scale[0]),int(oy+y*self.scale[1]));self.settle()
-  else:self.xtest.fake_input(self.d,self.X.MotionNotify,x=int(ox+x),y=int(oy+y));self.d.sync();time.sleep(.08)
+  else:
+   self.xtest.fake_input(self.d,self.X.MotionNotify,x=int(ox+x),y=int(oy+y));self.d.sync()
+   # Let the actual pointer motion reach ImGui before pressing a button.
+   self.settle()
 
  def click(self,x,y,button=1,mods=(),hold=None):
   self.move(x,y)

@@ -15,6 +15,15 @@ name: Compilation profile parity
         description: Reuse a Windows-editor artifact to reproduce OS input without recompiling unchanged C++
         required: false
         default: ''
+      world_authoring_case:
+        description: Reuse matching prepared Windows binaries for local road input or remaining World Architect acceptance
+        type: choice
+        options:
+        - none
+        - local
+        - remaining
+        - finish
+        default: none
       plant_scene_only:
         description: Focus a prepared Windows run on plant map rendering diagnostics
         required: false
@@ -72,12 +81,13 @@ jobs:
         gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Windows-editor --dir prepared
         if ($LASTEXITCODE) { throw 'Prepared editor download failed' }
         $revision = (Get-Content prepared/compilation-editor-revision.txt).Trim()
+        if ($revision -notmatch '^[a-fA-F0-9]{40}$') { throw 'Invalid prepared source revision' }
         # PR checkouts build a synthetic merge commit, which may no longer be
         # referenced by the current PR after a test-driver-only update.
         git fetch --no-tags --depth=1 origin $revision
         if ($LASTEXITCODE) { throw 'Cannot retrieve the prepared editor source revision' }
-        git diff --exit-code $revision HEAD -- native qc tests/compilation-profile-probe.cpp patches scripts/build-editor-engine.sh scripts/apply-engine-patches.py
-        if ($LASTEXITCODE) { throw 'Prepared C++/CSQC/probe sources differ: rebuild the editor first' }
+        python scripts/ci-verify-prepared.py --revision $revision
+        if ($LASTEXITCODE) { throw 'Prepared sources or build recipes differ: rebuild the editor first' }
         Copy-Item prepared/fteplug_ftebroom_x64.dll bundle/ReyondBroom-Windows-x64 -Force
         Copy-Item prepared/ftebroom/csaddon.dat bundle/ReyondBroom-Windows-x64/ftebroom -Force
         Copy-Item prepared/tools/compilation-profile-probe.exe bundle/ReyondBroom-Windows-x64/tools -Force
@@ -91,8 +101,50 @@ jobs:
         Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
         python -m pip install Pillow==12.0.0 pywinauto trimesh==4.8.3 numpy==2.3.4
     - name: Exercise actual Windows controls with OS input
-      if: inputs.plant_scene_only != 'true'
+      if: inputs.plant_scene_only != 'true' && (inputs.world_authoring_case == '' || inputs.world_authoring_case == 'none')
       run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
+    - name: Exercise the prepared World Architect with actual OS input
+      if: inputs.world_authoring_case != '' && inputs.world_authoring_case != 'none'
+      shell: pwsh
+      run: |
+        $runtime = 'bundle/ReyondBroom-Windows-x64'
+        if (!(Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue)) { throw 'World input fixture requires a 1920x1080 test desktop' }
+        Set-DisplayResolution -Width 1920 -Height 1080 -Force
+        python scripts/ci-stage-assets.py $runtime
+        if ($LASTEXITCODE) { throw 'Current prepared runtime assets could not be staged' }
+        python tests/make-linux-build-fixture.py $runtime
+        if ($LASTEXITCODE) { throw 'World Architect input fixture failed' }
+        if ('${{ inputs.world_authoring_case }}' -eq 'local') {
+          python scripts/test-world-architect-ui.py $runtime qa/world/local-ui --local-only
+          if ($LASTEXITCODE) { throw 'Prepared World Architect local input failed' }
+        }
+        if ('${{ inputs.world_authoring_case }}' -in @('remaining','finish')) {
+          gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Linux-x64 --dir prepared-fixtures
+          if ($LASTEXITCODE) { throw 'Matching portable World fixtures unavailable' }
+          $gateFile = Get-ChildItem prepared-fixtures -Recurse -Filter gate-project-1.world.json | Select-Object -First 1
+          $moduleFile = Get-ChildItem prepared-fixtures -Recurse -Filter module-pack-1.json | Select-Object -First 1
+          if (!$gateFile -or !$moduleFile) { throw 'Missing prepared gate/module fixtures' }
+          $gateDir = $gateFile.DirectoryName
+          $moduleDir = $moduleFile.DirectoryName
+          python scripts/ci-verify-prepared.py --fixtures $gateDir $moduleDir
+          if ($LASTEXITCODE) { throw 'Prepared fixture sources differ from current code' }
+          if ('${{ inputs.world_authoring_case }}' -eq 'remaining') {
+            foreach ($case in @('quality','planning','exterior-light')) {
+              python scripts/test-world-architect-ui.py $runtime "qa/world/$case-ui" "--$case-only"
+              if ($LASTEXITCODE) { throw "Prepared World Architect $case failed" }
+            }
+            python scripts/test-world-architect-ui.py $runtime qa/world/gates-ui --gates-only --gate-fixtures $gateDir
+            if ($LASTEXITCODE) { throw 'Prepared World Architect gates failed' }
+            python scripts/test-world-gates.py $runtime qa/world/gates-applied --applied qa/world/gates-ui --fixture-texture "$runtime/ftebroom/textures/ftebroom/qa_blue.tga"
+            if ($LASTEXITCODE) { throw 'Prepared World Architect actual gate BSP failed' }
+          }
+          python scripts/test-world-architect-ui.py $runtime qa/world/modules-ui --modules-only --module-fixtures $moduleDir
+          if ($LASTEXITCODE) { throw 'Prepared World Architect modules failed' }
+          if ('${{ inputs.world_authoring_case }}' -eq 'finish') {
+            python scripts/test-viewport-create.py $runtime qa/world/create-dark-1280 --theme dark --width 1280 --height 800
+            if ($LASTEXITCODE) { throw 'Prepared viewport placement integration failed' }
+          }
+        }
     - name: Exercise the prepared Plant Editor with OS input
       shell: pwsh
       run: |

@@ -69,3 +69,15 @@ verified warm restore on the same Linux/Windows runner, avoiding false misses
 caused by different runner images. These are CI tests, not editor feature tests.
 New QA artifacts expire after seven days; existing artifacts and releases are
 untouched.
+
+World Architect has separate `world_core` and `world_ui` suites. The core suite
+checks mission prerequisites, serialization, cancellation, exact convex player
+clearance, a small seed corpus and real Q1/Q3/FTE MAP compilation. Manual full
+mode expands the corpus to 100 seeds per preset/profile. UI checks exercise the
+real render target, project replay, export, acknowledged Apply and Undo/Redo.
+
+Known World Architect additions to shared host/command files are classified only
+when removing those exact registrations/guards leaves the complete file equal
+to the base revision. Any other edit keeps the conservative shared-code scope.
+Focus guards include input consumers; geometry changes include the tool UI and
+placement. This does not select the unrelated plant-generation corpus.

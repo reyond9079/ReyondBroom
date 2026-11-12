@@ -24,9 +24,83 @@ def module(name):
 
 
 planner, cache, runner, smoke = [module(n) for n in ('plan', 'dependency', 'run-checks', 'release-smoke')]
+prepared = module('verify-prepared')
 
 
 class ScopeTests(unittest.TestCase):
+    def test_prepared_world_choice_has_a_nonempty_default_and_normal_mode(self):
+        import yaml
+        workflow = yaml.safe_load((REPO/'.github/workflows/compilation-profile-checks.yml').read_text())
+        inputs = workflow['on']['workflow_dispatch']['inputs']
+        choice = inputs['world_authoring_case']
+        self.assertEqual(choice['default'], 'none')
+        self.assertTrue(all(choice['options']))
+        self.assertIn(choice['default'], choice['options'])
+        steps = workflow['jobs']['windows-input-reproduction']['steps']
+        normal = next(s for s in steps if s.get('name') == 'Exercise actual Windows controls with OS input')
+        world = next(s for s in steps if s.get('name') == 'Exercise the prepared World Architect with actual OS input')
+        self.assertIn("inputs.world_authoring_case == 'none'", normal['if'])
+        self.assertIn("inputs.world_authoring_case != 'none'", world['if'])
+
+    def test_world_core_routes_its_editor_consumers_without_botany(self):
+        p = planner.plan(['native/world_architect/generator.h'])
+        self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})
+
+    def test_authored_modules_and_gate_contracts_keep_the_world_scope(self):
+        for path in ['tests/world-modules.cpp', 'tests/world-gates.cpp', 'scripts/test-world-gates.py']:
+            self.assertEqual(set(planner.plan([path])['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})
+
+    def test_legacy_codec_has_focused_migration_checks(self):
+        p = planner.plan(['native/world_architect/legacy.h'])
+        self.assertEqual(set(p['suites']), {'world_legacy'})
+        self.assertTrue(p['runtime'])
+
+    def test_legacy_shared_storage_and_brush_consumers(self):
+        self.assertEqual(set(planner.plan(['plugins/autolevel/al_storage.cpp'])['suites']), {'world_legacy'})
+        p = planner.plan(['plugins/autolevel/al_brush.cpp'])
+        self.assertTrue({'world_core', 'world_ui', 'world_legacy'} <= set(p['suites']))
+        self.assertFalse(p['flags']['plant_core'])
+
+    def test_world_art_theme_is_geometry_with_its_own_ui_consumers(self):
+        p = planner.plan(['native/world_architect/theme_kits.h'])
+        self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})
+        self.assertFalse(p['flags']['viewport'] or p['flags']['compilation_ui'] or p['flags']['matrix_ui'])
+
+    def test_world_frame_and_input_include_migration_dialogs(self):
+        for path in ['native/ftebroom_world_authoring.h', 'scripts/editor_os_input.py']:
+            p = planner.plan([path])
+            self.assertTrue({'world_ui', 'world_legacy'} <= set(p['suites']))
+            self.assertFalse(p['flags']['plant_core'] or p['flags']['atlas'])
+        self.assertEqual(set(planner.plan(['native/ftebroom_world_authoring.h'])['suites']), {'world_ui', 'world_legacy', 'placement'})
+        self.assertEqual(set(planner.plan(['native/ftebroom_world_architect.h'])['suites']), {'world_ui', 'world_legacy', 'placement'})
+
+    def test_world_host_registration_and_focus_guards_are_classified_by_code(self):
+        before = 'void frame(){modelViewerPanel();bbBenchTick();plantPanel();}\nif(runUiNavigation()||plantFocused())capture();\n'
+        after = 'static void worldOpen();\n'+before.replace('plantPanel();', 'plantPanel();worldPanel();').replace('plantFocused()', 'plantFocused()||worldArchitectFocused()')
+        groups = planner.world_host_scope('native/ftebroom.cpp', before, after)
+        self.assertEqual(groups, {'world_ui', 'input'})
+        self.assertIsNone(planner.world_host_scope('native/ftebroom.cpp', before, after.replace('capture();', 'cameraMove();')))
+        p = planner.plan(['native/ftebroom.cpp'], semantic={'native/ftebroom.cpp': groups})
+        self.assertTrue(p['flags']['compilation_ui'] and p['flags']['onboarding'])
+        self.assertFalse(p['flags']['plant_core'])
+
+    def test_world_scoped_clipboard_allocator_keeps_legacy_changes_conservative(self):
+        before = 'int id=terrain_edit(TEREDIT_ENT_ADD,"");entities[i]=id;\n'
+        after = 'int fb_world_importing;\n'+before.replace('terrain_edit(', 'fb_world_importing?fb_tx_empty_entity():(int)terrain_edit(')
+        self.assertEqual(planner.world_host_scope('qc/fb_clipboard.qc', before, after), {'world_ui'})
+        self.assertIsNone(planner.world_host_scope('qc/fb_clipboard.qc', before, after.replace('entities[i]=id', 'entities[i]=0')))
+
+    def test_promoted_world_menu_keeps_legacy_entry_and_other_plugin_changes_conservative(self):
+        source = (REPO/'native/ftebroom_plugins.h').read_text()
+        begin = source.index('    if(ImGui::MenuItem("World Architect..."))')
+        end = source.index('    ImGui::EndMenu();\n  }\n}', begin)
+        promoted = source[begin:end]
+        previous = ('    if(ImGui::MenuItem("World Architect (development preview)..."))worldOpen();\n'
+                    '    if(ImGui::MenuItem("Manage plugins..."))pluginManagerOpen=true;\n'
+                    '    for(auto& p:editorPlugins)if(p.api)if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n')
+        self.assertEqual(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted), {'world_ui'})
+        self.assertIsNone(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted.replace('pluginManagerOpen=true;', 'pluginManagerOpen=false;')))
+
     def test_windows_release_build_creates_its_output_when_audio_tests_are_skipped(self):
         import re
         import shlex
@@ -178,6 +252,15 @@ class RunnerTests(unittest.TestCase):
                 else: runner.main()
                 return [list(map(str, c.args[0])) for c in calls.call_args_list]
 
+    def test_ui_only_world_changes_prepare_fixtures_without_core_bsp_repeats(self):
+        for paths, fixtures_only in [(['qc/fb_world_architect.qc'], True), (['native/world_architect/gates.h'], False)]:
+            commands = self.run_plan(paths)
+            for script in ['test-world-modules.py', 'test-world-gates.py']:
+                standalone = [cmd for cmd in commands if any(arg.endswith('/'+script) for arg in cmd) and '--applied' not in cmd]
+                self.assertEqual(len(standalone), 1)
+                self.assertEqual('--fixtures-only' in standalone[0], fixtures_only)
+            self.assertTrue(any('--applied' in cmd and any(arg.endswith('/test-world-gates.py') for arg in cmd) for cmd in commands))
+
     def test_profiles_execute_import_migration_files_paths_real_compiler_and_launch_only(self):
         calls = self.run_plan(['native/ftebroom_run.h'])
         text = json.dumps(calls)
@@ -260,6 +343,29 @@ class PackageGateTests(unittest.TestCase):
             root = Path(folder); version, _ = self.fixture(root, 'Linux-x64')
             (root/'ReyondBroom-Linux-x64/fteqw-gl64').write_bytes(b'stale')
             with self.assertRaises(AssertionError): smoke.verify(root, 'Linux-x64', version)
+
+
+class PreparedReuseTests(unittest.TestCase):
+    def test_only_test_driver_steps_can_change_without_rebuilding(self):
+        original=(REPO/'.github/workflows/compilation-profile-checks.yml').read_text()
+        prepared.verify_recipes(original, original.replace('Exercise actual Windows controls with OS input','Focused input reproduction'))
+        jobs=prepared.build_jobs(original)
+        changed_job=jobs['windows'].replace('-O1', '-O2', 1)
+        self.assertNotEqual(changed_job,jobs['windows'])
+        changed=original.replace(jobs['windows'], changed_job)
+        with self.assertRaises(AssertionError): prepared.verify_recipes(original, changed)
+
+    def test_fixture_provenance_rejects_changed_inputs_and_path_escape(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo=Path(temporary);(repo/'native').mkdir();source=repo/'native/core.h';source.write_text('first\nline\n')
+            fixture=repo/'fixture';fixture.mkdir();manifest=fixture/'provenance.json'
+            manifest.write_text(json.dumps({'sourceHashes':{'native/core.h':hashlib.sha256(source.read_bytes()).hexdigest()}}))
+            prepared.verify_fixture(fixture,repo)
+            source.write_bytes(b'first\r\nline\r\n');prepared.verify_fixture(fixture,repo)
+            source.write_text('changed')
+            with self.assertRaises(AssertionError): prepared.verify_fixture(fixture,repo)
+            manifest.write_text(json.dumps({'sourceHashes':{'../other':'invalid'}}))
+            with self.assertRaises(AssertionError): prepared.verify_fixture(fixture,repo)
 
 
 class WorkflowTests(unittest.TestCase):

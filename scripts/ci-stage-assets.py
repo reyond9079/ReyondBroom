@@ -11,5 +11,5 @@ for name in ('ftebroom.cfg', 'quake1.ent', 'update-ftebroom.py', 'update-ftebroo
              'fonts/FTEBroom-CJK.otf', 'scripts/ftebroom.shader'):
     target = data/name; target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(repo/'runtime'/name, target)
-for name in ('glsl', 'plants'):
+for name in ('glsl', 'plants', 'world-architect'):
     shutil.copytree(repo/'runtime'/name, data/name, dirs_exist_ok=True)

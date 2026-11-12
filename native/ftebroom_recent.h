@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 struct RecentMap { std::string path; int profile=-1; bool favorite=false; };
 static std::vector<RecentMap> recentMaps;
-static bool recentLoaded=false,recentWindow=false,recentFavorites=false;
+static bool recentLoaded=false,recentWindow=false,recentFavorites=false,recentFocusRequested=false;
+static bool recentManualUpdates=false;
 enum class WelcomeStage { Updates, Recovery, Recent };
 static WelcomeStage recentStage=WelcomeStage::Recent;
 static bool welcomeUpdatePanel();
@@ -12,8 +13,11 @@ static bool welcomeRecoveryPanel();
 static void welcomeQaItem(const char* id);
 static void welcomeQaWindow(const char* id);
 static void welcomeQaPublish();
-static void recentOpen(){recentStage=welcomeUpdateCommitted()?WelcomeStage::Updates:WelcomeStage::Recent;recentWindow=true;}
-static void welcomeStartup(){recentStage=WelcomeStage::Updates;recentWindow=true;}
+static void recentOpen(){recentStage=welcomeUpdateCommitted()?WelcomeStage::Updates:WelcomeStage::Recent;recentManualUpdates=false;recentWindow=true;}
+static void welcomeStartup(){recentStage=WelcomeStage::Updates;recentManualUpdates=false;recentWindow=true;}
+static void recentOpenUpdates(){
+  recentStage=WelcomeStage::Updates;recentManualUpdates=true;recentWindow=true;recentFocusRequested=true;
+}
 static const char* recentProfileName(int profile) {
   return profile==0?"Quake III Arena":profile==1?"FTE Custom game":profile==2?"Quake 1":profile==3?"Quake II":profile==4?"Half-Life":"Unknown profile";
 }
@@ -49,6 +53,7 @@ static bool recentStar(const char* id,bool& value) {
 static void recentPanel() {
   if(firstSetupStep>=0){recentWindow=false;welcomeQaPublish();return;}
   if(!recentWindow){welcomeQaPublish();return;}recentLoad();ImGui::SetNextWindowSize({760,520},ImGuiCond_FirstUseEver);
+  if(recentFocusRequested){ImGui::SetNextWindowFocus();recentFocusRequested=false;}
   if(ImGui::Begin("Welcome to ReyondBroom",&recentWindow,ImGuiWindowFlags_NoCollapse)) {
     welcomeQaWindow("welcome/window");
     if(recentStage==WelcomeStage::Updates){if(welcomeUpdatePanel())recentStage=WelcomeStage::Recovery;}

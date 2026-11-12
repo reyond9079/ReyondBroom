@@ -29,6 +29,25 @@ function Status([string]$text,[string]$stage='', [long]$received=-1,[long]$total
 }
 function Under([string]$base,[string]$relative){$p=[IO.Path]::GetFullPath((Join-Path $base $relative));if(!$p.StartsWith($base.TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe archive path'};return $p}
 function FileHash([string]$path){$stream=[IO.File]::OpenRead($path);$sha=[Security.Cryptography.SHA256]::Create();try{return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','').ToLowerInvariant()}finally{$stream.Dispose();$sha.Dispose()}}
+function Install-File([string]$source,[string]$target,[string]$backupPath=''){
+ $temporary=$target+'.ftebroom-update-'+[guid]::NewGuid().ToString('N')+'.tmp'
+ try{
+  [IO.File]::Copy($source,$temporary)
+  for($attempt=0;;$attempt++){
+   try{
+    if([IO.File]::Exists($target)){
+     $replacementBackup=if($backupPath){$backupPath}else{[NullString]::Value}
+     [IO.File]::Replace($temporary,$target,$replacementBackup)
+    }else{[IO.File]::Move($temporary,$target)}
+    return
+   }catch{
+    $cause=$_.Exception.GetBaseException()
+    if($attempt -ge 7 -or $cause -isnot [IO.IOException] -or ($cause.HResult -band 0xffff) -notin 32,33){throw}
+    Start-Sleep -Milliseconds 125
+   }
+  }
+ }finally{if([IO.File]::Exists($temporary)){try{[IO.File]::Delete($temporary)}catch{}}}
+}
 function CleanupUpdates([string]$keep){
  $base=[IO.Path]::GetFullPath($updates)
  if((Get-Item -LiteralPath $base).Attributes -band [IO.FileAttributes]::ReparsePoint){return}
@@ -190,14 +209,21 @@ try {
  $backup=Join-Path $updates ('backup-'+[guid]::NewGuid());New-Item -ItemType Directory -Path $backup | Out-Null
  foreach($file in Get-ChildItem -LiteralPath $stage -File -Recurse){
   $relative=$file.FullName.Substring($stage.Length+1);if(Preserve $relative){continue};$target=Under $Root $relative;$saved=Under $backup $relative
-  $existed=Test-Path -LiteralPath $target;if($existed){New-Item -ItemType Directory -Force ([IO.Path]::GetDirectoryName($saved)) | Out-Null;Copy-Item -LiteralPath $target -Destination $saved}
-  $changed+=,@($target,$saved,$existed);New-Item -ItemType Directory -Force ([IO.Path]::GetDirectoryName($target)) | Out-Null
-  $temporary=$target+'.ftebroom-update.tmp';Copy-Item -LiteralPath $file.FullName -Destination $temporary -Force;Move-Item -LiteralPath $temporary -Destination $target -Force
+  try{
+   $existed=[IO.File]::Exists($target)
+   if($existed){
+    if((Get-Item -LiteralPath $target).Length -eq $file.Length -and (FileHash $target) -eq (FileHash $file.FullName)){continue}
+    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($saved)) | Out-Null
+   }
+   [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target)) | Out-Null
+   Install-File $file.FullName $target $saved
+   $changed+=,@($target,$saved,$existed)
+  }catch{throw "Cannot install ${relative}: $($_.Exception.GetBaseException().Message)"}
  }
  if((Test-Path "$stage/bin/fteqw64.exe") -and (Test-Path "$Root/fteqw64.exe")){
   $target=Under $Root 'fteqw64.exe';$saved=Under $backup 'fteqw64.exe'
   Copy-Item -LiteralPath $target -Destination $saved -Force
-  $changed+=,@($target,$saved,$true);Remove-Item -LiteralPath $target
+  Remove-Item -LiteralPath $target;$changed+=,@($target,$saved,$true)
  }
  try{CleanupUpdates $backup}catch{} # Cache cleanup must not roll back a successful install.
  Status 'Update installed. Your settings and documents were preserved. Start ReyondBroom normally.' 'installed'
@@ -208,8 +234,14 @@ try {
   try{Start-Process -FilePath $launcher -WorkingDirectory $Root | Out-Null}catch{Status 'Update installed. Start ReyondBroom normally to continue.' 'installed'}
  }
 } catch {
- foreach($item in $changed){try{if($item[2]){Copy-Item -LiteralPath $item[1] -Destination $item[0] -Force}else{Remove-Item -LiteralPath $item[0] -Force}}catch{}}
- Status ('Update failed: '+$_.Exception.Message) 'error';exit 1
+ $failure=$_.Exception.Message;$rollbackErrors=@()
+ for($index=$changed.Count-1;$index -ge 0;$index--){
+  $item=$changed[$index]
+  try{if($item[2]){Install-File $item[1] $item[0]}else{[IO.File]::Delete($item[0])}}
+  catch{$rollbackErrors+=$item[0]}
+ }
+ if($rollbackErrors.Count){$failure+=' Rollback could not restore: '+($rollbackErrors -join ', ')}
+ Status ('Update failed: '+$failure) 'error';exit 1
 } finally {
  if($process){$process.Dispose()}
  if($mutex){try{$mutex.ReleaseMutex()}catch{};$mutex.Dispose()}

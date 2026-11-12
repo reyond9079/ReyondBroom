@@ -546,7 +546,10 @@ static void actionMenus()
         if(ImGui::MenuItem("Bevel...")){command("ftebroom_generator cancel\n");generatorWindow=2;generatorPreview=false;}
       }
       if(std::string(group)=="Edit" && gameProfile==1)ImGui::MenuItem("Create FTE Engine terrain...",nullptr,&terrainCreateWindow);
-      if(std::string(group)=="Help" && ImGui::BeginMenu("Updates")){updatePanel();ImGui::EndMenu();}
+      if(std::string_view(group)=="Help"){
+        if(ImGui::MenuItem("Updates..."))recentOpenUpdates();
+        runUiRecordGlobal("Menu/Help/Updates...");
+      }
       if(std::string(group)=="View") {
         if(ImGui::BeginMenu("Visibility")){actionMenuGroup("View",true);ImGui::EndMenu();}
         if(ImGui::MenuItem("Viewport options..."))viewOptionsOpen=true;

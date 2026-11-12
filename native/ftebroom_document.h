@@ -543,7 +543,9 @@ static void testBackups()
 // Paths stay in native filesystem APIs; only generated ASCII aliases reach FTE commands.
 static bool fileBrowserSaving, fileBrowserExport, fileBrowserDefinitions,
   definitionsRequest;
-static void definitionsChoose(const std::filesystem::path& path);
+static bool definitionsChoose(const std::filesystem::path& path,std::string& error);
+static std::filesystem::path definitionsBrowseFolder();
+static int definitionFileFilter=0;
 
 static char fileBrowserPath[4096] = {}, fileBrowserName[1024] = {};
 static std::filesystem::path overwriteTarget;
@@ -584,7 +586,8 @@ static void documentFileBrowser()
     fileBrowserDefinitions = definitionsRequest;
     definitionsRequest = false;
     openRequest = saveRequest = false;
-    if(!fileBrowserDefinitions && !fileBrowserTrace)fileBrowserFolder=documentDefaultFolder();
+    if(fileBrowserDefinitions){fileBrowserFolder=definitionsBrowseFolder();definitionFileFilter=0;}
+    else if(!fileBrowserTrace)fileBrowserFolder=documentDefaultFolder();
     else if(fileBrowserFolder.empty())fileBrowserFolder=documentDefaultFolder();
     std::snprintf(
       fileBrowserPath,
@@ -640,6 +643,12 @@ static void documentFileBrowser()
         std::snprintf(fileBrowserPath,sizeof fileBrowserPath,"%s",fileBrowserFolder.u8string().c_str());
       }else documentError="Folder does not exist or cannot be read.";
     }
+    const char* definitionExtensions[]={"", ".fgd", ".def", ".ent"};
+    if(fileBrowserDefinitions){
+      const char* formats[]={uiTr("All definition formats"),uiTr("FGD entity definitions (.fgd)"),uiTr("QUAKED definitions (.def)"),uiTr("XML entity definitions (.ent)")};
+      ImGui::SetNextItemWidth(std::min(320.f,ImGui::GetContentRegionAvail().x));
+      if(ImGui::Combo("Format",&definitionFileFilter,formats,IM_ARRAYSIZE(formats)))fileBrowserName[0]=0;
+    }
     const float contentsHeight=std::max(80.f,ImGui::GetContentRegionAvail().y-105);
     ImGui::BeginChild("Folder hierarchy",{std::min(230.f,ImGui::GetContentRegionAvail().x*.35f),contentsHeight},ImGuiChildFlags_Borders|ImGuiChildFlags_ResizeX);
     int treeBudget=2000;auto treeRoot=fileBrowserFolder.root_path();if(treeRoot.empty())treeRoot=fileBrowserFolder;
@@ -653,7 +662,8 @@ static void documentFileBrowser()
       for(const auto& entry:found){auto extension=entry.second.extension().u8string();std::transform(extension.begin(),extension.end(),extension.begin(),::tolower);
         bool pak=extension==".pak";bool allowedPak=gameClassic()&&!fileBrowserDefinitions&&!fileBrowserTrace&&!fileBrowserObj;
         if(pak&&!allowedPak)continue;
-        if(entry.first || (fileBrowserObj ? extension==".obj" : fileBrowserTrace ? (fileBrowserTrace==1?(extension==".lin"||extension==".pts"):extension==".prt") : fileBrowserDefinitions ? (extension==".ent"||extension==".def"||extension==".fgd") : extension==".map"))entries.push_back(entry);
+        bool definition=(extension==".ent"||extension==".def"||extension==".fgd")&&(!definitionFileFilter||extension==definitionExtensions[definitionFileFilter]);
+        if(entry.first || (fileBrowserObj ? extension==".obj" : fileBrowserTrace ? (fileBrowserTrace==1?(extension==".lin"||extension==".pts"):extension==".prt") : fileBrowserDefinitions ? definition : extension==".map"))entries.push_back(entry);
       }
     }catch(const std::exception& e){if(fileBrowserNew&&!std::filesystem::exists(fileBrowserFolder))ImGui::TextWrapped("This folder will be created when you press Create map. Use Up one level to browse its parent.");else ImGui::TextWrapped("%s",e.what());}
     std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {
@@ -712,11 +722,7 @@ static void documentFileBrowser()
           documentError = "Choose an .ent, .def or .fgd file.";
         else if (!std::filesystem::is_regular_file(target, error))
           documentError = "Definition file does not exist.";
-        else
-        {
-          definitionsChoose(target);
-          ImGui::CloseCurrentPopup();
-        }
+        else if(definitionsChoose(target,documentError))ImGui::CloseCurrentPopup();
       }
       else if (!*fileBrowserName || extension != (fileBrowserObj ? ".obj" : ".map"))
         documentError = fileBrowserObj ? "Choose an .obj file." : "Choose a .map file.";

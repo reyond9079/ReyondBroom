@@ -15,7 +15,7 @@ static std::map<int, std::map<std::string, std::string>> entityProperties;
 static std::map<std::string, int> entityUsage;
 static std::set<std::string> selectedEntityClasses;
 static std::set<std::string> entityMapColors;
-static std::string definitionSource, definitionError, definitionMapPath;
+static std::string definitionSource, definitionOrigin, definitionError, definitionNotice, definitionMapPath;
 static std::map<std::string, ImVec2> entityTestItems;
 static void entityTestItem(const std::string& name)
 {
@@ -82,16 +82,12 @@ static std::string definitionsExpand(
   return result;
 }
 #include "ftebroom_entity_preview.h"
-static void definitionsLoadCommand()
+#include "ftebroom_bb_io.h"
+static bool definitionsLoad(std::string selection, bool mapOverride)
 {
-  if (commands->IsInsecure())
-    return;
-  char argument[4096]{};
-  commands->Argv(1, argument, sizeof argument);
-  std::string path = argument;
-  const bool mapOverride = path.empty() && !definitionMapPath.empty();
-  if (mapOverride)
-    path = definitionMapPath;
+  const bool bundled=selection=="builtin:reyond";
+  std::string path=std::move(selection), notice;
+  std::string origin="Map override";
   if (path.rfind("external:", 0) == 0)
     path = path.substr(9);
   if (path.rfind("builtin:", 0) == 0)
@@ -102,20 +98,31 @@ static void definitionsLoadCommand()
     if (mapOverride && gameClassic() && !path.empty())
     {
       std::string probe;
-      if (!definitionsReadSource(path, probe))
+      if (!definitionsReadSource(path, probe)){
+        notice=std::string(uiTr("Map definition file unavailable:"))+" "+path;
         path.clear();
+      }
     }
     if (path.empty())
     {
-      path=gameDefinitionPath();
+      if(!bundled)path=gameDefinitionPath(origin);
       std::string probe;
-      if(path.empty())path = definitionsReadSource("scripts/entities.def", probe) ? "scripts/entities.def"
-                                                                  : "entities.ent";
+      if(path.empty()&&!bundled&&gameProfile==1&&definitionsReadSource("scripts/entities.def",probe)){
+        origin="Detected in mod";path="scripts/entities.def";
+      }
+      if(path.empty()){
+        gameProfileLoad();origin="Bundled with ReyondBroom";path=bundledDefinitionPath();
+        const auto local=documentPath(path);
+        if(std::filesystem::is_regular_file(local))path=local.generic_u8string();
+      }
     }
     std::set<std::string> includes;
     auto source = definitionsExpand(path, includes);
-    auto loaded =
-      ftebroom::entityRead(source, std::filesystem::u8path(path).extension().u8string());
+    const auto extension=entityLower(std::filesystem::u8path(path).extension().u8string());
+    const auto firstMarkup=source.find_first_of("{<");
+    if(extension==".ent"&&firstMarkup!=source.npos&&source[firstMarkup]=='{')
+      throw std::runtime_error(uiTr("This .ent file contains map entities. Choose an XML .ent definition file instead."));
+    auto loaded=ftebroom::entityRead(source,extension);
     if(gameProfile==2) {
       std::string base;
       if(definitionsReadSource("quake1.ent",base)) {
@@ -136,7 +143,6 @@ static void definitionsLoadCommand()
         if(data)core->Free(data);
       }
     }
-    clearEntityPreviews();
     std::ostringstream out;
     for (const auto& item : loaded)
     {
@@ -171,9 +177,12 @@ static void definitionsLoadCommand()
       throw std::runtime_error("Cannot write entity definition cache");
     int written=files->Write(cacheFile,cache.data(),static_cast<int>(cache.size()));files->Close(cacheFile);
     if(written!=static_cast<int>(cache.size()))throw std::runtime_error("Incomplete entity definition cache");
+    clearEntityPreviews();
     entityDefinitions = std::move(loaded);
     ++entityDefinitionEpoch;
     definitionSource = path;
+    definitionOrigin=origin;
+    definitionNotice=notice;
     definitionError.clear();
     // A map can start its CSQC after the notification command has been sent.
     cvars->SetFloat("ftebroom_entity_assets_epoch",cvars->GetFloat("ftebroom_entity_assets_epoch")+1);
@@ -183,20 +192,43 @@ static void definitionsLoadCommand()
     core->Print(("ReyondBroom: loaded " + std::to_string(entityDefinitions.size())
                  + " entity definitions from " + path + "\n")
                   .c_str());
+    return true;
   }
   catch (const std::exception& e)
   {
     definitionError = e.what();
     core->Print(("ReyondBroom: " + definitionError + "\n").c_str());
   }
+  return false;
+}
+static void definitionsLoadCommand()
+{
+  if (commands->IsInsecure())return;
+  char argument[4096]{};
+  commands->Argv(1,argument,sizeof argument);
+  definitionsLoad(*argument?argument:definitionMapPath,!*argument&&!definitionMapPath.empty());
   definitionRequestPending = false;
 }
-static void definitionsChoose(const std::filesystem::path& path)
+static void definitionsSetMapSource(const std::string& value)
 {
-  auto name = path.generic_u8string();
-  command(("ftebroom_entity_definition_path " + organizationQuote("external:" + name)
-           + "\nftebroom_definitions " + organizationQuote(name) + "\n")
-            .c_str());
+  definitionMapPath=value;
+  command(("ftebroom_entity_definition_path "+organizationQuote(value)+"\n").c_str());
+}
+static bool definitionsChoose(const std::filesystem::path& path,std::string& error)
+{
+  const auto source="external:"+path.generic_u8string();
+  if(!definitionsLoad(source,false)){error=definitionError;return false;}
+  definitionsSetMapSource(source);
+  return true;
+}
+static std::filesystem::path definitionsBrowseFolder()
+{
+  std::error_code error;
+  const auto current=std::filesystem::u8path(definitionSource).parent_path();
+  if(definitionOrigin!="Bundled with ReyondBroom"&&std::filesystem::is_directory(current,error))return current;
+  const auto mod=std::filesystem::u8path(gameProfile==2?q1Authoring():gameRuntime());
+  if(std::filesystem::is_directory(mod,error))return mod;
+  return documentDefaultFolder();
 }
 static int entitySelectionEpoch = -1;
 static bool entitySelectionLinked=false;
@@ -332,39 +364,133 @@ static std::string entitySoundResource(const std::string& value)
   }
   return {};
 }
+static std::string entitySoundCandidate(const std::string& value)
+{
+  auto path=entitySoundPath(value);
+  if(path.find_first_not_of("+-0123456789.eE \t")==path.npos)return {};
+  return path;
+}
+static std::string entitySoundScope()
+{
+  std::ostringstream scope;
+  auto add=[&](const std::filesystem::path& folder){
+    auto path=folder.lexically_normal().generic_u8string();
+#ifdef _WIN32
+    path=entityLower(path);
+#endif
+    scope<<' '<<std::quoted(path);
+  };
+  scope<<gameProfile;
+  add(std::filesystem::u8path(gameProfile==0?std::string(baseq3):gameRuntime()));
+  if(gameProfile==2)for(const auto& folder:gameMapResourcePaths)add(folder);
+  return scope.str();
+}
+using EntitySoundBindings=std::map<std::pair<std::string,std::string>,std::string>;
+static std::filesystem::path entitySoundSettingsPath(){return settingsPath().parent_path()/"ftebroom-preferences-sound-previews.txt";}
+static EntitySoundBindings entitySoundLoadBindings()
+{
+  EntitySoundBindings result;
+  std::ifstream in(entitySoundSettingsPath());
+  std::string scope,classname,path;
+  while(result.size()<4096&&in>>std::quoted(scope)>>std::quoted(classname)>>std::quoted(path))
+    result[{scope,classname}]=entitySoundPath(path);
+  return result;
+}
+static void entitySoundSaveBindings(const EntitySoundBindings& bindings)
+{
+  std::ostringstream out;
+  for(const auto& [key,path]:bindings)out<<std::quoted(key.first)<<' '<<std::quoted(key.second)<<' '<<std::quoted(path)<<'\n';
+  ftebroom::bb::atomicWrite(entitySoundSettingsPath(),out.str());
+}
 static void entitySoundPreview()
 {
-  if(!uiInspectorFold("Sound preview",0))return;
   static char manual[1024]={};
   static std::string error;
+  static std::vector<std::pair<int,std::string>> previousSelection;
+  static std::string previousScope;
+  static int previousMap=-1;
+  std::vector<std::pair<int,std::string>> selection;
+  for(const auto& [id,props]:entityProperties){
+    auto it=props.find("classname");
+    selection.emplace_back(id,it==props.end()?(id==0?"worldspawn":""):entityLower(it->second));
+  }
+  const auto scope=entitySoundScope();
+  if(scope!=previousScope||selection!=previousSelection||previousMap!=organizationMapEpoch){
+    manual[0]=0;error.clear();previousSelection=selection;previousScope=scope;previousMap=organizationMapEpoch;
+  }
+  if(!uiInspectorFold("Sound preview",0))return;
+  static auto bindings=entitySoundLoadBindings();
+  const std::string classname=selection.size()==1?selection.front().second:std::string();
+  const auto bindingKey=std::make_pair(scope,classname);
+  const char* source="Entity property";
   std::string candidate;
   bool music=false;
+  const std::initializer_list<const char*> soundKeys={"noise","sound","soundfile","noise1"};
+  const std::initializer_list<const char*> worldKeys={"ambient_sound","_ambient_sound","ambient","_ambient","ambience","music","sounds"};
   for(const auto& entity:entityProperties) {
     auto findSound=[&](std::initializer_list<const char*> keys){
       for(const char* key:keys){
         auto it=entity.second.find(key);
         if(it==entity.second.end())continue;
-        auto path=entitySoundPath(it->second);
+        auto path=entitySoundCandidate(it->second);
         if(path.empty())continue;
-        if(path.find_first_not_of("+-0123456789.eE \t")==path.npos)
-          continue; // numeric ambient light, track or sound preset
         candidate=std::move(path);
         music=std::string_view(key)=="music";
         return;
       }
     };
-    if(entity.first==0)
-      findSound({"ambient_sound","_ambient_sound","ambient","_ambient","ambience","music","sounds"});
-    if(candidate.empty())findSound({"noise","sound","soundfile","noise1"});
-    auto classname=entity.second.find("classname");
-    if(candidate.empty()&&classname!=entity.second.end()) {
-      static const std::map<std::string,std::string> ambient={{"ambient_suck_wind","ambience/suck1.wav"},{"ambient_drone","ambience/drone6.wav"},{"ambient_flouro_buzz","ambience/buzz1.wav"},{"ambient_drip","ambience/drip1.wav"},{"ambient_comp_hum","ambience/comp1.wav"},{"ambient_thunder","ambience/thunder1.wav"},{"ambient_light_buzz","ambience/fl_hum1.wav"},{"ambient_swamp1","ambience/swamp1.wav"},{"ambient_swamp2","ambience/swamp2.wav"}};
-      auto it=ambient.find(classname->second);if(it!=ambient.end())candidate=it->second;
-    }
+    if(entity.first==0)findSound(worldKeys);
+    if(candidate.empty())findSound(soundKeys);
     if(!candidate.empty())break;
   }
-  if(!candidate.empty())ImGui::TextWrapped("Entity sound: %s",candidate.c_str());
-  if(ImGui::InputTextWithHint("Sound override","Relative path, e.g. ambience/wind.wav",manual,sizeof manual))error.clear();
+  const auto saved=bindings.find(bindingKey);
+  if(candidate.empty()&&saved!=bindings.end()){source="Saved preview for class";candidate=saved->second;}
+  for(const auto& [id,name]:selection){
+    if(!candidate.empty())break;
+    const auto definition=entityDefinitions.find(name);
+    if(definition!=entityDefinitions.end()){
+      const auto& properties=definition->second.properties;
+      auto findDefault=[&](std::initializer_list<const char*> keys){
+        for(const char* key:keys){
+          auto it=properties.find(key);
+          if(it!=properties.end())candidate=entitySoundCandidate(it->second.value);
+          if(!candidate.empty()){music=std::string_view(key)=="music";break;}
+        }
+      };
+      if(id==0)findDefault(worldKeys);
+      if(candidate.empty())findDefault(soundKeys);
+      if(candidate.empty())for(const auto& [key,property]:properties){
+        if(property.type=="sound")candidate=entitySoundCandidate(property.value);
+        if(!candidate.empty())break;
+      }
+      if(!candidate.empty()){source="Definition default";break;}
+    }
+  }
+  if(candidate.empty())for(const auto& [id,name]:selection){
+      static const std::map<std::string,std::string> ambient={{"ambient_suck_wind","ambience/suck1.wav"},{"ambient_drone","ambience/drone6.wav"},{"ambient_flouro_buzz","ambience/buzz1.wav"},{"ambient_drip","ambience/drip1.wav"},{"ambient_comp_hum","ambience/comp1.wav"},{"ambient_thunder","ambience/thunder1.wav"},{"ambient_light_buzz","ambience/fl_hum1.wav"},{"ambient_swamp1","ambience/swamp1.wav"},{"ambient_swamp2","ambience/swamp2.wav"}};
+      auto it=ambient.find(name);if(it!=ambient.end()){source="Built-in ambient sound";candidate=it->second;break;}
+  }
+  if(!candidate.empty())ImGui::TextWrapped("%s: %s",uiTr(source),candidate.c_str());
+  if(ImGui::InputTextWithHint("Sound override",uiTr("Relative path, e.g. ambience/wind.wav"),manual,sizeof manual))error.clear();
+  if(!classname.empty()){
+    auto save=[&](bool clear){
+      try{
+        auto next=bindings;
+        if(clear)next.erase(bindingKey);
+        else {
+          const auto path=entitySoundResource(manual);
+          if(path.empty()){error="Sound file not found in mounted game resources.";return;}
+          next[bindingKey]=path;
+        }
+        entitySoundSaveBindings(next);bindings=std::move(next);manual[0]=0;error.clear();
+      }catch(const std::exception& e){error=e.what();}
+    };
+    const bool hasSaved=saved!=bindings.end();
+    ImGui::BeginDisabled(!*manual);const bool store=ImGui::Button("Save preview for class");ImGui::EndDisabled();
+    ImGui::SameLine();ImGui::BeginDisabled(!hasSaved);const bool clear=ImGui::Button("Clear class preview");ImGui::EndDisabled();
+    if(store||clear)save(clear);
+    ImGui::TextDisabled("%s",uiTr("Class preview paths are stored in the editor."));
+  }
   static float volume=.7f;ImGui::SliderFloat("Preview volume",&volume,0,1);
   if(ImGui::Button("Play sound")) {
     const auto requested=*manual?std::string(manual):candidate;
@@ -427,12 +553,23 @@ static bool entityBrowserIcon(const char* id,bool filter){
   return clicked;
 }
 static void entityDefinitionControls(){
-  ImGui::TextWrapped("%s",definitionSource.c_str());
+  const bool bundled=definitionMapPath=="builtin:reyond";
+  const bool automatic=definitionMapPath.empty()||(!bundled&&definitionMapPath.rfind("builtin:",0)==0);
+  const char* modes[]={"Automatic (profile or mod)","Bundled definitions","Map override"};
+  if(ImGui::BeginCombo("Definition source",uiTr(modes[automatic?0:bundled?1:2]))){
+    if(ImGui::Selectable(modes[0],automatic)&&!automatic&&definitionsLoad({},false))definitionsSetMapSource({});
+    if(ImGui::Selectable(modes[1],bundled)&&!bundled&&definitionsLoad("builtin:reyond",false))definitionsSetMapSource("builtin:reyond");
+    if(ImGui::Selectable(modes[2],!automatic&&!bundled))definitionsRequest=true;
+    ImGui::EndCombo();
+  }
+  if(!definitionSource.empty()){
+    const auto extension=entityLower(std::filesystem::u8path(definitionSource).extension().u8string());
+    ImGui::TextWrapped("%s (%s)",uiTr(definitionOrigin.c_str()),extension.c_str());
+    ImGui::TextWrapped("%s",definitionSource.c_str());
+  }
   if(ImGui::Button("Browse definitions..."))definitionsRequest=true;
   ImGui::SameLine();if(ImGui::Button("Reload"))command("ftebroom_definitions\n");
-  if(ImGui::Button("Use game defaults")){
-    definitionMapPath.clear();command("ftebroom_entity_definition_path \"\"\nftebroom_definitions\n");
-  }
+  if(!definitionNotice.empty())ImGui::TextWrapped("%s",definitionNotice.c_str());
   if(!definitionError.empty())ImGui::TextWrapped("%s",definitionError.c_str());
 }
 static void entityPanel()

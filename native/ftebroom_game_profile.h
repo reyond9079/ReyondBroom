@@ -137,18 +137,27 @@ static void gameProfileFields(bool wizard=false)
   gameWallBrowser();
 }
 
-static std::string gameDefinitionPath()
+static std::string bundledDefinitionPath()
 {
-  gameProfileLoad();if(gameProfile>=3){
+  if(gameProfile==4)return hlRuntime?"counterstrike.fgd":"halflife.fgd";
+  if(gameProfile==3)return "quake2.fgd";
+  if(gameProfile==2)return q1UseLibre?"librequake.def":"quake1.ent";
+  return "entities.ent";
+}
+static std::string gameDefinitionPath(std::string& origin)
+{
+  gameProfileLoad();origin="Game profile";if(gameProfile>=3){
     auto overridePath=gameProfile==3?q2Definitions:hlDefinitions;if(*overridePath)return overridePath;
+    origin="Detected in mod";
     auto found=ftebroom::discoverModDefinitions(std::filesystem::u8path(gameRuntime()));
-    return !found.empty()?found:gameProfile==3?"quake2.fgd":hlRuntime?"counterstrike.fgd":"halflife.fgd";
+    return found;
   }if(gameProfile==2){
     if(*q1Definitions)return q1Definitions;
+    origin="Detected in mod";
     std::string detected;
     if(gameMapModsKnown)for(auto path=gameMapResourcePaths.rbegin();path!=gameMapResourcePaths.rend()&&detected.empty();++path)detected=ftebroom::discoverModDefinitions(*path);
     if(detected.empty())detected=ftebroom::discoverModDefinitions(std::filesystem::u8path(q1Authoring()));
-    return !detected.empty()?detected:q1UseLibre?"librequake.def":"quake1.ent";
+    return detected;
   }if(gameProfile!=1)return {};
   if(*gameDefinitions)return gameDefinitions;
   auto root=std::filesystem::u8path(gameQC);
@@ -170,5 +179,6 @@ static std::string gameDefinitionPath()
   auto path=settingsPath().parent_path()/"ftebroom-mod-entities.def";
   std::ofstream output(path);output<<result;output.close();
   if(!output)throw std::runtime_error("Cannot write the local mod entity definition cache.");
+  origin="QuakeC source";
   return path.u8string();
 }

@@ -162,22 +162,41 @@ static bool welcomeUpdatePanel(){
     }
     return false;
   }
-  if(updateStage=="current")return true;
+  if(updateStage=="current"&&!recentManualUpdates)return true;
   if(updateStage=="available"){
     ImGui::TextWrapped("A new release is available. Download it now to continue with the latest version.");
-    bool start=ImGui::Button("Update and continue",{-1,0});welcomeQaItem("update/start");if(start&&updateStart("prepare"))updateCommitted=true;
+    ImGui::BeginDisabled(updateRunning());
+    bool start=ImGui::Button("Update and continue",{-1,0});welcomeQaItem("update/start");
+    ImGui::EndDisabled();
+    if(start&&updateStart("prepare"))updateCommitted=true;
   }
-  bool skip=ImGui::Button("Continue without updating",{-1,0});welcomeQaItem("update/skip");if(skip)return true;
-  if(updateStage=="error"&&ImGui::Button("Check again",{-1,0}))updateStart();
+  if(!recentManualUpdates){
+    bool skip=ImGui::Button("Continue without updating",{-1,0});welcomeQaItem("update/skip");if(skip)return true;
+  }
+  if(updateStage=="error"||(recentManualUpdates&&updateStage=="current")){
+    ImGui::BeginDisabled(updateRunning());
+    if(ImGui::Button("Check again",{-1,0}))updateStart();
+    ImGui::EndDisabled();
+  }
   return false;
 }
 static void updatePanel(){
   ImGui::Text("ReyondBroom %s",editorVersion().c_str());
   if(!updateAvailable.empty())ImGui::TextColored(ImVec4(.42f,.78f,.58f,1.f),"Available: %s",updateAvailable.c_str());
   ImGui::TextWrapped("%s",updateMessage.empty()?"Updates are checked automatically at startup.":updateMessage.c_str());
-  if(updateCommitted){if(ImGui::Button("Show update progress")){recentStage=WelcomeStage::Updates;recentWindow=true;}}
+  bool showProgress=false;
+  if(updateCommitted){showProgress=ImGui::Button("Show update progress");welcomeQaItem("updates/show-progress");}
   else {
-    if(updateStage=="available"&&ImGui::Button("Update and continue")&&updateStart("prepare")){updateCommitted=true;recentStage=WelcomeStage::Updates;recentWindow=true;}
+    ImGui::BeginDisabled(updateRunning());
+    if(updateStage=="available"){
+      const bool start=ImGui::Button("Update and continue");welcomeQaItem("updates/start");
+      if(start&&updateStart("prepare"))updateCommitted=showProgress=true;
+    }
     if(ImGui::Button("Check for updates"))updateStart();
+    ImGui::EndDisabled();
+  }
+  if(showProgress){
+    recentOpenUpdates();
+    ImGui::CloseCurrentPopup();
   }
 }

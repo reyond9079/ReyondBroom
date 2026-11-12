@@ -158,8 +158,11 @@ WORLD_HOST_ADDITIONS = {
     ],
     'qc/csaddon.qc': ['    registercommand("ftebroom_world_apply");\n'],
     'native/ftebroom_plugins.h': [
+        '  const bool opened=ImGui::BeginMenu("Plugins");runUiRecordGlobal("menu/Plugins");\n  if(opened){\n',
+        '  if(ImGui::BeginMenu("Plugins")){\n',
         '    if(ImGui::MenuItem("World Architect (development preview)..."))worldOpen();\n',
         '    if(ImGui::MenuItem("World Architect..."))worldOpen();\n',
+        '    runUiRecordGlobal("Menu/Plugins/World Architect...");\n',
         '    for(auto& p:editorPlugins)if(p.api)if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n',
         '    for(auto& p:editorPlugins)if(p.api&&p.id!="org.reyondbroom.autolevel"&&p.id!="org.reyondbroom.levelgen")if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n',
         '    if(ImGui::BeginMenu("Legacy generators")){\n      for(auto& p:editorPlugins)if(p.api&&(p.id=="org.reyondbroom.autolevel"||p.id=="org.reyondbroom.levelgen"))if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n      ImGui::EndMenu();\n    }\n',

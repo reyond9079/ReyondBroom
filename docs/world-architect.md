@@ -1,15 +1,15 @@
-# World Architect development preview
+# World Architect
 
-RB-7 is still in development. AutoLevel remains available and remains the default
-generator until the complete specification passes acceptance. The preview below
-is implemented in native C++/ImGui; generation needs no Python, external editor,
+World Architect is the primary level generator in Plugins. AutoLevel remains
+available under **Plugins → Legacy generators**, with its data and settings
+preserved. The workspace is implemented in native C++/ImGui; generation needs no Python, external editor,
 cloud service or language model.
 
 ## First run
 
 1. Open a brush map under Quake 1, Quake III or FTE Custom.
-2. Open **Plugins → World Architect (development preview)**.
-3. Choose a prototype preset, seed, scale, damage and dressing density.
+2. Open **Plugins → World Architect**.
+3. Choose a preset, seed, scale, damage and dressing density.
 4. Click **Generate candidates**. Preview does not change the authored scene.
 5. Select a candidate. Quality compares up to four actual spatial plans and their
    individual score breakdowns side by side; selecting one also selects its
@@ -19,12 +19,11 @@ cloud service or language model.
 6. Save the editable project or export its MAP and assets. Use **Apply to current
    map** to insert editable geometry in one map Undo/Redo transaction.
 
-The eight registry entries are still prototype configurations, not eight
-finished showcase maps. Each configuration has scenario-specific physical structures, including roof
+The eight presets have scenario-specific physical structures, including roof
 escape stairs, a checkpoint booth/barricade, a factory crane and presses, garage
 openings, a genuinely broken overpass, a continuous mall service corridor, and
-an evacuation portico/beacon. Final art and play acceptance remains open. See [development status](world-architect-development.md) for
-the delivered and remaining work.
+an evacuation portico/beacon. See [acceptance evidence](world-architect-acceptance.md)
+for measured generation, editor, compiler and game results and their limits.
 
 ## Iterate while preserving earlier stages
 
@@ -167,8 +166,8 @@ preserved with an explicit inspection diagnostic.
   Read the diagnostics; reduce scale/scope or adjust incompatible dimensions.
 - Apply waits for an executed import acknowledgment. Stale map/profile requests
   and malformed staging files leave the map unchanged.
-- Quake II and GoldSrc compiler/play acceptance is not certified for this preview.
-- Opening the preview does not overwrite or silently migrate AutoLevel settings,
+- Quake II and GoldSrc compiler/play acceptance is not certified.
+- Opening World Architect does not overwrite or silently migrate AutoLevel settings,
   modules or maps. Use the explicit migration bundle for backup/extraction; keep
   the existing AutoLevel route for its WFC authoring and solver semantics.
 

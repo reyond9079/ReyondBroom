@@ -1,0 +1,1064 @@
+{
+  "sourceRevision": "049be4c0e4bff5f69981d1512d428a68b563ec11",
+  "method": "100 seeds x eight presets x three formats; four candidates per seed; deterministic replay, independent MAP parse and representative real BSP/light compilers",
+  "corpus": [
+    {
+      "profile": 2,
+      "accepted_batches": 800,
+      "attempts": 3200,
+      "rejections": 21,
+      "compiled": [
+        "checkpoint",
+        "hospital",
+        "metro",
+        "factory",
+        "courtyard",
+        "overpass",
+        "mall",
+        "evacuation"
+      ],
+      "presets": {
+        "checkpoint": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 82,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 791,
+            "mean": 1065.05,
+            "max": 1137
+          },
+          "mapBytes": {
+            "min": 1051126,
+            "mean": 1423300.55,
+            "max": 1521231
+          },
+          "routeUnits": {
+            "min": 9536.09549782967,
+            "mean": 10652.423154436186,
+            "max": 11292.14045105495
+          },
+          "generationMs": {
+            "min": 104.116007,
+            "mean": 135.24887143,
+            "max": 211.376437
+          },
+          "roomHeightKinds": {
+            "min": 4,
+            "mean": 6.25,
+            "max": 7
+          }
+        },
+        "courtyard": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 89,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 771,
+            "mean": 993.59,
+            "max": 1110
+          },
+          "mapBytes": {
+            "min": 1039015,
+            "mean": 1341054.43,
+            "max": 1499692
+          },
+          "routeUnits": {
+            "min": 17586.055708429034,
+            "mean": 23724.150516061607,
+            "max": 28707.97866225078
+          },
+          "generationMs": {
+            "min": 84.835026,
+            "mean": 116.99497235999999,
+            "max": 172.321082
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "evacuation": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 92,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 722,
+            "mean": 925.4,
+            "max": 1164
+          },
+          "mapBytes": {
+            "min": 983091,
+            "mean": 1258267.63,
+            "max": 1581460
+          },
+          "routeUnits": {
+            "min": 7903.40818043084,
+            "mean": 22502.419357751798,
+            "max": 33576.34577975402
+          },
+          "generationMs": {
+            "min": 70.600799,
+            "mean": 97.65718083,
+            "max": 185.904783
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "factory": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 84,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 982,
+            "mean": 1079.42,
+            "max": 1256
+          },
+          "mapBytes": {
+            "min": 1413035,
+            "mean": 1561320.87,
+            "max": 1834645
+          },
+          "routeUnits": {
+            "min": 15124.0383238255,
+            "mean": 16243.731701645565,
+            "max": 17973.123948975313
+          },
+          "generationMs": {
+            "min": 112.735743,
+            "mean": 127.80912459,
+            "max": 153.438309
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 6.2,
+            "max": 7
+          }
+        },
+        "hospital": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 965,
+            "mean": 1019.59,
+            "max": 1089
+          },
+          "mapBytes": {
+            "min": 1289222,
+            "mean": 1361761.04,
+            "max": 1454229
+          },
+          "routeUnits": {
+            "min": 10871.259242705994,
+            "mean": 12972.753547231867,
+            "max": 14784.937594435474
+          },
+          "generationMs": {
+            "min": 83.265836,
+            "mean": 98.68490951,
+            "max": 141.219839
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.93,
+            "max": 6
+          }
+        },
+        "mall": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 80,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 669,
+            "mean": 709.65,
+            "max": 748
+          },
+          "mapBytes": {
+            "min": 895720,
+            "mean": 950069.8,
+            "max": 1004503
+          },
+          "routeUnits": {
+            "min": 10392.890361448555,
+            "mean": 11758.490482623662,
+            "max": 14086.67510354179
+          },
+          "generationMs": {
+            "min": 58.110351,
+            "mean": 65.42235538,
+            "max": 89.416868
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 4.97,
+            "max": 7
+          }
+        },
+        "metro": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 496,
+            "mean": 522.18,
+            "max": 556
+          },
+          "mapBytes": {
+            "min": 663794,
+            "mean": 698963.08,
+            "max": 744445
+          },
+          "routeUnits": {
+            "min": 11793.583490970916,
+            "mean": 12993.830812382339,
+            "max": 15107.504485582767
+          },
+          "generationMs": {
+            "min": 41.865151,
+            "mean": 49.080730169999995,
+            "max": 102.539508
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 5.37,
+            "max": 6
+          }
+        },
+        "overpass": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 789,
+            "mean": 1024.09,
+            "max": 1222
+          },
+          "mapBytes": {
+            "min": 1064787,
+            "mean": 1380817.19,
+            "max": 1646702
+          },
+          "routeUnits": {
+            "min": 15929.423680243217,
+            "mean": 27652.322622304695,
+            "max": 33246.50341115341
+          },
+          "generationMs": {
+            "min": 83.253871,
+            "mean": 116.80074,
+            "max": 163.78722199999999
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.96,
+            "max": 6
+          }
+        }
+      },
+      "compileSeconds": {
+        "checkpoint": 2.660448840004392,
+        "hospital": 1.5894016289967112,
+        "metro": 0.5704636909940746,
+        "factory": 3.5183439149986953,
+        "courtyard": 1.3357870150066447,
+        "overpass": 1.3905067690066062,
+        "mall": 1.0020053409971297,
+        "evacuation": 1.7578690800000913
+      },
+      "waterLeaves": 6
+    },
+    {
+      "profile": 0,
+      "accepted_batches": 800,
+      "attempts": 3200,
+      "rejections": 21,
+      "compiled": [
+        "checkpoint",
+        "hospital",
+        "metro",
+        "factory",
+        "courtyard",
+        "overpass",
+        "mall",
+        "evacuation"
+      ],
+      "presets": {
+        "checkpoint": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 82,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 785,
+            "mean": 1059.05,
+            "max": 1131
+          },
+          "mapBytes": {
+            "min": 1043001,
+            "mean": 1415175.55,
+            "max": 1513106
+          },
+          "routeUnits": {
+            "min": 9536.09549782967,
+            "mean": 10652.423154436186,
+            "max": 11292.14045105495
+          },
+          "generationMs": {
+            "min": 86.243059,
+            "mean": 121.91561657,
+            "max": 203.73275
+          },
+          "roomHeightKinds": {
+            "min": 4,
+            "mean": 6.25,
+            "max": 7
+          }
+        },
+        "courtyard": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 89,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 765,
+            "mean": 987.59,
+            "max": 1104
+          },
+          "mapBytes": {
+            "min": 1030872,
+            "mean": 1332881.73,
+            "max": 1491519
+          },
+          "routeUnits": {
+            "min": 17586.055708429034,
+            "mean": 23724.150516061607,
+            "max": 28707.97866225078
+          },
+          "generationMs": {
+            "min": 80.907373,
+            "mean": 106.46703081,
+            "max": 134.031293
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "evacuation": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 92,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 716,
+            "mean": 919.4,
+            "max": 1158
+          },
+          "mapBytes": {
+            "min": 974948,
+            "mean": 1250124.63,
+            "max": 1573317
+          },
+          "routeUnits": {
+            "min": 7903.40818043084,
+            "mean": 22502.419357751798,
+            "max": 33576.34577975402
+          },
+          "generationMs": {
+            "min": 67.543534,
+            "mean": 91.63243966,
+            "max": 118.818225
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "factory": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 84,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 976,
+            "mean": 1073.42,
+            "max": 1250
+          },
+          "mapBytes": {
+            "min": 1405060,
+            "mean": 1553345.87,
+            "max": 1826670
+          },
+          "routeUnits": {
+            "min": 15124.0383238255,
+            "mean": 16243.731701645565,
+            "max": 17973.123948975313
+          },
+          "generationMs": {
+            "min": 110.127928,
+            "mean": 126.68263302999999,
+            "max": 162.904576
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 6.2,
+            "max": 7
+          }
+        },
+        "hospital": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 959,
+            "mean": 1013.59,
+            "max": 1083
+          },
+          "mapBytes": {
+            "min": 1281127,
+            "mean": 1353666.04,
+            "max": 1446134
+          },
+          "routeUnits": {
+            "min": 10871.259242705994,
+            "mean": 12972.753547231867,
+            "max": 14784.937594435474
+          },
+          "generationMs": {
+            "min": 80.260623,
+            "mean": 88.05678421,
+            "max": 109.112496
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.93,
+            "max": 6
+          }
+        },
+        "mall": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 80,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 663,
+            "mean": 703.65,
+            "max": 742
+          },
+          "mapBytes": {
+            "min": 887685,
+            "mean": 942034.8,
+            "max": 996468
+          },
+          "routeUnits": {
+            "min": 10392.890361448555,
+            "mean": 11758.490482623662,
+            "max": 14086.67510354179
+          },
+          "generationMs": {
+            "min": 56.519136,
+            "mean": 61.01051136,
+            "max": 78.383651
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 4.97,
+            "max": 7
+          }
+        },
+        "metro": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 490,
+            "mean": 516.18,
+            "max": 550
+          },
+          "mapBytes": {
+            "min": 655747,
+            "mean": 690916.08,
+            "max": 736398
+          },
+          "routeUnits": {
+            "min": 11793.583490970916,
+            "mean": 12993.830812382339,
+            "max": 15107.504485582767
+          },
+          "generationMs": {
+            "min": 40.982949,
+            "mean": 44.74335883,
+            "max": 58.13828
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 5.37,
+            "max": 6
+          }
+        },
+        "overpass": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 783,
+            "mean": 1018.09,
+            "max": 1216
+          },
+          "mapBytes": {
+            "min": 1056644,
+            "mean": 1372644.79,
+            "max": 1638529
+          },
+          "routeUnits": {
+            "min": 15929.423680243217,
+            "mean": 27652.322622304695,
+            "max": 33246.50341115341
+          },
+          "generationMs": {
+            "min": 80.05501699999999,
+            "mean": 106.86370127,
+            "max": 143.321407
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.96,
+            "max": 6
+          }
+        }
+      },
+      "compileSeconds": {
+        "checkpoint": 1.6768738480168395,
+        "hospital": 2.635172495007282,
+        "metro": 1.0077856659772806,
+        "factory": 1.6882913560257293,
+        "courtyard": 2.1811101339990273,
+        "overpass": 2.328895779006416,
+        "mall": 1.5507982459967025,
+        "evacuation": 2.238589246000629
+      },
+      "waterShaders": 1
+    },
+    {
+      "profile": 1,
+      "accepted_batches": 800,
+      "attempts": 3200,
+      "rejections": 21,
+      "compiled": [
+        "checkpoint",
+        "hospital",
+        "metro",
+        "factory",
+        "courtyard",
+        "overpass",
+        "mall",
+        "evacuation"
+      ],
+      "presets": {
+        "checkpoint": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 82,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 785,
+            "mean": 1059.05,
+            "max": 1131
+          },
+          "mapBytes": {
+            "min": 1042996,
+            "mean": 1415170.55,
+            "max": 1513101
+          },
+          "routeUnits": {
+            "min": 9536.09549782967,
+            "mean": 10652.423154436186,
+            "max": 11292.14045105495
+          },
+          "generationMs": {
+            "min": 87.58145499999999,
+            "mean": 120.78696448999999,
+            "max": 161.043062
+          },
+          "roomHeightKinds": {
+            "min": 4,
+            "mean": 6.25,
+            "max": 7
+          }
+        },
+        "courtyard": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 89,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 765,
+            "mean": 987.59,
+            "max": 1104
+          },
+          "mapBytes": {
+            "min": 1030867,
+            "mean": 1332876.73,
+            "max": 1491514
+          },
+          "routeUnits": {
+            "min": 17586.055708429034,
+            "mean": 23724.150516061607,
+            "max": 28707.97866225078
+          },
+          "generationMs": {
+            "min": 79.697807,
+            "mean": 105.65974794,
+            "max": 134.541712
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "evacuation": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 92,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 716,
+            "mean": 919.4,
+            "max": 1158
+          },
+          "mapBytes": {
+            "min": 974943,
+            "mean": 1250119.63,
+            "max": 1573312
+          },
+          "routeUnits": {
+            "min": 7903.40818043084,
+            "mean": 22502.419357751798,
+            "max": 33576.34577975402
+          },
+          "generationMs": {
+            "min": 67.821935,
+            "mean": 100.61901562999999,
+            "max": 154.364688
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "factory": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 84,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 976,
+            "mean": 1073.42,
+            "max": 1250
+          },
+          "mapBytes": {
+            "min": 1405055,
+            "mean": 1553340.87,
+            "max": 1826665
+          },
+          "routeUnits": {
+            "min": 15124.0383238255,
+            "mean": 16243.731701645565,
+            "max": 17973.123948975313
+          },
+          "generationMs": {
+            "min": 110.53947699999999,
+            "mean": 126.34078966999999,
+            "max": 145.43016
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 6.2,
+            "max": 7
+          }
+        },
+        "hospital": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 959,
+            "mean": 1013.59,
+            "max": 1083
+          },
+          "mapBytes": {
+            "min": 1281122,
+            "mean": 1353661.04,
+            "max": 1446129
+          },
+          "routeUnits": {
+            "min": 10871.259242705994,
+            "mean": 12972.753547231867,
+            "max": 14784.937594435474
+          },
+          "generationMs": {
+            "min": 80.632369,
+            "mean": 86.57520068,
+            "max": 111.165849
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.93,
+            "max": 6
+          }
+        },
+        "mall": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 80,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 663,
+            "mean": 703.65,
+            "max": 742
+          },
+          "mapBytes": {
+            "min": 887680,
+            "mean": 942029.8,
+            "max": 996463
+          },
+          "routeUnits": {
+            "min": 10392.890361448555,
+            "mean": 11758.490482623662,
+            "max": 14086.67510354179
+          },
+          "generationMs": {
+            "min": 56.74667,
+            "mean": 71.65086868,
+            "max": 103.073697
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 4.97,
+            "max": 7
+          }
+        },
+        "metro": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 490,
+            "mean": 516.18,
+            "max": 550
+          },
+          "mapBytes": {
+            "min": 655742,
+            "mean": 690911.08,
+            "max": 736393
+          },
+          "routeUnits": {
+            "min": 11793.583490970916,
+            "mean": 12993.830812382339,
+            "max": 15107.504485582767
+          },
+          "generationMs": {
+            "min": 41.484199000000004,
+            "mean": 44.8199828,
+            "max": 77.537038
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 5.37,
+            "max": 6
+          }
+        },
+        "overpass": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 783,
+            "mean": 1018.09,
+            "max": 1216
+          },
+          "mapBytes": {
+            "min": 1056639,
+            "mean": 1372639.79,
+            "max": 1638524
+          },
+          "routeUnits": {
+            "min": 15929.423680243217,
+            "mean": 27652.322622304695,
+            "max": 33246.50341115341
+          },
+          "generationMs": {
+            "min": 79.337053,
+            "mean": 107.74883709,
+            "max": 152.523164
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.96,
+            "max": 6
+          }
+        }
+      },
+      "compileSeconds": {
+        "checkpoint": 1.5426515570143238,
+        "hospital": 2.609268455009442,
+        "metro": 0.9195248539908789,
+        "factory": 1.6902495219837874,
+        "courtyard": 2.154641504981555,
+        "overpass": 2.2307545889925677,
+        "mall": 1.5163612290052697,
+        "evacuation": 2.2938019199937116
+      },
+      "waterShaders": 1
+    }
+  ],
+  "performance": {
+    "sourceRevision": "049be4c",
+    "elapsedSeconds": 1312.9308133150043,
+    "pipelinePeakRssKiB": 741456,
+    "pipelineIncludes": "Fixture compilation, 100-seed/preset/profile deterministic generation and replay, actual BSP/light compilers",
+    "userSeconds": 1311.415973,
+    "systemSeconds": 10.788763,
+    "exitCode": 0
+  },
+  "captureProvenance": {
+    "hospital": {
+      "source": "/workspace/reyon7/final-gameplay/full-review-4/hospital-walk-60.png",
+      "sourceSha256": "a6b1c6628ce8b3b65e7d2aeb21cc2615975c618bb3712e381fb23790ed796e3c",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    },
+    "metro": {
+      "source": "/workspace/reyon7/final-gameplay/full-review-5/metro-walk-12.png",
+      "sourceSha256": "90f8337385bd7a8457d55e4cf2618ced945cbc3e7242c9fe894fd3fcad5446f0",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    },
+    "city": {
+      "source": "/workspace/reyon7/final-gameplay/full-review-5/evacuation-walk-48.png",
+      "sourceSha256": "25e8bfa3a9f4896a7d8f70b00934c6c068eb451fff84ca8fa41bc786e74eb60a",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    },
+    "stair-lighting": {
+      "source": "/workspace/reyon7/stair-light-review/engine/captures/hospital-exterior-stair-lit.png",
+      "sourceSha256": "cd28f74a2c1365885b71e714c4a80e66e8257655e138383d5163aa0c6cc42050",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    }
+  },
+  "humanStyleReview": {
+    "date": "2026-11-12",
+    "evidence": "Actual hospital, metro and city game captures shown inline in chat",
+    "response": "Принимаю текущий стиль",
+    "scope": "Environment style accepted; this does not assert a full human route walkthrough."
+  },
+  "platformRuns": {
+    "production": 43171833201,
+    "preparedWindowsLocal": 43176652194,
+    "preparedWindowsRemaining": 43177426103
+  },
+  "promotionEvidence": {
+    "native": {
+      "moduleSha256": "6d88a0edff2716f25b82264c4ab804ab4d624f548a82c75804d00dbb09c51781",
+      "change": "Only primary/legacy menu organization and World workspace labels since production049; generator/QC unchanged",
+      "immutableFile": "/workspace/reyon7/fteplug-world-promoted.so"
+    },
+    "workspaceChecks": [
+      "the first workspace tab click is received after actual OS activation",
+      "settings Undo restores the previous independent seed edit",
+      "a second settings Undo restores the original seed",
+      "settings Redo survives the Undo button action and restores both edits",
+      "actual UI generates accepted candidates without mutating the scene",
+      "candidate generation and preview leave authored brushes unchanged",
+      "chosen candidate passes the physical hull navigation oracle",
+      "project saves the selected candidate and complete preset registry snapshot",
+      "project reopen and regeneration restore the exact selected candidate",
+      "3D preview contains actual textured architecture instead of a missing render target",
+      "export writes actual brush MAP and a versioned editable project",
+      "portable export includes real original WAD and texture assets",
+      "Apply waits for an executed QC map transaction acknowledgment",
+      "Apply inserts editable generated brushes",
+      "Apply retains every original authored brush plane",
+      "one Undo restores the original scene",
+      "one Redo restores the complete generated world",
+      "execution-time epoch guard rejects a stale request without changing the map",
+      "import protocol rejects path-shaped request tokens",
+      "invalid staged MAP is rejected atomically",
+      "rejected imports do not create extra map Undo transactions",
+      "rejected imports preserve the previous complete Redo transaction",
+      "freezing architecture retains the selected site while later stages use a new seed",
+      "regeneration reuses the actual frozen prefix cache",
+      "saved project restores frozen stage recipes and its selected candidate",
+      "freeze, regeneration and project replay leave authored map geometry unchanged"
+    ],
+    "entryChecks": [
+      "workspace closes without affecting the map",
+      "primary Plugins menu opens World Architect through actual OS input",
+      "preserved AutoLevel opens through the explicit Legacy generators submenu"
+    ],
+    "CIpolicyChecks": 31
+  }
+}

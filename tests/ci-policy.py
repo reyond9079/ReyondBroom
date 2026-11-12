@@ -76,6 +76,17 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(planner.world_host_scope('qc/fb_clipboard.qc', before, after), {'world_ui'})
         self.assertIsNone(planner.world_host_scope('qc/fb_clipboard.qc', before, after.replace('entities[i]=id', 'entities[i]=0')))
 
+    def test_promoted_world_menu_keeps_legacy_entry_and_other_plugin_changes_conservative(self):
+        source = (REPO/'native/ftebroom_plugins.h').read_text()
+        begin = source.index('    if(ImGui::MenuItem("World Architect..."))')
+        end = source.index('    ImGui::EndMenu();\n  }\n}', begin)
+        promoted = source[begin:end]
+        previous = ('    if(ImGui::MenuItem("World Architect (development preview)..."))worldOpen();\n'
+                    '    if(ImGui::MenuItem("Manage plugins..."))pluginManagerOpen=true;\n'
+                    '    for(auto& p:editorPlugins)if(p.api)if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n')
+        self.assertEqual(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted), {'world_ui'})
+        self.assertIsNone(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted.replace('pluginManagerOpen=true;', 'pluginManagerOpen=false;')))
+
     def test_windows_release_build_creates_its_output_when_audio_tests_are_skipped(self):
         import re
         import shlex

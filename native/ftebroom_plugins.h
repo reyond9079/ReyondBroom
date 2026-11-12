@@ -201,9 +201,13 @@ static void pluginsTick(){
 }
 static void pluginsMenu(){
   if(ImGui::BeginMenu("Plugins")){
-    if(ImGui::MenuItem("World Architect (development preview)..."))worldOpen();
+    if(ImGui::MenuItem("World Architect..."))worldOpen();
     if(ImGui::MenuItem("Manage plugins..."))pluginManagerOpen=true;
-    for(auto& p:editorPlugins)if(p.api)if(ImGui::MenuItem(p.name.c_str()))p.open=true;
+    for(auto& p:editorPlugins)if(p.api&&p.id!="org.reyondbroom.autolevel"&&p.id!="org.reyondbroom.levelgen")if(ImGui::MenuItem(p.name.c_str()))p.open=true;
+    if(ImGui::BeginMenu("Legacy generators")){
+      for(auto& p:editorPlugins)if(p.api&&(p.id=="org.reyondbroom.autolevel"||p.id=="org.reyondbroom.levelgen"))if(ImGui::MenuItem(p.name.c_str()))p.open=true;
+      ImGui::EndMenu();
+    }
     ImGui::EndMenu();
   }
 }

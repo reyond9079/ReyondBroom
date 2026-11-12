@@ -4,7 +4,8 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--engine',type=Path);a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--engine',type=Path);a=p.parse_args()
+assert not (a.regions_only and a.pins_only),'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
@@ -71,6 +72,24 @@ try:
  check(True,'the first workspace tab click is received after actual OS activation')
  click('tab/0')
  before=save('wa-before');baseline=planes(before)
+ if a.pins_only:
+  assert a.preset=='evacuation','Pin fixture needs independently generated buildings'
+  click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
+  def export_pin(name):
+   click('tab/4');dest=out/name/'world.map';click('export');choose(dest);wait(dest.exists);return regions(dest)
+  original=export_pin('before-pin');click('tab/3');click('detail-building');click('detail-building/101');click('pin-building');wait(lambda:live()['settings']['pinnedRegions']==[101])
+  check(all(live()['settings']['stageLocks'][:2]),'pinning through actual UI freezes the shared Mission and Site')
+  click('undo-settings');wait(lambda:not live()['settings']['pinnedRegions']);click('redo-settings');wait(lambda:live()['settings']['pinnedRegions']==[101])
+  check(True,'pinning participates in ordinary settings Undo and Redo')
+  click('seed');ui.key('a',('ctrl',));ui.text('57');ui.key('enter');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);assert not live()['error'],live()['error']
+  changed=export_pin('after-pin')
+  check(changed['101']['geometry']==original['101']['geometry'] and changed['101']['points']==original['101']['points'],'a pinned building keeps exact exported brushes and point entities after regeneration')
+  check(any(changed[k]['geometry']!=original[k]['geometry'] for k in ['100','102','103']),'other buildings still vary under a new global seed')
+  click('tab/3');project=out/'pinned.world.json';click('save-project');choose(project);wait(project.exists);click('open-project');choose(project);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
+  replay=export_pin('reopened-pin');check(replay==changed,'saved project reload restores the accepted pinned world without an in-memory candidate')
+  click('tab/3');click('pin-building');wait(lambda:not live()['settings']['pinnedRegions']);check(not live()['settings']['regionRecipes'],'unpin removes the building recipes through actual UI')
+  check(planes(save('wa-pin-preview'))==baseline,'pin, regenerate, export and project replay retain the authored map')
+  ImageGrab.grab().save(out/'world-pins.png');(out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect pin UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.regions_only:
   assert a.preset=='evacuation','Regional fixture needs multiple buildings'
   click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);seeds=live()['candidateSeeds'];assert 1 in seeds;click('candidate/'+str(seeds.index(1)))

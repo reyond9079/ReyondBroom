@@ -41,6 +41,22 @@ candidate never exempts new collision requirements.
 of map Undo/Redo. Changing configuration makes the old candidate stale; regenerate
 before export or Apply.
 
+## Preserve a complete building
+
+In **Project → Building details**, select a building and click **Pin selected
+building**. Its accepted Architecture, Damage and Dressing recipes are retained
+independently. New seeds can vary the other buildings. Mission and Site remain
+frozen while pins exist: moving their roads, rooms or lots would invalidate the
+retained building. Navigation and export still validate every candidate.
+
+Pins are saved inside the editable project, including the registry fingerprint;
+they need no external mesh cache. Pin/unpin uses settings Undo/Redo. **Unpin
+selected building** releases its recipes and any later global stage freezes;
+the shared Mission/Site baseline remains until explicitly unlocked. Unpin all
+buildings before choosing **Freeze through → None**, changing presets or
+retargeting the profile. Local detail regeneration is disabled for a pinned
+building.
+
 ## Regenerate a building's details
 
 Apply a selected candidate once. In **Project → Building details**, choose a

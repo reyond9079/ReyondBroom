@@ -57,7 +57,7 @@ static std::string worldInputKey(){return wa::serialize(worldArchitect.settings)
 static wa::Json worldProject(){auto& s=worldArchitect;auto json=wa::serialize(s.settings);json["registry"]=s.registrySource;json["projectId"]=s.project;if(auto world=worldSelected();world&&s.generated==worldInputKey()){json["selectedCandidateSeed"]=world->seed;json["diagnostics"]=wa::diagnostics(*world);}return json;}
 static void worldLoadProject(const std::string& name){
   if(worldArchitect.job.valid()||!worldArchitect.request.empty())throw std::runtime_error("Wait for generation and map insertion to finish before opening a project");
-  auto path=std::filesystem::u8path(name);if(std::filesystem::file_size(path)>1024*1024)throw std::runtime_error("World project exceeds 1 MiB");
+  auto path=std::filesystem::u8path(name);if(std::filesystem::file_size(path)>8*1024*1024)throw std::runtime_error("World project exceeds 8 MiB");
   const auto json=wa::Json::parse(q1Read(path));auto& s=worldArchitect;auto registry=json.contains("registry")?wa::readRegistry(json.at("registry")):s.registry;auto settings=wa::deserialize(json,registry);
   auto project=json.value("projectId","wa-"+worldIdentity());wa::safeToken(project);if(project.size()>64)throw std::runtime_error("Project identity exceeds its ownership budget");auto desired=json.contains("selectedCandidateSeed")?std::optional<uint64_t>{json.at("selectedCandidateSeed").get<uint64_t>()}:std::nullopt;
   s.project=project;s.registry=std::move(registry);if(json.contains("registry"))s.registrySource=json.at("registry");s.settings=std::move(settings);s.desiredSeed=desired;s.batch={};s.undo.clear();s.redo.clear();s.selected=0;s.generated.clear();s.error.clear();s.message="Project loaded with its preset snapshot. Generate to restore its saved candidate.";
@@ -233,7 +233,7 @@ static void worldPanel(){
     ImGui::BeginDisabled(frozen>=3);ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Damage",&damage,0,1))s.settings.damage=damage;worldRect("damage");ImGui::EndDisabled();ImGui::SameLine();
     ImGui::BeginDisabled(frozen>=4);ImGui::SetNextItemWidth(150*uiScale());if(ImGui::SliderFloat("Dressing",&density,0,1))s.settings.dressing=density;worldRect("dressing");ImGui::EndDisabled();ImGui::SameLine();
     const char* freezeNames[]={"None","Mission","Site","Architecture","Damage","Dressing"};ImGui::SetNextItemWidth(150*uiScale());bool freezeOpen=ImGui::BeginCombo("Freeze through",freezeNames[frozen+1]);worldRect("freeze");if(freezeOpen){
-      for(int i=0;i<6;i++){ImGui::BeginDisabled(i&&!worldSelected());if(ImGui::Selectable(freezeNames[i],frozen==i-1))worldAction([&]{s.settings=i?wa::freezeThrough(s.settings,*worldSelected(),s.registry,i-1):wa::cleanSettings(s.settings);});worldRect("freeze/"+std::to_string(i));ImGui::EndDisabled();}ImGui::EndCombo();
+      for(int i=0;i<6;i++){ImGui::BeginDisabled((i&&!worldSelected())||(i<3&&!s.settings.pinnedRegions.empty()));if(ImGui::Selectable(freezeNames[i],frozen==i-1))worldAction([&]{s.settings=i?wa::freezeThrough(s.settings,*worldSelected(),s.registry,i-1):wa::cleanSettings(s.settings);});worldRect("freeze/"+std::to_string(i));ImGui::EndDisabled();}ImGui::EndCombo();
     }
     if(frozen>=0)ImGui::TextUnformatted("Frozen stages keep their selected candidate recipes; seed changes affect later stages. Navigation and export are always checked.");
     if(!restoredSettings)worldChanged(before);else s.gesture=0;ImGui::EndDisabled();
@@ -262,8 +262,11 @@ static void worldPanel(){
             ImGui::SetNextItemWidth(260*uiScale());const auto& current=*std::find_if(world->spatial.buildings.begin(),world->spatial.buildings.end(),[&](const auto& b){return b.id==s.detailRegion;});
             auto label=current.archetype+" / "+std::to_string(current.floors)+" floors / "+std::to_string(current.rooms.size())+" rooms";
             bool buildingsOpen=ImGui::BeginCombo("Building",label.c_str());worldRect("detail-building");if(buildingsOpen){for(size_t i=0;i<world->spatial.buildings.size();i++){const auto& b=world->spatial.buildings[i];auto text="Building "+std::to_string(i+1)+" / "+b.archetype;if(ImGui::Selectable(text.c_str(),s.detailRegion==b.id))s.detailRegion=b.id;worldRect("detail-building/"+std::to_string(b.id));}ImGui::EndCombo();}
+            const bool pinned=s.settings.regionRecipes.count(s.detailRegion)!=0;
+            ImGui::BeginDisabled(!pinned&&s.generated!=worldInputKey());if(worldButton(pinned?"Unpin selected building":"Pin selected building","pin-building"))worldAction([&]{auto previous=wa::serialize(s.settings);s.settings=pinned?wa::unpinBuilding(s.settings,s.detailRegion):wa::pinBuilding(s.settings,*world,s.registry,s.detailRegion);worldChanged(previous);});ImGui::EndDisabled();
+            ImGui::TextWrapped("Pins preserve the accepted building's architecture, damage and dressing. Mission and Site remain frozen to retain its lot and routes. Unpin before changing those stages.");
             ImGui::SetNextItemWidth(180*uiScale());ImGui::InputScalar("Detail seed",ImGuiDataType_U64,&s.detailSeed);worldRect("detail-seed");
-            ImGui::BeginDisabled(s.generated!=worldInputKey());if(worldButton("Preview selected building details","regenerate-region"))worldAction([&]{auto previous=wa::serialize(s.settings);s.settings=wa::regenerateDetails(s.settings,*world,s.registry,s.detailRegion,s.detailSeed);worldChanged(previous);worldGenerate();});ImGui::EndDisabled();ImGui::EndDisabled();
+            ImGui::BeginDisabled(pinned||s.generated!=worldInputKey());if(worldButton("Preview selected building details","regenerate-region"))worldAction([&]{auto previous=wa::serialize(s.settings);s.settings=wa::regenerateDetails(s.settings,*world,s.registry,s.detailRegion,s.detailSeed);worldChanged(previous);worldGenerate();});ImGui::EndDisabled();ImGui::EndDisabled();
             ImGui::TextWrapped("This keeps the selected candidate's architecture and every other region's detail streams. Review the preview, then update only the selected building in Export.");
           }
         }

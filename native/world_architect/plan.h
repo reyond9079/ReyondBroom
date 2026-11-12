@@ -71,12 +71,16 @@ struct Settings {
   std::vector<MissionNode> missionPins;
   std::vector<Road> roadPins;
   std::vector<uint64_t> pinnedRegions;
+  // Clean per-building Architecture / Damage / Dressing recipes. Mission
+  // and Site stay frozen while pins exist to retain their lots and routes.
+  std::map<uint64_t,std::array<Json,3>> regionRecipes;
+  uint64_t pinnedRegistry=0;
   std::map<uint64_t,uint64_t> regionSeeds;
   std::vector<Influence> influences;
   std::map<std::string,double> weights{{"variety",1},{"route",1},{"circulation",1}};
 };
 struct WorldPlan {
-  int schema=schemaVersion;uint64_t seed=0;int profile=2;std::string preset,theme,sourceRevision;
+  int schema=schemaVersion;uint64_t seed=0,registryFingerprint=0;int profile=2;std::string preset,theme,sourceRevision;
   V low,high;std::map<std::string,uint64_t> seeds;
   MissionGraph mission;SpatialGraph spatial;ArchitecturePlan architecture;
   DamageField damage;std::vector<AssetPlacement> assets;NavigationGraph navigation;Diagnostics diagnostics;
@@ -124,21 +128,37 @@ inline Registry readRegistry(const Json& j){
   }
   if(r.presets.empty()||r.themes.empty())throw std::runtime_error("Empty World Architect registry");return r;
 }
-inline Settings deserialize(const Json& j,const Registry& r);
+inline Settings deserialize(const Json& j,const Registry& r,bool recipe=false);
 inline Settings cleanSettings(Settings s){s.locked.fill(false);s.frozen.fill(Json(nullptr));s.frozenRegistry=0;return s;}
+inline Settings unpinnedSettings(Settings s){s=cleanSettings(std::move(s));s.pinnedRegions.clear();s.regionRecipes.clear();s.pinnedRegistry=0;return s;}
 inline int lockedThrough(const Settings& s){int last=-1;for(int i=0;i<5;i++)if(s.locked[i])last=i;return last;}
-inline void validate(const Settings& s,const Registry& r){
+inline void validate(const Settings& s,const Registry& r,bool recipe=false){
   r.preset(s.preset);capability(s.profile);finite(s.scale,.6,1.4,"Scale must be 0.6..1.4");finite(s.damage,0,1,"Damage must be 0..1");finite(s.dressing,0,1,"Dressing must be 0..1");finite(s.candidates,1,16,"Candidate count must be 1..16");
   finite(s.player.radius,8,32,"Player radius must be 8..32");finite(s.player.height,32,80,"Player height must be 32..80");finite(s.player.step,4,18,"Player step must be 4..18");
-  if(!s.pinnedRegions.empty())throw std::runtime_error("Pinned-region locking is not yet supported");
+  if(s.pinnedRegions.size()>4||s.regionRecipes.size()!=s.pinnedRegions.size())throw std::runtime_error("Building pins require one bounded recipe set per building");
+  if(!s.pinnedRegions.empty()){
+    if(s.pinnedRegistry!=r.fingerprint)throw std::runtime_error("Building pins require their original registry snapshot");
+    if(!recipe&&(!s.locked[0]||!s.locked[1]))throw std::runtime_error("Unpin buildings before unlocking their Mission and Site");
+    std::set<uint64_t> pins;const auto& p=r.preset(s.preset);const int buildings=p.scope==Scope::Interior?1:p.blocks;
+    for(auto id:s.pinnedRegions){
+      if(id<100||id>=uint64_t(100+buildings)||!pins.insert(id).second||!s.regionRecipes.count(id))throw std::runtime_error("Unknown or duplicate pinned building");
+      for(const auto& input:s.regionRecipes.at(id)){
+        if(!input.is_object()||input.dump().size()>65536)throw std::runtime_error("Invalid pinned-building recipe budget");
+        if(input.value("pinnedRegions",Json::array()).size()||input.value("regionRecipes",Json::array()).size())throw std::runtime_error("Recursive building pins are not allowed");
+        if(input.contains("frozenStageInputs"))for(const auto& nested:input.at("frozenStageInputs"))if(!nested.is_null())throw std::runtime_error("A building recipe cannot contain frozen stages");
+        if(input.contains("stageLocks"))for(const auto& flag:input.at("stageLocks"))if(flag.get<bool>())throw std::runtime_error("A building recipe must be clean");
+        auto clean=deserialize(input,r,true);if(clean.profile!=s.profile||clean.preset!=s.preset)throw std::runtime_error("Unpin buildings before changing profile or preset");
+      }
+    }
+  }
   bool gap=false;for(int i=0;i<7;i++){if(s.locked[i]){if(gap||i>=5)throw std::runtime_error("Freeze a stage with its upstream stages; Navigation and Export are always revalidated");}else gap=true;}
   const int last=lockedThrough(s);
   if(last>=0&&s.frozenRegistry!=r.fingerprint)throw std::runtime_error("Locked stages require the registry snapshot from their accepted candidate");
   for(int i=0;i<5;i++)if(!s.frozen[i].is_null()){
-    const auto& baseline=s.frozen[i];if(!baseline.is_object()||baseline.dump().size()>65536)throw std::runtime_error("Invalid locked-stage input budget");
+    const auto& baseline=s.frozen[i];if(!baseline.is_object()||baseline.dump().size()>1024*1024)throw std::runtime_error("Invalid locked-stage input budget");
     if(baseline.contains("frozenStageInputs"))for(const auto& nested:baseline.at("frozenStageInputs"))if(!nested.is_null())throw std::runtime_error("Recursive locked-stage input is not allowed");
     if(baseline.contains("stageLocks"))for(const auto& flag:baseline.at("stageLocks"))if(flag.get<bool>())throw std::runtime_error("A stage input must be a clean generation recipe");
-    auto input=deserialize(baseline,r);if(i<=last&&(input.profile!=s.profile||input.preset!=s.preset))throw std::runtime_error("Unlock stages before changing the game profile or preset");
+    auto input=deserialize(baseline,r,true);if(i<=last&&(input.profile!=s.profile||input.preset!=s.preset))throw std::runtime_error("Unlock stages before changing the game profile or preset");
   }else if(i<=last)throw std::runtime_error("A stage lock has no accepted generation input");
   if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
   for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route"&&name!="circulation")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
@@ -151,9 +171,10 @@ inline Json serialize(const Settings& s){
   j["missionPins"]=Json::array();for(const auto& p:s.missionPins)j["missionPins"].push_back({{"id",p.id},{"position",vector(p.position)}});
   j["roadPins"]=Json::array();for(const auto& p:s.roadPins)j["roadPins"].push_back({{"id",p.id},{"a",vector(p.a)},{"b",vector(p.b)},{"width",p.width}});
   j["regionSeeds"]=Json::array();for(const auto& [id,seed]:s.regionSeeds)j["regionSeeds"].push_back({{"region",id},{"seed",seed}});
+  j["pinnedRegistry"]=s.pinnedRegistry;j["regionRecipes"]=Json::array();for(const auto& [id,recipes]:s.regionRecipes)j["regionRecipes"].push_back({{"region",id},{"inputs",recipes}});
   j["influences"]=Json::array();for(const auto& p:s.influences)j["influences"].push_back({{"id",p.id},{"low",vector(p.low)},{"high",vector(p.high)},{"kind",p.kind},{"strength",p.strength}});return j;
 }
-inline Settings deserialize(const Json& j,const Registry& r){
+inline Settings deserialize(const Json& j,const Registry& r,bool recipe){
   if(j.at("schemaVersion")!=schemaVersion)throw std::runtime_error("Unsupported World Architect project version");Settings s;
   s.seed=j.at("worldSeed");s.preset=j.at("presetId");s.profile=j.at("profileId");s.candidates=j.at("candidates");s.scale=j.at("scale");s.damage=j.at("damage");s.dressing=j.at("dressing");
   const auto& p=j.at("player");s.player={p.at("radius"),p.at("height"),p.at("step")};s.locked=j.at("stageLocks").get<std::array<bool,7>>();s.weights=j.at("qualityWeights").get<std::map<std::string,double>>();s.pinnedRegions=j.value("pinnedRegions",std::vector<uint64_t>{});
@@ -161,7 +182,8 @@ inline Settings deserialize(const Json& j,const Registry& r){
   for(const auto& p:j.at("missionPins")){MissionNode n;n.id=p.at("id");n.position=vector(p.at("position"));n.pinned=true;s.missionPins.push_back(n);}
   for(const auto& p:j.at("roadPins")){Road road;road.id=p.at("id");road.a=vector(p.at("a"));road.b=vector(p.at("b"));road.width=p.at("width");road.pinned=true;s.roadPins.push_back(road);}
   for(const auto& p:j.at("regionSeeds"))s.regionSeeds[p.at("region").get<uint64_t>()]=p.at("seed").get<uint64_t>();
-  for(const auto& p:j.at("influences")){Influence mask;mask.id=p.at("id");mask.low=vector(p.at("low"));mask.high=vector(p.at("high"));mask.kind=p.at("kind");mask.strength=p.at("strength");s.influences.push_back(mask);}validate(s,r);return s;
+  s.pinnedRegistry=j.value("pinnedRegistry",uint64_t(0));if(j.contains("regionRecipes"))for(const auto& p:j.at("regionRecipes"))if(!s.regionRecipes.emplace(p.at("region").get<uint64_t>(),p.at("inputs").get<std::array<Json,3>>()).second)throw std::runtime_error("Duplicate building recipe");
+  for(const auto& p:j.at("influences")){Influence mask;mask.id=p.at("id");mask.low=vector(p.at("low"));mask.high=vector(p.at("high"));mask.kind=p.at("kind");mask.strength=p.at("strength");s.influences.push_back(mask);}validate(s,r,recipe);return s;
 }
 inline MissionGraph mission(const Settings& settings,const Preset& preset){
   MissionGraph graph;Random rng(subSeed(settings.seed,"Mission"));

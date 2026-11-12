@@ -84,6 +84,15 @@ inside group properties distinguish MAP float reconstruction error from edits.
 Entity-slot reuse is scoped to this import path; ordinary clipboard behavior
 retains its existing allocation path.
 
+Complete building pins now capture the accepted per-region Architecture, Damage
+and Dressing recipes, including composed stage seeds and influence fields.
+Shared Mission/Site recipes stay frozen while pins exist; every other building
+can still vary under new downstream seeds. Clean bounded recipes are portable
+in project JSON, registry/profile mismatches and recursive payloads are rejected,
+and pin/unpin participates in settings Undo/Redo. Unpinning drops stale later
+stage freezes while retaining other pins. This is building-level preservation,
+not the still-pending room, graph and road authoring interface.
+
 Physical checks sweep the configured player hull against expanded convex brush
 planes, verify support along links, handle stair risers, and require all generated
 navigation anchors to be reachable. Logical mission validation searches actual
@@ -115,7 +124,8 @@ attempts out of 3200, and a real Quake 1 hospital `qbsp`/`light` run with no lea
 and no empty lightmaps. Real UI generation/export, Apply acknowledgment,
 authored-content preservation and one Undo/Redo have passed on native Linux.
 That corpus predates subsequent architecture and regional work. The regional
-slice has passed 308 contracts and 24 actual SDL2 scenarios, including manual
+slice has passed 322 contracts, 24 regional SDL2 scenarios and eight focused
+actual SDL2 pin scenarios, including manual
 edit protection, save/reopen, parent preservation and whole-project changes.
 The executed metro Apply also passes its production ExportMap snapshot through
 real BSP/lighting compilation; binary inspection confirms liquid brush contents.
@@ -130,10 +140,10 @@ different optional branches. More road patterns, archetype-specific interior
 families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
-Pinned-region preservation, graph/road/volume editing, painted masks,
+Graph/road/volume editing, painted masks,
 room-level regeneration, candidate comparison panes, legacy module
 migration, extension-pack validation, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.
-Unsupported pinned-region fields fail explicitly instead of silently ignoring
+Malformed or incompatible pin recipes fail explicitly instead of silently ignoring
 designer intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu
 entry may be retired before the complete Definition of Done is met.

@@ -163,24 +163,26 @@ static void worldRoadPanel(){
   ImGui::EndDisabled();worldPlanCanvas(true);
 }
 static void worldInfluencePanel(bool dressing){
-  auto& s=worldArchitect;auto before=wa::serialize(s.settings);const char* kinds[]={"damage","preserve","avoid","dressing"};
-  ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=(dressing?4:2));
-  ImGui::TextWrapped("Drag a rectangle on the plan to paint a bounded influence volume for the selected floor. Preserve suppresses damage and props; avoid rejects overlapping building envelopes. These fields are part of the saved project.");
-  ImGui::Combo("Field type",&s.paintType,kinds,4);worldRect("mask-type");ImGui::SliderFloat("Field strength",&s.paintStrength,0,1);worldRect("mask-strength");ImGui::SliderInt("Field floor",&s.planFloor,0,4);
+  auto& s=worldArchitect;auto before=wa::serialize(s.settings);const char* kinds[]={"damage","preserve","avoid","dressing","must-pass","vertical-link","no-generation"};
+  int constraintStage=s.paintType>=4?1:(dressing?4:2);
+  ImGui::BeginDisabled(s.job.valid());
+  ImGui::TextWrapped("Drag a rectangle on the plan to paint a bounded influence volume for the selected floor. Preserve suppresses damage and props; avoid rejects overlapping building envelopes. Must-pass adds a required player stop. Vertical-link requires an existing continuous stair route spanning the exact XYZ bounds; set a height of at least 256. No-generation rejects content inside its bounds, retaining the shared ground and sky seal. These hard constraints are frozen with Site.");
+  ImGui::Combo("Field type",&s.paintType,kinds,7);worldRect("mask-type");constraintStage=s.paintType>=4?1:(dressing?4:2);ImGui::BeginDisabled(wa::lockedThrough(s.settings)>=constraintStage);ImGui::BeginDisabled(s.paintType>=4);ImGui::SliderFloat("Field strength",&s.paintStrength,0,1);worldRect("mask-strength");ImGui::EndDisabled();ImGui::SliderInt("Field floor",&s.planFloor,0,4);
   if(worldButton("Preserve selected building","mask-preserve-building"))worldAction([&]{auto* world=worldSelected();if(!world)return;auto found=std::find_if(world->spatial.buildings.begin(),world->spatial.buildings.end(),[&](const auto& b){return b.id==s.detailRegion;});if(found==world->spatial.buildings.end())found=world->spatial.buildings.begin();uint64_t id=1;for(const auto& mask:s.settings.influences)id=std::max(id,mask.id+1);s.settings.influences.push_back({id,found->low-wa::V{8,8,8},found->high+wa::V{8,8,8},"preserve",1});});
   if(!s.settings.influences.empty()){
     s.maskSelection=std::clamp(s.maskSelection,0,int(s.settings.influences.size()-1));const auto mask=s.settings.influences[size_t(s.maskSelection)];auto label=std::to_string(mask.id)+" / "+mask.kind;
     if(ImGui::BeginCombo("Saved fields",label.c_str())){for(size_t i=0;i<s.settings.influences.size();i++){const auto& m=s.settings.influences[i];auto name=std::to_string(m.id)+" / "+m.kind;if(ImGui::Selectable(name.c_str(),s.maskSelection==int(i)))s.maskSelection=int(i);}ImGui::EndCombo();}
+    const int savedStage=(mask.kind=="must-pass"||mask.kind=="vertical-link"||mask.kind=="no-generation")?1:(mask.kind=="dressing"?4:2);ImGui::BeginDisabled(wa::lockedThrough(s.settings)>=savedStage);
     if(auto value=worldVectorInput("Volume minimum XYZ",mask.low,3,"volume-min"))worldAction([&]{auto next=s.settings;next.influences[size_t(s.maskSelection)].low=*value;wa::validate(next,s.registry);s.settings=std::move(next);});
     if(auto value=worldVectorInput("Volume maximum XYZ",mask.high,3,"volume-max"))worldAction([&]{auto next=s.settings;next.influences[size_t(s.maskSelection)].high=*value;wa::validate(next,s.registry);s.settings=std::move(next);});
-    if(worldButton("Remove selected field","mask-remove"))s.settings.influences.erase(s.settings.influences.begin()+s.maskSelection);
+    if(worldButton("Remove selected field","mask-remove"))s.settings.influences.erase(s.settings.influences.begin()+s.maskSelection);ImGui::EndDisabled();
   }
-  ImGui::EndDisabled();worldChanged(before);
+  ImGui::EndDisabled();ImGui::EndDisabled();worldChanged(before);
   // Canvas input uses the same active ImGui item and actual pointer events.
   auto origin=ImGui::GetCursorScreenPos();worldPlanCanvas(true);auto rectMin=ImGui::GetItemRectMin(),rectMax=ImGui::GetItemRectMax();auto* world=worldSelected();if(!world)return;
   double scale=std::min((rectMax.x-rectMin.x-32)/(world->high.x-world->low.x),(rectMax.y-rectMin.y-32)/(world->high.y-world->low.y));
   auto worldPoint=[&](ImVec2 p){return wa::V{world->low.x+(p.x-origin.x-16)/scale,world->low.y+(p.y-origin.y-16)/scale,double(s.planFloor*256)};};
-  bool allowed=!s.job.valid()&&wa::lockedThrough(s.settings)<(dressing?4:2);
+  bool allowed=!s.job.valid()&&wa::lockedThrough(s.settings)<constraintStage;
   if(allowed&&ImGui::IsItemHovered()&&ImGui::IsMouseClicked(0)){s.painting=true;s.paintStart=worldPoint(ImGui::GetIO().MousePos);}
   if(s.painting&&ImGui::IsMouseReleased(0)){s.painting=false;auto end=worldPoint(ImGui::GetIO().MousePos);auto low=wa::V{std::min(end.x,s.paintStart.x),std::min(end.y,s.paintStart.y),double(s.planFloor*256)-1},high=wa::V{std::max(end.x,s.paintStart.x),std::max(end.y,s.paintStart.y),double((s.planFloor+1)*256)};
     if(high.x-low.x>=16&&high.y-low.y>=16)worldEdit([&](auto& next){uint64_t id=1;for(const auto& m:next.influences)id=std::max(id,m.id+1);next.influences.push_back({id,low,high,kinds[s.paintType],s.paintStrength});});

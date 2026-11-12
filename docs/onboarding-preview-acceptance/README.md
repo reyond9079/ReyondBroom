@@ -25,8 +25,9 @@ editing commands and Escape retain their existing return-to-editor behavior.
 - `scripts/test-rb10-welcome.py --require-splash`: artwork dimensions and
   persistence during a deliberately pending check, download, verification
   and restart, plus existing recovery and exit guards.
-- `tests/ci-policy.py`: 35 policy tests, including exact guarded host edits and
-  conservative fallback when ordinary dispatch changes.
+- `tests/ci-policy.py`: 36 policy tests, including exact guarded host edits,
+  conservative fallback when ordinary dispatch changes, and rejection of
+  mismatched artwork in runtime/source archives on all three platforms.
 
 The selected CI suites are `ci_unit`, `onboarding`, `updater` and `viewport`.
 The generator suites, full atlas and theme/size matrix are excluded.
@@ -34,18 +35,21 @@ Local native/QC build hashes and results are recorded in the adjacent JSON
 files. Screenshots show the modified local build based on the alpha.154 SDK;
 the SDK's title/version is not a newly published release.
 
-## Remaining release dependency
+## Artwork
 
-The original user-supplied painting must be added as
-`runtime/ui/update-splash.png` before merge and release. The image was visible
-in chat but its bytes were unavailable in the workspace. The updater lifecycle
-was validated with a clearly labelled synthetic portrait in disposable test
-runtimes. That fixture is not a distribution asset.
+`runtime/ui/update-splash.png` is the original 1217 x 1293 PNG extracted from
+the user's ZIP, with its bytes preserved. Its SHA-256 is
+`22eaf787b9cb9a823a46db8647bf951c15b1545cee489801a8a93964d1a854d3`.
+The complete update-window check was repeated with this original image after
+an initial layout preflight using a synthetic portrait fixture.
 
-After the original is available, repeat the splash check with it, package the
-next version and run the mandatory Windows/Linux/Linux SDL2 release gates.
+The release gate verifies that each runtime includes the image and that its
+hash matches the corresponding source archive. Packaged startup, version,
+manifest and checksum gates remain mandatory on Windows/Linux/Linux SDL2.
 
 ## Screenshots
+
+![Original artwork during an update check](update-check.png)
 
 ![Vertex practice](onboarding-vertex-practice.png)
 

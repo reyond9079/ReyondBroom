@@ -4,8 +4,8 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--engine',type=Path);a=p.parse_args()
-assert not (a.regions_only and a.pins_only),'Select one focused authoring scenario'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--engine',type=Path);a=p.parse_args()
+assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only])<=1,'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
@@ -30,6 +30,16 @@ def check(value,name):
 ui=NativeInput(proc,state,live,wait,out,focus_required=True)
 def click(key):
  r=wait(lambda:live()['widgets'].get(key));ui.click(r['x']+r['width']/2,r['y']+r['height']/2)
+def drag(start,end):
+ ui.move(*start)
+ if os.name=='nt':ui.user.mouse_event(2,0,0,0,0)
+ else:ui.xtest.fake_input(ui.d,ui.X.ButtonPress,1);ui.d.sync()
+ try:
+  ui.settle();ui.move(*end);ui.settle()
+ finally:
+  if os.name=='nt':ui.user.mouse_event(4,0,0,0,0)
+  else:ui.xtest.fake_input(ui.d,ui.X.ButtonRelease,1);ui.d.sync()
+ ui.settle()
 def console(text):ui.console(text);time.sleep(.2)
 def save(name):
  dest=data/'maps'/(name+'.map');dest.unlink(missing_ok=True);console('mod_terrain_save "" '+name);wait(dest.exists);return dest
@@ -63,21 +73,51 @@ def regions(path):
   children=sorted(json.dumps(f,sort_keys=True) for f,g,b in rows if f.get('_tb_group')==fields.get('_tb_id'))
   result[fields['_wa_region']]={'fields':fields,'geometry':geometry,'points':children}
  return result
+def verify_paint(existing):
+ click('tab/Destruction');canvas=live()['widgets']['plan-canvas'];drag((canvas['x']+canvas['width']*.2,canvas['y']+canvas['height']*.2),(canvas['x']+canvas['width']*.35,canvas['y']+canvas['height']*.35));wait(lambda:len(live()['settings']['influences'])==existing+1)
+ painted=live()['settings']['influences'][-1];check(painted['kind']=='damage' and all(b>a for a,b in zip(painted['low'],painted['high'])),'dragging the floor plan creates a real bounded influence volume')
+ click('undo-settings');wait(lambda:len(live()['settings']['influences'])==existing);check(True,'painted volumes participate in settings Undo')
 try:
  wait(lambda:live()['open'] and 'generate' in live()['widgets']);ui.position()
  # Xvfb has no window manager to transfer focus after an external engine exits.
  # Acquire actual OS keyboard focus before the first console shortcut.
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
- click('tab/3');wait(lambda:'save-project' in live()['widgets'])
+ click('tab/Export');wait(lambda:'apply' in live()['widgets'])
  check(True,'the first workspace tab click is received after actual OS activation')
- click('tab/0')
+ click('tab/Overview')
  before=save('wa-before');baseline=planes(before)
+ if a.paint_only:
+  click('generate');wait(lambda:live()['candidates'] and not live()['busy']);verify_paint(0);check(planes(save('wa-paint-preview'))==baseline,'painting and settings Undo leave the authored map intact');ImageGrab.grab().save(out/'world-painted-fields.png');print('World Architect paint UI:',len(checks),'checks passed',flush=True);sys.exit(0)
+ if a.designer_only:
+  assert a.preset=='hospital'
+  def generate():
+   click('generate');wait(lambda:live()['candidates'] and not live()['busy']);assert not live()['error'],live()['error']
+  def export_design(name):
+   click('tab/Export');dest=out/name/'world.map';click('export');choose(dest);wait(dest.exists);return dest
+  generate();original=export_design('original');nodes=len(live()['world']['missionNodes'])
+  for tab in ['Overview','Mission Graph','Site & Roads','Buildings','Architecture','Destruction','Dressing','Quality','Export']:click('tab/'+tab)
+  check(True,'all nine requested workspace panels receive actual OS input')
+  click('tab/Architecture');r=live()['widgets']['architecture-width'];ui.click(r['x']+r['width']*.3,r['y']+r['height']/2,mods=('ctrl',));ui.key('a',('ctrl',));ui.text('1920');ui.key('enter');wait(lambda:live()['settings']['architecture']['width']==1920)
+  generate();wider=export_design('wider');check(planes(wider)!=planes(original),'architecture dimensions change actual exported brush planes')
+  click('undo-settings');wait(lambda:live()['settings']['architecture']['width']==0);generate();restored=export_design('restored');check(planes(restored)==planes(original),'architecture settings Undo restores the original deterministic brushes')
+  click('tab/Mission Graph');world=live()['world'];beat=next(n for n in world['missionNodes'] if n['role']=='Introduction');room=next(r for r in world['rooms'] if r['floor']==0 and r['id']!=beat['room']);canvas=live()['widgets']['plan-canvas'];low=world['bounds']['low'];high=world['bounds']['high'];scale=min((canvas['width']-32)/(high[0]-low[0]),(canvas['height']-32)/(high[1]-low[1]))
+  def canvas_point(p):return (canvas['x']+16+(p[0]-low[0])*scale,canvas['y']+16+(p[1]-low[1])*scale)
+  target=[(room['low'][i]+room['high'][i])/2 for i in range(3)];drag(canvas_point(beat['position']),canvas_point(target));wait(lambda:any(p['id']==beat['id'] for p in live()['settings']['missionPins']));generate()
+  check(next(n for n in live()['world']['missionNodes'] if n['id']==beat['id'])['room']==room['id'],'dragging a graph beat reserves the actual target room in the regenerated geometry')
+  click('mission-add');wait(lambda:len(live()['settings']['missionGraph']['nodes'])==nodes+1);click('mission-one-way');wait(lambda:live()['settings']['missionGraph']['edges'][0]['oneWay'])
+  generate();check(len(live()['world']['missionNodes'])==nodes+1 and live()['world']['valid'],'mission authoring produces an additional physically reachable room beat and a valid directed traversal');mission_edited=export_design('mission-edited')
+  click('tab/Destruction');click('mask-preserve-building');wait(lambda:len(live()['settings']['influences'])==1);generate();preserved=export_design('preserved');check(planes(preserved)!=planes(mission_edited),'preserve fields change real generated architecture and dressing')
+  click('tab/Overview');project=out/'designer.world.json';click('save-project');choose(project);wait(project.exists);saved=json.loads(project.read_text());check(saved['missionGraph']['edges'][0]['oneWay'] and saved['influences'][0]['kind']=='preserve','editable project persists authored graph transitions and spatial fields')
+  click('open-project');choose(project);wait(lambda:live()['candidates']==0);generate();replayed=export_design('replayed');check(planes(replayed)==planes(preserved),'saved designer project reproduces the exact exported architecture after reopen')
+  verify_paint(1)
+  check(planes(save('wa-designer-preview'))==baseline,'designer edits, generation and export leave the authored scene intact')
+  click('tab/Mission Graph');ImageGrab.grab().save(out/'world-mission-editor.png');(out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect designer UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.pins_only:
   assert a.preset=='evacuation','Pin fixture needs independently generated buildings'
   click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
   def export_pin(name):
-   click('tab/4');dest=out/name/'world.map';click('export');choose(dest);wait(dest.exists);return regions(dest)
-  original=export_pin('before-pin');click('tab/3');click('detail-building');click('detail-building/101');click('pin-building');wait(lambda:live()['settings']['pinnedRegions']==[101])
+   click('tab/Export');dest=out/name/'world.map';click('export');choose(dest);wait(dest.exists);return regions(dest)
+  original=export_pin('before-pin');click('tab/Buildings');click('detail-building');click('detail-building/101');click('pin-building');wait(lambda:live()['settings']['pinnedRegions']==[101])
   check(all(live()['settings']['stageLocks'][:2]),'pinning through actual UI freezes the shared Mission and Site')
   click('undo-settings');wait(lambda:not live()['settings']['pinnedRegions']);click('redo-settings');wait(lambda:live()['settings']['pinnedRegions']==[101])
   check(True,'pinning participates in ordinary settings Undo and Redo')
@@ -85,19 +125,19 @@ try:
   changed=export_pin('after-pin')
   check(changed['101']['geometry']==original['101']['geometry'] and changed['101']['points']==original['101']['points'],'a pinned building keeps exact exported brushes and point entities after regeneration')
   check(any(changed[k]['geometry']!=original[k]['geometry'] for k in ['100','102','103']),'other buildings still vary under a new global seed')
-  click('tab/3');project=out/'pinned.world.json';click('save-project');choose(project);wait(project.exists);click('open-project');choose(project);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
+  click('tab/Overview');project=out/'pinned.world.json';click('save-project');choose(project);wait(project.exists);click('open-project');choose(project);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
   replay=export_pin('reopened-pin');check(replay==changed,'saved project reload restores the accepted pinned world without an in-memory candidate')
-  click('tab/3');click('pin-building');wait(lambda:not live()['settings']['pinnedRegions']);check(not live()['settings']['regionRecipes'],'unpin removes the building recipes through actual UI')
+  click('tab/Buildings');click('pin-building');wait(lambda:not live()['settings']['pinnedRegions']);check(not live()['settings']['regionRecipes'],'unpin removes the building recipes through actual UI')
   check(planes(save('wa-pin-preview'))==baseline,'pin, regenerate, export and project replay retain the authored map')
   ImageGrab.grab().save(out/'world-pins.png');(out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect pin UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.regions_only:
   assert a.preset=='evacuation','Regional fixture needs multiple buildings'
   click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);seeds=live()['candidateSeeds'];assert 1 in seeds;click('candidate/'+str(seeds.index(1)))
-  click('tab/4');click('apply');wait(lambda:live()['applyStatus']=='ok' and not live()['request']);original=save('wa-regions-original');old=regions(original)
+  click('tab/Export');click('apply');wait(lambda:live()['applyStatus']=='ok' and not live()['request']);original=save('wa-regions-original');old=regions(original)
   check({'100','101','102','103'}<=set(old),'actual editor imports four separately owned building groups')
   check(all(len(v['fields'].get('_wa_baseline',''))==64 for v in old.values()),'ownership baselines are computed from the executed editor contents')
-  click('tab/3');click('detail-building');click('detail-building/101');r=live()['widgets']['detail-seed'];ui.click(r['x']+r['width']*.4,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text('57');ui.key('enter')
-  click('regenerate-region');wait(lambda:live()['candidates']==1 and not live()['busy']);click('tab/4');click('update-region');wait(lambda:live()['applyStatus']=='ok' and not live()['request']);updated=save('wa-regions-updated');new=regions(updated)
+  click('tab/Buildings');click('detail-building');click('detail-building/101');r=live()['widgets']['detail-seed'];ui.click(r['x']+r['width']*.4,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text('57');ui.key('enter')
+  click('regenerate-region');wait(lambda:live()['candidates']==1 and not live()['busy']);click('tab/Export');click('update-region');wait(lambda:live()['applyStatus']=='ok' and not live()['request']);updated=save('wa-regions-updated');new=regions(updated)
   check(new['101']['geometry']!=old['101']['geometry'],'selected building details change in the actual map')
   check(len(new['101']['geometry'])>100,'regenerated building retains real brushes inside its owned group')
   check(entities(original)[0][:2]==entities(updated)[0][:2],'regional replacement preserves worldspawn geometry and properties exactly')
@@ -138,10 +178,10 @@ try:
   tampered.write_text(text);epoch=live()['mapEpoch'];console('mapedit maps/wa-regions-tampered.map');wait(lambda:live()['mapEpoch']!=epoch);tampered_before=planes(save('wa-regions-tampered-before'));click('update-region');wait(lambda:not live()['request'])
   check(live()['applyStatus']=='modified' and planes(save('wa-regions-tampered-rejected'))==tampered_before,'a corrupt ownership snapshot cannot authorize replacement')
   epoch=live()['mapEpoch'];console('mapedit maps/wa-regions-parented-updated.map');wait(lambda:live()['mapEpoch']!=epoch);whole_before=save('wa-whole-before')
-  click('freeze');click('freeze/0');click('preset');click('preset/hospital');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);click('tab/4');click('update-world');wait(lambda:not live()['request']);whole=save('wa-whole-hospital')
+  click('freeze');click('freeze/0');click('preset');click('preset/hospital');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);click('tab/Export');click('update-world');wait(lambda:not live()['request']);whole=save('wa-whole-hospital')
   check(live()['applyStatus']=='ok' and set(regions(whole))=={'0','100'},'whole-project update removes obsolete building and street regions')
   check(entities(whole_before)[0][:2]==entities(whole)[0][:2] and any(f.get('_tb_id')==parent and f.get('_tb_name')=='Authored container' for f,g,b in entities(whole)),'whole-project update retains worldspawn and the emptied authored container')
-  click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);click('tab/4');click('update-world');wait(lambda:not live()['request']);expanded=save('wa-whole-evacuation')
+  click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);click('tab/Export');click('update-world');wait(lambda:not live()['request']);expanded=save('wa-whole-evacuation')
   check(live()['applyStatus']=='ok' and {'100','101','102','103'}<=set(regions(expanded)),'whole-project update adds newly generated building regions')
   ImageGrab.grab().save(out/'world-regions.png');(out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect regional UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.preset=='hospital':
@@ -156,17 +196,17 @@ try:
  generated=save('wa-generated');check(planes(generated)==baseline,'candidate generation and preview leave authored brushes unchanged')
  check(live()['world']['valid'] and live()['world']['reachable']==live()['world']['navigationNodes'],'chosen candidate passes the physical hull navigation oracle')
  click('candidate/1');wait(lambda:live()['selected']==1);chosen=live()['world']['seed']
- click('tab/3');saved_project=out/'saved.world.json';click('save-project');choose(saved_project);wait(saved_project.exists);saved=json.loads(saved_project.read_text())
+ click('tab/Overview');saved_project=out/'saved.world.json';click('save-project');choose(saved_project);wait(saved_project.exists);saved=json.loads(saved_project.read_text())
  check(saved['selectedCandidateSeed']==chosen and len(saved['registry']['presets'])==8,'project saves the selected candidate and complete preset registry snapshot')
  click('open-project');choose(saved_project);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
  check(live()['world']['seed']==chosen,'project reopen and regeneration restore the exact selected candidate')
- click('tab/0');time.sleep(1);desktop=ImageGrab.grab().convert('RGB');desktop.save(out/'world-preview.png')
+ click('tab/Overview');time.sleep(1);desktop=ImageGrab.grab().convert('RGB');desktop.save(out/'world-preview.png')
  preview=live()['widgets']['preview'];ox,oy=ui.position();sx,sy=getattr(ui,'scale',(1,1));box=(int(ox+preview['x']*sx),int(oy+preview['y']*sy),int(ox+(preview['x']+preview['width'])*sx),int(oy+(preview['y']+preview['height'])*sy))
  visible=sum(g>r*1.01 and g>b*1.02 and 50<g<210 for r,g,b in desktop.crop(box).getdata())
  check(visible>1000,'3D preview contains actual textured architecture instead of a missing render target')
- click('tab/1');time.sleep(.5);ImageGrab.grab().save(out/'world-site-plan.png')
- click('tab/2');time.sleep(.5);ImageGrab.grab().save(out/'world-quality.png')
- click('tab/4');exported=out/'exported/world.map';exported.parent.mkdir(exist_ok=True);click('export');choose(exported);wait(exported.exists)
+ click('tab/Site & Roads');time.sleep(.5);ImageGrab.grab().save(out/'world-site-plan.png')
+ click('tab/Quality');time.sleep(.5);ImageGrab.grab().save(out/'world-quality.png')
+ click('tab/Export');exported=out/'exported/world.map';exported.parent.mkdir(exist_ok=True);click('export');choose(exported);wait(exported.exists)
  check('"worldspawn"' in exported.read_text() and (exported.parent/'world.world.json').exists(),'export writes actual brush MAP and a versioned editable project')
  check(any(exported.parent.glob('world-architect-*.wad')) and any((exported.parent/'textures').glob('*.tga')),'portable export includes real original WAD and texture assets')
  if a.preset=='metro':check('surfaceparm water' in (exported.parent/'scripts/world-architect-metro.shader').read_text() and any(name in exported.read_text() for name in ['wa_water_metro','*wametro','!wametro']),'flooded platform exports its liquid MAP material and shader assets')
@@ -189,7 +229,7 @@ try:
   check(not live()['error'] and live()['world']['stageSeeds']['Site']==site_seed,'freezing architecture retains the selected site while later stages use a new seed')
   previous_seed=live()['world']['seed'];seed(42);click('generate');wait(lambda:not live()['busy'] and live()['world']['seed']!=previous_seed)
   check(set(['Mission','Site','Architecture'])<=set(live()['world']['cachedStages']),'regeneration reuses the actual frozen prefix cache')
-  locked_seed=live()['world']['seed'];locked_project=out/'locked.world.json';click('tab/3');click('save-project');choose(locked_project);wait(locked_project.exists);click('open-project');choose(locked_project);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
+  locked_seed=live()['world']['seed'];locked_project=out/'locked.world.json';click('tab/Overview');click('save-project');choose(locked_project);wait(locked_project.exists);click('open-project');choose(locked_project);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy'])
   check(live()['world']['seed']==locked_seed and all(live()['settings']['stageLocks'][:3]),'saved project restores frozen stage recipes and its selected candidate')
   click('freeze');click('freeze/0');wait(lambda:not any(live()['settings']['stageLocks']));check(planes(save('wa-frozen-preview'))==planes(applied),'freeze, regeneration and project replay leave authored map geometry unchanged')
  for path in [before,generated,applied,undone,redone]:shutil.copy2(path,out/path.name)

@@ -44,6 +44,7 @@ def main():
     if 'world_core' in suites:
         run('world_core', 'scripts/test-world-architect.py', out/'world/core', '--runtime', root,
             '--seeds', '100' if selected['mode'] == 'full' else '3', gui=False)
+        run('world_core', 'scripts/test-world-designer.py', root, out/'world/designer-core', gui=False)
     if 'world_ui' in suites:
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/ui')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/metro-ui', '--preset', 'metro')
@@ -51,6 +52,7 @@ def main():
             out/'world/metro-ui', '--fixture-texture', root/'ftebroom/textures/ftebroom/qa_blue.tga', gui=False)
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/regions-ui', '--preset', 'evacuation', '--regions-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/pins-ui', '--preset', 'evacuation', '--pins-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/designer-ui', '--designer-only')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))

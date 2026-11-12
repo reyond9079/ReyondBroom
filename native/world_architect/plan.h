@@ -39,6 +39,7 @@ struct Experience {int beats=7,branches=2,loops=1;double verticality=.5,openness
 struct MissionNode {uint64_t id=0;Role role=Role::Challenge;std::string name;V position;bool required=true,pinned=false;int floor=0;uint64_t room=0;};
 struct MissionEdge {uint64_t a=0,b=0;bool optional=false,oneWay=false;std::string purpose;uint64_t prerequisite=0;};
 struct MissionGraph {std::vector<MissionNode> nodes;std::vector<MissionEdge> edges;};
+inline void validateMission(const MissionGraph& graph);
 struct Road {uint64_t id=0;V a,b;double width=160;std::string hierarchy="local";bool pinned=false;};
 struct Lot {uint64_t id=0;V low,high;std::string zone;};
 struct Room {uint64_t id=0;V low,high,entry;std::string function;int floor=0;bool required=true;uint64_t mission=0;};
@@ -69,6 +70,9 @@ struct Settings {
   std::array<bool,7> locked{};
   std::array<Json,5> frozen;uint64_t frozenRegistry=0;
   std::vector<MissionNode> missionPins;
+  std::optional<MissionGraph> authoredMission;
+  // Empty / zero fields inherit the registry's archetype program.
+  std::string layout,theme;double width=0,depth=0,hall=0;int floors=0,rooms=0,blocks=0;
   std::vector<Road> roadPins;
   std::vector<uint64_t> pinnedRegions;
   // Clean per-building Architecture / Damage / Dressing recipes. Mission
@@ -129,17 +133,31 @@ inline Registry readRegistry(const Json& j){
   if(r.presets.empty()||r.themes.empty())throw std::runtime_error("Empty World Architect registry");return r;
 }
 inline Settings deserialize(const Json& j,const Registry& r,bool recipe=false);
+inline Preset stagePreset(const Settings& s,const Registry& registry){
+  auto p=registry.preset(s.preset);
+  if(!s.layout.empty()){
+    if(s.layout!="spine"&&s.layout!="ring"&&s.layout!="atrium"&&s.layout!="parallel"&&s.layout!="courtyard"&&s.layout!="offset"&&s.layout!="branched")throw std::runtime_error("Unknown designer layout grammar");p.layout=s.layout;
+  }
+  if(!s.theme.empty()){registry.theme(s.theme);p.theme=s.theme;}
+  if(s.width){finite(s.width,768,2560,"Building width must be 768..2560");p.width=s.width;}
+  if(s.depth){finite(s.depth,448,1536,"Building depth must be 448..1536");p.depth=s.depth;}
+  if(s.hall){finite(s.hall,64,224,"Gallery half-width must be 64..224");p.hallHalfWidth=s.hall;}
+  if(s.floors){finite(s.floors,1,4,"Floors must be 1..4");p.floors=s.floors;}
+  if(s.rooms){finite(s.rooms,2,16,"Rooms must be 2..16");p.rooms=s.rooms;}
+  if(s.blocks){finite(s.blocks,1,4,"Blocks must be 1..4");if((p.scope==Scope::Interior||p.scope==Scope::Arena)&&s.blocks!=1)throw std::runtime_error("Interior archetypes use one building envelope");p.blocks=s.blocks;}
+  return p;
+}
 inline Settings cleanSettings(Settings s){s.locked.fill(false);s.frozen.fill(Json(nullptr));s.frozenRegistry=0;return s;}
 inline Settings unpinnedSettings(Settings s){s=cleanSettings(std::move(s));s.pinnedRegions.clear();s.regionRecipes.clear();s.pinnedRegistry=0;return s;}
 inline int lockedThrough(const Settings& s){int last=-1;for(int i=0;i<5;i++)if(s.locked[i])last=i;return last;}
 inline void validate(const Settings& s,const Registry& r,bool recipe=false){
-  r.preset(s.preset);capability(s.profile);finite(s.scale,.6,1.4,"Scale must be 0.6..1.4");finite(s.damage,0,1,"Damage must be 0..1");finite(s.dressing,0,1,"Dressing must be 0..1");finite(s.candidates,1,16,"Candidate count must be 1..16");
+  stagePreset(s,r);if(s.authoredMission)validateMission(*s.authoredMission);capability(s.profile);finite(s.scale,.6,1.4,"Scale must be 0.6..1.4");finite(s.damage,0,1,"Damage must be 0..1");finite(s.dressing,0,1,"Dressing must be 0..1");finite(s.candidates,1,16,"Candidate count must be 1..16");
   finite(s.player.radius,8,32,"Player radius must be 8..32");finite(s.player.height,32,80,"Player height must be 32..80");finite(s.player.step,4,18,"Player step must be 4..18");
   if(s.pinnedRegions.size()>4||s.regionRecipes.size()!=s.pinnedRegions.size())throw std::runtime_error("Building pins require one bounded recipe set per building");
   if(!s.pinnedRegions.empty()){
     if(s.pinnedRegistry!=r.fingerprint)throw std::runtime_error("Building pins require their original registry snapshot");
     if(!recipe&&(!s.locked[0]||!s.locked[1]))throw std::runtime_error("Unpin buildings before unlocking their Mission and Site");
-    std::set<uint64_t> pins;const auto& p=r.preset(s.preset);const int buildings=p.scope==Scope::Interior?1:p.blocks;
+    std::set<uint64_t> pins;const auto p=stagePreset(s,r);const int buildings=(p.scope==Scope::Interior||p.scope==Scope::Arena)?1:p.blocks;
     for(auto id:s.pinnedRegions){
       if(id<100||id>=uint64_t(100+buildings)||!pins.insert(id).second||!s.regionRecipes.count(id))throw std::runtime_error("Unknown or duplicate pinned building");
       for(const auto& input:s.regionRecipes.at(id)){
@@ -147,7 +165,7 @@ inline void validate(const Settings& s,const Registry& r,bool recipe=false){
         if(input.value("pinnedRegions",Json::array()).size()||input.value("regionRecipes",Json::array()).size())throw std::runtime_error("Recursive building pins are not allowed");
         if(input.contains("frozenStageInputs"))for(const auto& nested:input.at("frozenStageInputs"))if(!nested.is_null())throw std::runtime_error("A building recipe cannot contain frozen stages");
         if(input.contains("stageLocks"))for(const auto& flag:input.at("stageLocks"))if(flag.get<bool>())throw std::runtime_error("A building recipe must be clean");
-        auto clean=deserialize(input,r,true);if(clean.profile!=s.profile||clean.preset!=s.preset)throw std::runtime_error("Unpin buildings before changing profile or preset");
+        auto clean=deserialize(input,r,true);if(clean.profile!=s.profile||clean.preset!=s.preset||stagePreset(clean,r).theme!=p.theme)throw std::runtime_error("Unpin buildings before changing profile, preset or theme");
       }
     }
   }
@@ -163,7 +181,7 @@ inline void validate(const Settings& s,const Registry& r,bool recipe=false){
   if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
   for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route"&&name!="circulation")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
   std::set<uint64_t> ids;for(const auto& p:s.missionPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate mission pin");for(int a=0;a<3;a++)finite(p.position[a],-30000,30000,"Invalid mission pin");}
-  ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}finite(p.width,96,512,"Invalid road width");if(al::length(p.a-p.b)<128)throw std::runtime_error("Road pin is too short");}
+  ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}finite(p.width,48,512,"Invalid road width");if(al::length(p.a-p.b)<48||p.a.z!=0||p.b.z!=0)throw std::runtime_error("Road pins require a ground-plane segment of at least 48 units");}
   for(const auto& mask:s.influences){for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing")throw std::runtime_error("Unknown influence type");}
 }
 inline Json serialize(const Settings& s){
@@ -172,6 +190,8 @@ inline Json serialize(const Settings& s){
   j["roadPins"]=Json::array();for(const auto& p:s.roadPins)j["roadPins"].push_back({{"id",p.id},{"a",vector(p.a)},{"b",vector(p.b)},{"width",p.width}});
   j["regionSeeds"]=Json::array();for(const auto& [id,seed]:s.regionSeeds)j["regionSeeds"].push_back({{"region",id},{"seed",seed}});
   j["pinnedRegistry"]=s.pinnedRegistry;j["regionRecipes"]=Json::array();for(const auto& [id,recipes]:s.regionRecipes)j["regionRecipes"].push_back({{"region",id},{"inputs",recipes}});
+  j["architecture"]={{"layout",s.layout},{"theme",s.theme},{"width",s.width},{"depth",s.depth},{"hall",s.hall},{"floors",s.floors},{"rooms",s.rooms},{"blocks",s.blocks}};
+  j["missionGraph"]=nullptr;if(s.authoredMission){auto& graph=j["missionGraph"];graph={{"nodes",Json::array()},{"edges",Json::array()}};for(const auto& n:s.authoredMission->nodes)graph["nodes"].push_back({{"id",n.id},{"role",int(n.role)},{"name",n.name},{"required",n.required}});for(const auto& e:s.authoredMission->edges)graph["edges"].push_back({{"a",e.a},{"b",e.b},{"optional",e.optional},{"oneWay",e.oneWay},{"purpose",e.purpose},{"prerequisite",e.prerequisite}});}
   j["influences"]=Json::array();for(const auto& p:s.influences)j["influences"].push_back({{"id",p.id},{"low",vector(p.low)},{"high",vector(p.high)},{"kind",p.kind},{"strength",p.strength}});return j;
 }
 inline Settings deserialize(const Json& j,const Registry& r,bool recipe){
@@ -183,6 +203,12 @@ inline Settings deserialize(const Json& j,const Registry& r,bool recipe){
   for(const auto& p:j.at("roadPins")){Road road;road.id=p.at("id");road.a=vector(p.at("a"));road.b=vector(p.at("b"));road.width=p.at("width");road.pinned=true;s.roadPins.push_back(road);}
   for(const auto& p:j.at("regionSeeds"))s.regionSeeds[p.at("region").get<uint64_t>()]=p.at("seed").get<uint64_t>();
   s.pinnedRegistry=j.value("pinnedRegistry",uint64_t(0));if(j.contains("regionRecipes"))for(const auto& p:j.at("regionRecipes"))if(!s.regionRecipes.emplace(p.at("region").get<uint64_t>(),p.at("inputs").get<std::array<Json,3>>()).second)throw std::runtime_error("Duplicate building recipe");
+  if(j.contains("architecture")){const auto& a=j.at("architecture");s.layout=a.at("layout");s.theme=a.at("theme");s.width=a.at("width");s.depth=a.at("depth");s.hall=a.at("hall");s.floors=a.at("floors");s.rooms=a.at("rooms");s.blocks=a.at("blocks");}
+  if(j.contains("missionGraph")&&!j.at("missionGraph").is_null()){
+    const auto& graph=j.at("missionGraph");if(graph.at("nodes").size()>63||graph.at("edges").size()>256)throw std::runtime_error("Mission override budget exceeded");MissionGraph g;
+    for(const auto& n:graph.at("nodes")){MissionNode node;node.id=n.at("id");int role=n.at("role");finite(role,0,7,"Unknown mission role");node.role=Role(role);node.name=n.at("name");if(node.name.size()>120)throw std::runtime_error("Mission name exceeds its budget");node.required=n.at("required");g.nodes.push_back(node);}
+    for(const auto& e:graph.at("edges")){MissionEdge edge;edge.a=e.at("a");edge.b=e.at("b");edge.optional=e.at("optional");edge.oneWay=e.at("oneWay");edge.purpose=e.at("purpose");if(edge.purpose.size()>120)throw std::runtime_error("Mission transition name exceeds its budget");edge.prerequisite=e.at("prerequisite");g.edges.push_back(edge);}s.authoredMission=std::move(g);
+  }
   for(const auto& p:j.at("influences")){Influence mask;mask.id=p.at("id");mask.low=vector(p.at("low"));mask.high=vector(p.at("high"));mask.kind=p.at("kind");mask.strength=p.at("strength");s.influences.push_back(mask);}validate(s,r,recipe);return s;
 }
 inline MissionGraph mission(const Settings& settings,const Preset& preset){
@@ -201,35 +227,37 @@ inline MissionGraph mission(const Settings& settings,const Preset& preset){
   for(int i=0;i<preset.experience.loops;i++){
     int from=rng.integer(1,count-3);graph.edges.push_back({uint64_t(from),uint64_t(from+3),true,false,"return shortcut",0});
   }
-  for(auto& n:graph.nodes)for(const auto& pin:settings.missionPins)if(n.id==pin.id){n.position=pin.position;n.pinned=true;}
+  if(settings.authoredMission){graph=*settings.authoredMission;for(auto& n:graph.nodes){n.position={};n.room=0;n.floor=0;n.pinned=false;}}
+  for(const auto& pin:settings.missionPins){auto found=std::find_if(graph.nodes.begin(),graph.nodes.end(),[&](const auto& n){return n.id==pin.id;});if(found==graph.nodes.end())throw std::runtime_error("A pinned mission node no longer exists");found->position=pin.position;found->pinned=true;}
   return graph;
 }
 // State-space traversal honors prerequisite nodes and one-way edges. It is
 // separate from the later physical hull/navigation check.
-inline void validateMission(const MissionGraph& graph){
+inline std::vector<uint64_t> missionTraversal(const MissionGraph& graph){
   if(graph.nodes.empty()||graph.nodes.size()>63)throw std::runtime_error("Mission needs 1..63 nodes");std::map<uint64_t,size_t> index;int starts=0,exits=0;size_t start=0;
-  for(size_t i=0;i<graph.nodes.size();i++){const auto& n=graph.nodes[i];if(!n.id||!index.emplace(n.id,i).second)throw std::runtime_error("Duplicate mission node");if(n.role==Role::Start){start=i;starts++;}exits+=n.role==Role::Exit;}
+  for(size_t i=0;i<graph.nodes.size();i++){const auto& n=graph.nodes[i];if(!n.id||!index.emplace(n.id,i).second)throw std::runtime_error("Duplicate mission node");finite(int(n.role),0,7,"Unknown mission role");if(n.name.size()>120)throw std::runtime_error("Mission name exceeds its budget");if(n.role==Role::Start){start=i;starts++;}exits+=n.role==Role::Exit;}
   if(starts!=1||exits!=1)throw std::runtime_error("Mission needs one start and one exit");
-  for(const auto& e:graph.edges)if(!index.count(e.a)||!index.count(e.b)||e.a==e.b||(e.prerequisite&&!index.count(e.prerequisite)))throw std::runtime_error("Invalid mission edge");
+  if(graph.edges.size()>256)throw std::runtime_error("Too many mission transitions");for(const auto& e:graph.edges)if(!index.count(e.a)||!index.count(e.b)||e.a==e.b||(e.prerequisite&&!index.count(e.prerequisite))||e.purpose.size()>120)throw std::runtime_error("Invalid mission edge");
   uint64_t required=0,tracked=0;
   for(size_t i=0;i<graph.nodes.size();i++)if(graph.nodes[i].required)required|=uint64_t(1)<<i;
   tracked=required;for(const auto& e:graph.edges)if(e.prerequisite)tracked|=uint64_t(1)<<index.at(e.prerequisite);
-  using State=std::pair<size_t,uint64_t>;std::deque<State> queue{{start,(uint64_t(1)<<start)&tracked}};std::set<State> seen;
+  using State=std::pair<size_t,uint64_t>;State initial{start,(uint64_t(1)<<start)&tracked};std::deque<State> queue{initial};std::map<State,State> parents{{initial,initial}};
   while(!queue.empty()){
-    auto [at,visited]=queue.front();queue.pop_front();if(!seen.insert({at,visited}).second)continue;
-    if(seen.size()>100000)throw std::runtime_error("Mission state search exceeds 100000 states");
-    if(graph.nodes[at].role==Role::Exit&&(visited&required)==required)return;
+    auto [at,visited]=queue.front();queue.pop_front();
+    if(graph.nodes[at].role==Role::Exit&&(visited&required)==required){std::vector<uint64_t> route;State state{at,visited};for(;;){route.push_back(graph.nodes[state.first].id);if(state==initial)break;state=parents.at(state);}std::reverse(route.begin(),route.end());return route;}
     for(const auto& e:graph.edges){
       if(e.prerequisite&&!(visited&(uint64_t(1)<<index.at(e.prerequisite))))continue;
       size_t next=SIZE_MAX;if(index.at(e.a)==at)next=index.at(e.b);else if(!e.oneWay&&index.at(e.b)==at)next=index.at(e.a);
-      if(next!=SIZE_MAX)queue.push_back({next,visited|((uint64_t(1)<<next)&tracked)});
+      if(next!=SIZE_MAX){State state{next,visited|((uint64_t(1)<<next)&tracked)};if(parents.emplace(state,State{at,visited}).second){if(parents.size()>100000)throw std::runtime_error("Mission state search exceeds 100000 states");queue.push_back(state);}}
     }
   }
   throw std::runtime_error("Mission cannot visit its required beats and reach the exit under its gate / direction rules");
 }
+inline void validateMission(const MissionGraph& graph){(void)missionTraversal(graph);}
 inline Json diagnostics(const WorldPlan& world){
   Json j={{"schemaVersion",schemaVersion},{"seed",world.seed},{"preset",world.preset},{"profile",world.profile},{"valid",world.diagnostics.valid},{"rejects",world.diagnostics.rejects},{"warnings",world.diagnostics.warnings},{"timingMs",world.diagnostics.timing},{"cachedStages",world.diagnostics.cachedStages},{"scores",world.diagnostics.score},{"brushes",world.diagnostics.brushes},{"mapBytes",world.diagnostics.mapBytes},{"routeLength",world.diagnostics.routeLength},{"stageSeeds",world.seeds},{"reachable",world.navigation.reachable},{"navigationNodes",world.navigation.nodes.size()}};
   j["missionNodes"]=Json::array();for(const auto& n:world.mission.nodes)j["missionNodes"].push_back({{"id",n.id},{"role",roleName(n.role)},{"required",n.required},{"room",n.room},{"floor",n.floor},{"position",vector(n.position)}});
-  j["missionEdges"]=Json::array();for(const auto& e:world.mission.edges)j["missionEdges"].push_back({{"a",e.a},{"b",e.b},{"purpose",e.purpose},{"optional",e.optional}});return j;
+  j["missionEdges"]=Json::array();for(const auto& e:world.mission.edges)j["missionEdges"].push_back({{"a",e.a},{"b",e.b},{"purpose",e.purpose},{"optional",e.optional},{"oneWay",e.oneWay},{"prerequisite",e.prerequisite}});
+  j["bounds"]={{"low",vector(world.low)},{"high",vector(world.high)}};j["rooms"]=Json::array();for(const auto& b:world.spatial.buildings)for(const auto& room:b.rooms)j["rooms"].push_back({{"id",room.id},{"building",b.id},{"floor",room.floor},{"low",vector(room.low)},{"high",vector(room.high)},{"function",room.function},{"mission",room.mission}});return j;
 }
 }

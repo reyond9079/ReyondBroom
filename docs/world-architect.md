@@ -11,7 +11,7 @@ cloud service or language model.
 2. Open **Plugins → World Architect (development preview)**.
 3. Choose a prototype preset, seed, scale, damage and dressing density.
 4. Click **Generate candidates**. Preview does not change the authored scene.
-5. Select a candidate. Inspect its 3D view, floor cutaway, mission/site plan,
+5. Select a candidate. Inspect Overview's 3D view, floor cutaway, mission/site plan,
    rejection diagnostics and quality measurements. **Walk from spawn** uses
    grounded collision and step checks; drag with the right mouse button to look.
 6. Save the editable project or export its MAP and assets. Use **Apply to current
@@ -43,7 +43,7 @@ before export or Apply.
 
 ## Preserve a complete building
 
-In **Project → Building details**, select a building and click **Pin selected
+In **Buildings → Building details**, select a building and click **Pin selected
 building**. Its accepted Architecture, Damage and Dressing recipes are retained
 independently. New seeds can vary the other buildings. Mission and Site remain
 frozen while pins exist: moving their roads, rooms or lots would invalidate the
@@ -59,7 +59,7 @@ building.
 
 ## Regenerate a building's details
 
-Apply a selected candidate once. In **Project → Building details**, choose a
+Apply a selected candidate once. In **Buildings → Building details**, choose a
 building and detail seed, then click **Preview selected building details**.
 The mission, site and architecture recipes stay frozen; only that building's
 Damage/Dressing streams change. Other buildings retain their original streams.
@@ -78,6 +78,35 @@ not a force-overwrite operation. One map Undo/Redo covers the replacement.
 added/removed regions. **Apply** adds a new project; trying to add the same
 project again is rejected. A project from a different preset/site cannot replace
 one building of an incompatible architecture; update the complete world instead.
+
+## Author the plan before Apply
+
+The workspace has **Overview, Mission Graph, Site & Roads, Buildings,
+Architecture, Destruction, Dressing, Quality and Export** panels. Save/open
+project controls live in Overview. Settings Undo/Redo remains separate from map
+Undo/Redo, and export requires regenerating stale candidates.
+
+In Mission Graph, drag a beat onto a functional room on the selected floor.
+The point snaps to that room's player anchor; generation reserves it before
+building the walls and reassigns unpinned beats around it. Add optional branches
+or edit mission transitions. Invalid disconnections and two pins in one room
+fail explicitly. Directed transitions constrain the validated mission traversal;
+they do not yet instantiate physical engine gates.
+
+Architecture changes the real circulation grammar, floor count, minimum room
+count, building dimensions and gallery width. These fields inherit the preset
+until overridden. Site & Roads changes street width and segment endpoints;
+road brushes, curbs and navigation change together. Edits that cross a building,
+leave the sealed site or disconnect required navigation are rejected. Unlock
+the relevant upstream stage before editing it.
+
+In Destruction or Dressing, choose a field type and strength, then drag a
+rectangle on the floor plan. Preserve suppresses structural destruction and
+props; damage/dressing fields override their local amounts, and avoid volumes
+reject building overlaps. **Preserve selected building** paints its full
+envelope. Fields persist in the editable project. Dressing also selects the
+original art palette; a new palette requires unlocking Architecture and
+unpinning buildings. Rich theme-specific grammar remains in development.
 
 ## Files, profiles and troubleshooting
 

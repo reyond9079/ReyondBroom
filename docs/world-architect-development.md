@@ -366,3 +366,22 @@ Apply errors also expose parser/geometry context rather than only parse-failed.
 Filtered profile/preset options let interrupted or focused corpora run without
 repeating unchanged completed cases. Final post-repair corpus/CI acceptance is
 still pending; AutoLevel remains the default.
+
+### Focused Windows input reproduction
+
+The `f46537e` Linux/SDL2 jobs passed. Windows passed generation, actual Apply,
+metro, regional updates, pins, designer controls, themes and all scenario
+previews, then stopped in the road-sketch test. Its start point sampled a short
+radial road and fell within an existing endpoint handle at Windows font/canvas
+sizes. The fixture now draws through empty central space and checks pixel
+clearance/drag distance before sending input. Nine actual SDL local-authoring
+checks passed with the replacement gesture.
+
+Prepared Windows reproduction supports separate `local` and `remaining` World
+Architect cases. Reuse checks the complete native/CSQC/engine inputs and both
+normal build job recipes, including compiler flags and dependency actions.
+Portable gate/module fixture source hashes must match before reuse. Test-driver
+changes therefore do not require rebuilding an unchanged editor; changed build
+inputs explicitly reject reuse. Thirty CI policy contracts pass. These focused
+runs complement the production revision's Linux/SDL2 and earlier Windows checks;
+they are not a replacement for the mandatory packaged release gates.

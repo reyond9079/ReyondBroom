@@ -24,6 +24,7 @@ def module(name):
 
 
 planner, cache, runner, smoke = [module(n) for n in ('plan', 'dependency', 'run-checks', 'release-smoke')]
+prepared = module('verify-prepared')
 
 
 class ScopeTests(unittest.TestCase):
@@ -317,6 +318,28 @@ class PackageGateTests(unittest.TestCase):
             root = Path(folder); version, _ = self.fixture(root, 'Linux-x64')
             (root/'ReyondBroom-Linux-x64/fteqw-gl64').write_bytes(b'stale')
             with self.assertRaises(AssertionError): smoke.verify(root, 'Linux-x64', version)
+
+
+class PreparedReuseTests(unittest.TestCase):
+    def test_only_test_driver_steps_can_change_without_rebuilding(self):
+        original=(REPO/'.github/workflows/compilation-profile-checks.yml').read_text()
+        prepared.verify_recipes(original, original.replace('Exercise actual Windows controls with OS input','Focused input reproduction'))
+        jobs=prepared.build_jobs(original)
+        changed_job=jobs['windows'].replace('-O1', '-O2', 1)
+        self.assertNotEqual(changed_job,jobs['windows'])
+        changed=original.replace(jobs['windows'], changed_job)
+        with self.assertRaises(AssertionError): prepared.verify_recipes(original, changed)
+
+    def test_fixture_provenance_rejects_changed_inputs_and_path_escape(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo=Path(temporary);(repo/'native').mkdir();source=repo/'native/core.h';source.write_text('first')
+            fixture=repo/'fixture';fixture.mkdir();manifest=fixture/'provenance.json'
+            manifest.write_text(json.dumps({'sourceHashes':{'native/core.h':hashlib.sha256(source.read_bytes()).hexdigest()}}))
+            prepared.verify_fixture(fixture,repo)
+            source.write_text('changed')
+            with self.assertRaises(AssertionError): prepared.verify_fixture(fixture,repo)
+            manifest.write_text(json.dumps({'sourceHashes':{'../other':'invalid'}}))
+            with self.assertRaises(AssertionError): prepared.verify_fixture(fixture,repo)
 
 
 class WorkflowTests(unittest.TestCase):

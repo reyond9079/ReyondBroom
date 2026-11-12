@@ -164,9 +164,17 @@ try:
   click('freeze');click('freeze/0');click('preset');click('preset/evacuation');local_generate();click('tab/Site & Roads');road=live()['world']['roads'][0];points=road['points'];mid=[(points[0][i]+points[-1][i])/2 for i in range(3)];click('road-curved');wait(lambda:live()['settings']['roadPins'] and live()['settings']['roadPins'][0]['control'] is not None)
   r=live()['widgets']['road-control'];ui.click(r['x']+r['width']*.15,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(str(round(mid[0])));ui.key('enter');r=live()['widgets']['road-control'];ui.click(r['x']+r['width']*.55,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(str(round(mid[1]+32)));ui.key('enter');local_generate()
   check(len(live()['world']['roads'][0]['points'])>2 and live()['world']['valid'],'Bezier controls generate a physically validated curved road in the actual editor')
-  world=live()['world'];canvas=live()['widgets']['plan-canvas'];scale=min((canvas['width']-32)/(world['bounds']['high'][0]-world['bounds']['low'][0]),(canvas['height']-32)/(world['bounds']['high'][1]-world['bounds']['low'][1]));points=world['roads'][0]['points'];start=points[max(1,int((len(points)-1)*.2))];end=points[max(2,int((len(points)-1)*.35))]
+  world=live()['world'];canvas=live()['widgets']['plan-canvas'];scale=min((canvas['width']-32)/(world['bounds']['high'][0]-world['bounds']['low'][0]),(canvas['height']-32)/(world['bounds']['high'][1]-world['bounds']['low'][1]));start=[-256,-256,0];end=[256,128,0]
   def road_pixel(p):return (canvas['x']+16+(p[0]-world['bounds']['low'][0])*scale,canvas['y']+16+(p[1]-world['bounds']['low'][1])*scale)
-  count=len(world['roads']);drag(road_pixel(start),road_pixel(end));wait(lambda:any(p['id']>=9000 for p in live()['settings']['roadPins']));local_generate();check(len(live()['world']['roads'])==count+1 and live()['world']['valid'],'dragging empty plan space builds an additional real road and navigation path');ImageGrab.grab().save(out/'world-curved-road.png')
+  # Use the radial site's empty central space. Sampling a short road arc can
+  # land inside its eight-pixel endpoint/control handle at Windows font sizes.
+  start_pixel,end_pixel=road_pixel(start),road_pixel(end);handles=[]
+  for road in world['roads']:
+   handles.extend([road['points'][0],road['points'][-1]])
+  handles.extend(p['control'] for p in live()['settings']['roadPins'] if p.get('control'))
+  assert all(sum((a-b)**2 for a,b in zip(start_pixel,road_pixel(handle)))>81 for handle in handles),'Sketch fixture overlaps an existing road handle'
+  assert sum((a-b)**2 for a,b in zip(start_pixel,end_pixel))>100,'Sketch fixture is shorter than the drag threshold'
+  count=len(world['roads']);drag(start_pixel,end_pixel);wait(lambda:any(p['id']>=9000 for p in live()['settings']['roadPins']));local_generate();check(len(live()['world']['roads'])==count+1 and live()['world']['valid'],'dragging empty plan space builds an additional real road and navigation path');ImageGrab.grab().save(out/'world-curved-road.png')
   click('tab/Destruction');click('mask-preserve-building');wait(lambda:len(live()['settings']['influences'])==1);r=live()['widgets']['volume-max'];old=live()['settings']['influences'][0]['high'][2];ui.click(r['x']+r['width']*.72,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(str(round(old+64)));ui.key('enter');wait(lambda:live()['settings']['influences'][0]['high'][2]==round(old+64));check(True,'volume height editing updates the saved XYZ field rather than only the plan rectangle')
   click('undo-settings');wait(lambda:live()['settings']['influences'][0]['high'][2]==old);check(True,'numeric volume edits undo in one settings transaction');check(planes(save('wa-local-preview'))==baseline,'local authoring and export preserve the active authored scene');print('World Architect local authoring UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.scenarios_only:

@@ -197,9 +197,35 @@ families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
 Complete spline/volume editing, richer painted masks, physical gate realization,
-room-level regeneration, candidate comparison panes, direct procedural use of
+room-level regeneration, direct procedural use of
 imported module packs, extension-pack validation, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.
 Malformed or incompatible pin recipes fail explicitly instead of silently ignoring
 designer intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu
 entry may be retired before the complete Definition of Done is met.
+
+## Scenario geometry and candidate comparison
+
+The six remaining scenario configurations now add their own physical structures:
+checkpoint booth/barricade and roof overlook; factory presses, gantry, fractured
+roof and brush ivy; residential garages and roof stairs; two broken overpass
+decks with building detours; mall retail signs and a continuous lit service
+corridor; evacuation portico and rooftop beacon. Scenario landmarks move before
+architecture to their actual roof/gallery anchor. Roof markers use building
+ownership during regional replacement even without a room ID. Garage facade
+ornaments respect the full door opening. Mall room partitions end before the
+service corridor, which is reserved against subsequent rubble placement.
+
+Quality compares up to four actual candidate site/room/route plans alongside
+per-candidate measurements. Selection changes the same world used by 3D preview,
+export and Apply; it is not an illustrative mockup. There is a focused actual-OS
+`--scenarios-only` UI check and physical scenario contracts. The core suite now
+compiles all eight representative presets on the three certified profiles;
+this is scoped to World Architect changes and does not enable unrelated suites.
+These additions alone do not satisfy final visual/gameplay acceptance.
+
+The scenario slice passed 359 core contracts, 20 actual SDL2 input/render/
+comparison checks, and 72 accepted input batches across Quake 1, Quake III and
+FTE (three input seeds per preset/profile). All six new representative scenarios
+compiled and lit on each profile: 18 actual BSP/light runs. The full 100-seed
+acceptance and compiled first-person review remain separate final gates.

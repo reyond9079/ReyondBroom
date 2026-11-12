@@ -11,15 +11,19 @@ cloud service or language model.
 2. Open **Plugins → World Architect (development preview)**.
 3. Choose a prototype preset, seed, scale, damage and dressing density.
 4. Click **Generate candidates**. Preview does not change the authored scene.
-5. Select a candidate. Inspect Overview's 3D view, floor cutaway, mission/site plan,
+5. Select a candidate. Quality compares up to four actual spatial plans and their
+   individual score breakdowns side by side; selecting one also selects its
+   Overview 3D geometry. Inspect the 3D view, floor cutaway, mission/site plan,
    rejection diagnostics and quality measurements. **Walk from spawn** uses
    grounded collision and step checks; drag with the right mouse button to look.
 6. Save the editable project or export its MAP and assets. Use **Apply to current
    map** to insert editable geometry in one map Undo/Redo transaction.
 
 The eight registry entries are still prototype configurations, not eight
-finished showcase maps. Hospital and metro currently have the most specific
-structural events. See [development status](world-architect-development.md) for
+finished showcase maps. Each configuration has scenario-specific physical structures, including roof
+escape stairs, a checkpoint booth/barricade, a factory crane and presses, garage
+openings, a genuinely broken overpass, a continuous mall service corridor, and
+an evacuation portico/beacon. Final art and play acceptance remains open. See [development status](world-architect-development.md) for
 the delivered and remaining work.
 
 ## Iterate while preserving earlier stages

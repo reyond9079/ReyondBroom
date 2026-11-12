@@ -25,11 +25,12 @@ inline void themeArchitecture(WorldPlan& w,const Settings& settings,const Buildi
     for(int side:{-1,1}){
       const double y=side<0?b.low.y:b.high.y;
       if(theme.grammar=="clinical"){
-        box(w,b.id,"clinical ceramic belt",{b.low.x,y-12,z+82},{b.high.x,y+12,z+100},3);
+        facadeStrip(w,b,"clinical ceramic belt",floor,side>0,z+82,z+100,12,3);
         box(w,b.id,"clinical service rail",{b.low.x,y-13,z+204},{b.high.x,y+13,z+212},2);
       }
       for(int i=0;i<bays;i++){
         double x=b.low.x+width*(i+.5)/bays;
+        auto gaps=facadeGaps(b,floor,side>0);if(std::any_of(gaps.begin(),gaps.end(),[&](auto gap){return x>=gap[0]-32&&x<=gap[1]+32;}))continue;
         if(theme.grammar=="masonry")archBand(w,b.id,"masonry arch surround",{x,y+12,z+168},{x,y-12,z+168},42,42,10,2);
         if(theme.grammar=="brutalist")addBrush(w,b.id,"exposed concrete buttress",bevel({x-14,y-28,z},{x+14,y+28,z+236},material(w,2),8));
         if(theme.grammar=="industrial"){

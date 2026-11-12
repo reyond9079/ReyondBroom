@@ -42,6 +42,11 @@ class ScopeTests(unittest.TestCase):
         self.assertTrue({'world_core', 'world_ui', 'world_legacy'} <= set(p['suites']))
         self.assertFalse(p['flags']['plant_core'])
 
+    def test_world_art_theme_is_geometry_with_its_own_ui_consumers(self):
+        p = planner.plan(['native/world_architect/theme_kits.h'])
+        self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})
+        self.assertFalse(p['flags']['viewport'] or p['flags']['compilation_ui'] or p['flags']['matrix_ui'])
+
     def test_world_frame_and_input_include_migration_dialogs(self):
         for path in ['native/ftebroom_world_authoring.h', 'scripts/editor_os_input.py']:
             p = planner.plan([path])

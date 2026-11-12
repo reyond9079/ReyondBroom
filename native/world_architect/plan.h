@@ -60,7 +60,7 @@ struct Preset {
   Scope scope=Scope::Interior;int floors=2,rooms=6,blocks=2;
   double width=1408,depth=832,street=192,damage=.4;
   double hallHalfWidth=72;std::vector<std::string> roomFunctions{"public","service","storage"};
-  std::string ruinEvent;
+  std::string ruinEvent,scenario;
   Experience experience;
 };
 struct ArtTheme {std::string id,grammar="plain";std::array<std::array<unsigned char,3>,6> colors;double weathering=0,baySpacing=192;std::array<double,3> lightColor{1,.85,.7};};
@@ -127,6 +127,7 @@ inline Registry readRegistry(const Json& j){
     p.hallHalfWidth=item.value("hallHalfWidth",(p.layout=="atrium"||p.layout=="ring"||p.layout=="parallel")?128.:72.);finite(p.hallHalfWidth,64,224,"Gallery / corridor half-width must be 64..224");
     p.roomFunctions=item.value("roomFunctions",p.roomFunctions);if(p.roomFunctions.empty()||p.roomFunctions.size()>24)throw std::runtime_error("A room program needs 1..24 named functions");for(const auto& function:p.roomFunctions)safeToken(function);
     p.ruinEvent=item.value("ruinEvent",std::string{});if(!p.ruinEvent.empty()&&p.ruinEvent!="collapsed-stair"&&p.ruinEvent!="flooded-platform")throw std::runtime_error("Unsupported structural ruin event");
+    p.scenario=item.value("scenario",std::string{});if(!p.scenario.empty()&&p.scenario!="checkpoint"&&p.scenario!="factory"&&p.scenario!="courtyard"&&p.scenario!="overpass"&&p.scenario!="mall"&&p.scenario!="evacuation")throw std::runtime_error("Unknown authored scenario kit");
     if(!ids.insert("preset/"+p.id).second)throw std::runtime_error("Duplicate preset");
     auto scope=item.at("scope").get<int>();finite(scope,0,3,"Invalid scope");p.scope=Scope(scope);
     if(!p.ruinEvent.empty()&&p.scope!=Scope::Interior)throw std::runtime_error("This structural event requires an interior envelope");

@@ -107,6 +107,10 @@ def plan(paths, full=False, release=False, semantic=None):
         elif path == 'native/world_architect/legacy.h':
             # This read-only codec is consumed by migration, not generation.
             matched = {'world_legacy'}
+        elif path.startswith('native/world_architect/'):
+            # Art-theme geometry belongs to the generator. Broad native UI
+            # theme rules must not capture this independently namespaced code.
+            matched = {'world_core'}
         else:
             for patterns, groups in RULES:
                 if any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns):

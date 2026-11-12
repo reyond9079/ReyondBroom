@@ -4,6 +4,30 @@
 template<class F>static void worldEdit(F edit){
   auto& s=worldArchitect;worldAction([&]{auto next=s.settings;edit(next);wa::validate(next,s.registry);auto previous=wa::serialize(s.settings);s.settings=std::move(next);worldChanged(previous);});
 }
+static void worldCandidateComparison(){
+  auto& s=worldArchitect;if(s.batch.worlds.empty())return;
+  ImGui::SeparatorText("Compare validated candidates");
+  ImGui::TextWrapped("Each plan shows the candidate's actual building envelopes, room partitions, streets and validated player route. Select a plan to inspect its 3D geometry in Overview.");
+  const int count=std::min(4,int(s.batch.worlds.size()));
+  if(ImGui::BeginTable("Candidate comparison",count,ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_SizingStretchSame)){
+    for(int i=0;i<count;i++){
+      ImGui::TableNextColumn();ImGui::PushID(i);const auto& w=s.batch.worlds[size_t(i)];
+      auto label="Select seed "+std::to_string(w.seed);if(worldButton(label.c_str(),("compare-select/"+std::to_string(i)).c_str())){s.selected=i;s.dirty=true;}
+      if(i==s.selected)ImGui::TextUnformatted("Selected");else ImGui::TextUnformatted(" ");
+      auto pos=ImGui::GetCursorScreenPos();ImVec2 size{std::max(48.f,ImGui::GetContentRegionAvail().x),180*uiScale()};ImGui::InvisibleButton("Candidate spatial plan",size);worldRect("compare-plan/"+std::to_string(i));
+      auto* drawList=ImGui::GetWindowDrawList();drawList->AddRectFilled(pos,{pos.x+size.x,pos.y+size.y},IM_COL32(25,32,34,255));
+      double scale=std::min((size.x-12)/(w.high.x-w.low.x),(size.y-12)/(w.high.y-w.low.y));
+      auto point=[&](wa::V p){return ImVec2{pos.x+6+float((p.x-w.low.x)*scale),pos.y+6+float((p.y-w.low.y)*scale)};};
+      for(const auto& road:w.spatial.roads)drawList->AddLine(point(road.a),point(road.b),IM_COL32(100,104,98,255),std::max(1.f,float(road.width*scale)));
+      for(const auto& b:w.spatial.buildings){drawList->AddRectFilled(point(b.low),point(b.high),IM_COL32(102,112,94,220));for(const auto& room:b.rooms)if(!room.floor)drawList->AddRect(point(room.low),point(room.high),IM_COL32(180,180,160,255));}
+      for(size_t n=1;n<w.navigation.mainRoute.size();n++)drawList->AddLine(point(w.navigation.nodes[w.navigation.mainRoute[n-1]].feet),point(w.navigation.nodes[w.navigation.mainRoute[n]].feet),IM_COL32(250,190,70,255),1.5f);
+      ImGui::Text("%zu brushes / %.0f route units",w.diagnostics.brushes,w.diagnostics.routeLength);
+      for(const auto& [name,value]:w.diagnostics.score)ImGui::Text("%s: %.2f",name.c_str(),value);
+      ImGui::PopID();
+    }
+    ImGui::EndTable();
+  }
+}
 static void worldLegacyPanel(){
   auto& s=worldArchitect;bool show=ImGui::CollapsingHeader("Legacy AutoLevel migration");worldRect("legacy-panel");if(!show)return;
   ImGui::TextWrapped("Choose an AutoLevel repository, builder or settings file. Inspect the report, then save its backup and extracted module MAPs. Originals and the active map are retained. Solver settings without an equivalent are reported explicitly.");
@@ -50,7 +74,7 @@ static void worldMissionPanel(){
     if(worldButton("Remove transition","mission-remove-edge"))worldEdit([&](auto& next){if(!next.authoredMission)next.authoredMission=world->mission;auto& e=next.authoredMission->edges;e.erase(e.begin()+s.missionEdge);});
     ImGui::TextWrapped("Transitions constrain the validated mission traversal. They do not yet create physical engine gate entities. Edits that disconnect required beats are rejected.");
   }
-  ImGui::EndDisabled();ImGui::SetNextItemWidth(120*uiScale());ImGui::SliderInt("Plan floor",&s.planFloor,0,3);worldRect("plan-floor");
+  ImGui::EndDisabled();ImGui::SetNextItemWidth(120*uiScale());ImGui::SliderInt("Plan floor",&s.planFloor,0,4);worldRect("plan-floor");
   ImGui::TextWrapped("Drag a beat onto a functional room on this floor. It snaps to that room's player anchor; other unpinned beats are reassigned around it. Unlock Mission to edit.");
   worldPlanCanvas(false);
 }
@@ -75,7 +99,7 @@ static void worldInfluencePanel(bool dressing){
   auto& s=worldArchitect;auto before=wa::serialize(s.settings);const char* kinds[]={"damage","preserve","avoid","dressing"};
   ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=(dressing?4:2));
   ImGui::TextWrapped("Drag a rectangle on the plan to paint a bounded influence volume for the selected floor. Preserve suppresses damage and props; avoid rejects overlapping building envelopes. These fields are part of the saved project.");
-  ImGui::Combo("Field type",&s.paintType,kinds,4);worldRect("mask-type");ImGui::SliderFloat("Field strength",&s.paintStrength,0,1);worldRect("mask-strength");ImGui::SliderInt("Field floor",&s.planFloor,0,3);
+  ImGui::Combo("Field type",&s.paintType,kinds,4);worldRect("mask-type");ImGui::SliderFloat("Field strength",&s.paintStrength,0,1);worldRect("mask-strength");ImGui::SliderInt("Field floor",&s.planFloor,0,4);
   if(worldButton("Preserve selected building","mask-preserve-building"))worldAction([&]{auto* world=worldSelected();if(!world)return;auto found=std::find_if(world->spatial.buildings.begin(),world->spatial.buildings.end(),[&](const auto& b){return b.id==s.detailRegion;});if(found==world->spatial.buildings.end())found=world->spatial.buildings.begin();uint64_t id=1;for(const auto& mask:s.settings.influences)id=std::max(id,mask.id+1);s.settings.influences.push_back({id,found->low-wa::V{8,8,8},found->high+wa::V{8,8,8},"preserve",1});});
   if(!s.settings.influences.empty()){
     s.maskSelection=std::clamp(s.maskSelection,0,int(s.settings.influences.size()-1));const auto mask=s.settings.influences[size_t(s.maskSelection)];auto label=std::to_string(mask.id)+" / "+mask.kind;

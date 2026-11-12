@@ -19,10 +19,10 @@ name: Compilation profile parity
         description: Reuse matching prepared Windows binaries for local road input or remaining World Architect acceptance
         type: choice
         options:
-        - ''
+        - none
         - local
         - remaining
-        default: ''
+        default: none
       plant_scene_only:
         description: Focus a prepared Windows run on plant map rendering diagnostics
         required: false
@@ -100,10 +100,10 @@ jobs:
         Copy-Item mesa/extracted/x64/opengl32.dll bundle/ReyondBroom-Windows-x64/bin/rb_qa_opengl.dll -Force
         python -m pip install Pillow==12.0.0 pywinauto trimesh==4.8.3 numpy==2.3.4
     - name: Exercise actual Windows controls with OS input
-      if: inputs.plant_scene_only != 'true' && inputs.world_authoring_case == ''
+      if: inputs.plant_scene_only != 'true' && (inputs.world_authoring_case == '' || inputs.world_authoring_case == 'none')
       run: python scripts/test-compilation-ui.py bundle/ReyondBroom-Windows-x64 qa/ui
     - name: Exercise the prepared World Architect with actual OS input
-      if: inputs.world_authoring_case != ''
+      if: inputs.world_authoring_case != '' && inputs.world_authoring_case != 'none'
       shell: pwsh
       run: |
         $runtime = 'bundle/ReyondBroom-Windows-x64'

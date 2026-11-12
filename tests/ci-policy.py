@@ -28,6 +28,20 @@ prepared = module('verify-prepared')
 
 
 class ScopeTests(unittest.TestCase):
+    def test_prepared_world_choice_has_a_nonempty_default_and_normal_mode(self):
+        import yaml
+        workflow = yaml.safe_load((REPO/'.github/workflows/compilation-profile-checks.yml').read_text())
+        inputs = workflow['on']['workflow_dispatch']['inputs']
+        choice = inputs['world_authoring_case']
+        self.assertEqual(choice['default'], 'none')
+        self.assertTrue(all(choice['options']))
+        self.assertIn(choice['default'], choice['options'])
+        steps = workflow['jobs']['windows-input-reproduction']['steps']
+        normal = next(s for s in steps if s.get('name') == 'Exercise actual Windows controls with OS input')
+        world = next(s for s in steps if s.get('name') == 'Exercise the prepared World Architect with actual OS input')
+        self.assertIn("inputs.world_authoring_case == 'none'", normal['if'])
+        self.assertIn("inputs.world_authoring_case != 'none'", world['if'])
+
     def test_world_core_routes_its_editor_consumers_without_botany(self):
         p = planner.plan(['native/world_architect/generator.h'])
         self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})

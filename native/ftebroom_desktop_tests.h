@@ -481,7 +481,7 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     event(1,wheelUp,0,900,500,testW,testH);event(2,wheelUp,0,900,500,testW,testH);frame();
   }
   if(std::string(mode)=="features113tourfinish"){
-    frame();expect(tourStep==6&&tourDone,"features113_tools_reveal");tourFinish(false);frame();expect(!tourActive&&cvars->GetFloat("ftebroom_tour_active")==0,"features113_tour_restores_workspace");
+    frame();expect(tourStep==tourToolsStep&&tourDone,"features113_tools_reveal");tourFinish(false);frame();expect(!tourActive&&cvars->GetFloat("ftebroom_tour_active")==0,"features113_tour_restores_workspace");
   }
   if(std::string(mode)=="q2106"){
     recentWindow=false;expect(gameProfile==3&&!assetsLoading&&assetError.empty(),"q2106_resources");

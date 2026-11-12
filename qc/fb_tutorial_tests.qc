@@ -10,10 +10,18 @@ int fb_tutorial_brushes()
 }
 void fb_tutorial_stage_check()
 {
-    int step=cvar("ftebroom_tour_step"),expected=(step==1 || step==6)?0:1;
+    int step=cvar("ftebroom_tour_step"),expected=(step==1 || step==8)?0:1;
     int actual=fb_tutorial_brushes(),selected=selectedbrushcount;
     print(sprintf("FTEBROOM_TUTORIAL_STATE step=%i brushes=%i selected=%i expected=%i view=%g\n",step,actual,selected,expected,cvar("ca_brush_view")));
-    fb_tutorial_expect(cvar("ftebroom_tour_fixture_ready")==step+1 && fb_tutorial_brushes()==expected && cvar("ca_brush_view")==0,strcat("native_stage_fixture_",itos(step)));
+    int clipFixture=TRUE;
+    if(step==7){
+        vector bounds[2];clipFixture=FALSE;
+        if(selected==1){
+            brush_getfacepoints(selectedbrushes[0].model,selectedbrushes[0].id,0,bounds,2);
+            clipFixture=vlen(bounds[1]-bounds[0]-'96 96 64')<0.01;
+        }
+    }
+    fb_tutorial_expect(cvar("ftebroom_tour_fixture_ready")==step+1 && actual==expected && cvar("ca_brush_view")==0 && clipFixture,strcat("native_stage_fixture_",itos(step)));
 }
 float fb_tutorial_testcommand()
 {

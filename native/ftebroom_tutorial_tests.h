@@ -3,7 +3,7 @@
 if(std::string_view(mode)=="rb10tourstage"){
   char step[16]{};commands->Argv(2,step,sizeof step);
   firstSetupStep=-1;setupNeeded=false;recentWindow=false;
-  if(!tourActive)tourBegin();tourPrepare(std::clamp(std::atoi(step),0,6));
+  if(!tourActive)tourBegin();tourPrepare(std::clamp(std::atoi(step),0,tourToolsStep));
   expect(tourWaitingForMap,"rb10_tutorial_every_stage_requests_fresh_map");
 }
 if(std::string_view(mode)=="rb10tourcheck"){

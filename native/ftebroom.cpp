@@ -304,6 +304,43 @@ static void softLightGalleryPanel(){
     if(ImGui::Button("Context menu"))ImGui::OpenPopup("Control menu");if(ImGui::BeginPopup("Control menu")){ImGui::MenuItem("Duplicate");ImGui::MenuItem("Rename");ImGui::Separator();ImGui::MenuItem("Delete");ImGui::EndPopup();}
   }ImGui::End();
 }
+static void drawClipPoints()
+{
+  if ((int)cvars->GetFloat("ftebroom_tool") == 2)
+  {
+    auto overlay = ImGui::GetForegroundDrawList();
+    auto clipRect = viewRects[viewFocus];
+    overlay->PushClipRect(
+      {clipRect.x, clipRect.y}, {clipRect.x + clipRect.w, clipRect.y + clipRect.h});
+    ImVec2 previousPoint;
+    for (int i = 0; i < (int)cvars->GetFloat("ftebroom_clip_points"); ++i)
+    {
+      char name[64], position[128];
+      float x = 0, y = 0;
+      std::snprintf(name, sizeof name, "ftebroom_clip_point_%i", i);
+      cvars->GetString(name, position, sizeof position);
+      if (std::sscanf(position, "%f %f", &x, &y) == 2)
+      {
+        overlay->AddCircleFilled({x, y}, 5, IM_COL32(255, 140, 30, 255));
+        overlay->AddText(
+          {x + 8, y - 12}, IM_COL32(255, 190, 70, 255), std::to_string(i + 1).c_str());
+        if (i)
+          overlay->AddLine(previousPoint, {x, y}, IM_COL32(255, 140, 30, 255), 2);
+        previousPoint = {x, y};
+      }
+    }
+    if (cvars->GetFloat("ftebroom_clip_hover_valid"))
+    {
+      char hover[128];
+      float x = 0, y = 0;
+      cvars->GetString("ftebroom_clip_hover", hover, sizeof hover);
+      if (std::sscanf(hover, "%f %f", &x, &y) == 2)
+        overlay->AddCircle({x, y}, 7, IM_COL32(255, 140, 30, 255), 0, 2);
+    }
+    overlay->PopClipRect();
+  }
+}
+
 static void panel(float w, float h)
 {
   auto& io = ImGui::GetIO();
@@ -325,7 +362,7 @@ static void panel(float w, float h)
     uiHasScene=true;uiScenePos={0,0};uiSceneSize={w,h};popupOpen=false;viewCompute(w,h);
     if(io.WantTextInput||sceneDrag)std::fill(std::begin(moveHeld),std::end(moveHeld),false);
     cvars->SetFloat("ftebroom_forward",float(moveHeld[0])-float(moveHeld[1]));cvars->SetFloat("ftebroom_right",float(moveHeld[3])-float(moveHeld[2]));cvars->SetFloat("ftebroom_up",float(moveHeld[4])-float(moveHeld[5]));
-    tourPanel(w,h);uiCursorUpdate(sceneLook,uiCursorPercent/100.f);render();return;
+    drawClipPoints();tourPanel(w,h);uiCursorUpdate(sceneLook,uiCursorPercent/100.f);render();return;
   }
   const float menuHeight = ImGui::GetFrameHeight();
   const float statusHeight = ImGui::GetTextLineHeight() + std::max(16 * uiScale(),2*ImGui::GetStyle().WindowPadding.y);
@@ -429,39 +466,7 @@ static void panel(float w, float h)
         IM_COL32(255, 225, 55, 255));
     overlay->PopClipRect();
   }
-  if ((int)cvars->GetFloat("ftebroom_tool") == 2)
-  {
-    auto overlay = ImGui::GetForegroundDrawList();
-    auto clipRect = viewRects[viewFocus];
-    overlay->PushClipRect(
-      {clipRect.x, clipRect.y}, {clipRect.x + clipRect.w, clipRect.y + clipRect.h});
-    ImVec2 previousPoint;
-    for (int i = 0; i < (int)cvars->GetFloat("ftebroom_clip_points"); ++i)
-    {
-      char name[64], position[128];
-      float x = 0, y = 0;
-      std::snprintf(name, sizeof name, "ftebroom_clip_point_%i", i);
-      cvars->GetString(name, position, sizeof position);
-      if (std::sscanf(position, "%f %f", &x, &y) == 2)
-      {
-        overlay->AddCircleFilled({x, y}, 5, IM_COL32(255, 140, 30, 255));
-        overlay->AddText(
-          {x + 8, y - 12}, IM_COL32(255, 190, 70, 255), std::to_string(i + 1).c_str());
-        if (i)
-          overlay->AddLine(previousPoint, {x, y}, IM_COL32(255, 140, 30, 255), 2);
-        previousPoint = {x, y};
-      }
-    }
-    if (cvars->GetFloat("ftebroom_clip_hover_valid"))
-    {
-      char hover[128];
-      float x = 0, y = 0;
-      cvars->GetString("ftebroom_clip_hover", hover, sizeof hover);
-      if (std::sscanf(hover, "%f %f", &x, &y) == 2)
-        overlay->AddCircle({x, y}, 7, IM_COL32(255, 140, 30, 255), 0, 2);
-    }
-    overlay->PopClipRect();
-  }
+  drawClipPoints();
   if (io.WantTextInput || popupOpen || sceneDrag || ctrlHeld || (modEmbedded && modPlay))
     std::fill(std::begin(moveHeld), std::end(moveHeld), false);
   cvars->SetFloat("ftebroom_forward", float(moveHeld[0]) - float(moveHeld[1]));
@@ -1351,7 +1356,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
       io.AddKeyEvent(ImGuiMod_Alt, down);
       cvars->SetFloat("ftebroom_alt", down);
     }
-    if(tourActive&&(tourDemo||ImGui::GetTime()<tourInputReady))return qtrue;
+    if(tourActive&&tourKey(key,down,inScene,hit))return qtrue;
     if (preferencesCaptureKey(key,down)) return qtrue;
     if (modEmbedded && inScene && key == mouseKeys[0])return qtrue;
     if (key == mouseKeys[0])

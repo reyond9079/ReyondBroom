@@ -115,6 +115,11 @@ static void worldArchitecturePanel(){
 static void worldMissionPanel(){
   auto& s=worldArchitect;auto* world=worldSelected();if(!world){ImGui::TextUnformatted("Generate a candidate to edit its mission.");return;}
   ImGui::BeginDisabled(s.job.valid()||s.settings.locked[0]);
+  bool experienceOpen=ImGui::CollapsingHeader("Mission experience controls");worldRect("experience-controls");if(experienceOpen){
+    auto before=wa::serialize(s.settings);auto preset=wa::stagePreset(s.settings,s.registry);int beats=preset.experience.beats,branches=preset.experience.branches,loops=preset.experience.loops;
+    ImGui::BeginDisabled(s.settings.authoredMission.has_value());if(ImGui::SliderInt("Main beats",&beats,5,12,"%d",ImGuiSliderFlags_AlwaysClamp))s.settings.missionBeats=beats;worldRect("mission-beats");if(ImGui::SliderInt("Optional branches",&branches,0,4,"%d",ImGuiSliderFlags_AlwaysClamp))s.settings.optionalBranches=branches;worldRect("mission-branches");if(ImGui::SliderInt("Return shortcuts",&loops,0,4,"%d",ImGuiSliderFlags_AlwaysClamp))s.settings.missionLoops=loops;worldRect("mission-loops");ImGui::EndDisabled();worldChanged(before);
+    ImGui::TextWrapped("These counts generate mission topology before room allocation. Explicitly authored graphs retain their own topology. Regenerate to inspect the resulting physical plan; a graph shortcut does not by itself certify a useful physical loop.");
+  }
   const auto graph=s.settings.authoredMission?*s.settings.authoredMission:world->mission;
   auto selected=std::find_if(graph.nodes.begin(),graph.nodes.end(),[&](const auto& n){return n.id==s.missionNode;});if(selected==graph.nodes.end()){s.missionNode=graph.nodes.front().id;selected=graph.nodes.begin();}
   if(ImGui::BeginCombo("Mission beat",selected->name.c_str())){for(const auto& n:graph.nodes){auto label=std::to_string(n.id)+" / "+n.name;if(ImGui::Selectable(label.c_str(),s.missionNode==n.id))s.missionNode=n.id;}ImGui::EndCombo();}worldRect("mission-node");
@@ -147,6 +152,7 @@ static void worldRoadPanel(){
   auto& s=worldArchitect;auto* world=worldSelected();if(!world)return;
   ImGui::TextWrapped("Drag in empty plan space to sketch a pedestrian road; drag an endpoint or blue Bezier control to edit a segment. Blue lines show edited recipes; Generate validates and builds their street/curb brushes and navigation. Building intersections, disconnected routes and edits outside the sealed site are rejected.");
   ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=1);
+  if(ImGui::BeginCombo("Road pattern",wa::stagePreset(s.settings,s.registry).roadPattern.c_str())){for(const auto* pattern:{"grid","organic","hybrid","radial"}){if(ImGui::Selectable(pattern,s.settings.roadPattern==pattern))worldEdit([&](auto& next){next.roadPattern=pattern;next.roadPins.clear();});worldRect(std::string("road-pattern/")+pattern);}ImGui::EndCombo();}worldRect("road-pattern");
   if(!world->spatial.roads.empty()){
     auto selected=std::find_if(world->spatial.roads.begin(),world->spatial.roads.end(),[&](const auto& r){return r.id==s.roadSelection;});if(selected==world->spatial.roads.end()){s.roadSelection=world->spatial.roads.front().id;selected=world->spatial.roads.begin();}
     auto label=std::to_string(selected->id)+" / "+selected->hierarchy;if(ImGui::BeginCombo("Road",label.c_str())){for(const auto& road:world->spatial.roads){auto text=std::to_string(road.id)+" / "+road.hierarchy;if(ImGui::Selectable(text.c_str(),road.id==s.roadSelection))s.roadSelection=road.id;}ImGui::EndCombo();}

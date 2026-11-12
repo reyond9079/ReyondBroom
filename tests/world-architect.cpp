@@ -22,6 +22,12 @@ int main(int argc,char** argv)try{
       for(const auto& [name,bytes]:bundle){auto asset=output/std::filesystem::u8path(name);std::filesystem::create_directories(asset.parent_path());std::ofstream(asset,std::ios::binary).write(bytes.data(),bytes.size());}
       {auto list=output/"scripts/shaderlist.txt";std::string text;if(std::ifstream previous{list};previous)text.assign(std::istreambuf_iterator<char>(previous),{});auto name=shaderStem(world);if(text.find(name)==text.npos)std::ofstream(list,std::ios::app)<<name<<'\n';}
       std::ofstream(path.string()+".map")<<withWad(argc>6?groupedMap(world,argv[6]):world.map,world,(std::filesystem::absolute(output)/wadFilename(world,ftebroom::defaultQuakePalette())).generic_string());std::ofstream(path.string()+".json")<<proof.dump(2);}
+      // Keep one complete spatial proof per preset, then retain compact,
+      // independently useful variation/performance records for the seed corpus.
+      Json masses=Json::array(),dimensions=Json::array();std::set<int> heights;
+      for(const auto& b:world.spatial.buildings){masses.push_back({vector(b.low),vector(b.high)});for(const auto& room:b.rooms){dimensions.push_back(vector(room.high-room.low));heights.insert(int(room.high.z-room.low.z));}}
+      proof["variation"]={{"masses",hash(masses.dump())},{"rooms",hash(dimensions.dump())},{"roads",hash(proof.at("roads").dump())},{"mission",hash(proof.at("missionEdges").dump())},{"architecture",world.architectureKey},{"roomCount",dimensions.size()},{"roomHeightKinds",heights.size()}};
+      if(seed>1)for(const auto* field:{"rooms","roads","missionNodes","missionEdges","warnings","stageSeeds"})proof.erase(field);
       results.push_back(proof);
       std::cout<<"PASS "<<preset.id<<" seed "<<seed<<" brushes "<<world.diagnostics.brushes<<" route "<<world.diagnostics.routeLength<<'\n'<<std::flush;
     }

@@ -312,3 +312,24 @@ update/history/reopen/manual-edit checks pass. Four additional UI checks capture
 the production ExportMap after executed Apply; that unchanged snapshot compiles
 and lights with both actual brush models. Twenty-eight CI policy tests verify
 scope and fixture-only preparation for UI-only changes.
+
+### Experience, planning volumes and street patterns
+
+Checkpoint `f9c3b6d` adds saved experience modes, target route scoring, required
+route/vertical/empty volumes and roof return geometry. The physical roof test
+removes exterior and interior vertical circulation independently and requires
+both remaining routes to reach the landmark. It found and fixed a rear guard
+that clipped the last odd-floor stair return. 393 core contracts passed.
+
+The following street-pattern revision adds real curved/hybrid sweeps and radial
+parcel placement with a convex octagonal plaza. Generated roads now undergo the
+same sampled envelope/site checks as authored roads. 399 core contracts passed
+with the new per-preset defaults; 17 actual SDL UI checks passed for modes, patterns, painted required routes, history and reopen; nine pattern BSP/light checks passed across Quake 1, Quake III and FTE.
+
+The subsequent composition revision adds explicit main-beat/branch/shortcut
+counts, per-room usable ceiling heights with actual suspended-ceiling brushes,
+lights below those ceilings, and closer initial orbit framing. 402 core
+contracts and 20 actual SDL planning UI checks passed. Authored-module and
+physical-door MAPs each compiled/lit under all three certified formats again.
+The 100-seed/preset/profile corpus and final representative walkthroughs are
+running. This checkpoint still does not claim final human art/play acceptance.

@@ -229,3 +229,35 @@ save/reopen and rejects manual geometry or entity-property changes; generated
 model bookkeeping names are compared through actual geometry, rather than
 being mistaken for authored changes. One-way graph flags remain mission
 traversal metadata; they do not invent an irreversible engine controller.
+
+## Experience and spatial constraints
+
+Overview offers Preset, Exploration, Adventure, Hub and Arena experience modes.
+They change mission beats/branches/loops, the circulation grammar and initial
+ranking weights. Target route length changes the measured route preference;
+it never bypasses hard reachability checks. Authored mission graphs retain their
+explicit topology. Unlock Mission and unpin buildings before changing modes.
+
+Site & Roads offers Grid, Organic, Hybrid and Radial patterns. Organic streets
+use the same bounded Bezier sweep as authored roads; Hybrid keeps main streets
+straight and curves local connections. Radial sites arrange parcels around a
+real octagonal gathering plaza and connect their entrances along lot boundaries.
+Changing the pattern resets road overrides in an undoable settings transaction.
+Presets choose different default patterns. Roads are checked against building
+masses and sealed site bounds after curve tessellation.
+
+Destruction/Dressing field tools also offer three hard planning constraints:
+
+- **must-pass:** reserve a supported player anchor and visit it in the validated
+  route before returning to the destination;
+- **vertical-link:** require a continuous, collision-tested stair connection
+  inside the exact XYZ bounds, spanning at least one 256-unit floor;
+- **no-generation:** reject generated brushes or point entities inside the
+  volume. Shared ground and the outer sky seal remain. Move the volume or revise
+  the site if it overlaps content; this control does not silently erase a building.
+
+These constraints belong to Site. Unlock Site to edit them. Vertical-link checks
+an existing connection; it does not promise to carve a staircase through an
+arbitrary existing layout. All fields save/reopen and use settings Undo/Redo.
+Checkpoint and Residential Courtyard have both external fire stairs and an
+internal roof return, so their rooftop landmarks participate in a genuine loop.

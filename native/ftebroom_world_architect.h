@@ -21,7 +21,7 @@ namespace wa=ftebroom::worldArchitect;
 struct WorldArchitectWork {std::atomic<bool> cancel{false};std::atomic<int> stage{0};};
 struct WorldArchitectState {
   bool open=false,owner=false,dirty=true,qa=false,walk=false,ortho=false,focusRequest=false;
-  ImGuiID gesture=0;int selected=0,tab=0,cutaway=-1;float yaw=135,pitch=35,zoom=1;
+  ImGuiID gesture=0;int selected=0,tab=0,cutaway=-1;float yaw=135,pitch=35,zoom=.6f;
   wa::V eye{};wa::Settings settings;wa::Registry registry;wa::Json registrySource;std::optional<uint64_t> desiredSeed;
   std::future<wa::CandidateBatch> job;std::shared_ptr<WorldArchitectWork> work;
   std::shared_ptr<wa::PrefixCache> prefixCache=std::make_shared<wa::PrefixCache>();

@@ -29,7 +29,11 @@ def verify_fixture(folder, repo=REPO):
     for name, digest in manifest['sourceHashes'].items():
         path = Path(name.replace('\\', '/'))
         assert not path.is_absolute() and '..' not in path.parts, 'Unsafe fixture provenance path'
-        assert hashlib.sha256((repo/path).read_bytes()).hexdigest() == digest, 'Prepared fixture source changed: '+name
+        raw=(repo/path).read_bytes()
+        # C++/JSON/QC source manifests cross Windows checkout line endings.
+        # Accept exact bytes or the compiler-equivalent LF spelling only.
+        hashes={hashlib.sha256(raw).hexdigest(),hashlib.sha256(raw.replace(b'\r\n',b'\n')).hexdigest()}
+        assert digest in hashes, 'Prepared fixture source changed: '+name
 
 
 def main():

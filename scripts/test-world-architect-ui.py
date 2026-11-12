@@ -166,8 +166,8 @@ try:
   check(len(live()['world']['roads'][0]['points'])>2 and live()['world']['valid'],'Bezier controls generate a physically validated curved road in the actual editor')
   world=live()['world'];canvas=live()['widgets']['plan-canvas'];scale=min((canvas['width']-32)/(world['bounds']['high'][0]-world['bounds']['low'][0]),(canvas['height']-32)/(world['bounds']['high'][1]-world['bounds']['low'][1]));start=[-256,-256,0];end=[256,128,0]
   def road_pixel(p):return (canvas['x']+16+(p[0]-world['bounds']['low'][0])*scale,canvas['y']+16+(p[1]-world['bounds']['low'][1])*scale)
-  # Use the radial site's empty central space. Sampling a short road arc can
-  # land inside its eight-pixel endpoint/control handle at Windows font sizes.
+  # Use a long stroke through the radial site's empty central space, clearing
+  # both endpoint/control handles and the six-pixel drag threshold.
   start_pixel,end_pixel=road_pixel(start),road_pixel(end);handles=[]
   for road in world['roads']:
    handles.extend([road['points'][0],road['points'][-1]])

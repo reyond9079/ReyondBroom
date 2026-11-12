@@ -11,7 +11,7 @@ static float viewSplitX = .5f, viewSplitY = .5f;
 static bool viewFocusArmed = false, viewLoaded = false;
 static void viewSave()
 {
-  if (cvars->GetFloat("ftebroom_skip_setup"))
+  if (tourActive || cvars->GetFloat("ftebroom_skip_setup"))
     return;
   std::ofstream file(documentPath("view-layout.cfg"));
   file << viewLayout << ' ' << viewSplitX << ' ' << viewSplitY << '\n';

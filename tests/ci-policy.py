@@ -101,6 +101,17 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted), {'world_ui'})
         self.assertIsNone(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted.replace('pluginManagerOpen=true;', 'pluginManagerOpen=false;')))
 
+    def test_onboarding_clip_overlay_move_requires_identical_shared_rendering(self):
+        path = 'native/ftebroom.cpp'
+        block = '  if (clipSelected()) { drawExistingPoints(); }'
+        before = 'static void panel() {\n    tourPanel(w,h);\n'+block+'\n}\n' \
+                 'if(tourActive&&(tourDemo||ImGui::GetTime()<tourInputReady))return qtrue;\n'
+        after = 'static void drawClipPoints()\n{\n'+block+'\n}\n\n' + before.replace(
+            block, '  drawClipPoints();').replace('tourPanel(w,h);', 'drawClipPoints();tourPanel(w,h);').replace(
+            '(tourDemo||ImGui::GetTime()<tourInputReady)', 'tourKey(key,down,inScene,hit)')
+        self.assertEqual(planner.onboarding_host_scope(path, before, after), {'onboarding'})
+        self.assertIsNone(planner.onboarding_host_scope(path, before, after.replace('drawExistingPoints', 'drawDifferentPoints')))
+
     def test_windows_release_build_creates_its_output_when_audio_tests_are_skipped(self):
         import re
         import shlex

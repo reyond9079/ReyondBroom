@@ -8,6 +8,8 @@ void fb_tutorial_prepare(int step)
 {
     if(!cvar("ftebroom_tour_active"))return;
     fb_cancel();fb_tool_deactivate();fb_selection_clear();
+    // Loading a map can restore its last projection after the native layout reset.
+    cvar_set("ca_brush_view","0");
     // This command only operates in the lesson's disposable map. Clear both
     // the map's fixture and any practice geometry before preparing a stage.
     static int ids[128];static vector axes[1];static float distances[1];
@@ -21,10 +23,10 @@ void fb_tutorial_prepare(int step)
         fb_delete_geometry();
     }
     fb_tx_commit();fb_selection_clear();
-    // Camera and grid lessons need one reference brush; creation starts empty.
-    if(step==0 || (step>=2 && step<=5))fb_createbox('0 0 32','96 96 64');
-    if(step==0 || step==5)fb_selection_clear();
-    if(cvar("ftebroom_skip_setup"))cvar_set("ftebroom_tour_fixture_ready",ftos(step+1));
+    // Creation and the final tools page are empty; Clip starts with one selected brush.
+    if(step==0 || (step>=2 && step<=7))fb_createbox('0 0 32','96 96 64');
+    if(step==0 || step==5 || step==6)fb_selection_clear();
+    cvar_set("ftebroom_tour_fixture_ready",ftos(step+1));
     fb_tutorial_checkpoint=history;
     if(cvar("ftebroom_skip_setup") && cvar("ftebroom_followup133_qa"))fb_tutorial_stage_check();
 }
@@ -39,6 +41,7 @@ void fb_tutorial_restore()
     // Demonstrations are not user edits and must not remain available as Redo.
     for(int i=history;i<history_max;i++)history_release(&historyring[i&(historyring_length-1)]);
     history_max=history;fb_history_labels();fb_document_tick();
+    if(cvar("ftebroom_tour_step")==7 && cvar("ftebroom_skip_setup") && cvar("ftebroom_followup133_qa"))fb_tutorial_stage_check();
 }
 float fb_tutorial_command()
 {

@@ -60,7 +60,7 @@ RULES = [
       'scripts/test-rb10-browsers.py', 'tests/browser*'], {'browser'}),
     (['native/*input*', 'native/*shortcut*', 'native/ftebroom_actions*',
       'native/ftebroom_context*', 'native/ftebroom_desktop*',
-      'scripts/editor_os_input.py', 'scripts/test-editor133-input.py'], {'input'}),
+      'scripts/editor_os_input.py'], {'input'}),
     (['scripts/test-engine-viewport.py'], {'input'}),
     (['patches/*input*', 'patches/*mouse*', 'patches/*window*'], {'input'}),
     (['patches/*resource*', 'patches/*mapasset*'], {'resources'}),
@@ -75,7 +75,7 @@ RULES = [
       'native/*viewport*', 'native/*camera*', 'native/*grid*',
       'native/ftebroom_resolution*', 'scripts/test-viewport-appearance.py',
       'scripts/test-engine-viewport.py', 'tests/*grid*'], {'render'}),
-    (['native/*tutorial*', 'native/*onboarding*'], {'onboarding'}),
+    (['native/*tutorial*', 'native/*onboarding*', 'qc/fb_tutorial*.qc', 'scripts/test-editor133-input.py'], {'onboarding'}),
     (['runtime/update-*', 'scripts/*updater*', 'tests/*updater*',
       'native/ftebroom_updat*', 'native/ftebroom_welcome*'], {'updater'}),
     (['native/*theme*', 'native/*translations*', 'native/*appearance*',
@@ -186,14 +186,56 @@ def world_host_scope(path, before, after):
     return groups
 
 
+ONBOARDING_HOST_REPLACEMENTS = {
+    'native/ftebroom_views.h': [('if (cvars->GetFloat("ftebroom_skip_setup"))',
+                                'if (tourActive || cvars->GetFloat("ftebroom_skip_setup"))')],
+    'native/ftebroom_desktop_tests.h': [('tourStep==6&&tourDone', 'tourStep==tourToolsStep&&tourDone')],
+    'qc/ftebroom_edit.qc': [('    if(valid) {fb_clip_count=0;fb_clip_exact=FALSE;print(sprintf("ReyondBroom: clipped %i brushes.\\n",applied));}',
+                            '    if(valid) {\n        fb_clip_count=0;fb_clip_exact=FALSE;print(sprintf("ReyondBroom: clipped %i brushes.\\n",applied));\n'
+                            '        if(applied && cvar("ftebroom_tour_step")==7)fb_tour_signal(7);\n    }')],
+    'qc/csaddon.qc': [('        cvar_set("ftebroom_tour_anchor",sprintf("%g %g",screen113_x,screen113_y));\n',
+                       '        cvar_set("ftebroom_tour_anchor",sprintf("%g %g",screen113_x,screen113_y));\n'
+                       '        if(step113==7){\n            // Points on the top face of the 96 x 96 x 64 lesson brush.\n'
+                       "            vector clipStart=project('16 -32 64'),clipEnd=project('16 32 64');\n"
+                       '            cvar_set("ftebroom_tour_clip_pixels",sprintf("%g %g %g %g",clipStart_x,clipStart_y,clipEnd_x,clipEnd_y));\n        }\n')],
+    'native/ftebroom.cpp': [
+        ('    tourPanel(w,h);', '    drawClipPoints();tourPanel(w,h);'),
+        ('if(tourActive&&(tourDemo||ImGui::GetTime()<tourInputReady))return qtrue;',
+         'if(tourActive&&tourKey(key,down,inScene,hit))return qtrue;'),
+    ],
+}
+
+
+def onboarding_host_scope(path, before, after):
+    replacements = ONBOARDING_HOST_REPLACEMENTS.get(path)
+    if not replacements or before == after:
+        return None
+    if path == 'native/ftebroom.cpp':
+        # The ordinary editor still calls the identical overlay code. Verify
+        # the extraction before allowing a tutorial-only validation scope.
+        start = 'static void drawClipPoints()\n{\n'
+        prefix, marker, tail = after.partition(start)
+        block, end, suffix = tail.partition('\n}\n')
+        if not marker or not end or not block or before.count(block) != 1:
+            return None
+        after = prefix + suffix.removeprefix('\n')
+        before = before.replace(block, '  drawClipPoints();')
+    for old, new in replacements:
+        if before.count(old) != 1:
+            return None
+        before = before.replace(old, new)
+    return {'onboarding'} if before == after else None
+
+
 def semantic_scopes(base, head, paths):
     result = {}
     for path in paths:
-        if path not in WORLD_HOST_ADDITIONS:
+        if path not in WORLD_HOST_ADDITIONS and path not in ONBOARDING_HOST_REPLACEMENTS:
             continue
         def read(ref):
             return subprocess.check_output(['git', 'show', ref+':'+path], stderr=subprocess.PIPE).decode()
-        groups = world_host_scope(path, read(base), read(head))
+        before, after = read(base), read(head)
+        groups = world_host_scope(path, before, after) or onboarding_host_scope(path, before, after)
         if groups:
             result[path] = groups
     return result

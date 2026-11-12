@@ -8,14 +8,15 @@ from editor_os_input import NativeInput,read_ui_json
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
 root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-data=root/'ftebroom';state=data/'placement-ui-live.json';focus=data/'native-input-live.json'
-for path in (state,focus,data/'qconsole.log',root/'qconsole.log'):path.unlink(missing_ok=True)
+data=root/'ftebroom';state=data/'placement-ui-live.json';focus=data/'native-input-live.json';lesson=data/'onboarding-live.json'
+for path in (state,focus,lesson,data/'qconsole.log',root/'qconsole.log'):path.unlink(missing_ok=True)
 (data/'editor133.cfg').write_text('exec qa-clip.cfg\nset ftebroom_input_qa 1\nset ftebroom_placement_qa 1\nin 12 echo EDITOR133_READY\n')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');stream=(out/'editor.log').open('wb')
 process=subprocess.Popen([str(engine),*render,'-basedir',str(root),'-nohome','-noupdates','-nosound','-condebug','-window','-width','1280','-height','800','+set','ftebroom_skip_setup','1','+exec','editor133.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT)
 checks=[];trace=[]
 def live():return read_ui_json(state)
+def lesson_live():return read_ui_json(lesson)
 def logs():
  for path in (data/'qconsole.log',root/'qconsole.log'):
   if path.exists():return path.read_text(errors='replace')
@@ -35,6 +36,7 @@ def check(ok,label):
  checks.append(label);(out/'results.json').write_text(json.dumps(checks,indent=2));print('PASS',label,flush=True)
 # Engine input telemetry keeps advancing during the onboarding's dedicated UI.
 ui=NativeInput(process,focus,live,wait,out,focus_required=True)
+def lesson_click(name):ui.click(*wait(lambda:lesson_live()['widgets'].get(name)))
 try:
  wait(lambda:'EDITOR133_READY' in logs() and live()['views']);ui.position()
  ui.console('set ftebroom_view_layout 4')
@@ -57,7 +59,7 @@ try:
  wait(lambda:'FTEBROOM_LAYOUT_PASS divider_drag' in logs())
  check('FTEBROOM_LAYOUT_FAIL' not in logs(),'native layout/focus/projection checks pass')
  ui.console('set ftebroom_followup133_qa 1')
- for step in [0,1,2,3,4,5,6,3]:
+ for step in [0,1,2,3,4,5,8,3]:
   marker=f'FTEBROOM_TUTORIAL_PASS native_stage_fixture_{step}'
   previous=logs().count(marker)
   ui.console('ftebroom_test_desktop rb10tourstage '+str(step))
@@ -65,6 +67,39 @@ try:
   check('FTEBROOM_TUTORIAL_FAIL' not in logs(),f'onboarding stage {step} loads only its target fixture'+(' on replay' if previous else ''))
   time.sleep(.3);ui.settle()
   ImageGrab.grab().save(out/f'onboarding-stage-{step}.png')
+ ui.console('ftebroom_test_desktop rb10tourstage 6')
+ wait(lambda:lesson_live()['step']==6 and lesson_live()['ready'] and len(lesson_live()['views'])==1)
+ ui.move(860,500);ui.key('space')
+ check(not lesson_live()['done'] and lesson_live()['views'][0]['type']==0,'lesson requires a layout change before Space')
+ lesson_click('layout');lesson_click('layout/4')
+ wait(lambda:len(lesson_live()['views'])==4)
+ before=[v['type'] for v in lesson_live()['views']];v=lesson_live()['views'][3]
+ ui.move(v['x']+v['width']*.6,v['y']+v['height']*.6);ui.key('space')
+ wait(lambda:lesson_live()['done'])
+ after=[v['type'] for v in lesson_live()['views']]
+ check(after[:3]==before[:3] and after[3]==0,'onboarding layout uses real viewports and Space cycles only the hovered one')
+ ImageGrab.grab().save(out/'onboarding-four-views.png')
+ lesson_click('next')
+ wait(lambda:lesson_live()['step']==7 and lesson_live()['ready'] and len(lesson_live()['targets'])==2)
+ check(len(lesson_live()['views'])==1 and lesson_live()['views'][0]['type']==0,'Clip starts in one perspective viewport')
+ for tool in (0,1,3,7,8,9,5,6):lesson_click(f'tool/{tool}')
+ check(not lesson_live()['chosen'] and not lesson_live()['tool'],'all tools except Clip are disabled on the lesson toolbar')
+ clips=logs().count('ReyondBroom: clipped 1 brushes.')
+ restored=logs().count('FTEBROOM_TUTORIAL_PASS native_stage_fixture_7')
+ lesson_click('tool/2');wait(lambda:lesson_live()['demo'] and lesson_live()['tool']==2)
+ wait(lambda:lesson_live()['ready'] and not lesson_live()['demo'] and logs().count('FTEBROOM_TUTORIAL_PASS native_stage_fixture_7')>restored)
+ check(logs().count('ReyondBroom: clipped 1 brushes.')==clips+1 and not lesson_live()['done'] and lesson_live()['clipPoints']==0,'animated Clip commits a real cut, then restores exactly one selected uncut brush')
+ targets=lesson_live()['targets'];ui.click(*targets[0]);wait(lambda:lesson_live()['clipPoints']==1)
+ ui.key('enter');check(not lesson_live()['done'],'Enter with one point cannot pass the lesson')
+ ui.click(*targets[1]);wait(lambda:lesson_live()['clipPoints']==2)
+ ImageGrab.grab().save(out/'onboarding-clip-points.png')
+ ui.key('enter');wait(lambda:lesson_live()['done'])
+ check(logs().count('ReyondBroom: clipped 1 brushes.')==clips+2,'practice finishes only after a real two-point Clip cut')
+ lesson_click('next');wait(lambda:lesson_live()['step']==8 and lesson_live()['ready'] and lesson_live()['done'])
+ check(len(lesson_live()['views'])==1,'final tools page still has one viewport')
+ previous=state.stat().st_mtime_ns
+ lesson_click('next');wait(lambda:state.stat().st_mtime_ns!=previous and len(live()['views'])==4)
+ check(True,'finishing restores the saved four-view editor workspace')
  (out/'combined.log').write_text(logs())
  assert not any(x in logs() for x in ['_FAIL ','CSQC_Abort','Host_Error','runaway loop'])
  (out/'provenance.json').write_text(json.dumps({'build_info':(root/'build-info.txt').read_text(),'method':'Actual OS keyboard input; native stage transitions load disposable maps; independent QC brush counts; unedited screenshots'},indent=2))

@@ -357,7 +357,10 @@ void fb_clip_apply()
         if(valid) fb_tx_commit();else fb_tx_cancel();
     }
     for(int p=0;p<total*2;p++) fb_poly_free(&parts[p]);memfree(parts);memfree(contents);memfree(selection);
-    if(valid) {fb_clip_count=0;fb_clip_exact=FALSE;print(sprintf("ReyondBroom: clipped %i brushes.\n",applied));}
+    if(valid) {
+        fb_clip_count=0;fb_clip_exact=FALSE;print(sprintf("ReyondBroom: clipped %i brushes.\n",applied));
+        if(applied && cvar("ftebroom_tour_step")==7)fb_tour_signal(7);
+    }
     else {cvar_set("ftebroom_selection_status",strcat("Clip cancelled: ",fb_geom_error));print(strcat("ReyondBroom: Clip cancelled: ",fb_geom_error,"\n"));}
 }
 int fb_generator_replaces(int model,int id);

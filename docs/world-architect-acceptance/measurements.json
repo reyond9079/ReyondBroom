@@ -1059,6 +1059,6 @@
       "primary Plugins menu opens World Architect through actual OS input",
       "preserved AutoLevel opens through the explicit Legacy generators submenu"
     ],
-    "CIpolicyChecks": 31
+    "CIpolicyChecks": 32
   }
 }

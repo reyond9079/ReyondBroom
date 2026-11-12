@@ -1,9 +1,14 @@
 # World Architect development status
 
-RB-7 is **not complete**. [The full specification](specs/RB-7-world-architect-spec.md)
-remains the acceptance contract. AutoLevel remains the default generator and its
-plugin, settings and authored maps are unchanged. The additional native window
-is explicitly a development preview, not a finished replacement.
+The current implementation and acceptance results are described in the
+[user guide](world-architect.md) and [acceptance report](world-architect-acceptance.md).
+The user accepted the demonstrated environment style after reviewing actual
+hospital, metro and city game captures. World Architect is now the primary
+Plugins entry; AutoLevel is retained under Legacy generators. Final merge and
+packaged release validation remain outstanding until recorded in the PR.
+
+The following sections are a chronological engineering journal. Statements
+about incomplete phases describe those earlier checkpoints, not current status.
 
 The current vertical slice contains an engine-independent typed WorldPlan,
 mission and spatial graphs, convex architectural elements, damage fields,

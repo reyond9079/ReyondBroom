@@ -265,8 +265,8 @@ static void worldPanel(){
   }
   ImGui::SetNextWindowSize({1500*uiScale(),900*uiScale()},ImGuiCond_FirstUseEver);
   if(s.focusRequest){ImGui::SetNextWindowFocus();s.focusRequest=false;}
-  if(ImGui::Begin("World Architect — development preview",&s.open,ImGuiWindowFlags_NoDocking)){
-    ImGui::TextWrapped("Development preview: mission / physical navigation foundation. AutoLevel remains available; final architecture and art acceptance is still pending.");
+  if(ImGui::Begin("World Architect",&s.open,ImGuiWindowFlags_NoDocking)){
+    ImGui::TextWrapped("Plan, generate and refine a playable world. Preview candidates before applying editable geometry to your map.");
     auto before=wa::serialize(s.settings);bool restoredSettings=false;ImGui::BeginDisabled(s.job.valid());
     const int frozen=wa::lockedThrough(s.settings);
     ImGui::BeginDisabled(frozen>=0);ImGui::SetNextItemWidth(220*uiScale());bool presetsOpen=ImGui::BeginCombo("Preset",s.registry.preset(s.settings.preset).name.c_str());worldRect("preset");if(presetsOpen){for(const auto& p:s.registry.presets){if(ImGui::Selectable(p.name.c_str(),p.id==s.settings.preset)){s.settings.preset=p.id;s.settings.damage=p.damage;}worldRect("preset/"+p.id);}ImGui::EndCombo();}ImGui::EndDisabled();ImGui::SameLine();
@@ -297,7 +297,7 @@ static void worldPanel(){
           ImGui::SetNextItemWidth(220*uiScale());float targetRoute=float(s.settings.targetRoute);if(ImGui::SliderFloat("Target route (units)",&targetRoute,512,20000,"%.0f",ImGuiSliderFlags_AlwaysClamp))s.settings.targetRoute=targetRoute;worldRect("target-route");worldChanged(modeBefore);
           if(worldButton("Save editable project...","save-project"))runUiChoose((documentPath("world-architect")/"project.world.json").u8string(),[](const std::string& name){auto path=std::filesystem::u8path(name);std::filesystem::create_directories(path.parent_path());bb::atomicWrite(path,worldProject().dump(2));},true);
           if(worldButton("Open project...","open-project"))runUiChoose(documentPath("world-architect").u8string(),worldLoadProject);
-          ImGui::TextWrapped("Legacy AutoLevel settings and maps are preserved. This preview does not overwrite or silently migrate them.");
+          ImGui::TextWrapped("Legacy AutoLevel settings and maps are preserved. Use Plugins > Legacy generators to open AutoLevel, or explicitly import a migration backup below.");
           worldLegacyPanel();
           worldAction(worldPreview);
         }

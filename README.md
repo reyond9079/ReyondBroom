@@ -1,5 +1,11 @@
 # ReyondBroom FTE-native map editor
 
+**World Architect:** native procedural level authoring with eight presets,
+mission and street planning, editable architecture and ruins, original materials,
+candidate scoring and safe regional regeneration. Open **Plugins → World Architect**;
+AutoLevel is preserved under **Legacy generators**.
+[Guide](docs/world-architect.md) · [Acceptance evidence and limits](docs/world-architect-acceptance.md).
+
 **Alpha 121:** Native model authoring: cubes and meshes, hierarchical pivots,
 UV editing, 2D/3D painting, keyframe animation and `.bbmodel` projects. Export
 animated assets to Quake-family formats and place them on a map.

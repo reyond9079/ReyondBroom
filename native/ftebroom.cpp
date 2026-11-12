@@ -2158,7 +2158,7 @@ extern "C" qboolean NATIVEEXPORT FTEPlug_Init(plugcorefuncs_t* api)
   commands->AddCommand("ftebroom_test_mod_controls",testModControls,"Test embedded controls menu.");
   commands->AddCommand("ftebroom_test_uv_input", testUVInput, "Test UV canvas pointer routing.");
   commands->AddCommand("ftebroom_test_run", testRunProfiles, "Test run profiles in disposable runs.");
-  commands->AddCommand("ftebroom_world_architect",worldCommand,"Open the World Architect development preview.");
+  commands->AddCommand("ftebroom_world_architect",worldCommand,"Open World Architect.");
   commands->AddCommand("ftebroom_plant",plantCommand,"Open the native Plant Editor or select a plant preset.");
   commands->AddCommand("ftebroom_test_desktop",testDesktop,"Test desktop integration in disposable installations.");
 #ifndef _WIN32

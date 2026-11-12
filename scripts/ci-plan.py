@@ -147,6 +147,7 @@ WORLD_HOST_ADDITIONS = {
         '#include "ftebroom_world_architect.h"\n',
         '  if(worldArchitect.work)worldArchitect.work->cancel=true;worldRelease();\n',
         '  commands->AddCommand("ftebroom_world_architect",worldCommand,"Open the World Architect development preview.");\n',
+        '  commands->AddCommand("ftebroom_world_architect",worldCommand,"Open World Architect.");\n',
         '||worldArchitectFocused()', '&&!worldArchitectFocused()', 'worldPanel();',
     ],
     'qc/fb_clipboard.qc': [
@@ -158,6 +159,10 @@ WORLD_HOST_ADDITIONS = {
     'qc/csaddon.qc': ['    registercommand("ftebroom_world_apply");\n'],
     'native/ftebroom_plugins.h': [
         '    if(ImGui::MenuItem("World Architect (development preview)..."))worldOpen();\n',
+        '    if(ImGui::MenuItem("World Architect..."))worldOpen();\n',
+        '    for(auto& p:editorPlugins)if(p.api)if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n',
+        '    for(auto& p:editorPlugins)if(p.api&&p.id!="org.reyondbroom.autolevel"&&p.id!="org.reyondbroom.levelgen")if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n',
+        '    if(ImGui::BeginMenu("Legacy generators")){\n      for(auto& p:editorPlugins)if(p.api&&(p.id=="org.reyondbroom.autolevel"||p.id=="org.reyondbroom.levelgen"))if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n      ImGui::EndMenu();\n    }\n',
     ],
 }
 

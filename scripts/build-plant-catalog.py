@@ -12,9 +12,23 @@ FAMILIES = {'tree':0,'conifer':1,'shrub':2,'grass':3,'fern':4,'flower':5,
             'mushroom':6,'cactus':7,'palm':8,'bamboo':9,'vine':10,'riparian':12}
 ROWS = []
 
+# Nominal mature stature, in metres, independent of editor/game units. The
+# original descriptor dimensions remain unchanged for saved generator projects.
+# Most herb descriptors are centimetres; trees/palms and tall bamboo use dm.
+HEIGHT_METRES = {
+    'japanese-maple': 5., 'apple': 5., 'cork-oak': 12., 'rowan': 10.,
+    'umbrella-acacia': 10., 'tree-juniper': 9., 'dwarf-bamboo': .55,
+    'saguaro': 9., 'cereus': 7., 'prickly-pear': 2.,
+    'amanita': .18, 'boletus': .20, 'oyster': .15, 'chanterelle': .12,
+    'woodland': .20, 'honey-fungus': .15, 'bracket-fungus': .20, 'morel': .15,
+    'fantasy': 3.,
+}
+
 def species(key, name, latin, category, height, **parameters):
+    metres = HEIGHT_METRES.get(key, height / (10. if category in ('tree', 'conifer', 'palm', 'bamboo') else 100.))
     ROWS.append(dict(id=key, name=name, scientificName=latin, category=category,
-                     family=FAMILIES[category], parameters=dict(height=height, **parameters)))
+                     family=FAMILIES[category], defaultHeightMetres=metres,
+                     parameters=dict(height=height, **parameters)))
 
 # Crown: spreading, oval, columnar, weeping, umbrella, pyramidal, vase,
 # multiple leaders, horizontally layered. Leaf geometry is a separate trait.

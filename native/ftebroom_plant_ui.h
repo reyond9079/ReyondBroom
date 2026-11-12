@@ -43,13 +43,15 @@ static void plantProperties() {
     plantText("Plant name",s.doc.name);
     if(s.doc.generator<plants::latestGenerator(s.doc.family)){ImGui::TextWrapped("This project uses a previous plant generator.");if(plantButton("Upgrade plant generator","upgrade-generator"))s.doc=plants::upgradeGenerator(s.doc);}
     else ImGui::TextDisabled("Plant generator %d",s.doc.generator);ImGui::TextDisabled("%s",plants::familyName(f));
-    plantSlider("Height",p.height,1,480,"%.1f units");plantSlider("Age / growth",p.age,.1,1);
+    plantSlider("Height",p.height,.1,2048,"%.1f units");
+    ImGui::TextDisabled("Player height: %.0f units  |  Plant: %.2fx",plants::humanHeightUnits(gameProfile),p.height/plants::humanHeightUnits(gameProfile));
+    plantSlider("Age / growth",p.age,.1,1);
     plantCombo("Quality",p.quality,"Realistic\0Optimized Game-Ready\0Low Poly\0Stylized\0");
     if(s.advanced&&s.doc.generator>=4&&(f==plants::Family::Broadleaf||f==plants::Family::Conifer))
       ImGui::Checkbox("Smooth branch junctions",&s.doc.smoothJunctions);
     if(f!=plants::Family::Mushroom)plantCombo("Season",p.season,"Spring\0Summer\0Autumn\0Winter\0");
     if(tree||f==plants::Family::Conifer||f==plants::Family::Grass)plantSlider("Foliage density",p.density,.1,1.8);
-    if(f!=plants::Family::Grass)plantSlider("Stem radius",p.radius,.1,std::min(100.,p.height*.40),"%.2f units");
+    if(f!=plants::Family::Grass)plantSlider("Stem radius",p.radius,.01,std::min(200.,p.height*.40),"%.2f units");
   }
   if(s.advanced&&ImGui::CollapsingHeader("Shape / growth")) {
     if(tree||f==plants::Family::Conifer||f==plants::Family::Cactus||f==plants::Family::Mushroom)plantSlider("Crown / cap spread",p.spread,.1,1.5);
@@ -78,7 +80,7 @@ static void plantProperties() {
     if(s.doc.generator>=4&&(f==plants::Family::Broadleaf||f==plants::Family::Conifer))plantInt("Trees in group",p.clumps,1,8);
   }
   if(leafy||f==plants::Family::Conifer||f==plants::Family::Grass)if(ImGui::CollapsingHeader("Leaves / needles",ImGuiTreeNodeFlags_DefaultOpen)) {
-    if(f!=plants::Family::Grass)plantSlider("Leaf / leaflet size",p.leafSize,.5,60,"%.1f units");
+    if(f!=plants::Family::Grass)plantSlider("Leaf / leaflet size",p.leafSize,.01,160,"%.1f units");
     plantSlider("Leaf / blade width",p.leafWidth,.015,1.5);
     if(s.advanced) {
       if(s.doc.generator>=2){
@@ -95,7 +97,7 @@ static void plantProperties() {
     }
   }
   if(flowering)if(ImGui::CollapsingHeader("Flowers",ImGuiTreeNodeFlags_DefaultOpen)) {
-    plantSlider("Flower diameter",p.flowerSize,1,70);plantSlider("Bloom stage",p.bloom,0,1);plantInt("Petals",p.petals,3,40);plantInt("Petal layers",p.flowerLayers,1,8);
+    plantSlider("Flower diameter",p.flowerSize,.01,240);plantSlider("Bloom stage",p.bloom,0,1);plantInt("Petals",p.petals,3,40);plantInt("Petal layers",p.flowerLayers,1,8);
   }
   if(f==plants::Family::Mushroom&&ImGui::CollapsingHeader("Mushroom surface",ImGuiTreeNodeFlags_DefaultOpen)){plantSlider("Cap thickness",p.capThickness,.03,.8);plantSlider("Gills / pores",p.gills,0,1);}
   if(f==plants::Family::Cactus&&ImGui::CollapsingHeader(pads?"Cactus pads / spines":"Cactus ribs / spines",ImGuiTreeNodeFlags_DefaultOpen)){if(pads)plantInt("Pad count",p.leaves,4,40);else if(s.doc.generator==1||p.organ<4)plantSlider("Rib count",p.ribs,3,24,"%.0f");if(s.doc.generator==1||p.organ<4)plantSlider("Spine length",p.spines,0,1);}
@@ -429,7 +431,7 @@ static void plantConfirmSwitch() {
     ImGui::TextWrapped("Save the editable plant before continuing?");
     if(plantButton("Save","confirm-save")){auto next=std::move(s.nextAction);s.nextAction={};ImGui::CloseCurrentPopup();plantAction([&](){plantAskSave(std::move(next));});}
     ImGui::SameLine();if(plantButton("Discard","confirm-discard")){auto next=std::move(s.nextAction);s.nextAction={};
-      s.doc=s.saved.empty()?plants::presets().front():plants::deserialize(plants::Json::parse(s.saved));s.undo.clear();s.redo.clear();
+      s.doc=s.saved.empty()?plants::presetsForProfile(gameProfile).front():plants::deserialize(plants::Json::parse(s.saved));s.undo.clear();s.redo.clear();
       ImGui::CloseCurrentPopup();if(next)next();}
     ImGui::SameLine();if(plantButton("Keep editing","confirm-cancel")){s.nextAction={};ImGui::CloseCurrentPopup();}
     ImGui::EndPopup();
@@ -509,6 +511,7 @@ static void plantExportDialog() {
 static void plantPanel() {
   PlantQaMainScope qaMainScope;
   auto& s=plantState;plantQaFrame();plantAction(plantTick);plantAction(plantGameTick);
+  if(s.open&&s.libraryProfile!=gameProfile)plantAction(plantLibraryLoad);
   if(!s.open||(s.hidden&&!s.closeRequest)){plantWriteQa();return;}
   s.widgets=plants::Json::object();auto before=plants::serialize(s.doc);auto revision=s.revision;
   auto display=ImGui::GetIO().DisplaySize;float u=uiScale();
@@ -519,7 +522,7 @@ static void plantPanel() {
   if(ImGui::Begin(dirty?"Plant Editor *###Plant Editor":"Plant Editor###Plant Editor",&open,ImGuiWindowFlags_NoDocking)) {
     if(s.qa){auto p=ImGui::GetWindowPos(),size=ImGui::GetWindowSize();s.widgets["window"]={{"x",p.x},{"y",p.y},{"width",size.x},{"height",size.y}};}
     ImGui::PushItemWidth(-1);
-    if(plantButton("New","new"))plantRequest([](){placementCancel(plantPlacement);auto d=plants::presets().front();d.name="Untitled oak";d.seed=uint32_t(plants::mix(d.seed,plantState.revision+1));plantSelect(d);});ImGui::SameLine();
+    if(plantButton("New","new"))plantRequest([](){placementCancel(plantPlacement);auto d=plants::presetsForProfile(gameProfile).front();d.name="Untitled oak";d.seed=uint32_t(plants::mix(d.seed,plantState.revision+1));plantSelect(d);});ImGui::SameLine();
     if(plantButton("Open...","open"))plantRequest([](){runUiChoose(plantFolder().u8string(),[](const std::string& path){plantOpenFile(std::filesystem::u8path(path));});});ImGui::SameLine();
     if(plantButton("Save","save"))plantAction([](){plantAskSave();});ImGui::SameLine();
     if(plantButton("Save as...","save-as"))plantAction([](){plantAskSave({},true);});ImGui::SameLine();

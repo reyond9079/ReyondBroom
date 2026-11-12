@@ -75,6 +75,25 @@ struct ArtTheme {std::string id,grammar="plain";std::array<std::array<unsigned c
 inline std::string shortKey(uint64_t n){std::ostringstream out;out.imbue(std::locale::classic());out<<std::hex<<std::setfill('0')<<std::setw(6)<<(n&0xffffff);return out.str();}
 inline std::string themeAssetKey(const ArtTheme& theme){return shortKey(hash(Json{{"encoding",2},{"id",theme.id},{"colors",theme.colors},{"grammar",theme.grammar},{"weathering",theme.weathering},{"baySpacing",theme.baySpacing},{"lightColor",theme.lightColor}}.dump()));}
 struct Influence {uint64_t id=0;V low,high;std::string kind="preserve";double strength=1;};
+struct AuthoredModule {
+  std::string id,function,source,license,map;int profile=2;
+  std::map<std::string,int> materials;
+};
+inline Json moduleJson(const AuthoredModule& module){return {{"id",module.id},{"function",module.function},{"profile",module.profile},{"source",module.source},{"license",module.license},{"map",module.map},{"materialSlots",module.materials}};}
+inline AuthoredModule readModule(const Json& j){
+  AuthoredModule m;m.id=j.at("id");m.function=j.at("function");m.profile=j.at("profile");m.source=j.at("source");m.license=j.at("license");m.map=j.at("map");m.materials=j.at("materialSlots").get<std::map<std::string,int>>();return m;
+}
+inline void validateModule(const AuthoredModule& m){
+  safeToken(m.id);safeToken(m.function);finite(m.profile,0,4,"Unknown authored module profile");
+  if(m.source.empty()||m.source.size()>2000||m.license.empty()||m.license.size()>2000||m.map.empty()||m.map.size()>65536||m.materials.size()>64)throw std::runtime_error("Authored module exceeds its source, license, MAP or material budget");
+  for(const auto& [material,slot]:m.materials){if(material.empty()||material.size()>120)throw std::runtime_error("Invalid authored material name");finite(slot,0,5,"Authored material aliases use theme slots 0..5");}
+}
+inline std::vector<AuthoredModule> readModulePack(const Json& j){
+  if(j.at("schemaVersion")!=1||j.at("modules").empty()||j.at("modules").size()>16)throw std::runtime_error("Expected an authored module pack v1 with 1..16 modules");
+  std::vector<AuthoredModule> result;size_t bytes=0;std::set<std::string> ids;
+  for(const auto& item:j.at("modules")){auto m=readModule(item);validateModule(m);if(!ids.insert(m.id).second)throw std::runtime_error("Duplicate authored module ID");bytes+=m.map.size();if(bytes>131072)throw std::runtime_error("Authored module pack exceeds 128 KiB of source MAPs");auto geometry=al::parseMap(m.map);if(geometry.brushes.empty()||geometry.brushes.size()>128||geometry.entities.size()>32)throw std::runtime_error("Each authored module needs 1..128 convex brushes and at most 32 point entities");for(const auto& brush:geometry.brushes){al::validateBrush(brush);for(const auto& face:brush.faces)if(!m.materials.count(face.material))throw std::runtime_error("Declare a theme slot for every authored material; original MAP bytes are retained");}result.push_back(std::move(m));}
+  return result;
+}
 struct Settings {
   uint64_t seed=1;std::string preset="hospital";int profile=2,candidates=4;
   double scale=1,damage=.4,dressing=.5;Player player;
@@ -85,6 +104,7 @@ struct Settings {
   // Empty / zero fields inherit the registry's archetype program.
   std::string layout,theme;double width=0,depth=0,hall=0;int floors=0,rooms=0,blocks=0;
   std::vector<Road> roadPins;
+  std::vector<AuthoredModule> modules;std::map<uint64_t,std::string> roomModules;
   std::vector<uint64_t> pinnedRegions;
   // Clean per-building Architecture / Damage / Dressing recipes. Mission
   // and Site stay frozen while pins exist to retain their lots and routes.
@@ -100,6 +120,7 @@ struct WorldPlan {
   MissionGraph mission;SpatialGraph spatial;ArchitecturePlan architecture;
   DamageField damage;std::vector<AssetPlacement> assets;NavigationGraph navigation;Diagnostics diagnostics;
   std::string map,architectureKey;
+  std::map<std::string,AuthoredModule> authoredSources;
   std::array<std::shared_ptr<const Settings>,7> stageInputs;
 };
 struct ProfileCapability {const char* name;bool sky,patches,models,shaders;const char* spawn;double coordinateLimit;};
@@ -174,7 +195,7 @@ inline void validate(const Settings& s,const Registry& r,bool recipe=false){
     for(auto id:s.pinnedRegions){
       if(id<100||id>=uint64_t(100+buildings)||!pins.insert(id).second||!s.regionRecipes.count(id))throw std::runtime_error("Unknown or duplicate pinned building");
       for(const auto& input:s.regionRecipes.at(id)){
-        if(!input.is_object()||input.dump().size()>65536)throw std::runtime_error("Invalid pinned-building recipe budget");
+        if(!input.is_object()||input.dump().size()>262144)throw std::runtime_error("Invalid pinned-building recipe budget");
         if(input.value("pinnedRegions",Json::array()).size()||input.value("regionRecipes",Json::array()).size())throw std::runtime_error("Recursive building pins are not allowed");
         if(input.contains("frozenStageInputs"))for(const auto& nested:input.at("frozenStageInputs"))if(!nested.is_null())throw std::runtime_error("A building recipe cannot contain frozen stages");
         if(input.contains("stageLocks"))for(const auto& flag:input.at("stageLocks"))if(flag.get<bool>())throw std::runtime_error("A building recipe must be clean");
@@ -182,6 +203,9 @@ inline void validate(const Settings& s,const Registry& r,bool recipe=false){
       }
     }
   }
+  if(s.modules.size()>16||s.roomModules.size()>256)throw std::runtime_error("Authored module assignment budget exceeded");
+  size_t moduleBytes=0;std::set<std::string> moduleIds;for(const auto& module:s.modules){validateModule(module);if(!moduleIds.insert(module.id).second)throw std::runtime_error("Duplicate authored module ID");moduleBytes+=module.map.size();}if(moduleBytes>131072)throw std::runtime_error("Authored module MAP budget exceeded");
+  for(const auto& [room,id]:s.roomModules)if(!room||!moduleIds.count(id))throw std::runtime_error("Room references an absent authored module");
   bool gap=false;for(int i=0;i<7;i++){if(s.locked[i]){if(gap||i>=5)throw std::runtime_error("Freeze a stage with its upstream stages; Navigation and Export are always revalidated");}else gap=true;}
   const int last=lockedThrough(s);
   if(last>=0&&s.frozenRegistry!=r.fingerprint)throw std::runtime_error("Locked stages require the registry snapshot from their accepted candidate");
@@ -201,6 +225,7 @@ inline Json serialize(const Settings& s){
   Json j={{"schemaVersion",schemaVersion},{"worldSeed",s.seed},{"presetId",s.preset},{"profileId",s.profile},{"candidates",s.candidates},{"scale",s.scale},{"damage",s.damage},{"dressing",s.dressing},{"player",{{"radius",s.player.radius},{"height",s.player.height},{"step",s.player.step}}},{"stageLocks",s.locked},{"frozenStageInputs",s.frozen},{"frozenRegistry",s.frozenRegistry},{"qualityWeights",s.weights},{"pinnedRegions",s.pinnedRegions}};
   j["missionPins"]=Json::array();for(const auto& p:s.missionPins)j["missionPins"].push_back({{"id",p.id},{"position",vector(p.position)}});
   j["roadPins"]=Json::array();for(const auto& p:s.roadPins)j["roadPins"].push_back({{"id",p.id},{"a",vector(p.a)},{"b",vector(p.b)},{"width",p.width},{"control",p.control?vector(*p.control):Json(nullptr)}});
+  j["authoredModules"]=Json::array();for(const auto& module:s.modules)j["authoredModules"].push_back(moduleJson(module));j["roomModules"]=Json::array();for(const auto& [room,module]:s.roomModules)j["roomModules"].push_back({{"room",room},{"module",module}});
   j["roomSeeds"]=Json::array();for(const auto& [id,seed]:s.roomSeeds)j["roomSeeds"].push_back({{"room",id},{"seed",seed}});
   j["regionSeeds"]=Json::array();for(const auto& [id,seed]:s.regionSeeds)j["regionSeeds"].push_back({{"region",id},{"seed",seed}});
   j["pinnedRegistry"]=s.pinnedRegistry;j["regionRecipes"]=Json::array();for(const auto& [id,recipes]:s.regionRecipes)j["regionRecipes"].push_back({{"region",id},{"inputs",recipes}});
@@ -215,6 +240,8 @@ inline Settings deserialize(const Json& j,const Registry& r,bool recipe){
   if(j.contains("frozenStageInputs"))s.frozen=j.at("frozenStageInputs").get<std::array<Json,5>>();s.frozenRegistry=j.value("frozenRegistry",uint64_t(0));
   for(const auto& p:j.at("missionPins")){MissionNode n;n.id=p.at("id");n.position=vector(p.at("position"));n.pinned=true;s.missionPins.push_back(n);}
   for(const auto& p:j.at("roadPins")){Road road;road.id=p.at("id");road.a=vector(p.at("a"));road.b=vector(p.at("b"));road.width=p.at("width");if(p.contains("control")&&!p.at("control").is_null())road.control=vector(p.at("control"));road.pinned=true;s.roadPins.push_back(road);}
+  if(j.contains("authoredModules"))for(const auto& module:j.at("authoredModules"))s.modules.push_back(readModule(module));
+  if(j.contains("roomModules"))for(const auto& assignment:j.at("roomModules"))if(!s.roomModules.emplace(assignment.at("room").get<uint64_t>(),assignment.at("module").get<std::string>()).second)throw std::runtime_error("Duplicate authored room assignment");
   if(j.contains("roomSeeds"))for(const auto& p:j.at("roomSeeds"))if(!s.roomSeeds.emplace(p.at("room").get<uint64_t>(),p.at("seed").get<uint64_t>()).second)throw std::runtime_error("Duplicate room seed");
   for(const auto& p:j.at("regionSeeds"))s.regionSeeds[p.at("region").get<uint64_t>()]=p.at("seed").get<uint64_t>();
   s.pinnedRegistry=j.value("pinnedRegistry",uint64_t(0));if(j.contains("regionRecipes"))for(const auto& p:j.at("regionRecipes"))if(!s.regionRecipes.emplace(p.at("region").get<uint64_t>(),p.at("inputs").get<std::array<Json,3>>()).second)throw std::runtime_error("Duplicate building recipe");

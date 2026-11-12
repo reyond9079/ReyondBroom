@@ -101,7 +101,7 @@ static void worldPublish(const std::filesystem::path& root,const std::map<std::s
 static void worldExport(std::filesystem::path target){
   auto& s=worldArchitect;auto* selected=worldSelected();if(!selected||!selected->diagnostics.valid)throw std::runtime_error("Generate and select a valid candidate first");if(s.generated!=worldInputKey())throw std::runtime_error("Settings changed; regenerate before export");target.replace_extension(".map");
   const auto palette=gameProfile==2?q1Palette():ftebroom::defaultQuakePalette();auto bundle=wa::assetBundle(*selected,s.registry,palette);
-  bundle[target.filename().u8string()]=wa::withWad(wa::groupedMap(*selected,s.project),*selected,"world-architect-"+selected->theme+".wad");
+  bundle[target.filename().u8string()]=wa::withWad(wa::groupedMap(*selected,s.project),*selected,wa::wadFilename(*selected,palette));
   bundle[target.stem().u8string()+".world.json"]=worldProject().dump(2);
   worldPublish(target.parent_path(),bundle);s.message="Exported MAP, editable project and original texture assets.";
 }
@@ -114,7 +114,7 @@ static void worldApply(bool replace=false,std::optional<uint64_t> region={}){
   const auto palette=gameProfile==2?q1Palette():ftebroom::defaultQuakePalette();auto bundle=wa::assetBundle(*selected,s.registry,palette);
   placementPublish(bundle);
   if(gameWad()){
-    auto wad=documentPath("world-architect-"+selected->theme+".wad").u8string();std::string list=gameProfile==4?hlWads:q1Wads;
+    auto wad=documentPath(wa::wadFilename(*selected,palette)).u8string();std::string list=gameProfile==4?hlWads:q1Wads;
     if(list.find(wad)==list.npos){if(!list.empty())list+='\n';list+=wad;if(list.size()>=sizeof q1Wads)throw std::runtime_error("Configured WAD list is full");std::snprintf(gameProfile==4?hlWads:q1Wads,sizeof q1Wads,"%s",list.c_str());q1FindWads(true);}
   }
   do{s.request=worldIdentity();}while(std::filesystem::exists(documentPath("data/wa-import-"+s.request+".map")));
@@ -277,7 +277,7 @@ static void worldPanel(){
         if(tab==2)worldAction(worldRoadPanel);
         if(tab==4)worldAction(worldArchitecturePanel);
         if(tab==5)worldAction([]{worldInfluencePanel(false);});
-        if(tab==6)worldAction([]{auto& s=worldArchitect;auto before=wa::serialize(s.settings);auto p=wa::stagePreset(s.settings,s.registry);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());if(ImGui::BeginCombo("Art theme",p.theme.c_str())){for(const auto& theme:s.registry.themes){if(ImGui::Selectable(theme.id.c_str(),p.theme==theme.id))s.settings.theme=theme.id;}ImGui::EndCombo();}ImGui::EndDisabled();worldChanged(before);worldInfluencePanel(true);});
+        if(tab==6)worldAction([]{auto& s=worldArchitect;auto before=wa::serialize(s.settings);auto p=wa::stagePreset(s.settings,s.registry);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());bool themesOpen=ImGui::BeginCombo("Art theme",p.theme.c_str());worldRect("art-theme");if(themesOpen){for(const auto& theme:s.registry.themes){if(ImGui::Selectable(theme.id.c_str(),p.theme==theme.id))s.settings.theme=theme.id;worldRect("art-theme/"+theme.id);}ImGui::EndCombo();}ImGui::EndDisabled();worldChanged(before);worldInfluencePanel(true);});
         if(tab==7){
           if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& stage:world->diagnostics.cachedStages)ImGui::Text("Reused frozen stage: %s",stage.c_str());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms%s",name.c_str(),ms,std::find(world->diagnostics.cachedStages.begin(),world->diagnostics.cachedStages.end(),name)!=world->diagnostics.cachedStages.end()?" (original build time)":"");for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
           for(const auto& reject:s.batch.rejects)ImGui::TextWrapped("Rejected: %s",reject.c_str());

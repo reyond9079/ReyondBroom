@@ -47,6 +47,8 @@ class ScopeTests(unittest.TestCase):
             p = planner.plan([path])
             self.assertTrue({'world_ui', 'world_legacy'} <= set(p['suites']))
             self.assertFalse(p['flags']['plant_core'] or p['flags']['atlas'])
+        self.assertEqual(set(planner.plan(['native/ftebroom_world_authoring.h'])['suites']), {'world_ui', 'world_legacy', 'placement'})
+        self.assertEqual(set(planner.plan(['native/ftebroom_world_architect.h'])['suites']), {'world_ui', 'world_legacy', 'placement'})
 
     def test_world_host_registration_and_focus_guards_are_classified_by_code(self):
         before = 'void frame(){modelViewerPanel();bbBenchTick();plantPanel();}\nif(runUiNavigation()||plantFocused())capture();\n'

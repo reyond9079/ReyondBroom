@@ -5,13 +5,14 @@ from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('output',type=Path);p.add_argument('--runtime',type=Path);p.add_argument('--seeds',type=int,default=3);a=p.parse_args()
 assert 1<=a.seeds<=100
 repo=Path(__file__).resolve().parents[1];out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);suffix='.exe' if os.name=='nt' else ''
-sources=[*sorted((repo/'native/world_architect').glob('*.h')),*sorted((repo/'plugins/autolevel').glob('al_*.h')),repo/'plugins/autolevel/al_brush.cpp',repo/'runtime/world-architect/registry.json',repo/'tests/world-architect.cpp',repo/'tests/world-architect-contracts.cpp']
+sources=[*sorted((repo/'native/world_architect').glob('*.h')),*sorted((repo/'plugins/autolevel').glob('al_*.h')),repo/'plugins/autolevel/al_brush.cpp',repo/'runtime/world-architect/registry.json',repo/'tests/world-architect.cpp',repo/'tests/world-architect-contracts.cpp',repo/'tests/world-assets.cpp']
 (out/'provenance.json').write_text(json.dumps({'compiler':subprocess.check_output(['g++','--version'],text=True).splitlines()[0],'sourceHashes':{str(path.relative_to(repo)):hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},'seedsPerProfilePreset':a.seeds},indent=2)+'\n')
 def run(command,log,cwd=None):
  with log.open('wb') as stream:subprocess.run([str(arg) for arg in command],cwd=cwd or repo,stdout=stream,stderr=subprocess.STDOUT,check=True)
-for name in ['world-architect-contracts','world-architect']:
+for name in ['world-architect-contracts','world-assets','world-architect']:
  run(['g++','-std=c++17','-O1',repo/'tests'/(name+'.cpp'),'-o',out/(name+suffix)],out/(name+'-build.log'))
 run([out/('world-architect-contracts'+suffix),repo/'runtime/world-architect/registry.json'],out/'contracts.log')
+run([out/('world-assets'+suffix),repo/'runtime/world-architect/registry.json'],out/'assets.log')
 proof=[]
 for profile in [2,0,1]:
  folder=out/('profile-'+str(profile))/('baseq3' if profile<2 else 'maps-and-assets')

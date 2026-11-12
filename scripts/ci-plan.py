@@ -33,8 +33,9 @@ SUITES = {'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation
           'updater', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
 RULES = [
     (['native/world_architect/**', 'runtime/world-architect/**',
-      'tests/world-architect*', 'tests/world-designer.cpp', 'scripts/test-world-architect.py', 'scripts/test-world-designer.py'], {'world_core'}),
-    (['native/ftebroom_world_architect.h', 'native/ftebroom_world_authoring.h'], {'world_ui', 'input'}),
+      'tests/world-architect*', 'tests/world-designer.cpp', 'tests/world-assets.cpp', 'scripts/test-world-architect.py', 'scripts/test-world-designer.py'], {'world_core'}),
+    (['native/ftebroom_world_architect.h'], {'world_ui'}),
+    (['native/ftebroom_world_authoring.h'], {'world_ui'}),
     (['qc/fb_world_architect.qc', 'qc/fb_world_baseline.qc', 'scripts/test-world-architect-ui.py', 'scripts/test-world-applied.py'], {'world_ui'}),
     (['tests/world-legacy.cpp', 'scripts/test-world-legacy.py'], {'world_legacy'}),
     (['plugins/autolevel/al_storage.*', 'tests/test-autolevel-storage.cpp'], {'world_legacy'}),

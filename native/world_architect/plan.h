@@ -6,6 +6,7 @@
 #include <chrono>
 #include <deque>
 #include <functional>
+#include <iomanip>
 #include <numeric>
 #include <optional>
 #include <memory>
@@ -62,7 +63,9 @@ struct Preset {
   std::string ruinEvent;
   Experience experience;
 };
-struct ArtTheme {std::string id;std::array<std::array<unsigned char,3>,6> colors;};
+struct ArtTheme {std::string id,grammar="plain";std::array<std::array<unsigned char,3>,6> colors;double weathering=0,baySpacing=192;std::array<double,3> lightColor{1,.85,.7};};
+inline std::string shortKey(uint64_t n){std::ostringstream out;out.imbue(std::locale::classic());out<<std::hex<<std::setfill('0')<<std::setw(6)<<(n&0xffffff);return out.str();}
+inline std::string themeAssetKey(const ArtTheme& theme){return shortKey(hash(Json{{"encoding",2},{"id",theme.id},{"colors",theme.colors},{"grammar",theme.grammar},{"weathering",theme.weathering},{"baySpacing",theme.baySpacing},{"lightColor",theme.lightColor}}.dump()));}
 struct Influence {uint64_t id=0;V low,high;std::string kind="preserve";double strength=1;};
 struct Settings {
   uint64_t seed=1;std::string preset="hospital";int profile=2,candidates=4;
@@ -84,7 +87,7 @@ struct Settings {
   std::map<std::string,double> weights{{"variety",1},{"route",1},{"circulation",1}};
 };
 struct WorldPlan {
-  int schema=schemaVersion;uint64_t seed=0,registryFingerprint=0;int profile=2;std::string preset,theme,sourceRevision;
+  int schema=schemaVersion;uint64_t seed=0,registryFingerprint=0;int profile=2;std::string preset,theme,assetKey,sourceRevision;
   V low,high;std::map<std::string,uint64_t> seeds;
   MissionGraph mission;SpatialGraph spatial;ArchitecturePlan architecture;
   DamageField damage;std::vector<AssetPlacement> assets;NavigationGraph navigation;Diagnostics diagnostics;
@@ -113,6 +116,7 @@ inline Registry readRegistry(const Json& j){
   if(j.at("presets").size()>64||j.at("themes").size()>32)throw std::runtime_error("World Architect registry budget exceeded");
   for(const auto& item:j.at("themes")){
     ArtTheme t;t.id=item.at("id").get<std::string>();safeToken(t.id);if(!materialPrefixes.insert(t.id.substr(0,7)).second)throw std::runtime_error("Theme material prefixes must be unique");if(!ids.insert("theme/"+t.id).second)throw std::runtime_error("Duplicate theme");
+    t.grammar=item.value("grammar",std::string("plain"));if(t.grammar!="plain"&&t.grammar!="masonry"&&t.grammar!="brutalist"&&t.grammar!="industrial"&&t.grammar!="clinical"&&t.grammar!="subterranean"&&t.grammar!="civic")throw std::runtime_error("Unknown art-theme grammar");t.weathering=item.value("weathering",0.);finite(t.weathering,0,1,"Invalid theme weathering");t.baySpacing=item.value("baySpacing",192.);finite(t.baySpacing,96,384,"Invalid theme bay spacing");if(item.contains("lightColor"))t.lightColor=item.at("lightColor").get<std::array<double,3>>();for(auto channel:t.lightColor)finite(channel,0,1,"Invalid theme light color");
     const auto& colors=item.at("colors");if(colors.size()!=6)throw std::runtime_error("Theme needs six material colors");
     for(int a=0;a<6;a++)for(int c=0;c<3;c++){int n=colors.at(a).at(c);finite(n,0,255,"Invalid theme color");t.colors[a][c]=static_cast<unsigned char>(n);}r.themes.push_back(t);
   }
@@ -258,6 +262,6 @@ inline Json diagnostics(const WorldPlan& world){
   Json j={{"schemaVersion",schemaVersion},{"seed",world.seed},{"preset",world.preset},{"profile",world.profile},{"valid",world.diagnostics.valid},{"rejects",world.diagnostics.rejects},{"warnings",world.diagnostics.warnings},{"timingMs",world.diagnostics.timing},{"cachedStages",world.diagnostics.cachedStages},{"scores",world.diagnostics.score},{"brushes",world.diagnostics.brushes},{"mapBytes",world.diagnostics.mapBytes},{"routeLength",world.diagnostics.routeLength},{"stageSeeds",world.seeds},{"reachable",world.navigation.reachable},{"navigationNodes",world.navigation.nodes.size()}};
   j["missionNodes"]=Json::array();for(const auto& n:world.mission.nodes)j["missionNodes"].push_back({{"id",n.id},{"role",roleName(n.role)},{"required",n.required},{"room",n.room},{"floor",n.floor},{"position",vector(n.position)}});
   j["missionEdges"]=Json::array();for(const auto& e:world.mission.edges)j["missionEdges"].push_back({{"a",e.a},{"b",e.b},{"purpose",e.purpose},{"optional",e.optional},{"oneWay",e.oneWay},{"prerequisite",e.prerequisite}});
-  j["bounds"]={{"low",vector(world.low)},{"high",vector(world.high)}};j["rooms"]=Json::array();for(const auto& b:world.spatial.buildings)for(const auto& room:b.rooms)j["rooms"].push_back({{"id",room.id},{"building",b.id},{"floor",room.floor},{"low",vector(room.low)},{"high",vector(room.high)},{"function",room.function},{"mission",room.mission}});return j;
+  j["artTheme"]=world.theme;j["assetKey"]=world.assetKey;j["bounds"]={{"low",vector(world.low)},{"high",vector(world.high)}};j["rooms"]=Json::array();for(const auto& b:world.spatial.buildings)for(const auto& room:b.rooms)j["rooms"].push_back({{"id",room.id},{"building",b.id},{"floor",room.floor},{"low",vector(room.low)},{"high",vector(room.high)},{"function",room.function},{"mission",room.mission}});return j;
 }
 }

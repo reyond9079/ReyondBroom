@@ -5,10 +5,12 @@
 namespace ftebroom::worldArchitect {
 inline std::string vectorText(V p){std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<p.x<<' '<<p.y<<' '<<p.z;return out.str();}
 inline void cancelled(const std::atomic<bool>* flag){if(flag&&flag->load())throw std::runtime_error("Generation cancelled");}
-inline std::string assetId(const WorldPlan& w,int slot){return slot==6?"wa_water_"+w.theme.substr(0,7):"wa_"+w.theme.substr(0,7)+std::to_string(slot);}
-inline std::string materialId(const WorldPlan& w,int slot){return slot==6&&w.profile>=2?(w.profile==4?"!wa":"*wa")+w.theme.substr(0,7):assetId(w,slot);}
+inline std::string assetId(const WorldPlan& w,int slot){return slot==6?"wa_water_"+w.theme.substr(0,7)+(w.assetKey.empty()?"":"_"+w.assetKey):"wa_"+w.theme.substr(0,w.assetKey.empty()?7:4)+(w.assetKey.empty()?"":"_"+w.assetKey)+std::to_string(slot);}
+inline std::string classicWaterId(const WorldPlan& w,bool hl=false){return (hl?"!wa":"*wa")+w.theme.substr(0,w.assetKey.empty()?7:5)+(w.assetKey.empty()?"":"_"+w.assetKey);}
+inline std::string materialId(const WorldPlan& w,int slot){return slot==6&&w.profile>=2?classicWaterId(w,w.profile==4):assetId(w,slot);}
 inline std::string material(const WorldPlan& w,int slot){return materialId(w,slot);}
-inline std::string skyMaterial(const WorldPlan& w){return w.profile<2?"wa_sky_"+w.theme:"skywa"+w.theme.substr(0,7);}
+inline std::string classicSkyId(const WorldPlan& w){return w.assetKey.empty()?"skywa"+w.theme.substr(0,7):"sky"+w.theme.substr(0,5)+"_"+w.assetKey;}
+inline std::string skyMaterial(const WorldPlan& w){return w.profile<2?"wa_sky_"+w.theme+(w.assetKey.empty()?"":"_"+w.assetKey):classicSkyId(w);}
 inline bool inside(V p,V lo,V hi){return p.x>=lo.x&&p.y>=lo.y&&p.z>=lo.z&&p.x<=hi.x&&p.y<=hi.y&&p.z<=hi.z;}
 inline bool overlap(V lo,V hi,V otherLo,V otherHi,double gap=0){return lo.x<otherHi.x+gap&&hi.x>otherLo.x-gap&&lo.y<otherHi.y+gap&&hi.y>otherLo.y-gap&&lo.z<otherHi.z+gap&&hi.z>otherLo.z-gap;}
 inline uint64_t regionSeed(const Settings& s,uint64_t id,const char* stage){auto it=s.regionSeeds.find(id);return subSeed(it==s.regionSeeds.end()?s.seed:it->second,stage,id);}
@@ -236,6 +238,18 @@ inline void shell(WorldPlan& w){
     if(side==0)b.x=lo.x;else if(side==1)a.x=hi.x;else if(side==2)b.y=lo.y;else a.y=hi.y;
     auto brush=al::box(a,b,skyMaterial(w));addBrush(w,0,"sealed sky boundary",brush);
   }addBrush(w,0,"sealed sky ceiling",al::box({lo.x-32,lo.y-32,hi.z},{hi.x+32,hi.y+32,hi.z+32},skyMaterial(w)));
+  if(w.profile>=2){
+    // Classic BSP sky is a special non-solid contents volume. Back it with
+    // ordinary solid geometry so flood filling never depends on portal split
+    // order when interior liquid/detail planes reach the sky leaves.
+    for(int side=0;side<4;side++){
+      V a{lo.x-64,lo.y-64,lo.z-64},b{hi.x+64,hi.y+64,hi.z+64};
+      if(side==0)b.x=lo.x-32;else if(side==1)a.x=hi.x+32;else if(side==2)b.y=lo.y-32;else a.y=hi.y+32;
+      box(w,0,"sealed sky solid backing",a,b,2);
+    }
+    box(w,0,"sealed sky bottom backing",{lo.x-64,lo.y-64,lo.z-64},{hi.x+64,hi.y+64,lo.z-32},2);
+    box(w,0,"sealed sky top backing",{lo.x-64,lo.y-64,hi.z+32},{hi.x+64,hi.y+64,hi.z+64},2);
+  }
 }
 inline double influence(const Settings& settings,V p,const std::string& kind,double fallback);
 inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Building& b,const std::atomic<bool>* cancel){
@@ -437,6 +451,7 @@ inline bool protectedRoute(const WorldPlan& w,V p,double radius){
 inline double influence(const Settings& settings,V p,const std::string& kind,double fallback){
   double result=fallback;for(const auto& mask:settings.influences)if(mask.kind==kind&&inside(p,mask.low,mask.high))result=mask.strength;return result;
 }
+#include "theme_kits.h"
 inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* cancel,const Registry& registry){
   for(const auto& building:w.spatial.buildings){
     const auto s=regionInput(input,building.id,3,registry);
@@ -468,29 +483,17 @@ inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* c
     }
   }
 }
-inline void dressing(WorldPlan& w,const Settings& input,const Preset& preset,const std::atomic<bool>* cancel,const Registry& registry){
+inline void dressing(WorldPlan& w,const Settings& input,const Preset&,const std::atomic<bool>* cancel,const Registry& registry){
+  const auto& theme=registry.theme(w.theme);
   for(const auto& building:w.spatial.buildings){
-    const auto s=regionInput(input,building.id,4,registry);
-    cancelled(cancel);Random rng(regionSeed(s,building.id,"Dressing"));
+    cancelled(cancel);const auto settings=regionInput(input,building.id,4,registry);std::vector<V> occupied;
     for(const auto& room:building.rooms){
-      const double density=influence(s,room.low,"dressing",s.dressing);if(density<.01)continue;
-      V p{room.low.x+48,room.low.y+48,room.low.z};if(protectedRoute(w,p,72)||influence(s,p,"preserve",0)>0)continue;
-      const bool bed=preset.archetype=="hospital"||preset.archetype=="apartments";
-      if(bed){
-        box(w,building.id,"bed frame",{p.x-20,p.y-28,p.z+12},{p.x+20,p.y+28,p.z+20},4);
-        box(w,building.id,"bed mattress",{p.x-19,p.y-27,p.z+20},{p.x+19,p.y+27,p.z+28},2);
-        for(int x:{-1,1})for(int y:{-1,1})box(w,building.id,"bed leg",{p.x+x*16-2,p.y+y*23-2,p.z},{p.x+x*16+2,p.y+y*23+2,p.z+14},4);
-      }else{
-        double h=preset.archetype=="station"?24:40;
-        addBrush(w,building.id,"salvage crate",bevel({p.x-24,p.y-20,p.z},{p.x+24,p.y+20,p.z+h},material(w,4),8));
-        box(w,building.id,"crate band",{p.x-25,p.y-22,p.z+8},{p.x+25,p.y-18,p.z+12},2);
-      }
-      w.assets.push_back({building.id,bed?"abandoned sleeping / treatment area":"service storage","original procedural brush kit",p});
-      if(density>.65){
-        V q{room.high.x-32,room.high.y-32,p.z};if(!protectedRoute(w,q,70)){
-          std::vector<V> polygon;for(int a=0;a<8;a++){double angle=a*6.283185307179586/8;polygon.push_back({q.x+16*std::cos(angle),q.y+16*std::sin(angle),0});}
-          addBrush(w,building.id,"utility barrel",prism(polygon,q.z,q.z+40,material(w,3)));w.assets.push_back({building.id,"utility / water storage","original eight-sided barrel",q});
-        }
+      Random rng(subSeed(regionSeed(settings,building.id,"Dressing"),"Room",room.id));
+      for(auto p:std::array<V,4>{{{room.low.x+48,room.low.y+48,room.low.z},{room.high.x-48,room.low.y+48,room.low.z},{room.low.x+48,room.high.y-48,room.low.z},{room.high.x-48,room.high.y-48,room.low.z}}}){
+        const double density=influence(settings,p,"dressing",settings.dressing);if(rng.unit()>=density||influence(settings,p,"preserve",0)>0||protectedRoute(w,p,90))continue;
+        if(p.x<room.low.x+32||p.x>room.high.x-32||p.y<room.low.y+32||p.y>room.high.y-32)continue;
+        if(std::any_of(occupied.begin(),occupied.end(),[&](V other){return al::length(p-other)<90;}))continue;
+        occupied.push_back(p);semanticProp(w,building,room,theme,p);
       }
     }
   }
@@ -683,7 +686,7 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
   };
   stage(0,[&](const auto& input){w.mission=mission(input,stagePreset(input,registry));validateMission(w.mission);});
   stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);floorplan(w,input,p);});
-  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
+  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
   stage(3,[&](const auto& input){damage(w,input,cancel,registry);});
   stage(4,[&](const auto& input){dressing(w,input,stagePreset(input,registry),cancel,registry);});
   stage(5,[&](const auto& input){navigation(w,input,cancel);});

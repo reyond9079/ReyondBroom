@@ -38,7 +38,18 @@ Both are optional when reading early development projects; their defaults are
 explicit and deterministic. Unsupported grammar names, malformed functions,
 nonfinite dimensions, duplicate IDs and colliding material prefixes fail with
 an error. Six-color themes use original procedural textures and must have
-unique first seven characters because classic WAD names are bounded.
+unique first seven characters. Generated classic material IDs are bounded to
+15 bytes and include an art dependency identity.
+
+Theme entries may also define `grammar` (`plain`, `masonry`, `brutalist`,
+`industrial`, `clinical`, `subterranean` or `civic`), `weathering` (0..1),
+`baySpacing` (96..384) and an RGB `lightColor` (three channels in 0..1).
+Omitted fields retain the original plain palette behavior for old registry
+snapshots. These grammars add real facade/utility/vault geometry and alter
+material pattern generation; they are not labels for a palette-only switch.
+New grammar IDs require native implementations and their convex/export checks.
+Room-program functions also select the semantic furnishing kit. Every prop uses
+the selected theme's original materials and records its procedural provenance.
 
 The optional `ruinEvent: "collapsed-stair"` currently provides the hospital's
 broken central flight, exterior fire stairs, reception annex and courtyard exit.

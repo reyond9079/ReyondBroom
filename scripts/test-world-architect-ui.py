@@ -4,8 +4,8 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
-assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only])<=1,'Select one focused authoring scenario'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
+assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only])<=1,'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
@@ -86,6 +86,24 @@ try:
  check(True,'the first workspace tab click is received after actual OS activation')
  click('tab/Overview')
  before=save('wa-before');baseline=planes(before)
+ if a.themes_only or a.art_update_only:
+  from PIL import ImageStat
+  records=[];shared=out/'shared-packs'
+  for theme in ([] if a.art_update_only else ['brick','concrete','industrial','medical','metro','downtown']):
+   click('tab/Dressing');click('art-theme');click('art-theme/'+theme);click('generate');wait(lambda:live()['candidates'] and not live()['busy'] and live()['world']['artTheme']==theme);assert not live()['error'],live()['error']
+   click('tab/Overview');ui.settle();time.sleep(.3);desktop=ImageGrab.grab().convert('RGB');r=live()['widgets']['preview'];ox,oy=ui.position();sx,sy=getattr(ui,'scale',(1,1));crop=desktop.crop((int(ox+r['x']*sx),int(oy+r['y']*sy),int(ox+(r['x']+r['width'])*sx),int(oy+(r['y']+r['height'])*sy)));crop.save(out/('theme-'+theme+'.png'));check(max(ImageStat.Stat(crop).var)>20,'actual '+theme+' preview contains rendered art geometry')
+   records.append({'theme':theme,'assetKey':live()['world']['assetKey'],'brushes':live()['world']['brushes'],'renderSha256':hashlib.sha256(crop.tobytes()).hexdigest()});click('tab/Export');dest=shared/('world-'+theme+'.map');click('export');choose(dest);wait(dest.exists)
+  if not a.art_update_only:check(len({r['assetKey'] for r in records})==6 and len({r['renderSha256'] for r in records})==6,'all six live art grammars have distinct resources and actual rendered output')
+  click('tab/Dressing');click('art-theme');click('art-theme/brick');click('generate');wait(lambda:live()['candidates'] and not live()['busy'] and live()['world']['artTheme']=='brick')
+  if a.art_update_only:
+   click('tab/Export');original=shared/'world-brick.map';click('export');choose(original);wait(original.exists)
+  click('tab/Overview');project=out/'original-art.world.json';click('save-project');choose(project);wait(project.exists);art_project=json.loads(project.read_text())
+  for theme in art_project['registry']['themes']:
+   if theme['id']=='brick':theme['colors'][0][0]+=1
+  changed=out/'changed-art.world.json';changed.write_text(json.dumps(art_project));old_files={str(f.relative_to(shared)):hashlib.sha256(f.read_bytes()).hexdigest() for f in shared.rglob('*') if f.is_file() and f.name!='shaderlist.txt'};click('open-project');choose(changed);wait(lambda:live()['candidates']==0);click('generate');wait(lambda:live()['candidates'] and not live()['busy']);click('tab/Export');dest=shared/'world-brick-updated.map';click('export');choose(dest);wait(dest.exists)
+  check(all((shared/name).exists() and hashlib.sha256((shared/name).read_bytes()).hexdigest()==digest for name,digest in old_files.items()),'exporting an updated art dependency preserves every previous MAP, WAD, shader and texture')
+  check(len(list(shared.glob('world-architect-brick-*.wad')))==2,'old and updated versions of the same theme coexist in one export folder')
+  check(planes(save('wa-themed-preview'))==baseline,'art changes and repeated exports preserve the authored scene');(out/'theme-results.json').write_text(json.dumps(records,indent=2));print('World Architect theme UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.legacy_only:
   assert a.legacy_fixtures,'Pass the actual core-generated AutoLevel fixtures';fixtures=a.legacy_fixtures.resolve();expected=json.loads((fixtures/'expected.json').read_text());sources={name:(fixtures/name).read_bytes() for name in ['repository.txt','builder.txt','settings.txt']};seed_before=live()['settings']['worldSeed']
   click('legacy-panel');click('legacy-open');choose(fixtures/'repository.txt');wait(lambda:live().get('legacy',{}).get('sourceFormat')=='AUTOLEVEL_REPO')
@@ -222,7 +240,7 @@ try:
  click('tab/Export');exported=out/'exported/world.map';exported.parent.mkdir(exist_ok=True);click('export');choose(exported);wait(exported.exists)
  check('"worldspawn"' in exported.read_text() and (exported.parent/'world.world.json').exists(),'export writes actual brush MAP and a versioned editable project')
  check(any(exported.parent.glob('world-architect-*.wad')) and any((exported.parent/'textures').glob('*.tga')),'portable export includes real original WAD and texture assets')
- if a.preset=='metro':check('surfaceparm water' in (exported.parent/'scripts/world-architect-metro.shader').read_text() and any(name in exported.read_text() for name in ['wa_water_metro','*wametro','!wametro']),'flooded platform exports its liquid MAP material and shader assets')
+ if a.preset=='metro':check(any('surfaceparm water' in shader.read_text() for shader in (exported.parent/'scripts').glob('world-architect-metro-*.shader')) and any(name in exported.read_text() for name in ['wa_water_metro','*wametro','!wametro']),'flooded platform exports its liquid MAP material and shader assets')
  click('apply');wait(lambda:'One map Undo' in live()['message']);check(not live()['request'],'Apply waits for an executed QC map transaction acknowledgment')
  applied=save('wa-applied');check(len(planes(applied))>len(baseline)+100,'Apply inserts editable generated brushes')
  check(all(line in planes(applied) for line in baseline),'Apply retains every original authored brush plane')

@@ -2,11 +2,13 @@
 """Validate the World Architect stages and compile their real profile-aware MAPs."""
 import argparse,hashlib,json,os,struct,subprocess,time
 from pathlib import Path
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('output',type=Path);p.add_argument('--runtime',type=Path);p.add_argument('--seeds',type=int,default=3);a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('output',type=Path);p.add_argument('--runtime',type=Path);p.add_argument('--seeds',type=int,default=3);p.add_argument('--profiles',nargs='+',type=int,choices=[2,0,1],default=[2,0,1]);p.add_argument('--presets',nargs='+');a=p.parse_args()
 assert 1<=a.seeds<=100
+registry_presets=[p['id'] for p in json.loads((Path(__file__).resolve().parents[1]/'runtime/world-architect/registry.json').read_text())['presets']]
+selected_presets=list(dict.fromkeys(a.presets or registry_presets));assert set(selected_presets)<=set(registry_presets),'Unknown preset filter'
 repo=Path(__file__).resolve().parents[1];out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);suffix='.exe' if os.name=='nt' else ''
 sources=[*sorted((repo/'native/world_architect').glob('*.h')),*sorted((repo/'plugins/autolevel').glob('al_*.h')),repo/'plugins/autolevel/al_brush.cpp',repo/'runtime/world-architect/registry.json',repo/'tests/world-architect.cpp',repo/'tests/world-architect-contracts.cpp',repo/'tests/world-assets.cpp']
-(out/'provenance.json').write_text(json.dumps({'compiler':subprocess.check_output(['g++','--version'],text=True).splitlines()[0],'sourceHashes':{str(path.relative_to(repo)):hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},'seedsPerProfilePreset':a.seeds},indent=2)+'\n')
+(out/'provenance.json').write_text(json.dumps({'compiler':subprocess.check_output(['g++','--version'],text=True).splitlines()[0],'sourceHashes':{str(path.relative_to(repo)):hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},'seedsPerProfilePreset':a.seeds,'profiles':a.profiles,'presets':selected_presets},indent=2)+'\n')
 def run(command,log,cwd=None):
  with log.open('wb') as stream:subprocess.run([str(arg) for arg in command],cwd=cwd or repo,stdout=stream,stderr=subprocess.STDOUT,check=True)
 for name in ['world-architect-contracts','world-assets','world-architect']:
@@ -14,10 +16,14 @@ for name in ['world-architect-contracts','world-assets','world-architect']:
 run([out/('world-architect-contracts'+suffix),repo/'runtime/world-architect/registry.json'],out/'contracts.log')
 run([out/('world-assets'+suffix),repo/'runtime/world-architect/registry.json'],out/'assets.log')
 proof=[]
-for profile in [2,0,1]:
+for profile in dict.fromkeys(a.profiles):
  folder=out/('profile-'+str(profile))/('baseq3' if profile<2 else 'maps-and-assets')
- run([out/('world-architect'+suffix),repo/'runtime/world-architect/registry.json',folder,'*',a.seeds,profile,'qa-world'],out/('profile-'+str(profile)+'.log'))
- results=json.loads((folder/'results.json').read_text());assert len(results)==8*a.seeds
+ results=[]
+ for selected_preset in selected_presets:
+  run([out/('world-architect'+suffix),repo/'runtime/world-architect/registry.json',folder,selected_preset,a.seeds,profile,'qa-world'],out/('profile-'+str(profile)+'-'+selected_preset+'.log'))
+  results.extend(json.loads((folder/'results.json').read_text()))
+ assert len(results)==len(selected_presets)*a.seeds
+ (folder/'results.json').write_text(json.dumps(results,indent=2)+'\n')
  record={'profile':profile,'accepted_batches':len(results),'attempts':sum(r['attempted'] for r in results),'rejections':sum(len(r['rejected']) for r in results),'compiled':[]}
  record['presets']={}
  for preset in sorted({r['preset'] for r in results}):
@@ -32,7 +38,7 @@ for profile in [2,0,1]:
 
  if a.runtime:
   runtime=a.runtime.resolve()
-  for preset in ['hospital','checkpoint','evacuation','metro','factory','courtyard','overpass','mall']:
+  for preset in selected_presets:
    compile_started=time.monotonic();source=folder/(preset+'-1.map')
    if profile==2:
     for tool in ['qbsp','light']:

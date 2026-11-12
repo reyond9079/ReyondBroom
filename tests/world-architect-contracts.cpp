@@ -145,7 +145,17 @@ int main(int argc,char** argv)try{
      check(countKind(scene,"broken overpass deck")==2&&!hull.supported(gap,input.player),"overpass has two true partial decks and an unsupported central gap");
      check(std::any_of(scene.navigation.nodes.begin(),scene.navigation.nodes.end(),[&](const auto& n){return n.feet.x>b.high.x&&n.feet.z==257;})&&std::any_of(scene.navigation.nodes.begin(),scene.navigation.nodes.end(),[&](const auto& n){return n.feet.x<second.low.x&&n.feet.z==257&&n.feet.x>b.high.x;}),"both sides of the broken span expose reachable navigation anchors");
    }
-   if(input.preset=="evacuation")check(countKind(scene,"shelter assembly canopy")==1&&countKind(scene,"evacuation beacon tower")==4&&countKind(scene,"evacuation pennant")==1,"evacuation destination has an assembly portico and a skyline beacon");
+   if(input.preset=="evacuation"){
+     check(countKind(scene,"shelter assembly canopy")==1&&countKind(scene,"evacuation beacon tower")==4&&countKind(scene,"evacuation pennant")==1,"evacuation destination has an assembly portico and a skyline beacon");
+     bool footing=true;for(size_t i=1;i<scene.navigation.mainRoute.size();i++){
+       auto a=scene.navigation.nodes[scene.navigation.mainRoute[i-1]].feet,z=scene.navigation.nodes[scene.navigation.mainRoute[i]].feet;
+       // Deliberate short stair strides can bridge the small final-tread gap
+       // with the full hull. Long lateral shortcuts must have centre footing.
+       if(std::abs(a.z-z.z)>.1||al::length(z-a)<=128)continue;
+       int samples=std::max(1,int(std::ceil(al::length(z-a)/8)));for(int n=0;n<=samples;n++)footing&=hull.routeSupported(a+(z-a)*(double(n)/samples),input.player);
+     }
+     check(footing,"long city route links follow floor centres instead of clipping a diagonal over a stair shaft");
+   }
  }
  check(countKind(world,"broken stair remnant")==7&&countKind(world,"exterior fire stair")==32,"hospital has a physically broken central flight and two real exterior flights");
  check(countKind(world,"semicircular reception floor")==1&&std::any_of(world.architecture.elements.begin(),world.architecture.elements.end(),[](const auto& e){return e.kind=="semicircular reception floor"&&e.brush.faces.size()>6;}),"hospital contains convex non-rectangular reception architecture");
@@ -174,6 +184,10 @@ int main(int argc,char** argv)try{
  auto origin=world.navigation.nodes[0].feet;WorldPlan floor;floor.architecture.elements.push_back({0,"floor",al::box({-100,-100,-16},{100,100,0},"ground")});floor.architecture.elements.push_back({0,"step",al::box({10,-40,0},{50,40,16},"step")});Collision steps(floor);Player player;
  auto foot=V{-20,0,1};for(int i=0;i<70;i++){auto next=steps.move(foot,foot+V{1,0,0},player);check(bool(next),"preview movement follows grounded step-up / step-down physics");foot=*next;}
  check(foot.z>=16&&foot.z<=18,"preview walk raises the camera feet onto the real stair tread");
+ WorldPlan landing;landing.architecture.elements.push_back({0,"landing",al::box({-100,-100,-16},{100,0,0},"floor")});Collision landingHull(landing);
+ check(landingHull.supported({0,12,1},player),"a player's hull can touch a landing while its centre is over the shaft");
+ check(!landingHull.routeSupported({0,12,1},player),"route support rejects a corner-only contact over a stair opening");
+ check(landingHull.routeSupported({0,-24,1},player),"the supported landing centre remains available to navigation");
  WorldPlan triangle;triangle.architecture.elements.push_back({0,"angled test hull",prism({{0,0,0},{100,0,0},{0,100,0}},0,64,"stone")});Collision corners(triangle);
  check(!corners.blocked({120,-15,1},{140,-15,1},player),"exact convex/box sweep does not invent collision outside an angled corner");
  check(corners.blocked({120,-15,1},{80,-10,1},player),"exact convex/box sweep catches a true angled corner intersection");

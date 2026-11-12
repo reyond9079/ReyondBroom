@@ -464,6 +464,7 @@ inline double influence(const Settings& settings,V p,const std::string& kind,dou
 }
 #include "theme_kits.h"
 #include "scenario_kits.h"
+#include "module_kits.h"
 inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* cancel,const Registry& registry){
   for(const auto& building:w.spatial.buildings){
     const auto s=regionInput(input,building.id,3,registry);
@@ -498,9 +499,11 @@ inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* c
 inline void dressing(WorldPlan& w,const Settings& input,const Preset&,const std::atomic<bool>* cancel,const Registry& registry){
   const auto& theme=registry.theme(w.theme);
   for(const auto& [id,seed]:input.roomSeeds){bool found=false;for(const auto& b:w.spatial.buildings)for(const auto& room:b.rooms)if(room.id==id)found=true;if(!found)throw std::runtime_error("Room seed refers to a room outside the current floor plan");}
+  for(const auto& [id,module]:input.roomModules){bool found=false;for(const auto& b:w.spatial.buildings)for(const auto& room:b.rooms)if(room.id==id)found=true;if(!found)throw std::runtime_error("Authored module refers to a room outside the current floor plan");}
   for(const auto& building:w.spatial.buildings){
     cancelled(cancel);const auto settings=regionInput(input,building.id,4,registry);std::vector<V> occupied;
     for(const auto& room:building.rooms){
+      if(authoredRoom(w,settings,building,room))continue;
       auto override=settings.roomSeeds.find(room.id);Random rng(subSeed(override==settings.roomSeeds.end()?regionSeed(settings,building.id,"Dressing"):override->second,"Room",room.id));
       for(auto p:std::array<V,4>{{{room.low.x+48,room.low.y+48,room.low.z},{room.high.x-48,room.low.y+48,room.low.z},{room.low.x+48,room.high.y-48,room.low.z},{room.high.x-48,room.high.y-48,room.low.z}}}){
         const double density=influence(settings,p,"dressing",settings.dressing);if(rng.unit()>=density||influence(settings,p,"preserve",0)>0||protectedRoute(w,p,90))continue;

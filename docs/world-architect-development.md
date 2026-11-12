@@ -197,8 +197,7 @@ families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
 More complete spline/volume constraint semantics, physical gate realization,
-direct procedural use of
-imported module packs, extension-pack validation, collision/gameplay metrics beyond the
+broader authored-module shell/socket semantics, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.
 Malformed or incompatible pin recipes fail explicitly instead of silently ignoring
 designer intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu
@@ -248,3 +247,25 @@ this also avoids validating incomplete digit sequences as full site coordinates.
 Eight focused actual SDL2 input checks passed for room furnishing, exact project
 reopen, numeric Bezier controls, volume height and single-transaction Undo, with
 the active authored map unchanged.
+
+## Authored brush packs
+
+Versioned source-embedded packs now assign authored convex brush compositions to
+functional rooms. Profile/program, room dimensions, material aliases and reserved
+player hull routes are checked; shapes are translated without clipping/scaling.
+Raw MAP source, declared license/attribution and aliases are exported under
+content-versioned filenames. Saved projects and building pin recipes retain the
+actual module source. Compatible extracted legacy modules can be explicitly
+added to the same library after verified migration backup; WFC semantics remain
+in the legacy report/source instead of being silently reinterpreted.
+
+This slice passed 13 authored-module contracts, the existing 367 generator
+contracts, three real module BSP/light profile builds and seven actual SDL2
+pack-import/assignment/export/Undo/reopen checks. Imported modules currently
+support light and semantic points, explicit portable theme aliases and furnishing
+compositions inside generated rooms. Arbitrary runtime entity behavior, whole
+shell replacement and WFC/socket assembly are not certified by this slice.
+See [module format and workflow](world-architect-modules.md).
+
+Ten actual SDL2 legacy migration checks also pass, including explicit import of
+the byte-exact extracted brushes into the module library after backup verification.

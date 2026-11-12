@@ -65,7 +65,13 @@ inline std::map<std::string,std::string> assetBundle(const WorldPlan& w,const Re
   bundle["textures/sky.tga"]=tga(sky);bundle[wadFilename(w,palette)]=std::move(wad);
   std::string shaders;for(const auto& [name,body]:shaderDefinitions(w))shaders+=name+"\n"+body;
   bundle["scripts/"+shaderStem(w)+".shader"]=std::move(shaders);
-  bundle["WORLD-ARCHITECT-ASSETS.txt"]="Original ReyondBroom World Architect procedural masonry, concrete, floor, metal, wood and sky. GPL-3.0-or-later. No external asset packs required.\n";return bundle;
+  bundle["WORLD-ARCHITECT-ASSETS.txt"]="Original ReyondBroom World Architect procedural masonry, concrete, floor, metal, wood and sky. GPL-3.0-or-later. No external asset packs required.\n";
+  if(!w.authoredSources.empty()){
+    Json manifest={{"schemaVersion",1},{"modules",Json::array()}};
+    for(const auto& [key,module]:w.authoredSources){auto name="modules/"+key+".map";bundle[name]=module.map;manifest["modules"].push_back({{"file",name},{"id",module.id},{"source",module.source},{"license",module.license},{"materialSlots",module.materials}});}
+    auto identity=std::to_string(hash(manifest.dump()));bundle["modules/manifest-"+identity+".json"]=manifest.dump(2)+"\n";
+  }
+  return bundle;
 }
 inline std::string withWad(std::string map,const WorldPlan& w,const std::string& path){
   if(path.find_first_of("\"\r\n")!=path.npos)throw std::runtime_error("Unsafe WAD path");

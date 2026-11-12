@@ -11,6 +11,9 @@ static std::optional<wa::V> worldVectorInput(const char* label,wa::V value,int d
   // widgets. Retain the edit draft and commit the group when editing ends.
   bool commit=ImGui::IsItemDeactivatedAfterEdit();draft.second=ImGui::IsItemActive();if(commit)return wa::V{draft.first[0],draft.first[1],dimensions==2?value.z:draft.first[2]};return {};
 }
+static void worldImportModules(const std::vector<wa::AuthoredModule>& modules){
+  worldEdit([&](auto& next){for(const auto& module:modules){auto found=std::find_if(next.modules.begin(),next.modules.end(),[&](const auto& m){return m.id==module.id;});if(found==next.modules.end())next.modules.push_back(module);else if(wa::moduleJson(*found)!=wa::moduleJson(module))throw std::runtime_error("An imported module with this ID already has different source bytes; use a distinct ID");}});
+}
 static void worldCandidateComparison(){
   auto& s=worldArchitect;if(s.batch.worlds.empty())return;
   ImGui::SeparatorText("Compare validated candidates");
@@ -45,6 +48,15 @@ static void worldLegacyPanel(){
   ImGui::Text("Module records: %zu",report.at("convertedModules").size());
   if(worldButton("Save migration report and backup...","legacy-save"))runUiChoose((documentPath("world-architect")/("legacy-"+s.legacy->report.at("contentIdentity").get<std::string>())/"report.json").u8string(),[](const std::string& name){worldAction([&]{auto& state=worldArchitect;if(!state.legacy)throw std::runtime_error("No inspected legacy source");auto path=std::filesystem::u8path(name);path.replace_extension(".json");auto bundle=state.legacy->files;if(path.filename()!=std::filesystem::path("report.json")){auto text=bundle.at("report.json");bundle.erase("report.json");bundle[path.filename().u8string()]=std::move(text);}worldPublish(path.parent_path(),bundle);for(const auto& [relative,bytes]:bundle)if(q1Read(path.parent_path()/std::filesystem::u8path(relative))!=bytes)throw std::runtime_error("Migration bundle verification failed");state.legacySaved=true;state.message="Legacy backup and module MAPs saved and verified. Original files and map geometry were retained.";});},true);
   ImGui::BeginDisabled(!s.legacySaved||!s.legacy->seed||s.job.valid());if(worldButton("Copy suggested builder seed","legacy-seed"))worldEdit([&](auto& next){next.seed=*s.legacy->seed;});ImGui::EndDisabled();
+  const auto entries=report.at("convertedModules");if(s.legacySaved&&!entries.empty()){
+    s.legacyModule=std::clamp(s.legacyModule,0,int(entries.size()-1));auto entry=entries[size_t(s.legacyModule)];auto label=entry.value("name",std::string("Unnamed module"));
+    if(ImGui::BeginCombo("Extracted module",label.c_str())){for(size_t i=0;i<entries.size();i++)if(ImGui::Selectable(entries[i].value("name",std::to_string(i)).c_str(),s.legacyModule==int(i)))s.legacyModule=int(i);ImGui::EndCombo();}worldRect("legacy-module");
+    ImGui::SliderInt("Map original materials to theme slot",&s.legacyMaterial,0,5);worldRect("legacy-material");
+    ImGui::BeginDisabled(s.job.valid()||s.settings.locked[4]||!entry.contains("file")||!entry.contains("materialDependencies"));
+    if(worldButton("Import selected legacy brushes as a module","legacy-use-module"))worldAction([&]{wa::AuthoredModule module;module.id="legacy-"+report.at("contentIdentity").get<std::string>()+"-"+std::to_string(s.legacyModule);module.function="any";module.profile=s.settings.profile;module.source=report.at("sourceName");module.license="License unspecified in the original AutoLevel repository; source bytes retained";module.map=s.legacy->files.at(entry.at("file").get<std::string>());for(const auto& material:entry.at("materialDependencies"))module.materials[material.get<std::string>()]=s.legacyMaterial;worldImportModules(wa::readModulePack({{"schemaVersion",1},{"modules",wa::Json::array({wa::moduleJson(module)})}}));});
+    ImGui::EndDisabled();ImGui::TextWrapped("This explicitly aliases the selected module's materials to the chosen portable theme slot. The original MAP and its material names remain in the saved source. Assign the imported module to a compatible room in Dressing.");
+  }
+
 }
 static void worldRoomDressingPanel(){
   auto& s=worldArchitect;auto* world=worldSelected();if(!world)return;
@@ -57,6 +69,22 @@ static void worldRoomDressingPanel(){
   ImGui::BeginDisabled(s.job.valid()||s.generated!=worldInputKey()||s.settings.regionRecipes.count(s.detailRoom/10000));
   if(worldButton("Preview this room's furnishing","regenerate-room"))worldAction([&]{auto before=wa::serialize(s.settings);s.settings=wa::regenerateRoomDressing(s.settings,*world,s.registry,s.detailRoom,s.detailSeed);s.detailRegion=s.detailRoom/10000;worldChanged(before);worldGenerate();});ImGui::EndDisabled();
   ImGui::TextWrapped("Keeps mission, architecture, damage and every other room unchanged. Review the preview, then Update selected building in Export. Settings Undo restores the previous room seed.");
+}
+static void worldModulePanel(){
+  auto& s=worldArchitect;bool show=ImGui::CollapsingHeader("Authored brush modules");worldRect("module-panel");if(!show)return;
+  ImGui::TextWrapped("Import a v1 module pack with source/license metadata and explicit theme material aliases. Assignment preserves brush shapes and UVs, checks room fit and reserved player routes, and embeds the original MAP in the project/export.");
+  ImGui::BeginDisabled(s.job.valid()||s.settings.locked[4]);
+  if(worldButton("Import authored module pack...","module-open"))runUiChoose(documentPath("world-architect").u8string(),[](const std::string& name){worldAction([&]{auto path=std::filesystem::u8path(name);if(std::filesystem::file_size(path)>1024*1024)throw std::runtime_error("Module pack exceeds 1 MiB");worldImportModules(wa::readModulePack(wa::Json::parse(q1Read(path))));});});
+  ImGui::BeginDisabled(!s.detailRoom||s.settings.regionRecipes.count(s.detailRoom/10000));
+  auto found=s.settings.roomModules.find(s.detailRoom);auto selected=found==s.settings.roomModules.end()?std::string("Procedural furnishings"):found->second;
+  if(ImGui::BeginCombo("Room module",selected.c_str())){
+    if(ImGui::Selectable("Procedural furnishings",found==s.settings.roomModules.end()))worldEdit([&](auto& next){next.roomModules.erase(s.detailRoom);});worldRect("module/none");
+    const auto modules=s.settings.modules;for(const auto& module:modules){ImGui::BeginDisabled(module.profile!=s.settings.profile);if(ImGui::Selectable(module.id.c_str(),selected==module.id))worldEdit([&](auto& next){next.roomModules[s.detailRoom]=module.id;});worldRect("module/"+module.id);ImGui::EndDisabled();}
+    ImGui::EndCombo();
+  }worldRect("module-choice");
+  ImGui::EndDisabled();ImGui::EndDisabled();
+  if(s.settings.locked[4])ImGui::TextUnformatted("Unlock Dressing before importing or assigning modules.");
+  ImGui::Text("%zu imported modules / %zu room assignments",s.settings.modules.size(),s.settings.roomModules.size());
 }
 static void worldArchitecturePanel(){
   auto& s=worldArchitect;const auto p=wa::stagePreset(s.settings,s.registry);auto before=wa::serialize(s.settings);

@@ -4,8 +4,8 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--scenarios-only',action='store_true');p.add_argument('--local-only',action='store_true');p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
-assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only,a.scenarios_only,a.local_only])<=1,'Select one focused authoring scenario'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--scenarios-only',action='store_true');p.add_argument('--local-only',action='store_true');p.add_argument('--modules-only',action='store_true');p.add_argument('--module-fixtures',type=Path);p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
+assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only,a.scenarios_only,a.local_only,a.modules_only])<=1,'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
@@ -86,6 +86,18 @@ try:
  check(True,'the first workspace tab click is received after actual OS activation')
  click('tab/Overview')
  before=save('wa-before');baseline=planes(before)
+ if a.modules_only:
+  assert a.module_fixtures,'Pass the actual authored module fixtures';fixtures=a.module_fixtures.resolve()
+  def module_generate():
+   click('generate');wait(lambda:live()['candidates'] and not live()['busy']);assert not live()['error'],live()['error'];fixture=live()['candidateSeeds'].index(1);click('candidate/'+str(fixture));wait(lambda:live()['world']['seed']==1)
+  def module_export(name):
+   click('tab/Export');dest=out/name/'world.map';click('export');choose(dest);wait(dest.exists);return dest
+  module_generate();original=module_export('original');click('tab/Dressing');click('module-panel');click('module-open');choose(fixtures/('module-pack-'+str(live()['settings']['profileId'])+'.json'));wait(lambda:len(live()['settings']['authoredModules'])==1);check(True,'actual file-dialog import embeds the authored module pack source')
+  click('module-choice');click('module/qa-arch');wait(lambda:len(live()['settings']['roomModules'])==1);module_generate();changed=module_export('authored');check(planes(changed)!=planes(original),'assigned authored geometry changes the actual exported room')
+  sources=list((changed.parent/'modules').glob('qa-arch-*.map'));check(len(sources)==1 and sources[0].read_bytes()==(fixtures/'original-module.map').read_bytes(),'export preserves byte-exact authored MAP source with versioned provenance')
+  click('undo-settings');wait(lambda:not live()['settings']['roomModules']);module_generate();undone=module_export('undone');check(planes(undone)==planes(original),'one settings Undo removes the room assignment and restores procedural geometry')
+  click('redo-settings');wait(lambda:len(live()['settings']['roomModules'])==1);module_generate();click('tab/Overview');project=out/'authored.world.json';click('save-project');choose(project);wait(project.exists);click('open-project');choose(project);wait(lambda:live()['candidates']==0);module_generate();replayed=module_export('replayed');check(planes(replayed)==planes(changed),'embedded module pack and room assignment replay exactly after project reopen')
+  check(planes(save('wa-authored-preview'))==baseline,'module import, assignment, history and export preserve the active authored scene');click('tab/Overview');ImageGrab.grab().save(out/'world-authored-module.png');print('World Architect authored module UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.local_only:
   def local_generate():
    click('generate');wait(lambda:live()['candidates'] and not live()['busy']);assert not live()['error'],live()['error']
@@ -135,6 +147,7 @@ try:
   check((report.parent/'backup/original.txt').read_bytes()==sources['repository.txt'],'native migration saves a byte-exact original backup, including CRLF')
   check((report.parent/'modules/block-1.map').read_bytes()==expected['moduleMap'].encode(),'native migration extracts the original authored brush module and point entity unchanged')
   parsed=json.loads(report.read_text());check(parsed['convertedModules'][0]['materialDependencies']==['legacy/original'] and parsed['unsupported'],'migration report retains asset dependencies and lists unsupported solver features')
+  click('legacy-use-module');wait(lambda:len(live()['settings']['authoredModules'])==1);check(live()['settings']['authoredModules'][0]['map']==expected['moduleMap'],'verified legacy brush geometry can be explicitly imported into the procedural module library')
   click('legacy-open');choose(fixtures/'builder.txt');wait(lambda:live()['legacy']['sourceFormat']=='AUTOLEVEL_BUILDER');check(not live()['legacySaved'] and live()['settings']['worldSeed']==seed_before,'inspecting a builder does not silently copy its seed before backup publication')
   builder_report=out/'builder-bundle/report.json';click('legacy-save');choose(builder_report);wait(lambda:live()['legacySaved'] and builder_report.exists());click('legacy-seed');wait(lambda:live()['settings']['worldSeed']==23);check(True,'explicit seed conversion becomes available after verified backup publication')
   click('undo-settings');wait(lambda:live()['settings']['worldSeed']==seed_before);check(True,'copying a migrated seed participates in settings Undo')

@@ -27,7 +27,7 @@ struct WorldArchitectState {
   std::shared_ptr<wa::PrefixCache> prefixCache=std::make_shared<wa::PrefixCache>();
   wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request;
   std::string project,requestMode,requestRegion;uint64_t detailRegion=0,detailSeed=1;
-  uint64_t missionNode=0,dragMission=0,roadSelection=0,detailRoom=0;int missionEdge=0,planFloor=0,maskSelection=-1;
+  uint64_t missionNode=0,dragMission=0,roadSelection=0,detailRoom=0;int missionEdge=0,planFloor=0,maskSelection=-1,legacyModule=0,legacyMaterial=1;
   bool painting=false;wa::V paintStart{};float paintStrength=1;int paintType=0;
   std::optional<wa::LegacyMigration> legacy;bool legacySaved=false;
   double requestAt=0;std::filesystem::path requestPath;
@@ -278,7 +278,7 @@ static void worldPanel(){
         if(tab==2)worldAction(worldRoadPanel);
         if(tab==4)worldAction(worldArchitecturePanel);
         if(tab==5)worldAction([]{worldInfluencePanel(false);});
-        if(tab==6)worldAction([]{auto& s=worldArchitect;auto before=wa::serialize(s.settings);auto p=wa::stagePreset(s.settings,s.registry);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());bool themesOpen=ImGui::BeginCombo("Art theme",p.theme.c_str());worldRect("art-theme");if(themesOpen){for(const auto& theme:s.registry.themes){if(ImGui::Selectable(theme.id.c_str(),p.theme==theme.id))s.settings.theme=theme.id;worldRect("art-theme/"+theme.id);}ImGui::EndCombo();}ImGui::EndDisabled();worldChanged(before);worldRoomDressingPanel();worldInfluencePanel(true);});
+        if(tab==6)worldAction([]{auto& s=worldArchitect;auto before=wa::serialize(s.settings);auto p=wa::stagePreset(s.settings,s.registry);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());bool themesOpen=ImGui::BeginCombo("Art theme",p.theme.c_str());worldRect("art-theme");if(themesOpen){for(const auto& theme:s.registry.themes){if(ImGui::Selectable(theme.id.c_str(),p.theme==theme.id))s.settings.theme=theme.id;worldRect("art-theme/"+theme.id);}ImGui::EndCombo();}ImGui::EndDisabled();worldChanged(before);worldRoomDressingPanel();worldModulePanel();worldInfluencePanel(true);});
         if(tab==7){
           worldCandidateComparison();
           if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& stage:world->diagnostics.cachedStages)ImGui::Text("Reused frozen stage: %s",stage.c_str());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms%s",name.c_str(),ms,std::find(world->diagnostics.cachedStages.begin(),world->diagnostics.cachedStages.end(),name)!=world->diagnostics.cachedStages.end()?" (original build time)":"");for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}

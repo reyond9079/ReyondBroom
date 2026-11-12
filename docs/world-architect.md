@@ -188,3 +188,6 @@ placements; changing the seed does not bypass clearance/preserve requirements.
 Saved influence fields expose exact minimum/maximum XYZ coordinates. Commit a
 numeric edit by Enter or by leaving the field. Invalid/inverted volumes are
 rejected without changing the saved settings; a successful edit is one Undo.
+
+Authored brush packs and explicitly migrated legacy modules can be
+assigned to functional rooms; see [module format and workflow](world-architect-modules.md).

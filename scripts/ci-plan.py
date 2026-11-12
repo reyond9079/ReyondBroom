@@ -10,12 +10,12 @@ import subprocess
 # Edges are consumers/integration checks, not just matching file names. Shared
 # resource/input/render changes exercise authoring integration, not all botany.
 DEPENDENCIES = {
-    'world_architect': {'world_core', 'world_ui'},
+    'world_architect': {'world_core', 'world_ui', 'world_legacy'},
     'world_core': {'world_ui'},
-    'world_ui': {'placement'},
+    'world_ui': {'placement', 'world_legacy'},
     'profiles': {'profile_core', 'compilation'},
     'resources': {'compilation', 'resource_lookup', 'audio_archive', 'placement'},
-    'input': {'compilation_ui', 'viewport', 'browser', 'onboarding', 'placement', 'audio_ui'},
+    'input': {'compilation_ui', 'viewport', 'browser', 'onboarding', 'placement', 'audio_ui', 'world_ui'},
     'render': {'grid', 'viewport', 'placement'},
     'plants': {'plant_core', 'plant_ui', 'placement'},
     'plant_ui': {'placement'},
@@ -27,7 +27,7 @@ DEPENDENCIES = {
     'updater': set(), 'onboarding': set(), 'ui': {'viewport', 'compilation_ui'},
     'build': {'smoke'}, 'ci': {'ci_unit'},
 }
-SUITES = {'world_core', 'world_ui', 'profile_core', 'compilation', 'compilation_ui', 'resource_lookup',
+SUITES = {'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation', 'compilation_ui', 'resource_lookup',
           'audio_core', 'audio_ui', 'audio_archive', 'plant_core', 'plant_ui',
           'model_ui', 'placement', 'viewport', 'grid', 'browser', 'onboarding',
           'updater', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
@@ -36,6 +36,10 @@ RULES = [
       'tests/world-architect*', 'tests/world-designer.cpp', 'scripts/test-world-architect.py', 'scripts/test-world-designer.py'], {'world_core'}),
     (['native/ftebroom_world_architect.h', 'native/ftebroom_world_authoring.h'], {'world_ui', 'input'}),
     (['qc/fb_world_architect.qc', 'qc/fb_world_baseline.qc', 'scripts/test-world-architect-ui.py', 'scripts/test-world-applied.py'], {'world_ui'}),
+    (['tests/world-legacy.cpp', 'scripts/test-world-legacy.py'], {'world_legacy'}),
+    (['plugins/autolevel/al_storage.*', 'tests/test-autolevel-storage.cpp'], {'world_legacy'}),
+    (['plugins/autolevel/al_brush.*', 'plugins/autolevel/al_model.h',
+      'plugins/autolevel/al_fill.h', 'plugins/autolevel/al_math.h'], {'world_core'}),
     (['AGENTS.md', 'docs/**', '*.md'], {'docs'}),
     (['.github/**', 'scripts/ci-*', 'tests/ci-*'], {'ci'}),
     (['scripts/setup-ci-renderer.ps1'], {'ci'}),
@@ -99,6 +103,9 @@ def plan(paths, full=False, release=False, semantic=None):
             matched = set(semantic[path])
         elif path == 'tests/plant-export-manager.cpp':
             matched = {'plant_ui'}
+        elif path == 'native/world_architect/legacy.h':
+            # This read-only codec is consumed by migration, not generation.
+            matched = {'world_legacy'}
         else:
             for patterns, groups in RULES:
                 if any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns):

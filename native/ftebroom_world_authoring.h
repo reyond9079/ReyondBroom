@@ -4,6 +4,17 @@
 template<class F>static void worldEdit(F edit){
   auto& s=worldArchitect;worldAction([&]{auto next=s.settings;edit(next);wa::validate(next,s.registry);auto previous=wa::serialize(s.settings);s.settings=std::move(next);worldChanged(previous);});
 }
+static void worldLegacyPanel(){
+  auto& s=worldArchitect;bool show=ImGui::CollapsingHeader("Legacy AutoLevel migration");worldRect("legacy-panel");if(!show)return;
+  ImGui::TextWrapped("Choose an AutoLevel repository, builder or settings file. Inspect the report, then save its backup and extracted module MAPs. Originals and the active map are retained. Solver settings without an equivalent are reported explicitly.");
+  if(worldButton("Inspect legacy file...","legacy-open"))runUiChoose(documentPath("data/plugin-autolevel-settings.txt").u8string(),[](const std::string& name){worldAction([&]{auto path=std::filesystem::u8path(name);if(std::filesystem::file_size(path)>8*1024*1024)throw std::runtime_error("Legacy source exceeds 8 MiB");auto result=wa::migrateLegacy(q1Read(path),path.filename().u8string());worldArchitect.legacy=std::move(result);worldArchitect.legacySaved=false;worldArchitect.error.clear();});});
+  if(!s.legacy)return;const auto& report=s.legacy->report;ImGui::Text("Result: %s / %zu source bytes",report.at("status").get<std::string>().c_str(),size_t(report.at("sourceBytes").get<uint64_t>()));
+  if(report.contains("diagnostic"))ImGui::TextWrapped("%s",report.at("diagnostic").get<std::string>().c_str());
+  for(const auto& warning:report.at("unsupported"))ImGui::BulletText("%s",warning.get<std::string>().c_str());
+  ImGui::Text("Module records: %zu",report.at("convertedModules").size());
+  if(worldButton("Save migration report and backup...","legacy-save"))runUiChoose((documentPath("world-architect")/("legacy-"+s.legacy->report.at("contentIdentity").get<std::string>())/"report.json").u8string(),[](const std::string& name){worldAction([&]{auto& state=worldArchitect;if(!state.legacy)throw std::runtime_error("No inspected legacy source");auto path=std::filesystem::u8path(name);path.replace_extension(".json");auto bundle=state.legacy->files;if(path.filename()!=std::filesystem::path("report.json")){auto text=bundle.at("report.json");bundle.erase("report.json");bundle[path.filename().u8string()]=std::move(text);}worldPublish(path.parent_path(),bundle);for(const auto& [relative,bytes]:bundle)if(q1Read(path.parent_path()/std::filesystem::u8path(relative))!=bytes)throw std::runtime_error("Migration bundle verification failed");state.legacySaved=true;state.message="Legacy backup and module MAPs saved and verified. Original files and map geometry were retained.";});},true);
+  ImGui::BeginDisabled(!s.legacySaved||!s.legacy->seed||s.job.valid());if(worldButton("Copy suggested builder seed","legacy-seed"))worldEdit([&](auto& next){next.seed=*s.legacy->seed;});ImGui::EndDisabled();
+}
 static void worldArchitecturePanel(){
   auto& s=worldArchitect;const auto p=wa::stagePreset(s.settings,s.registry);auto before=wa::serialize(s.settings);
   ImGui::TextWrapped("These values change the functional floor plan and the generated brushes. Zero-valued dimensions inherit the preset. Unlock Site before editing the architectural program.");

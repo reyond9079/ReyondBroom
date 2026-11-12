@@ -39,8 +39,11 @@ def main():
             subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
         completed.append({'suite': suite, 'script': script})
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
-    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding', 'world_ui'}:
+    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding', 'world_ui', 'world_legacy'}:
         run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
+    if 'world_legacy' in suites:
+        run('world_legacy', 'scripts/test-world-legacy.py', out/'world/legacy-core', gui=False)
+        run('world_legacy', 'scripts/test-world-architect-ui.py', root, out/'world/legacy-ui', '--legacy-only', '--legacy-fixtures', out/'world/legacy-core')
     if 'world_core' in suites:
         run('world_core', 'scripts/test-world-architect.py', out/'world/core', '--runtime', root,
             '--seeds', '100' if selected['mode'] == 'full' else '3', gui=False)

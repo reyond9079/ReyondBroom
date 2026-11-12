@@ -108,6 +108,34 @@ envelope. Fields persist in the editable project. Dressing also selects the
 original art palette; a new palette requires unlocking Architecture and
 unpinning buildings. Rich theme-specific grammar remains in development.
 
+## Explicit AutoLevel migration
+
+Open **Overview → Legacy AutoLevel migration → Inspect legacy file**. Choose an
+`AUTOLEVEL_REPO`, `AUTOLEVEL_BUILDER` or `AUTOLEVEL_SETTINGS` version 1 file from
+the legacy plugin's data folder. Inspection retains the source and active map.
+
+**Save migration report and backup** publishes a bundle containing the exact
+original bytes in `backup/original.txt`, the parsed legacy form in `parsed/`,
+and repository blocks as individual `modules/block-N.map` files. Stored MAP text
+and point entities are retained without reserialization. The report inventories
+original material dependencies and unsupported solver settings. Keep the
+original assets with extracted blocks and inspect/import them through the
+editor's existing MAP workflow. This does not yet attach them to procedural
+dressing rules.
+
+After saving and verifying a builder backup, **Copy suggested builder seed**
+copies its seed explicitly and participates in settings Undo/Redo. Different
+algorithms do not reproduce the old WFC cell layout. Boundaries, solved layers,
+side IDs, big-block assembly, weights and legacy editor settings remain in the
+backup/canonical files. Referenced repositories/builders are inspected separately;
+the importer does not follow external paths automatically.
+
+Differing existing bundle files cause a preflight error instead of being
+overwritten. Unknown versions and malformed files produce a failure report and
+can still be backed up. Source files are limited to 8 MiB. Small module geometry
+is validated within a bounded budget; larger or unsupported geometry remains
+preserved with an explicit inspection diagnostic.
+
 ## Files, profiles and troubleshooting
 
 - Export writes the MAP, `.world.json`, original TGA/WAD assets, shader definitions
@@ -122,9 +150,9 @@ unpinning buildings. Rich theme-specific grammar remains in development.
 - Apply waits for an executed import acknowledgment. Stale map/profile requests
   and malformed staging files leave the map unchanged.
 - Quake II and GoldSrc compiler/play acceptance is not certified for this preview.
-- Opening the preview does not overwrite or migrate AutoLevel settings, modules
-  or maps. Keep using the existing AutoLevel route for legacy authoring until the
-  explicit migration tools are completed.
+- Opening the preview does not overwrite or silently migrate AutoLevel settings,
+  modules or maps. Use the explicit migration bundle for backup/extraction; keep
+  the existing AutoLevel route for its WFC authoring and solver semantics.
 
 For extension authors, see the [registry interface](world-architect-registry.md).
 Original procedural assets are distributed under GPL-3.0-or-later. The reused

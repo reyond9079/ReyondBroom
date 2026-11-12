@@ -108,6 +108,17 @@ semantic room props. These controls do not claim the complete spline/volume
 toolkit, engine gate entities, room-level replacement or six finished theme
 grammars. Original palette selection remains a material choice.
 
+Explicit legacy migration now reads version 1 AutoLevel repositories, builders
+and editor settings using the existing storage codec. It produces a byte-exact
+source backup, canonical legacy data, unchanged authored module MAPs, material
+dependency inventory and an explicit unsupported-feature report. It never
+silently replaces WFC layout/connection semantics with unrelated controls.
+Builder seed transfer requires a saved/verified bundle and uses settings Undo.
+The active map and original files are retained; geometry inspection is bounded.
+Fifteen migration contracts, the original AutoLevel storage test and nine actual
+SDL2 migration scenarios pass. Migration has its own dependency-selected CI
+suite; a codec-only change does not run the generator corpus or botanical tests.
+
 Physical checks sweep the configured player hull against expanded convex brush
 planes, verify support along links, handle stair risers, and require all generated
 navigation anchors to be reachable. Logical mission validation searches actual
@@ -162,8 +173,8 @@ families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
 Complete spline/volume editing, richer painted masks, physical gate realization,
-room-level regeneration, candidate comparison panes, legacy module
-migration, extension-pack validation, collision/gameplay metrics beyond the
+room-level regeneration, candidate comparison panes, direct procedural use of
+imported module packs, extension-pack validation, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.
 Malformed or incompatible pin recipes fail explicitly instead of silently ignoring
 designer intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu

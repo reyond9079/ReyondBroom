@@ -4,8 +4,8 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--engine',type=Path);a=p.parse_args()
-assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only])<=1,'Select one focused authoring scenario'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
+assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only])<=1,'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
@@ -86,6 +86,19 @@ try:
  check(True,'the first workspace tab click is received after actual OS activation')
  click('tab/Overview')
  before=save('wa-before');baseline=planes(before)
+ if a.legacy_only:
+  assert a.legacy_fixtures,'Pass the actual core-generated AutoLevel fixtures';fixtures=a.legacy_fixtures.resolve();expected=json.loads((fixtures/'expected.json').read_text());sources={name:(fixtures/name).read_bytes() for name in ['repository.txt','builder.txt','settings.txt']};seed_before=live()['settings']['worldSeed']
+  click('legacy-panel');click('legacy-open');choose(fixtures/'repository.txt');wait(lambda:live().get('legacy',{}).get('sourceFormat')=='AUTOLEVEL_REPO')
+  check(live()['legacy']['status']=='partial' and live()['settings']['worldSeed']==seed_before,'legacy repository inspection reports partial conversion and leaves generation settings unchanged')
+  report=out/'repository-bundle/report.json';click('legacy-save');choose(report);wait(lambda:live()['legacySaved'] and report.exists())
+  check((report.parent/'backup/original.txt').read_bytes()==sources['repository.txt'],'native migration saves a byte-exact original backup, including CRLF')
+  check((report.parent/'modules/block-1.map').read_bytes()==expected['moduleMap'].encode(),'native migration extracts the original authored brush module and point entity unchanged')
+  parsed=json.loads(report.read_text());check(parsed['convertedModules'][0]['materialDependencies']==['legacy/original'] and parsed['unsupported'],'migration report retains asset dependencies and lists unsupported solver features')
+  click('legacy-open');choose(fixtures/'builder.txt');wait(lambda:live()['legacy']['sourceFormat']=='AUTOLEVEL_BUILDER');check(not live()['legacySaved'] and live()['settings']['worldSeed']==seed_before,'inspecting a builder does not silently copy its seed before backup publication')
+  builder_report=out/'builder-bundle/report.json';click('legacy-save');choose(builder_report);wait(lambda:live()['legacySaved'] and builder_report.exists());click('legacy-seed');wait(lambda:live()['settings']['worldSeed']==23);check(True,'explicit seed conversion becomes available after verified backup publication')
+  click('undo-settings');wait(lambda:live()['settings']['worldSeed']==seed_before);check(True,'copying a migrated seed participates in settings Undo')
+  check(all((fixtures/name).read_bytes()==data for name,data in sources.items()) and planes(save('wa-legacy-preview'))==baseline,'legacy inspection, bundle publication and seed Undo preserve original files and authored map geometry')
+  ImageGrab.grab().save(out/'world-legacy-migration.png');(out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect legacy UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.paint_only:
   click('generate');wait(lambda:live()['candidates'] and not live()['busy']);verify_paint(0);check(planes(save('wa-paint-preview'))==baseline,'painting and settings Undo leave the authored map intact');ImageGrab.grab().save(out/'world-painted-fields.png');print('World Architect paint UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.designer_only:

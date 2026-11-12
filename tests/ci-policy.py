@@ -29,7 +29,24 @@ planner, cache, runner, smoke = [module(n) for n in ('plan', 'dependency', 'run-
 class ScopeTests(unittest.TestCase):
     def test_world_core_routes_its_editor_consumers_without_botany(self):
         p = planner.plan(['native/world_architect/generator.h'])
-        self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'placement'})
+        self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})
+
+    def test_legacy_codec_has_focused_migration_checks(self):
+        p = planner.plan(['native/world_architect/legacy.h'])
+        self.assertEqual(set(p['suites']), {'world_legacy'})
+        self.assertTrue(p['runtime'])
+
+    def test_legacy_shared_storage_and_brush_consumers(self):
+        self.assertEqual(set(planner.plan(['plugins/autolevel/al_storage.cpp'])['suites']), {'world_legacy'})
+        p = planner.plan(['plugins/autolevel/al_brush.cpp'])
+        self.assertTrue({'world_core', 'world_ui', 'world_legacy'} <= set(p['suites']))
+        self.assertFalse(p['flags']['plant_core'])
+
+    def test_world_frame_and_input_include_migration_dialogs(self):
+        for path in ['native/ftebroom_world_authoring.h', 'scripts/editor_os_input.py']:
+            p = planner.plan([path])
+            self.assertTrue({'world_ui', 'world_legacy'} <= set(p['suites']))
+            self.assertFalse(p['flags']['plant_core'] or p['flags']['atlas'])
 
     def test_world_host_registration_and_focus_guards_are_classified_by_code(self):
         before = 'void frame(){modelViewerPanel();bbBenchTick();plantPanel();}\nif(runUiNavigation()||plantFocused())capture();\n'

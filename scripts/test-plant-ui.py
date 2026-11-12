@@ -119,6 +119,8 @@ try:
   raise SystemExit(0)
  source=None
  if not a.scene_only:
+  human=72 if live()['profile'] in (1,4) else 56
+  expect(abs(live()['project']['parameters']['height']-24*human/1.8)<.01,'initial oak defaults use the selected game player scale')
   old_seed=live()['project']['seed'];click('randomize');ready();expect(live()['project']['seed']!=old_seed,'Randomize changes the generated seed')
   click('keep-variation');ready();expect(live()['project']['seed'] in live()['project']['variations'],'saved seed variation persists in editable project')
   source=data/'plants/projects/qa-editable.plant.json';source.unlink(missing_ok=True)
@@ -137,6 +139,7 @@ try:
   # Select representative species through the actual search and preset rows.
   for preset,search in [('oak','English oak'),('pine','Scots pine'),('wild-shrub','Wild hawthorn'),('meadow-grass','Meadow grass'),('amanita','Fly agaric'),('daisy','Oxeye daisy'),('bracken','Common bracken')]:
    edit('search',search);click('preset/'+preset);ready();expect(live()['project']['preset']==preset and live()['lods'][0]['triangles']>0,'native generation '+preset);screenshot(preset+'-dark')
+   if preset=='amanita':expect(abs(live()['project']['parameters']['height']-.18*human/1.8)<.01,'ordinary mushroom preset is scaled to 18 cm rather than a giant prop')
   click('assets/textures');wait(lambda:all(live()['widgets'].get('texture-map/'+str(i),{}).get('loaded') for i in range(3)));screenshot('plant-texture-maps');expect(True,'texture inspector loads albedo, normal and ORM after deferred upload');click('assets/variations')
   # Settings use the actual editor theme; geometry and project stay intact.
   console('ftebroom_plant qa light');wait(lambda:live()['theme']==3);screenshot('plant-editor-light');expect(live()['project']['preset']=='bracken','Modern Light changes the UI without replacing the plant')

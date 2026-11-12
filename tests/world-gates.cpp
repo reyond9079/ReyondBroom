@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include "../native/world_architect/assets.h"
+#include "../plugins/autolevel/al_brush.cpp"
+#include <fstream>
+#include <iostream>
+using namespace ftebroom::worldArchitect;
+int main(int argc,char** argv)try{
+  if(argc<2)throw std::runtime_error("registry.json [output]");Json json;std::ifstream(argv[1])>>json;auto registry=readRegistry(json);int count=0;
+  auto check=[&](bool ok,const char* name){if(!ok)throw std::runtime_error(name);std::cout<<"PASS "<<name<<'\n';count++;};
+  auto rejects=[&](auto action,const char* name){try{action();}catch(const std::exception&){check(true,name);return;}throw std::runtime_error(std::string("Expected rejection: ")+name);};
+  Settings settings;settings.candidates=1;settings.gateMode="standard";MissionGraph graph;graph.nodes={{1,Role::Start,"Start",{},true},{2,Role::Challenge,"Gated room",{},true},{3,Role::Reward,"Activation room",{},false},{4,Role::Exit,"Exit",{},true}};graph.edges={{1,3,true,false,"activation detour",0},{1,2,false,false,"gated destination",3},{2,4,false,false,"exit",0}};settings.authoredMission=graph;
+  auto world=generate(settings,registry);check(world.gates.size()==1&&world.architecture.brushEntities.size()==2,"prerequisite planning realizes one physical door and its activation brush entity");
+  const auto& gate=world.gates[0];const auto& door=world.architecture.brushEntities[0];const auto& trigger=world.architecture.brushEntities[1];
+  check(door.entity.fields.at("targetname")==trigger.entity.fields.at("target")&&door.entity.fields.at("wait")=="-1"&&trigger.entity.fields.at("wait")=="-1","one-shot activation targets a door that remains open");
+  auto bounds=al::polyhedron(door.brushes[0]);auto entry=(bounds.min+bounds.max)*.5;entry.z=bounds.min.z+1;Collision closed(world,nullptr,true);std::set<uint64_t> opened{gate.id};Collision open(world,&opened,true);
+  check(closed.blocked(entry,entry,settings.player)&&!open.blocked(entry,entry,settings.player),"closed/open gate state changes collision in the actual doorway");
+  std::set<uint64_t> activations;check(!activateGates(world,gate.activation+V{512,0,0},settings.player,activations)&&activateGates(world,gate.activation,settings.player,activations)&&activations.count(gate.id),"only actual activation-volume overlap unlocks the preview's gate state");
+  const Room* gatedRoom=nullptr;const auto& building=world.spatial.buildings[0];for(const auto& room:building.rooms)if(room.mission==gate.node)gatedRoom=&room;check(gatedRoom!=nullptr,"physical gate destination retains its reserved room");
+  Player sight{.1,.1,0};bool sealed=true;for(double x=gatedRoom->low.x+16;x<gatedRoom->high.x-16;x+=8){double y=gatedRoom->low.y>(building.low.y+building.high.y)/2?building.high.y+32:building.low.y-32;V outside{x,y,gatedRoom->low.z+128},inside{x,(gatedRoom->low.y+gatedRoom->high.y)/2,gatedRoom->low.z+128};if(!open.blocked(outside,inside,sight))sealed=false;}check(sealed,"a locked room's former facade windows cannot bypass the door through damage or jumping");
+  auto route=missionTraversal(world.mission);auto key=std::find(route.begin(),route.end(),gate.prerequisite),target=std::find(route.begin(),route.end(),gate.node);check(key!=route.end()&&target!=route.end()&&key<target,"validated mission traversal visits the activation before the gated room");
+  auto alternative=graph;alternative.edges.push_back({1,2,true,false,"ungated graph bypass",0});auto traversed=missionTraversal(alternative);check(std::find(traversed.begin(),traversed.end(),3)<std::find(traversed.begin(),traversed.end(),2),"an alternative graph edge cannot bypass the physical destination's prerequisite");
+  auto impossible=graph;impossible.edges.erase(impossible.edges.begin());rejects([&]{validateMission(impossible);},"an unreachable activation cannot be hidden behind a nominally valid locked edge");
+  auto conflict=graph;conflict.edges.push_back({1,2,true,false,"contradictory gate",1});rejects([&]{validateMission(conflict);},"contradictory prerequisites for one physical doorway fail explicitly");
+  auto parsed=al::parseMap(world.map);check(parsed.brushes.size()==brushCount(world)&&brushCount(world)==world.architecture.elements.size()+2,"raw MAP retains both dynamic brush models and counts them in budgets");
+  auto grouped=groupedMap(world,"gate-project-one"),other=groupedMap(world,"gate-project-two");check(grouped.find("\"classname\" \"func_door\"")!=grouped.npos&&grouped.find("\"classname\" \"trigger_multiple\"")!=grouped.npos&&al::parseMap(grouped).brushes.size()==brushCount(world),"owned MAP serialization retains actual brush entities and all their geometry");
+  auto prefix="wa_"+std::to_string(hash("gate-project-one"))+"_gate_1";check(grouped.find(prefix)!=grouped.npos&&other.find(prefix)==other.npos,"separate World Architect projects have isolated engine target names");
+  auto restored=generate(deserialize(serialize(settings),registry),registry);check(restored.map==world.map,"authored prerequisites and physical entities replay after project reopen");
+  auto details=regenerateDetails(settings,world,registry,100,57);auto detailed=generate(details,registry);check(detailed.architectureKey==world.architectureKey&&writeBrushEntity(detailed.architecture.brushEntities[0])==writeBrushEntity(door),"local detail regeneration preserves physical gate geometry and target wiring");
+  auto custom=settings;custom.profile=1;custom.gateMode="auto";check(generate(custom,registry).gates.empty(),"an unknown FTE game defaults to semantic metadata until the standard backend is explicitly selected");
+  auto unsupported=settings;unsupported.profile=3;auto semantic=generate(unsupported,registry);check(semantic.gates.empty()&&std::any_of(semantic.diagnostics.warnings.begin(),semantic.diagnostics.warnings.end(),[](const auto& warning){return warning.find("physical door/activation")!=warning.npos;}),"uncertified profiles retain mission data and explicitly report the missing gate realization");
+  if(argc>2){auto out=std::filesystem::path(argv[2]);std::filesystem::create_directories(out);Json records=Json::array();
+    for(int profile:{2,0,1}){auto input=settings;input.profile=profile;auto scene=generate(input,registry);auto folder=out/("profile-"+std::to_string(profile))/"baseq3";std::filesystem::create_directories(folder);for(const auto& [name,bytes]:assetBundle(scene,registry,ftebroom::defaultQuakePalette())){auto path=folder/name;std::filesystem::create_directories(path.parent_path());std::ofstream(path,std::ios::binary).write(bytes.data(),bytes.size());}std::ofstream(folder/"scripts/shaderlist.txt")<<shaderStem(scene)<<'\n';std::ofstream(folder/"gates.map")<<withWad(groupedMap(scene,"gate-project-one"),scene,(std::filesystem::absolute(folder)/wadFilename(scene,ftebroom::defaultQuakePalette())).generic_string());auto project=serialize(input);project["registry"]=json;project["projectId"]="gate-project-one";project["selectedCandidateSeed"]=1;std::ofstream(out/("gate-project-"+std::to_string(profile)+".world.json"))<<project.dump(2);records.push_back(diagnostics(scene));}
+    std::ofstream(out/"results.json")<<records.dump(2);
+  }
+  std::cout<<count<<" physical gate contracts passed\n";
+}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

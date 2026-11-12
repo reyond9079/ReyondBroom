@@ -896,6 +896,7 @@ void(float prevprogs) init =
     registercommand("ftebroom_copy_file");
     registercommand("ftebroom_paste_file");
     registercommand("ftebroom_import_file");
+    registercommand("ftebroom_world_apply");
     registercommand("ftebroom_model_extract");
 	registercommand("ftebroom_pointer");
     registercommand("ftebroom_tool_toggle");

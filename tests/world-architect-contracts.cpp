@@ -1,0 +1,205 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include "../native/world_architect/generator.h"
+#include "../plugins/autolevel/al_brush.cpp"
+#include <fstream>
+#include <iostream>
+using namespace ftebroom::worldArchitect;
+int main(int argc,char** argv)try{
+ if(argc!=2)throw std::runtime_error("Pass registry.json");Json j;std::ifstream(argv[1])>>j;auto registry=readRegistry(j);Settings settings;int count=0;
+ auto check=[&](bool ok,const char* label){if(!ok)throw std::runtime_error(label);++count;std::cout<<"PASS "<<label<<'\n';};
+ auto rejects=[&](auto action,const char* label){try{action();}catch(const std::exception&){check(true,label);return;}throw std::runtime_error(std::string("Expected rejection: ")+label);};
+ check(registry.presets.size()==8&&registry.themes.size()==6,"versioned prototype registry has eight cases and six original material themes");
+ check(serialize(deserialize(serialize(settings),registry))==serialize(settings),"settings roundtrip retains deterministic generation inputs");
+ auto older=serialize(settings);older.erase("experienceMode");older.erase("targetRoute");auto olderInput=deserialize(older,registry);check(olderInput.experienceMode=="preset"&&olderInput.targetRoute==2500,"older project recipes preserve their default experience and route score");
+ std::set<std::string> modeGraphs;for(const char* mode:{"exploration","adventure","hub","arena"}){auto input=settings;input.experienceMode=mode;input.weights=experienceWeights(mode);auto scene=generate(input,registry);modeGraphs.insert(diagnostics(scene).at("missionEdges").dump());check(scene.diagnostics.valid&&generate(deserialize(serialize(input),registry),registry).map==scene.map,"experience mode changes a valid physical plan and replays after reopen");}
+ check(modeGraphs.size()==4,"experience modes produce distinct mission topologies");
+ auto missionCount=settings;missionCount.missionBeats=5;missionCount.optionalBranches=0;missionCount.missionLoops=0;auto leanMission=generate(missionCount,registry);check(leanMission.mission.nodes.size()==5&&leanMission.mission.edges.size()==4,"authored experience counts change the real mission topology before spatial allocation");check(generate(deserialize(serialize(missionCount),registry),registry).map==leanMission.map,"mission experience counts replay after project reopen");
+ auto longTarget=settings;longTarget.targetRoute=20000;auto longWorld=generate(longTarget,registry);check(longWorld.diagnostics.score.at("route")==std::min(1.,longWorld.diagnostics.routeLength/20000),"target route controls the measured physical route preference");
+ auto future=serialize(settings);future["schemaVersion"]=2;rejects([&]{deserialize(future,registry);},"future schemas fail explicitly");
+ auto invalid=settings;invalid.scale=std::numeric_limits<double>::infinity();rejects([&]{validate(invalid,registry);},"nonfinite settings rejected");
+ invalid=settings;invalid.locked[0]=true;rejects([&]{validate(invalid,registry);},"stage locks require an accepted candidate's reproducible recipe");
+ auto badEvent=j;for(auto& preset:badEvent["presets"])if(preset["id"]=="hospital")preset["scope"]=1;rejects([&]{readRegistry(badEvent);},"structural extension events reject incompatible urban envelopes");
+ WorldPlan outside;rejects([&]{addBrush(outside,1,"outside profile",al::box({4990,0,0},{5010,32,32},"stone"));},"actual convex vertices enforce classic BSP coordinate limits");
+ auto graph=mission(settings,registry.preset(settings.preset));validateMission(graph);check(!graph.nodes.empty(),"generated mission has a coherent start-to-exit traversal");
+ graph.edges.clear();rejects([&]{validateMission(graph);},"disconnected required mission rejected");
+ graph.nodes={{1,Role::Start,"start",{},true},{2,Role::Reward,"key",{},false},{3,Role::Exit,"exit",{},true}};
+ graph.edges={{1,2,false,true,"irreversible trap",0},{1,3,false,false,"gate",2}};
+ rejects([&]{validateMission(graph);},"a key inside an irreversible trap cannot unlock a separately reachable gate");
+ graph.edges.push_back({2,1,false,true,"return",0});validateMission(graph);check(true,"a usable key-return route satisfies the gate dependency");
+ check(missionTraversal(graph)==std::vector<uint64_t>({1,2,1,3}),"mission traversal returns the usable prerequisite route rather than node-list order");
+ std::atomic<bool> cancel{true};rejects([&]{generate(settings,registry,&cancel);},"cancelled generation never returns a successful world");
+ check(subSeed(17,"Dressing",100)==subSeed(17,"Dressing",100)&&subSeed(17,"Damage",100)!=subSeed(17,"Dressing",100)&&subSeed(17,"Dressing",100)!=subSeed(17,"Dressing",101),"stage and region streams are reproducible and independent");
+ auto world=generate(settings,registry);Collision collision(world);
+ std::set<int> roomHeights;for(const auto& b:world.spatial.buildings)for(const auto& room:b.rooms)roomHeights.insert(int(room.high.z-room.low.z));check(roomHeights.size()>2&&std::any_of(world.architecture.elements.begin(),world.architecture.elements.end(),[](const auto& e){return e.kind=="functional suspended ceiling";}),"functional room heights produce independently varied real ceiling geometry");
+ auto lightIsolation=world;auto originalBrushes=lightIsolation.architecture.elements.size(),originalNodes=lightIsolation.navigation.nodes.size(),originalEntities=lightIsolation.architecture.entities.size();exteriorTraversalLights(lightIsolation,lightIsolation.spatial.buildings[0],1);check(lightIsolation.architecture.elements.size()==originalBrushes&&lightIsolation.navigation.nodes.size()==originalNodes&&lightIsolation.architecture.entities.size()==originalEntities+2,"exterior traversal light placement changes only point lights, retaining geometry and navigation");Collision stairLightHull(world);size_t stairLights=0;for(const auto& entity:world.architecture.entities)if(entity.entity.fields.count("_wa_light_role")){auto origin=entity.entity.fields.at("origin");std::istringstream in(origin);V p;in>>p.x>>p.y>>p.z;check(!stairLightHull.blocked(p,p,Player{.1,.1,0}),"exterior traversal light stays outside solid stair/landing geometry");stairLights++;}check(stairLights==2*size_t(world.spatial.buildings[0].floors-1),"every required hospital exterior flight receives local shadow-side lighting");
+ auto nearCorner=bevel({310.81348,397.45996,0},{335.90820,422.55566,18.68457},"regression",5.018944);check(nearCorner.faces.size()==7,"adversarial rubble retains a real corner chamfer rather than becoming a plain box");auto safeCut=al::parseMap("{\n\"classname\" \"worldspawn\"\n"+al::writeBrush(nearCorner)+"}\n").brushes[0].faces.back();double margin=1e30;for(int corner=0;corner<8;corner++){V p{corner&1?335.90820:310.81348,corner&2?422.55566:397.45996,corner&4?18.68457:0};margin=std::min(margin,std::abs(al::dot(safeCut.normal(),p)-safeCut.distance()));}check(margin>.5,"serialized adversarial rubble cut stays clear of the editor's near-corner clipping tolerance");
+ auto geometry=[](const WorldPlan& w){std::string result;for(const auto& element:w.architecture.elements)result+=element.kind+al::writeBrush(element.brush);return result;};
+ const auto& passRoom=world.spatial.buildings[0].rooms.back();auto constrained=settings;constrained.influences.push_back({1,passRoom.low+V{40,40,0},passRoom.high-V{40,40,0},"must-pass",1});auto passed=generate(constrained,registry);auto passAt=passed.passAnchors.at(1);check(std::find(passed.navigation.mainRoute.begin(),passed.navigation.mainRoute.end(),passAt)!=passed.navigation.mainRoute.end(),"must-pass volume adds its supported player anchor to the actual exported route");check(generate(deserialize(serialize(constrained),registry),registry).map==passed.map,"hard planning constraints replay through project serialization");
+ auto emptyZone=settings;emptyZone.influences.push_back({1,{world.low.x+1,world.low.y+1,1},{world.low.x+24,world.low.y+24,80},"no-generation",1});check(generate(emptyZone,registry).diagnostics.valid,"empty no-generation volume retains the shared ground and sky seal");emptyZone.influences[0].low=passRoom.low;emptyZone.influences[0].high=passRoom.high;rejects([&]{generate(emptyZone,registry);},"no-generation volume rejects overlapping generated room structure");
+ auto impossiblePass=settings;impossiblePass.influences.push_back({1,{0,0,1200},{64,64,1300},"must-pass",1});rejects([&]{generate(impossiblePass,registry);},"a floating unsupported must-pass point cannot become an accepted route");
+ auto vertical=settings;const auto& verticalBuilding=world.spatial.buildings[0];vertical.influences.push_back({1,verticalBuilding.low-V{200,200,0},V{verticalBuilding.high.x+200,verticalBuilding.high.y+200,256},"vertical-link",1});check(generate(vertical,registry).diagnostics.score.at("planningStops")==2,"vertical-link volume verifies a continuous floor-to-floor stair component");vertical.influences[0].low={-32,-32,0};vertical.influences[0].high={32,32,256};rejects([&]{generate(vertical,registry);},"a vertical-link volume without an actual stair component is rejected");
+ auto locked=freezeThrough(settings,world,registry,4);locked.seed=700;locked.scale=1.2;locked.damage=.9;locked.dressing=.1;PrefixCache cache;
+ auto cold=generate(locked,registry,nullptr,nullptr,&cache);check(geometry(cold)==geometry(world),"freezing all generative stages preserves exact brushes despite later seed and parameter edits");
+ locked.seed=701;auto warm=generate(locked,registry,nullptr,nullptr,&cache);check(geometry(warm)==geometry(world)&&warm.diagnostics.cachedStages.size()==5,"a warm prefix cache reuses the actual frozen outputs");
+ check(warm.seeds.at("Mission")==world.seeds.at("Mission")&&warm.seeds.at("Navigation")==subSeed(701,"Navigation"),"frozen stage seeds remain stable while navigation is regenerated");
+ auto restoredLocks=deserialize(serialize(locked),registry);auto replayLocks=generate(restoredLocks,registry);check(replayLocks.map==warm.map,"saved frozen-stage recipes replay identically without an in-memory cache");
+ auto bigPlayer=locked;bigPlayer.player.radius=32;rejects([&]{generate(bigPlayer,registry,nullptr,nullptr,&cache);},"frozen geometry cannot bypass a changed player-hull validation");
+ auto altered=locked;altered.frozen[1]["scale"]=1.1;auto changedPrefix=generate(altered,registry,nullptr,nullptr,&cache);check(changedPrefix.diagnostics.cachedStages==std::vector<std::string>{"Mission"}&&geometry(changedPrefix)!=geometry(warm),"changing an upstream recipe invalidates the prefix cache");
+ auto reusedChangedPrefix=generate(altered,registry,nullptr,nullptr,&cache);check(reusedChangedPrefix.diagnostics.cachedStages.size()==5,"a rebuilt prefix reports each reused stage exactly once");
+ auto mixed=freezeThrough(settings,world,registry,0);mixed.seed=19;auto mixedWorld=generate(mixed,registry);auto refrozen=freezeThrough(mixed,mixedWorld,registry,2);refrozen.seed=20;auto composite=generate(refrozen,registry);
+ check(composite.seeds.at("Mission")==world.seeds.at("Mission")&&composite.seeds.at("Site")==mixedWorld.seeds.at("Site"),"refreezing a composed plan preserves each stage's own original seed");
+ auto changedJson=j;changedJson["themes"][0]["colors"][0][0]=113;auto changedRegistry=readRegistry(changedJson);rejects([&]{generate(locked,changedRegistry);},"a changed registry cannot reuse a frozen recipe under an old fingerprint");
+ auto recursive=serialize(locked);recursive["frozenStageInputs"][0]["frozenStageInputs"][0]=serialize(settings);rejects([&]{deserialize(recursive,registry);},"recursive frozen-stage recipes fail before nested deserialization");
+ auto urbanSettings=settings;urbanSettings.preset="evacuation";auto urban=generate(urbanSettings,registry);std::set<std::string> roadPlans;for(const char* pattern:{"grid","organic","hybrid","radial"}){auto patterned=urbanSettings;patterned.roadPattern=pattern;auto scene=generate(patterned,registry);roadPlans.insert(diagnostics(scene).at("roads").dump());check(scene.diagnostics.valid&&generate(deserialize(serialize(patterned),registry),registry).map==scene.map,"road pattern creates a collision-verified street/building plan that replays");if(patterned.roadPattern=="radial")check(std::any_of(scene.architecture.elements.begin(),scene.architecture.elements.end(),[](const auto& e){return e.kind=="radial gathering plaza"&&e.brush.faces.size()==10;}),"radial site includes an actual octagonal gathering plaza");}check(roadPlans.size()==4,"all four road patterns have distinct street geometry and topology");
+ auto details=regenerateDetails(urbanSettings,urban,registry,101,57);auto detailed=generate(details,registry);
+ auto regionGeometry=[](const WorldPlan& w,uint64_t region){std::string text;for(const auto& e:w.architecture.elements)if(e.region==region)text+=e.kind+al::writeBrush(e.brush);return text;};
+ for(const auto& b:urban.spatial.buildings)if(b.id!=101)check(regionGeometry(urban,b.id)==regionGeometry(detailed,b.id),"building-detail regeneration preserves every unselected region's exact brush geometry");
+ check(regionGeometry(urban,101)!=regionGeometry(detailed,101),"selected building's regenerated details actually change");
+ auto againDetails=regenerateDetails(details,detailed,registry,101,58);PrefixCache detailCache;generate(details,registry,nullptr,nullptr,&detailCache);auto warmedDetails=generate(againDetails,registry,nullptr,nullptr,&detailCache);
+ check(warmedDetails.diagnostics.cachedStages==std::vector<std::string>({"Mission","Site","Architecture"}),"local detail regeneration reuses unchanged upstream stages and rebuilds the requested detail streams");
+ rejects([&]{regenerateDetails(urbanSettings,urban,registry,9999,1);},"unknown building IDs cannot become successful local regenerations");
+ auto pin=pinBuilding(urbanSettings,urban,registry,101);pin.seed=57;pin.damage=.95;pin.dressing=.95;
+ auto pinned=generate(pin,registry);
+ auto regionPoints=[](const WorldPlan& w,uint64_t region){std::string text;for(const auto& e:w.architecture.entities)if(e.region==region)text+=al::writeEntity(e.entity);return text;};
+ check(regionGeometry(pinned,101)==regionGeometry(urban,101)&&regionPoints(pinned,101)==regionPoints(urban,101),"a pinned building keeps its exact architecture, damage, dressing and point entities under new global inputs");
+ check(regionGeometry(pinned,100)!=regionGeometry(urban,100),"pinning one building still allows another building to vary");
+ check(pinned.spatial.buildings[1].pinned&&pinned.mission.nodes[2].room==urban.mission.nodes[2].room,"pins retain the upstream functional room assignment and expose their pinned state");
+ auto replayPin=generate(deserialize(serialize(pin),registry),registry);check(replayPin.map==pinned.map,"building pin recipes replay exactly after project serialization with no cache");
+ auto twoPins=pinBuilding(pin,pinned,registry,102);twoPins.seed=58;auto twicePinned=generate(twoPins,registry);check(regionGeometry(twicePinned,101)==regionGeometry(urban,101)&&regionGeometry(twicePinned,102)==regionGeometry(pinned,102),"adding a second pin preserves each building's own accepted recipe");
+ auto frozenPins=freezeThrough(twoPins,twicePinned,registry,4);check(generate(deserialize(serialize(frozenPins),registry),registry).map==twicePinned.map,"global stage freezes can retain clean building pin recipes without recursion");
+ auto unpinned=unpinBuilding(frozenPins,101);unpinned.seed=59;auto unpinnedWorld=generate(unpinned,registry);check(regionGeometry(unpinnedWorld,101)!=regionGeometry(urban,101)&&regionGeometry(unpinnedWorld,102)==regionGeometry(pinned,102),"unpin removes stale frozen detail recipes while preserving the other building's pin");
+ rejects([&]{pinBuilding(urbanSettings,urban,registry,9999);},"pinning an unknown region fails explicitly");
+ rejects([&]{generate(cleanSettings(pin),registry);},"pins cannot silently survive unlocking their shared site");
+ rejects([&]{generate(pin,changedRegistry);},"building pins reject a different registry fingerprint");
+ rejects([&]{pinBuilding(urbanSettings,urban,changedRegistry,101);},"pinning cannot relabel an accepted candidate from a different registry");
+ rejects([&]{regenerateDetails(pin,pinned,registry,101,1);},"local regeneration cannot overwrite a pinned building");
+ auto recursivePin=serialize(pin);recursivePin["regionRecipes"][0]["inputs"][0]["regionRecipes"]=recursivePin["regionRecipes"];rejects([&]{deserialize(recursivePin,registry);},"recursive pin payloads fail before nested deserialization");
+ auto invalidPin=serialize(pin);invalidPin["regionRecipes"][0]["inputs"][0]["profileId"]=0;rejects([&]{deserialize(invalidPin,registry);},"a pin cannot inject a different game profile into an accepted building");
+ auto designed=settings;designed.layout="spine";designed.width=1920;designed.rooms=8;designed.theme="brick";auto designWorld=generate(designed,registry);
+ check(designWorld.theme=="brick"&&geometry(designWorld)!=geometry(world)&&designWorld.spatial.buildings[0].high.x-designWorld.spatial.buildings[0].low.x==1920,"designer architecture and theme overrides change actual massing, circulation and materials");
+ auto designFreeze=freezeThrough(designed,designWorld,registry,4);designFreeze.layout="atrium";designFreeze.width=1408;designFreeze.theme="medical";auto designFrozen=generate(designFreeze,registry);
+ check(designFrozen.map==designWorld.map,"frozen stages use their own architecture overrides and material theme");
+ check(serialize(deserialize(serialize(designed),registry))==serialize(designed),"designer architecture overrides survive JSON serialization");
+ auto edited=settings;edited.authoredMission=world.mission;auto& beats=edited.authoredMission->nodes;auto targetBeat=std::find_if(beats.begin(),beats.end(),[](const auto& n){return n.role==Role::Challenge;});
+ auto targetRoom=world.spatial.buildings[0].rooms.back();MissionNode positionPin;positionPin.id=targetBeat->id;positionPin.position={(targetRoom.low.x+targetRoom.high.x)/2,(targetRoom.low.y+targetRoom.high.y)/2,targetRoom.low.z+1};edited.missionPins.push_back(positionPin);auto movedMission=generate(edited,registry);
+ auto movedBeat=std::find_if(movedMission.mission.nodes.begin(),movedMission.mission.nodes.end(),[&](const auto& n){return n.id==positionPin.id;});check(movedBeat->room==targetRoom.id&&movedBeat->pinned,"a pinned mission beat reserves its requested physical room before architecture");
+ check(generate(deserialize(serialize(edited),registry),registry).map==movedMission.map,"authored mission topology and room pins replay after save/load");
+ auto absentPin=edited;absentPin.missionPins[0].id=999;rejects([&]{generate(absentPin,registry);},"unknown mission pins cannot silently disappear");
+ auto duplicateRoom=edited;positionPin.id=beats[1].id;duplicateRoom.missionPins.push_back(positionPin);rejects([&]{generate(duplicateRoom,registry);},"two mission pins cannot reserve the same physical room");
+ auto releasedMission=edited;releasedMission.authoredMission=movedMission.mission;releasedMission.missionPins.clear();auto releasedGraph=mission(releasedMission,registry.preset(settings.preset));check(std::none_of(releasedGraph.nodes.begin(),releasedGraph.nodes.end(),[](const auto& n){return n.pinned||n.room;}),"removing a room pin clears stale realized positions in an authored mission");
+ auto roadDesign=urbanSettings;roadDesign.roadPins.push_back(urban.spatial.roads[0]);roadDesign.roadPins[0].width=128;roadDesign.roadPins[0].pinned=true;auto roadWorld=generate(roadDesign,registry);check(geometry(roadWorld)!=geometry(urban)&&roadWorld.spatial.roads[0].pinned,"a designer road width changes real street and curb brushes");
+ auto curved=roadDesign;curved.roadPins[0].control=(curved.roadPins[0].a+curved.roadPins[0].b)*.5+V{0,32,0};auto curvedWorld=generate(curved,registry);
+ check(geometry(curvedWorld)!=geometry(roadWorld)&&roadPoints(curvedWorld.spatial.roads[0]).size()>2,"Bezier authoring changes real road/curb brushes and navigation, not just the plan line");
+ check(generate(deserialize(serialize(curved),registry),registry).map==curvedWorld.map,"road curve control and tessellation replay exactly after project reopen");
+ auto invalidCurve=curved;invalidCurve.roadPins[0].control=V{0,30000,0};rejects([&]{generate(invalidCurve,registry);},"the whole curved road sweep is checked against site bounds");
+ auto roomDetail=regenerateRoomDressing(settings,world,registry,world.spatial.buildings[0].rooms[0].id,57);auto furnished=generate(roomDetail,registry);
+ check(furnished.architectureKey==world.architectureKey&&furnished.damage.zones.size()==world.damage.zones.size()&&furnished.spatial.buildings[0].rooms.size()==world.spatial.buildings[0].rooms.size(),"local room furnishing retains the accepted architecture, damage and room program");
+ auto withoutRoom=[&](const WorldPlan& w){std::string text;const auto& target=world.spatial.buildings[0].rooms[0];for(const auto& e:w.architecture.elements){auto p=al::polyhedron(e.brush);auto center=(p.min+p.max)*.5;if(!inside(center,target.low,target.high))text+=e.kind+al::writeBrush(e.brush);}return text;};
+ check(withoutRoom(furnished)==withoutRoom(world)&&geometry(furnished)!=geometry(world),"room furnishing actually changes the selected room and preserves every brush outside it");
+ check(generate(deserialize(serialize(roomDetail),registry),registry).map==furnished.map,"local room seed recipes reproduce the exact brushes after save and reopen");
+ rejects([&]{regenerateRoomDressing(settings,world,registry,9999,1);},"room regeneration cannot silently accept a missing room");
+ rejects([&]{regenerateRoomDressing(pin,pinned,registry,pinned.spatial.buildings[1].rooms[0].id,1);},"room regeneration respects complete building pins");
+ auto crossingRoad=urbanSettings;const auto& massing=urban.spatial.buildings[0];crossingRoad.roadPins.push_back({9000,{massing.low.x-100,0,0},{massing.high.x+100,0,0},128,"custom",true});crossingRoad.roadPins[0].a.y=crossingRoad.roadPins[0].b.y=(massing.low.y+massing.high.y)/2;rejects([&]{generate(crossingRoad,registry);},"road edits cannot run hidden street geometry through a building");
+ auto preserveDesign=settings;const auto& envelope=world.spatial.buildings[0];preserveDesign.influences.push_back({1,envelope.low-V{8,8,8},envelope.high+V{8,8,8},"preserve",1});auto preserveWorld=generate(preserveDesign,registry);
+ check(std::none_of(preserveWorld.architecture.elements.begin(),preserveWorld.architecture.elements.end(),[](const auto& e){return e.kind=="broken stair remnant"||e.kind=="fractured masonry"||e.kind=="bed frame";}),"a preserve volume changes physical stair destruction and suppresses damaged masonry and room props");
+ std::set<uint64_t> themeShapes;for(const auto& theme:registry.themes){auto themed=settings;themed.theme=theme.id;auto plan=generate(themed,registry);std::string points;for(const auto& e:plan.architecture.elements)for(const auto& f:e.brush.faces)for(auto p:f.points)points+=vector(p).dump();themeShapes.insert(hash(points));}
+ check(themeShapes.size()==6,"all six theme grammars change actual geometry rather than only material colors");
+ auto noProps=settings;noProps.damage=0;noProps.dressing=0;auto sparse=generate(noProps,registry);noProps.dressing=1;auto dense=generate(noProps,registry);auto semanticCount=[](const auto& w){return std::count_if(w.assets.begin(),w.assets.end(),[](const auto& a){return a.provenance.find("original semantic brush kit")==0;});};
+ check(semanticCount(sparse)==0&&semanticCount(dense)>0&&dense.architecture.elements.size()>sparse.architecture.elements.size(),"dressing density controls actual spatially excluded semantic prop placements");
+ check(std::any_of(dense.assets.begin(),dense.assets.end(),[](const auto& a){return a.rule.find("ward / sleeping")!=a.rule.npos;})&&std::any_of(dense.architecture.elements.begin(),dense.architecture.elements.end(),[](const auto& e){return e.kind=="bed mattress";}),"the room program selects recognizable treatment furnishings");
+ auto badTheme=j;badTheme["themes"][0]["grammar"]="unknown";rejects([&]{readRegistry(badTheme);},"unsupported theme grammars fail before generation");
+ check(std::count_if(world.architecture.elements.begin(),world.architecture.elements.end(),[](const auto& e){return e.kind.find("sealed sky") ==0&&e.kind.find("backing")!=e.kind.npos;})==6,"classic sky and liquid volumes have a complete opaque outer seal");
+ auto grouped=groupedMap(urban,"qa-world");auto groupRoundtrip=al::parseMap(grouped);check(groupRoundtrip.brushes.size()==urban.architecture.elements.size()&&grouped.find("\"_wa_project\" \"qa-world\"")!=grouped.npos,"owned MAP groups preserve the complete editable brush set");
+ auto oneRegion=al::parseMap(groupedMap(urban,"qa-world",101));check(oneRegion.brushes.size()==size_t(std::count_if(urban.architecture.elements.begin(),urban.architecture.elements.end(),[](const auto& e){return e.region==101;})),"a regional MAP contains exactly that region's brushes");
+ rejects([&]{groupedMap(urban,"../unsafe");},"group ownership identifiers reject path-shaped input");
+ WorldPlan programmed;programmed.mission=mission(settings,registry.preset(settings.preset));site(programmed,settings,registry.preset(settings.preset));floorplan(programmed,settings,registry.preset(settings.preset));
+ check(programmed.architecture.elements.empty()&&!programmed.spatial.buildings[0].rooms.empty(),"functional room programs exist before architecture emits its first brush");
+ std::set<uint64_t> reserved;for(const auto& beat:programmed.mission.nodes)if(beat.role!=Role::Start&&beat.role!=Role::Exit)check(beat.room&&reserved.insert(beat.room).second,"each indoor mission beat reserves a distinct functional room before geometry");
+ for(const auto& beat:world.mission.nodes)if(beat.required)check(std::any_of(world.navigation.mainRoute.begin(),world.navigation.mainRoute.end(),[&](size_t at){return al::length(world.navigation.nodes[at].feet-beat.position)<.01;}),"physical main route visits the planned required mission room");
+ check(al::length(world.navigation.nodes[world.navigation.mainRoute.front()].feet-world.mission.nodes.front().position)<.01,"exported route starts at the planned mission start");
+ auto countKind=[&](const WorldPlan& w,const std::string& kind){return std::count_if(w.architecture.elements.begin(),w.architecture.elements.end(),[&](const auto& element){return element.kind==kind;});};
+ for(const auto& id:{"checkpoint","courtyard","factory","mall","overpass","evacuation"}){
+   auto input=settings;input.preset=id;input.damage=registry.preset(id).damage;auto scene=generate(input,registry);Collision hull(scene);const auto& b=scene.spatial.buildings.front();double cy=(b.low.y+b.high.y)/2;
+   auto landmark=std::find_if(scene.mission.nodes.begin(),scene.mission.nodes.end(),[](const auto& n){return n.role==Role::Landmark;});
+   check(scene.diagnostics.valid,"scenario-specific architecture retains a valid complete mission route");
+   if(input.preset=="checkpoint"||input.preset=="courtyard"){
+     check(countKind(scene,"roof escape tread")==16*b.floors&&landmark!=scene.mission.nodes.end()&&landmark->position.z==b.high.z+1,"roof landmark has full-height physical fire-stair access");
+     auto reachesRoof=[&](bool exterior){std::vector<std::vector<size_t>> adjacent(scene.navigation.nodes.size());for(auto edge:scene.navigation.edges){adjacent[edge[0]].push_back(edge[1]);adjacent[edge[1]].push_back(edge[0]);}std::set<size_t> visited;std::deque<size_t> pending;for(size_t i=0;i<scene.navigation.nodes.size();i++)if(al::length(scene.navigation.nodes[i].feet-scene.mission.nodes.front().position)<1){pending.push_back(i);visited.insert(i);}while(!pending.empty()){auto at=pending.front();pending.pop_front();auto feet=scene.navigation.nodes[at].feet;if(al::length(feet-landmark->position)<1)return true;for(auto next:adjacent[at]){auto p=scene.navigation.nodes[next].feet;bool removed=exterior?(p.z>18&&p.z<b.high.z-1&&p.x>b.low.x&&p.x<b.high.x&&p.y>b.low.y&&p.y<b.high.y):(p.z>18&&p.x<b.low.x);if(!removed&&visited.insert(next).second)pending.push_back(next);}}return false;};
+     check(reachesRoof(false)&&reachesRoof(true),"roof route survives removing either the exterior stairs or the indoor vertical circulation");
+     check(missionRegion(scene,*landmark)==b.id,"roof mission marker belongs to the building during regional replacement");
+     auto localMap=groupedMap(scene,"roof-qa",b.id);check(localMap.find("\"_wa_id\" \""+std::to_string(landmark->id)+"\"")!=localMap.npos,"regional MAP includes the roof marker instead of losing it in the shared group");
+   }
+   if(input.preset=="checkpoint")check(countKind(scene,"checkpoint concrete barrier")==1&&countKind(scene,"sentry booth roof")==1,"checkpoint has a physical barricade and a separate sentry booth");
+   if(input.preset=="courtyard"){
+     const auto& garage=*std::find_if(b.rooms.begin(),b.rooms.end(),[](const auto& r){return r.function=="garage";});double x=(garage.low.x+garage.high.x)/2;
+     check(countKind(scene,"raised garage shutter")>0&&bool(hull.move({x,b.low.y-48,17},{x,b.low.y+48,1},input.player)),"garage aperture admits the configured player beneath the raised shutter");
+   }
+   if(input.preset=="factory")check(countKind(scene,"gantry crane rail")==2&&countKind(scene,"production press head")>0&&countKind(scene,"ivy leaf cluster")==24&&countKind(scene,"broken industrial roof frame")>0,"factory has production machinery, a crane, fractured roof and original brush ivy");
+   if(input.preset=="mall"){
+     V a{b.low.x+48,b.high.y-64,1},z{b.bays.back()-48,b.high.y-64,1};
+     check(!hull.blocked(a,z,input.player)&&hull.supported(a,input.player)&&hull.supported(z,input.player),"mall service corridor is continuously clear across room partitions");
+     check(countKind(scene,"service corridor lamp")>0&&countKind(scene,"retail fascia sign")>0&&landmark->position.z==257,"mall has lit retail/service circulation and a usable upper gallery");
+   }
+   if(input.preset=="overpass"){
+     const auto& second=scene.spatial.buildings[1];V gap{(b.high.x+second.low.x)/2,(cy+(second.low.y+second.high.y)/2)/2,257};
+     check(countKind(scene,"broken overpass deck")==2&&!hull.supported(gap,input.player),"overpass has two true partial decks and an unsupported central gap");
+     check(std::any_of(scene.navigation.nodes.begin(),scene.navigation.nodes.end(),[&](const auto& n){return n.feet.x>b.high.x&&n.feet.z==257;})&&std::any_of(scene.navigation.nodes.begin(),scene.navigation.nodes.end(),[&](const auto& n){return n.feet.x<second.low.x&&n.feet.z==257&&n.feet.x>b.high.x;}),"both sides of the broken span expose reachable navigation anchors");
+   }
+   if(input.preset=="evacuation"){
+     check(countKind(scene,"shelter assembly canopy")==1&&countKind(scene,"evacuation beacon tower")==4&&countKind(scene,"evacuation pennant")==1,"evacuation destination has an assembly portico and a skyline beacon");
+     bool footing=true;for(size_t i=1;i<scene.navigation.mainRoute.size();i++){
+       auto a=scene.navigation.nodes[scene.navigation.mainRoute[i-1]].feet,z=scene.navigation.nodes[scene.navigation.mainRoute[i]].feet;
+       // Deliberate short stair strides can bridge the small final-tread gap
+       // with the full hull. Long lateral shortcuts must have centre footing.
+       if(std::abs(a.z-z.z)>.1||al::length(z-a)<=128)continue;
+       int samples=std::max(1,int(std::ceil(al::length(z-a)/8)));for(int n=0;n<=samples;n++)footing&=hull.routeSupported(a+(z-a)*(double(n)/samples),input.player);
+     }
+     check(footing,"long city route links follow floor centres instead of clipping a diagonal over a stair shaft");
+   }
+ }
+ check(countKind(world,"broken stair remnant")==7&&countKind(world,"exterior fire stair")==32,"hospital has a physically broken central flight and two real exterior flights");
+ check(countKind(world,"semicircular reception floor")==1&&std::any_of(world.architecture.elements.begin(),world.architecture.elements.end(),[](const auto& e){return e.kind=="semicircular reception floor"&&e.brush.faces.size()>6;}),"hospital contains convex non-rectangular reception architecture");
+ auto exit=std::find_if(world.mission.nodes.begin(),world.mission.nodes.end(),[](const auto& n){return n.role==Role::Exit;});
+ check(exit!=world.mission.nodes.end()&&exit->room==0&&exit->position.x>world.spatial.buildings[0].high.x,"hospital journey ends outside the reception in its planned courtyard");
+ auto unruined=settings;unruined.damage=0;auto intact=generate(unruined,registry);check(!countKind(intact,"broken stair remnant")&&countKind(intact,"exterior fire stair")==32,"zero damage restores the central flight while retaining the outdoor route");
+ const auto& mass=world.spatial.buildings[0];const double holeX=(mass.low.x+144+mass.bays.back()-128)/2,cy=(mass.low.y+mass.high.y)/2;
+ check(!collision.supported({holeX,cy,257},settings.player),"upper atrium has a real unsupported floor opening");
+ check(collision.supported({holeX,cy+mass.hall-32,257},settings.player),"atrium side gallery retains a supported player-width route");
+ auto corridorRegistry=registry;for(auto& preset:corridorRegistry.presets)if(preset.id==settings.preset)preset.layout="spine";
+ auto corridor=generate(settings,corridorRegistry);Collision corridorHull(corridor);
+ check(corridorHull.supported({holeX,cy,257},settings.player),"switching atrium grammar to spine changes actual floor geometry");
+ check(world.diagnostics.score.at("separatedRoutes")>=1&&corridor.diagnostics.score.at("separatedRoutes")==0,"physical alternatives distinguish atrium galleries from dense links in a single corridor");
+ auto compact=registry;for(auto& preset:compact.presets)if(preset.id==settings.preset){preset.rooms=2;preset.floors=1;}
+ WorldPlan demand;demand.mission=mission(settings,compact.preset(settings.preset));site(demand,settings,compact.preset(settings.preset));floorplan(demand,settings,compact.preset(settings.preset));
+ check(demand.spatial.buildings[0].rooms.size()>=demand.mission.nodes.size()-1,"mission demand expands the room program beyond its minimum architectural count");
+ auto metroSettings=settings;metroSettings.preset="metro";auto metro=generate(metroSettings,registry);Collision metroHull(metro);
+ auto pool=std::find_if(metro.architecture.elements.begin(),metro.architecture.elements.end(),[](const auto& e){return e.kind=="floodwater";});check(pool!=metro.architecture.elements.end(),"metro has an actual liquid brush");auto bounds=al::polyhedron(pool->brush);
+ check(std::all_of(pool->brush.faces.begin(),pool->brush.faces.end(),[](const auto& face){return face.attributes.empty();}),"classic Valve 220 water omits unsupported Q3 flag tuples");
+ auto q3MetroSettings=metroSettings;q3MetroSettings.profile=0;auto q3Metro=generate(q3MetroSettings,registry);
+ check(std::any_of(q3Metro.architecture.elements.begin(),q3Metro.architecture.elements.end(),[](const auto& e){return e.kind=="floodwater"&&std::all_of(e.brush.faces.begin(),e.brush.faces.end(),[](const auto& face){return face.attributes=="32 0 0";});}),"Q3 water carries explicit contents through the editor's face-attribute import and save path");
+ check(std::none_of(metro.navigation.nodes.begin(),metro.navigation.nodes.end(),[&](const auto& n){return inside(n.feet,bounds.min,bounds.max);}),"every planned metro navigation anchor stays on a dry platform or gallery");
+ check(!metroHull.blocked((bounds.min+bounds.max)*.5,(bounds.min+bounds.max)*.5,settings.player),"water contents do not create an invisible solid collision hull");
+ for(const auto& node:world.navigation.nodes)check(!collision.blocked(node.feet,node.feet,settings.player),"accepted physical node clears the actual player hull");
+ auto bytes=world.map;auto selected=settings;selected.dressing=.9;auto dressed=generate(selected,registry);check(world.spatial.buildings[0].low.x==dressed.spatial.buildings[0].low.x&&world.spatial.buildings[0].rooms[0].low.x==dressed.spatial.buildings[0].rooms[0].low.x,"dressing changes preserve the upstream site and room plan");
+ auto origin=world.navigation.nodes[0].feet;WorldPlan floor;floor.architecture.elements.push_back({0,"floor",al::box({-100,-100,-16},{100,100,0},"ground")});floor.architecture.elements.push_back({0,"step",al::box({10,-40,0},{50,40,16},"step")});Collision steps(floor);Player player;
+ auto foot=V{-20,0,1};for(int i=0;i<70;i++){auto next=steps.move(foot,foot+V{1,0,0},player);check(bool(next),"preview movement follows grounded step-up / step-down physics");foot=*next;}
+ check(foot.z>=16&&foot.z<=18,"preview walk raises the camera feet onto the real stair tread");
+ WorldPlan landing;landing.architecture.elements.push_back({0,"landing",al::box({-100,-100,-16},{100,0,0},"floor")});Collision landingHull(landing);
+ check(landingHull.supported({0,12,1},player),"a player's hull can touch a landing while its centre is over the shaft");
+ check(!landingHull.routeSupported({0,12,1},player),"route support rejects a corner-only contact over a stair opening");
+ check(landingHull.routeSupported({0,-24,1},player),"the supported landing centre remains available to navigation");
+ WorldPlan triangle;triangle.architecture.elements.push_back({0,"angled test hull",prism({{0,0,0},{100,0,0},{0,100,0}},0,64,"stone")});Collision corners(triangle);
+ check(!corners.blocked({120,-15,1},{140,-15,1},player),"exact convex/box sweep does not invent collision outside an angled corner");
+ check(corners.blocked({120,-15,1},{80,-10,1},player),"exact convex/box sweep catches a true angled corner intersection");
+ check(!corners.supported({120,-15,65},player),"an expanded angled corner cannot provide fictitious player support");
+ WorldPlan angled;angled.theme="medical";wall(angled,1,{0,0,0},{100,100,0},0,16,32,0);
+ check(angled.architecture.elements.size()==1&&std::abs(al::polyhedron(angled.architecture.elements[0].brush).volume-std::sqrt(20000.)*16*32)<.01,"rotated road/wall extrusion preserves outward planes and positive volume");
+ for(const char* metric:{"visibility","cover","verticality","landmarkVisibility","roomAssetCoverage","spawnExposure"})check(std::isfinite(world.diagnostics.score.at(metric))&&world.diagnostics.score.at(metric)>=0&&world.diagnostics.score.at(metric)<=1,"physical quality preferences are bounded finite measurements");
+ check(std::abs(world.diagnostics.score.at("shortSightlines")+world.diagnostics.score.at("mediumSightlines")+world.diagnostics.score.at("longSightlines")-1)<1e-9,"eye-height sightline bins cover the actual bounded ray samples");
+ WorldPlan coverScene;coverScene.navigation.nodes.push_back({{0,0,1},0,true});coverScene.navigation.mainRoute={0};coverScene.architecture.elements.push_back({0,"low cover",al::box({32,-32,0},{64,32,36},"cover")});Collision lowCover(coverScene);spatialQuality(coverScene,settings,lowCover,{{}});
+ check(coverScene.diagnostics.score.at("cover")==1,"low geometry with a clear eye-height view is measured as cover");
+ coverScene.architecture.elements[0].brush=al::box({32,-32,0},{64,32,96},"wall");Collision tallCover(coverScene);spatialQuality(coverScene,settings,tallCover,{{}});
+ check(coverScene.diagnostics.score.at("cover")==0&&coverScene.diagnostics.score.at("visibility")>0,"a tall occluder is distinguished from usable low cover and changes the sightline distribution");
+ auto mallDressing=settings;mallDressing.preset="mall";mallDressing.dressing=1;auto retail=generate(mallDressing,registry);check(countKind(retail,"service counter")>0,"civic theming retains semantic retail counters rather than replacing every program with office desks");
+ std::cout<<count<<" World Architect contracts passed\n";
+}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

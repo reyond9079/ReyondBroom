@@ -1,0 +1,1653 @@
+{
+  "sourceRevision": "88cce47eb74058e3dbecd8dbbb0609692b3c3fb0",
+  "method": "100 seeds x eight presets x three formats; four candidates per seed; deterministic replay, independent MAP parse and representative real BSP/light compilers",
+  "corpus": [
+    {
+      "profile": 2,
+      "accepted_batches": 800,
+      "attempts": 3200,
+      "rejections": 21,
+      "compiled": [
+        "checkpoint",
+        "hospital",
+        "metro",
+        "factory",
+        "courtyard",
+        "overpass",
+        "mall",
+        "evacuation"
+      ],
+      "presets": {
+        "checkpoint": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 82,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 791,
+            "mean": 1065.05,
+            "max": 1137
+          },
+          "mapBytes": {
+            "min": 1051126,
+            "mean": 1423300.55,
+            "max": 1521231
+          },
+          "routeUnits": {
+            "min": 9626.032832524123,
+            "mean": 10771.613510756702,
+            "max": 11360.703539736756
+          },
+          "generationMs": {
+            "min": 97.213683,
+            "mean": 151.92390176,
+            "max": 209.393056
+          },
+          "roomHeightKinds": {
+            "min": 4,
+            "mean": 6.25,
+            "max": 7
+          }
+        },
+        "courtyard": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 89,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 771,
+            "mean": 993.59,
+            "max": 1110
+          },
+          "mapBytes": {
+            "min": 1039015,
+            "mean": 1341054.43,
+            "max": 1499692
+          },
+          "routeUnits": {
+            "min": 17882.143441024866,
+            "mean": 24180.19629758141,
+            "max": 29461.0652655768
+          },
+          "generationMs": {
+            "min": 108.553108,
+            "mean": 169.66318928,
+            "max": 348.024675
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "evacuation": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 92,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 722,
+            "mean": 925.4,
+            "max": 1164
+          },
+          "mapBytes": {
+            "min": 983091,
+            "mean": 1258267.63,
+            "max": 1581460
+          },
+          "routeUnits": {
+            "min": 7903.40818043084,
+            "mean": 22836.880584305407,
+            "max": 34258.91971149607
+          },
+          "generationMs": {
+            "min": 71.537726,
+            "mean": 115.53429049,
+            "max": 199.004618
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "factory": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 84,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 982,
+            "mean": 1079.42,
+            "max": 1256
+          },
+          "mapBytes": {
+            "min": 1413035,
+            "mean": 1561320.87,
+            "max": 1834645
+          },
+          "routeUnits": {
+            "min": 15218.891705723665,
+            "mean": 16338.585083543729,
+            "max": 18067.977330873477
+          },
+          "generationMs": {
+            "min": 117.010368,
+            "mean": 171.75658292,
+            "max": 311.899906
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 6.2,
+            "max": 7
+          }
+        },
+        "hospital": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 965,
+            "mean": 1019.59,
+            "max": 1089
+          },
+          "mapBytes": {
+            "min": 1289222,
+            "mean": 1361761.04,
+            "max": 1454229
+          },
+          "routeUnits": {
+            "min": 11154.567972346518,
+            "mean": 13229.586838964999,
+            "max": 15045.845125343618
+          },
+          "generationMs": {
+            "min": 85.196246,
+            "mean": 104.06850376,
+            "max": 147.545851
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.93,
+            "max": 6
+          }
+        },
+        "mall": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 80,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 669,
+            "mean": 709.65,
+            "max": 748
+          },
+          "mapBytes": {
+            "min": 895720,
+            "mean": 950069.8,
+            "max": 1004503
+          },
+          "routeUnits": {
+            "min": 10858.65474483361,
+            "mean": 12224.254866008714,
+            "max": 14552.439486926845
+          },
+          "generationMs": {
+            "min": 58.47668,
+            "mean": 75.0025163,
+            "max": 111.039416
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 4.97,
+            "max": 7
+          }
+        },
+        "metro": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 496,
+            "mean": 522.18,
+            "max": 556
+          },
+          "mapBytes": {
+            "min": 663794,
+            "mean": 698963.08,
+            "max": 744445
+          },
+          "routeUnits": {
+            "min": 11888.43687286908,
+            "mean": 13088.684194280502,
+            "max": 15202.35786748093
+          },
+          "generationMs": {
+            "min": 41.480700000000006,
+            "mean": 57.6855241,
+            "max": 98.090568
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 5.37,
+            "max": 6
+          }
+        },
+        "overpass": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 789,
+            "mean": 1024.09,
+            "max": 1222
+          },
+          "mapBytes": {
+            "min": 1064787,
+            "mean": 1380817.19,
+            "max": 1646702
+          },
+          "routeUnits": {
+            "min": 16166.276871050482,
+            "mean": 28162.00065641552,
+            "max": 33970.0498289258
+          },
+          "generationMs": {
+            "min": 99.867215,
+            "mean": 167.84949251999998,
+            "max": 297.013012
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.96,
+            "max": 6
+          }
+        }
+      },
+      "compileSeconds": {
+        "checkpoint": 3.359039438975742,
+        "hospital": 2.0604871720133815,
+        "metro": 0.6792157810123172,
+        "factory": 4.65398853798979,
+        "courtyard": 1.864436827978352,
+        "overpass": 2.3559873180056456,
+        "mall": 1.856300168990856,
+        "evacuation": 3.319966924987966
+      },
+      "waterLeaves": 6
+    },
+    {
+      "profile": 0,
+      "accepted_batches": 800,
+      "attempts": 3200,
+      "rejections": 21,
+      "compiled": [
+        "checkpoint",
+        "hospital",
+        "metro",
+        "factory",
+        "courtyard",
+        "overpass",
+        "mall",
+        "evacuation"
+      ],
+      "presets": {
+        "checkpoint": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 82,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 785,
+            "mean": 1059.05,
+            "max": 1131
+          },
+          "mapBytes": {
+            "min": 1043001,
+            "mean": 1415175.55,
+            "max": 1513106
+          },
+          "routeUnits": {
+            "min": 9626.032832524123,
+            "mean": 10771.613510756702,
+            "max": 11360.703539736756
+          },
+          "generationMs": {
+            "min": 99.908851,
+            "mean": 169.09650484999997,
+            "max": 299.896138
+          },
+          "roomHeightKinds": {
+            "min": 4,
+            "mean": 6.25,
+            "max": 7
+          }
+        },
+        "courtyard": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 89,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 765,
+            "mean": 987.59,
+            "max": 1104
+          },
+          "mapBytes": {
+            "min": 1030872,
+            "mean": 1332881.73,
+            "max": 1491519
+          },
+          "routeUnits": {
+            "min": 17882.143441024866,
+            "mean": 24180.19629758141,
+            "max": 29461.0652655768
+          },
+          "generationMs": {
+            "min": 88.850619,
+            "mean": 120.66328308,
+            "max": 177.81070300000002
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "evacuation": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 92,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 716,
+            "mean": 919.4,
+            "max": 1158
+          },
+          "mapBytes": {
+            "min": 974948,
+            "mean": 1250124.63,
+            "max": 1573317
+          },
+          "routeUnits": {
+            "min": 7903.40818043084,
+            "mean": 22836.880584305407,
+            "max": 34258.91971149607
+          },
+          "generationMs": {
+            "min": 68.638961,
+            "mean": 111.43847355,
+            "max": 190.792247
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "factory": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 84,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 976,
+            "mean": 1073.42,
+            "max": 1250
+          },
+          "mapBytes": {
+            "min": 1405060,
+            "mean": 1553345.87,
+            "max": 1826670
+          },
+          "routeUnits": {
+            "min": 15218.891705723665,
+            "mean": 16338.585083543729,
+            "max": 18067.977330873477
+          },
+          "generationMs": {
+            "min": 120.191176,
+            "mean": 160.1376727,
+            "max": 269.287088
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 6.2,
+            "max": 7
+          }
+        },
+        "hospital": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 959,
+            "mean": 1013.59,
+            "max": 1083
+          },
+          "mapBytes": {
+            "min": 1281127,
+            "mean": 1353666.04,
+            "max": 1446134
+          },
+          "routeUnits": {
+            "min": 11154.567972346518,
+            "mean": 13229.586838964999,
+            "max": 15045.845125343618
+          },
+          "generationMs": {
+            "min": 82.59469700000001,
+            "mean": 105.30867827,
+            "max": 155.532699
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.93,
+            "max": 6
+          }
+        },
+        "mall": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 80,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 663,
+            "mean": 703.65,
+            "max": 742
+          },
+          "mapBytes": {
+            "min": 887685,
+            "mean": 942034.8,
+            "max": 996468
+          },
+          "routeUnits": {
+            "min": 10858.65474483361,
+            "mean": 12224.254866008714,
+            "max": 14552.439486926845
+          },
+          "generationMs": {
+            "min": 57.1898,
+            "mean": 69.37046435,
+            "max": 98.293228
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 4.97,
+            "max": 7
+          }
+        },
+        "metro": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 490,
+            "mean": 516.18,
+            "max": 550
+          },
+          "mapBytes": {
+            "min": 655747,
+            "mean": 690916.08,
+            "max": 736398
+          },
+          "routeUnits": {
+            "min": 11888.43687286908,
+            "mean": 13088.684194280502,
+            "max": 15202.35786748093
+          },
+          "generationMs": {
+            "min": 41.537829,
+            "mean": 54.62601699,
+            "max": 81.074616
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 5.37,
+            "max": 6
+          }
+        },
+        "overpass": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 783,
+            "mean": 1018.09,
+            "max": 1216
+          },
+          "mapBytes": {
+            "min": 1056644,
+            "mean": 1372644.79,
+            "max": 1638529
+          },
+          "routeUnits": {
+            "min": 16166.276871050482,
+            "mean": 28162.00065641552,
+            "max": 33970.0498289258
+          },
+          "generationMs": {
+            "min": 90.636068,
+            "mean": 126.51644254000001,
+            "max": 184.568555
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.96,
+            "max": 6
+          }
+        }
+      },
+      "compileSeconds": {
+        "checkpoint": 2.1622981379914563,
+        "hospital": 3.2073801920050755,
+        "metro": 1.2998995340021793,
+        "factory": 2.213894354994409,
+        "courtyard": 2.8810634129913524,
+        "overpass": 2.939196561987046,
+        "mall": 2.1182979779841844,
+        "evacuation": 2.7437714539992157
+      },
+      "waterShaders": 1
+    },
+    {
+      "profile": 1,
+      "accepted_batches": 800,
+      "attempts": 3200,
+      "rejections": 21,
+      "compiled": [
+        "checkpoint",
+        "hospital",
+        "metro",
+        "factory",
+        "courtyard",
+        "overpass",
+        "mall",
+        "evacuation"
+      ],
+      "presets": {
+        "checkpoint": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 82,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 785,
+            "mean": 1059.05,
+            "max": 1131
+          },
+          "mapBytes": {
+            "min": 1042996,
+            "mean": 1415170.55,
+            "max": 1513101
+          },
+          "routeUnits": {
+            "min": 9626.032832524123,
+            "mean": 10771.613510756702,
+            "max": 11360.703539736756
+          },
+          "generationMs": {
+            "min": 91.293175,
+            "mean": 141.02661455999998,
+            "max": 223.347556
+          },
+          "roomHeightKinds": {
+            "min": 4,
+            "mean": 6.25,
+            "max": 7
+          }
+        },
+        "courtyard": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 89,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 765,
+            "mean": 987.59,
+            "max": 1104
+          },
+          "mapBytes": {
+            "min": 1030867,
+            "mean": 1332876.73,
+            "max": 1491514
+          },
+          "routeUnits": {
+            "min": 17882.143441024866,
+            "mean": 24180.19629758141,
+            "max": 29461.0652655768
+          },
+          "generationMs": {
+            "min": 82.19084099999999,
+            "mean": 123.76306832,
+            "max": 198.483064
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "evacuation": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 92,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 716,
+            "mean": 919.4,
+            "max": 1158
+          },
+          "mapBytes": {
+            "min": 974943,
+            "mean": 1250119.63,
+            "max": 1573312
+          },
+          "routeUnits": {
+            "min": 7903.40818043084,
+            "mean": 22836.880584305407,
+            "max": 34258.91971149607
+          },
+          "generationMs": {
+            "min": 71.699663,
+            "mean": 107.56137525,
+            "max": 167.627459
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.99,
+            "max": 6
+          }
+        },
+        "factory": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 84,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 976,
+            "mean": 1073.42,
+            "max": 1250
+          },
+          "mapBytes": {
+            "min": 1405055,
+            "mean": 1553340.87,
+            "max": 1826665
+          },
+          "routeUnits": {
+            "min": 15218.891705723665,
+            "mean": 16338.585083543729,
+            "max": 18067.977330873477
+          },
+          "generationMs": {
+            "min": 117.590327,
+            "mean": 145.07196381,
+            "max": 207.018873
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 6.2,
+            "max": 7
+          }
+        },
+        "hospital": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 959,
+            "mean": 1013.59,
+            "max": 1083
+          },
+          "mapBytes": {
+            "min": 1281122,
+            "mean": 1353661.04,
+            "max": 1446129
+          },
+          "routeUnits": {
+            "min": 11154.567972346518,
+            "mean": 13229.586838964999,
+            "max": 15045.845125343618
+          },
+          "generationMs": {
+            "min": 82.299401,
+            "mean": 97.44228563,
+            "max": 145.489067
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.93,
+            "max": 6
+          }
+        },
+        "mall": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 80,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 663,
+            "mean": 703.65,
+            "max": 742
+          },
+          "mapBytes": {
+            "min": 887680,
+            "mean": 942029.8,
+            "max": 996463
+          },
+          "routeUnits": {
+            "min": 10858.65474483361,
+            "mean": 12224.254866008714,
+            "max": 14552.439486926845
+          },
+          "generationMs": {
+            "min": 56.706612,
+            "mean": 70.19150219,
+            "max": 95.651923
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 4.97,
+            "max": 7
+          }
+        },
+        "metro": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 1,
+            "rooms": 100,
+            "roads": 1,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 490,
+            "mean": 516.18,
+            "max": 550
+          },
+          "mapBytes": {
+            "min": 655742,
+            "mean": 690911.08,
+            "max": 736393
+          },
+          "routeUnits": {
+            "min": 11888.43687286908,
+            "mean": 13088.684194280502,
+            "max": 15202.35786748093
+          },
+          "generationMs": {
+            "min": 40.601334,
+            "mean": 47.97225981,
+            "max": 70.879618
+          },
+          "roomHeightKinds": {
+            "min": 3,
+            "mean": 5.37,
+            "max": 6
+          }
+        },
+        "overpass": {
+          "batches": 100,
+          "uniqueSelectedSeeds": 100,
+          "structuralVariation": {
+            "masses": 100,
+            "rooms": 100,
+            "roads": 100,
+            "mission": 86,
+            "architecture": 100
+          },
+          "brushes": {
+            "min": 783,
+            "mean": 1018.09,
+            "max": 1216
+          },
+          "mapBytes": {
+            "min": 1056639,
+            "mean": 1372639.79,
+            "max": 1638524
+          },
+          "routeUnits": {
+            "min": 16166.276871050482,
+            "mean": 28162.00065641552,
+            "max": 33970.0498289258
+          },
+          "generationMs": {
+            "min": 93.715001,
+            "mean": 126.38721154000001,
+            "max": 189.897868
+          },
+          "roomHeightKinds": {
+            "min": 5,
+            "mean": 5.96,
+            "max": 6
+          }
+        }
+      },
+      "compileSeconds": {
+        "checkpoint": 1.8194189720088616,
+        "hospital": 2.8503195669909474,
+        "metro": 0.8905045519932173,
+        "factory": 1.6795555949793197,
+        "courtyard": 2.0943820110114757,
+        "overpass": 2.245338303007884,
+        "mall": 1.6437434839899652,
+        "evacuation": 2.2736057529982645
+      },
+      "waterShaders": 1
+    }
+  ],
+  "captureProvenance": {
+    "hospital": {
+      "source": "/workspace/reyon7/final-gameplay/full-review-4/hospital-walk-60.png",
+      "sourceSha256": "a6b1c6628ce8b3b65e7d2aeb21cc2615975c618bb3712e381fb23790ed796e3c",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    },
+    "metro": {
+      "source": "/workspace/reyon7/final-gameplay/full-review-5/metro-walk-12.png",
+      "sourceSha256": "90f8337385bd7a8457d55e4cf2618ced945cbc3e7242c9fe894fd3fcad5446f0",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    },
+    "city": {
+      "source": "/workspace/reyon7/final-gameplay/full-review-5/evacuation-walk-48.png",
+      "sourceSha256": "25e8bfa3a9f4896a7d8f70b00934c6c068eb451fff84ca8fa41bc786e74eb60a",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    },
+    "stair-lighting": {
+      "source": "/workspace/reyon7/stair-light-review/engine/captures/hospital-exterior-stair-lit.png",
+      "sourceSha256": "cd28f74a2c1365885b71e714c4a80e66e8257655e138383d5163aa0c6cc42050",
+      "crop": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "transformation": "Only desktop margins removed; game pixels unchanged"
+    }
+  },
+  "humanStyleReview": {
+    "date": "2026-11-12",
+    "evidence": "Actual hospital, metro and city game captures shown inline in chat",
+    "response": "Принимаю текущий стиль",
+    "scope": "Environment style accepted; this does not assert a full human route walkthrough."
+  },
+  "platformRuns": {
+    "production": 43171833201,
+    "preparedWindowsLocal": 43176652194,
+    "preparedWindowsRemaining": 43177426103,
+    "repairedSource": 43181102872,
+    "windowsFullRun88": {
+      "run": 43181102872,
+      "status": "Stopped at a test-fixture-only byte comparison after preceding World scenarios passed",
+      "actualExport": "Byte-identical to imported JSON map payload; separate C++ text fixture had CRLF bytes on Windows",
+      "continuation": "Prepared matching Windows binaries; run only corrected authored-module UI and the remaining placement integration; final result linked from PR45"
+    }
+  },
+  "promotionEvidence": {
+    "native": {
+      "moduleSha256": "6d88a0edff2716f25b82264c4ab804ab4d624f548a82c75804d00dbb09c51781",
+      "change": "Only primary/legacy menu organization and World workspace labels since production049; generator/QC unchanged",
+      "immutableFile": "/workspace/reyon7/fteplug-world-promoted.so"
+    },
+    "workspaceChecks": [
+      "the first workspace tab click is received after actual OS activation",
+      "settings Undo restores the previous independent seed edit",
+      "a second settings Undo restores the original seed",
+      "settings Redo survives the Undo button action and restores both edits",
+      "actual UI generates accepted candidates without mutating the scene",
+      "candidate generation and preview leave authored brushes unchanged",
+      "chosen candidate passes the physical hull navigation oracle",
+      "project saves the selected candidate and complete preset registry snapshot",
+      "project reopen and regeneration restore the exact selected candidate",
+      "3D preview contains actual textured architecture instead of a missing render target",
+      "export writes actual brush MAP and a versioned editable project",
+      "portable export includes real original WAD and texture assets",
+      "Apply waits for an executed QC map transaction acknowledgment",
+      "Apply inserts editable generated brushes",
+      "Apply retains every original authored brush plane",
+      "one Undo restores the original scene",
+      "one Redo restores the complete generated world",
+      "execution-time epoch guard rejects a stale request without changing the map",
+      "import protocol rejects path-shaped request tokens",
+      "invalid staged MAP is rejected atomically",
+      "rejected imports do not create extra map Undo transactions",
+      "rejected imports preserve the previous complete Redo transaction",
+      "freezing architecture retains the selected site while later stages use a new seed",
+      "regeneration reuses the actual frozen prefix cache",
+      "saved project restores frozen stage recipes and its selected candidate",
+      "freeze, regeneration and project replay leave authored map geometry unchanged"
+    ],
+    "entryChecks": [
+      "workspace closes without affecting the map",
+      "primary Plugins menu opens World Architect through actual OS input",
+      "preserved AutoLevel opens through the explicit Legacy generators submenu"
+    ],
+    "CIpolicyChecks": 32,
+    "finalEightPresetApplyChecks": [
+      "the first workspace tab click is received after actual OS activation",
+      "hospital best candidate executes actual owned Apply",
+      "hospital owns real editable map groups after insertion",
+      "hospital Apply is one atomic map Undo",
+      "checkpoint best candidate executes actual owned Apply",
+      "checkpoint owns real editable map groups after insertion",
+      "checkpoint Apply is one atomic map Undo",
+      "metro best candidate executes actual owned Apply",
+      "metro owns real editable map groups after insertion",
+      "metro Apply is one atomic map Undo",
+      "factory best candidate executes actual owned Apply",
+      "factory owns real editable map groups after insertion",
+      "factory Apply is one atomic map Undo",
+      "courtyard best candidate executes actual owned Apply",
+      "courtyard owns real editable map groups after insertion",
+      "courtyard Apply is one atomic map Undo",
+      "overpass best candidate executes actual owned Apply",
+      "overpass owns real editable map groups after insertion",
+      "overpass Apply is one atomic map Undo",
+      "mall best candidate executes actual owned Apply",
+      "mall owns real editable map groups after insertion",
+      "mall Apply is one atomic map Undo",
+      "evacuation best candidate executes actual owned Apply",
+      "evacuation owns real editable map groups after insertion",
+      "evacuation Apply is one atomic map Undo"
+    ]
+  },
+  "previousCorpusSourceRevision": "049be4c0e4bff5f69981d1512d428a68b563ec11",
+  "previousPipelinePerformance": {
+    "sourceRevision": "049be4c",
+    "elapsedSeconds": 1312.9308133150043,
+    "pipelinePeakRssKiB": 741456,
+    "pipelineIncludes": "Fixture compilation, 100-seed/preset/profile deterministic generation and replay, actual BSP/light compilers",
+    "userSeconds": 1311.415973,
+    "systemSeconds": 10.788763,
+    "exitCode": 0
+  },
+  "performance": {
+    "pipelines": [
+      {
+        "profiles": [
+          2
+        ],
+        "elapsedSeconds": 605.0131433010101,
+        "productionSourceHashes": {
+          "native/world_architect/assets.h": "24895db4a5c402431e569cb4a3ffdee0b23336b3ebd1c82f6603197ea2948fb3",
+          "native/world_architect/gates.h": "595089efe09a4d588993ba9e474232e880d64fc34d005ab57d6446978ba8ae03",
+          "native/world_architect/generator.h": "a3f7297b467b3c87caea8742c7c80a8708d72b08ea855c14907ac06f6978c2a5",
+          "native/world_architect/legacy.h": "7892772ac0761b6546d2837e06cf714b57461627a7963738405ad56a9cc5221f",
+          "native/world_architect/module_kits.h": "761a33aa41013cdc722218f2a123f25bf06dc3312c26797d0fae78547086a03c",
+          "native/world_architect/plan.h": "623d3c4f8a3c9c30d8b7d0cc7a7f7de6364e0db25e4b866ee2b4611b1e253e5f",
+          "native/world_architect/quality.h": "924c70ee34625c01164c726232a3846dc08c1df49119b73e52f4e91e69544c2a",
+          "native/world_architect/scenario_kits.h": "27006cf7241bdf64f13b7d9886f4cc1e7c75ba7376d291d7c3f0c84b99c60377",
+          "native/world_architect/theme_kits.h": "a7b464cf36f9a1fe9b84435471314729bc50a8f09598c965460bf75f78b3c818",
+          "plugins/autolevel/al_brush.h": "e838e3b2644e16a271bf827927cf44c70dbbb4fe86326bc73f24dcc45f45cc56",
+          "plugins/autolevel/al_build_map.h": "3a642aea9b8a94c6cbcedf0144840b08a4f1c43b19423ac3605e5134d644965e",
+          "plugins/autolevel/al_default_repo.h": "56ff36264122f937910de4a6c931afda48bd9fae7faa02711dcbc5e6140afac6",
+          "plugins/autolevel/al_fill.h": "60bebbfefc6da8c3e588cad7895ea5e0d3b288861df4946529d03df4cfef712e",
+          "plugins/autolevel/al_group_solver.h": "f0a25ece07a48c24dda4a3963eccf340ebf6fe41608a3cd5f7776f1260ea3a95",
+          "plugins/autolevel/al_hash.h": "303d96cf8ec34ff87361e4a463000c4d00cbf46bfb933f4e9458ae991313997a",
+          "plugins/autolevel/al_math.h": "d45e6d495bb58593e5ebeee59cde9188691b0218ad2129a6a92583a610b588f7",
+          "plugins/autolevel/al_model.h": "7a8654181db2b9066bd7bcb0ca108f6604b68c9d3d291e3da3c9bfc4744bdd3e",
+          "plugins/autolevel/al_repo_compile.h": "190dfeb70cc6aee236985eb8f98ecb39e2a4f2149c6ec44e8fc8aa2d0c9bdf95",
+          "plugins/autolevel/al_solver.h": "e2b12b83da646ea22ed3eea7d10d49a6d2b09a2b77be410fc12c18c7f76b5947",
+          "plugins/autolevel/al_storage.h": "3e6601a2ff84699b6f7fe84b98a19ff479537f31edc674931afb59e025a28641",
+          "plugins/autolevel/al_ui.h": "29e62aaf6f8862201bdca2c2639f7e3e0248c3defbaf3a540b9e6bf6ad92a24e",
+          "plugins/autolevel/al_viewport.h": "c2c6a1a844b91971fb9b63e52fe2e6f19186cc5de4dc12431e40083bcaccd6fb",
+          "plugins/autolevel/al_brush.cpp": "7027ed39234350a735e4a651e0b8bd958a0520c7920c805145d69b0058e7ae16",
+          "runtime/world-architect/registry.json": "e985eab2c344c7b030db20becf2e8bb9b35d4414283453a2f3e021c5e9ae3fb8"
+        },
+        "contractSummary": "413 World Architect contracts passed"
+      },
+      {
+        "profiles": [
+          0,
+          1
+        ],
+        "elapsedSeconds": 1037.5532190799713,
+        "productionSourceHashes": {
+          "native/world_architect/assets.h": "24895db4a5c402431e569cb4a3ffdee0b23336b3ebd1c82f6603197ea2948fb3",
+          "native/world_architect/gates.h": "595089efe09a4d588993ba9e474232e880d64fc34d005ab57d6446978ba8ae03",
+          "native/world_architect/generator.h": "a3f7297b467b3c87caea8742c7c80a8708d72b08ea855c14907ac06f6978c2a5",
+          "native/world_architect/legacy.h": "7892772ac0761b6546d2837e06cf714b57461627a7963738405ad56a9cc5221f",
+          "native/world_architect/module_kits.h": "761a33aa41013cdc722218f2a123f25bf06dc3312c26797d0fae78547086a03c",
+          "native/world_architect/plan.h": "623d3c4f8a3c9c30d8b7d0cc7a7f7de6364e0db25e4b866ee2b4611b1e253e5f",
+          "native/world_architect/quality.h": "924c70ee34625c01164c726232a3846dc08c1df49119b73e52f4e91e69544c2a",
+          "native/world_architect/scenario_kits.h": "27006cf7241bdf64f13b7d9886f4cc1e7c75ba7376d291d7c3f0c84b99c60377",
+          "native/world_architect/theme_kits.h": "a7b464cf36f9a1fe9b84435471314729bc50a8f09598c965460bf75f78b3c818",
+          "plugins/autolevel/al_brush.h": "e838e3b2644e16a271bf827927cf44c70dbbb4fe86326bc73f24dcc45f45cc56",
+          "plugins/autolevel/al_build_map.h": "3a642aea9b8a94c6cbcedf0144840b08a4f1c43b19423ac3605e5134d644965e",
+          "plugins/autolevel/al_default_repo.h": "56ff36264122f937910de4a6c931afda48bd9fae7faa02711dcbc5e6140afac6",
+          "plugins/autolevel/al_fill.h": "60bebbfefc6da8c3e588cad7895ea5e0d3b288861df4946529d03df4cfef712e",
+          "plugins/autolevel/al_group_solver.h": "f0a25ece07a48c24dda4a3963eccf340ebf6fe41608a3cd5f7776f1260ea3a95",
+          "plugins/autolevel/al_hash.h": "303d96cf8ec34ff87361e4a463000c4d00cbf46bfb933f4e9458ae991313997a",
+          "plugins/autolevel/al_math.h": "d45e6d495bb58593e5ebeee59cde9188691b0218ad2129a6a92583a610b588f7",
+          "plugins/autolevel/al_model.h": "7a8654181db2b9066bd7bcb0ca108f6604b68c9d3d291e3da3c9bfc4744bdd3e",
+          "plugins/autolevel/al_repo_compile.h": "190dfeb70cc6aee236985eb8f98ecb39e2a4f2149c6ec44e8fc8aa2d0c9bdf95",
+          "plugins/autolevel/al_solver.h": "e2b12b83da646ea22ed3eea7d10d49a6d2b09a2b77be410fc12c18c7f76b5947",
+          "plugins/autolevel/al_storage.h": "3e6601a2ff84699b6f7fe84b98a19ff479537f31edc674931afb59e025a28641",
+          "plugins/autolevel/al_ui.h": "29e62aaf6f8862201bdca2c2639f7e3e0248c3defbaf3a540b9e6bf6ad92a24e",
+          "plugins/autolevel/al_viewport.h": "c2c6a1a844b91971fb9b63e52fe2e6f19186cc5de4dc12431e40083bcaccd6fb",
+          "plugins/autolevel/al_brush.cpp": "7027ed39234350a735e4a651e0b8bd958a0520c7920c805145d69b0058e7ae16",
+          "runtime/world-architect/registry.json": "e985eab2c344c7b030db20becf2e8bb9b35d4414283453a2f3e021c5e9ae3fb8"
+        },
+        "contractSummary": "414 World Architect contracts passed"
+      }
+    ],
+    "execution": "Independent profile pipelines ran concurrently with actual editor/game QA; wall clocks include fixture builds, all deterministic replay and representative BSP/light compilers",
+    "coreSample": {
+      "sourceRevision": "88cce47eb74058e3dbecd8dbbb0609692b3c3fb0",
+      "case": "evacuation seed1, default Quake1 profile",
+      "elapsedSeconds": 0.1792215860041324,
+      "peakRssKiB": 9668,
+      "scope": "Standalone typed core, one world and diagnostic JSON output; excludes editor, GL and compilers; concurrent QA load"
+    }
+  },
+  "routeGeometryIsolation": {
+    "before": "970cd67170f237542fb8c59fce95a076f7c5cf66",
+    "after": "88cce47eb74058e3dbecd8dbbb0609692b3c3fb0",
+    "method": "Independent old and new generator binaries; byte-exact generated MAP comparison. Navigation changes, architecture/export does not.",
+    "records": [
+      {
+        "profile": 2,
+        "preset": "checkpoint",
+        "seed": 1,
+        "mapSha256": "3c942eabf1de30cf638822a02546e21e6bb1ee3130de601b5574080bf0c65eff",
+        "bytes": 1516034,
+        "oldRoute": 10872.90275179892,
+        "newRoute": 10986.434507827951
+      },
+      {
+        "profile": 2,
+        "preset": "checkpoint",
+        "seed": 2,
+        "mapSha256": "a4fbfb47b51427be5042cff54fa579ee4a032bcfb44a5ec8e0f9be8c8d4d1346",
+        "bytes": 1245924,
+        "oldRoute": 9626.476859467206,
+        "newRoute": 9716.414194161656
+      },
+      {
+        "profile": 2,
+        "preset": "hospital",
+        "seed": 1,
+        "mapSha256": "cf58d04fbf44a6bcd27e98917e087dfad7fafcfd8a5f0d450b43f94817dafc00",
+        "bytes": 1305247,
+        "oldRoute": 13384.309033638508,
+        "newRoute": 13652.31095610141
+      },
+      {
+        "profile": 2,
+        "preset": "hospital",
+        "seed": 2,
+        "mapSha256": "cda8e696b4a4bd916448e6d42ff06a3e94b3dda0a49783855eb598fab1ac27a7",
+        "bytes": 1353814,
+        "oldRoute": 14577.372418677105,
+        "newRoute": 14838.279949585249
+      },
+      {
+        "profile": 2,
+        "preset": "metro",
+        "seed": 1,
+        "mapSha256": "0a50f0f4d2c9686d72df20a8c23372e43c961b1e3b87d6a42f7ec0f117703643",
+        "bytes": 670648,
+        "oldRoute": 12650.07013380001,
+        "newRoute": 12744.923515698174
+      },
+      {
+        "profile": 2,
+        "preset": "metro",
+        "seed": 2,
+        "mapSha256": "a2694af4d38862d76a75ad5e317156e62e5946fc4d58d898dbf2f3eb9bfbc681",
+        "bytes": 682850,
+        "oldRoute": 14889.251330507977,
+        "newRoute": 14984.104712406142
+      },
+      {
+        "profile": 2,
+        "preset": "factory",
+        "seed": 1,
+        "mapSha256": "4e1d1c62e06df7e7dbf865cc075eb1bf5ae2d35a2254822a36d5bca5025b8b4d",
+        "bytes": 1695859,
+        "oldRoute": 16003.715813471621,
+        "newRoute": 16098.569195369782
+      },
+      {
+        "profile": 2,
+        "preset": "factory",
+        "seed": 2,
+        "mapSha256": "876b281557d73b614f1e87d3349312c5173d65153355b6d8cefaa0e2b1160caa",
+        "bytes": 1693608,
+        "oldRoute": 15930.43031758809,
+        "newRoute": 16025.283699486254
+      },
+      {
+        "profile": 2,
+        "preset": "courtyard",
+        "seed": 1,
+        "mapSha256": "9c1ec3ed9cebeab52a6f42df303f7fde666c7bd63c39dcca895f792c0c8e1a0d",
+        "bytes": 1473555,
+        "oldRoute": 24191.449739867836,
+        "newRoute": 24736.436362390337
+      },
+      {
+        "profile": 2,
+        "preset": "courtyard",
+        "seed": 2,
+        "mapSha256": "f12cb445141f885497ae49788c34d7f9498879bad9cdde78938323330a46f2e4",
+        "bytes": 1305605,
+        "oldRoute": 27794.389056797932,
+        "newRoute": 28407.938768002226
+      },
+      {
+        "profile": 2,
+        "preset": "overpass",
+        "seed": 1,
+        "mapSha256": "c978d36a7e72ad1370d2a5b4253fe34db48dfcdef300baf7c23bb5878e1814dc",
+        "bytes": 1512415,
+        "oldRoute": 24816.880349845444,
+        "newRoute": 25312.902123703814
+      },
+      {
+        "profile": 2,
+        "preset": "overpass",
+        "seed": 2,
+        "mapSha256": "0558d82d4a3041045b61713d3aa9feb899d13e1e6b24480a1584bfba43576ada",
+        "bytes": 1366890,
+        "oldRoute": 32767.605901286093,
+        "newRoute": 33491.15231905848
+      },
+      {
+        "profile": 2,
+        "preset": "mall",
+        "seed": 1,
+        "mapSha256": "9cfb0fdba71f9b12810fa1d4d431d913583dec5876b63eaf9db3c03d004f1c73",
+        "bytes": 908823,
+        "oldRoute": 11562.308833296827,
+        "newRoute": 12028.07321668188
+      },
+      {
+        "profile": 2,
+        "preset": "mall",
+        "seed": 2,
+        "mapSha256": "7f9f9fb6d09277bc89f3ebe372e80432e37b2f61b4f3ad0420a4989868db875b",
+        "bytes": 954594,
+        "oldRoute": 13899.802749896899,
+        "newRoute": 14365.567133281951
+      },
+      {
+        "profile": 2,
+        "preset": "evacuation",
+        "seed": 1,
+        "mapSha256": "b48ab3c3004dd737776827f440e25e6a149b74bcac063c35e6a8496480a9b1ad",
+        "bytes": 1522385,
+        "oldRoute": 26902.9787235941,
+        "newRoute": 27358.02801142214
+      },
+      {
+        "profile": 2,
+        "preset": "evacuation",
+        "seed": 2,
+        "mapSha256": "b81dd0bb16089907793893faa26905ae2cad8383e4b06999a20ed5fcf2666b1a",
+        "bytes": 1210266,
+        "oldRoute": 27399.59499876355,
+        "newRoute": 27854.64428659159
+      },
+      {
+        "profile": 0,
+        "preset": "checkpoint",
+        "seed": 1,
+        "mapSha256": "bd063f2723a428d9d931eef5a43d95a7f5a606d25d3ca581e7df9683e68c52bc",
+        "bytes": 1507909,
+        "oldRoute": 10872.90275179892,
+        "newRoute": 10986.434507827951
+      },
+      {
+        "profile": 0,
+        "preset": "checkpoint",
+        "seed": 2,
+        "mapSha256": "83e3e746d96989f7bace39ca68bc05af5fd22174c21f18521acf3a6c5a591895",
+        "bytes": 1237799,
+        "oldRoute": 9626.476859467206,
+        "newRoute": 9716.414194161656
+      },
+      {
+        "profile": 0,
+        "preset": "hospital",
+        "seed": 1,
+        "mapSha256": "157ecd6f59588a5700642eea0e8547226908e4c555898f51440743cbd4b87250",
+        "bytes": 1297152,
+        "oldRoute": 13384.309033638508,
+        "newRoute": 13652.31095610141
+      },
+      {
+        "profile": 0,
+        "preset": "hospital",
+        "seed": 2,
+        "mapSha256": "cfe4b9f98d76502afae886886e28251ed1960c9ff68b748341bf75d0249fd845",
+        "bytes": 1345719,
+        "oldRoute": 14577.372418677105,
+        "newRoute": 14838.279949585249
+      },
+      {
+        "profile": 0,
+        "preset": "metro",
+        "seed": 1,
+        "mapSha256": "9c698712ceaaa9759115d17c5ee146a5fb9206b762c82938ce4ba990e2d6a40e",
+        "bytes": 662601,
+        "oldRoute": 12650.07013380001,
+        "newRoute": 12744.923515698174
+      },
+      {
+        "profile": 0,
+        "preset": "metro",
+        "seed": 2,
+        "mapSha256": "e5ea0b74f6cce18644dd6d89c78b19fe41848aa6c0fea62b56dbe511e56c23eb",
+        "bytes": 674803,
+        "oldRoute": 14889.251330507977,
+        "newRoute": 14984.104712406142
+      },
+      {
+        "profile": 0,
+        "preset": "factory",
+        "seed": 1,
+        "mapSha256": "f63a94e27169e72b33af368cb25f4b23856fcd2dc2f0a4e43fa2d9e29fe11b6c",
+        "bytes": 1687884,
+        "oldRoute": 16003.715813471621,
+        "newRoute": 16098.569195369782
+      },
+      {
+        "profile": 0,
+        "preset": "factory",
+        "seed": 2,
+        "mapSha256": "34c51db0d00b5919d4bf0844b71d37dab1536d965bcf989326a009b92f00e29e",
+        "bytes": 1685633,
+        "oldRoute": 15930.43031758809,
+        "newRoute": 16025.283699486254
+      },
+      {
+        "profile": 0,
+        "preset": "courtyard",
+        "seed": 1,
+        "mapSha256": "fc5f3ed4c17dfde50daaaa9897525b6b593fc60b721bd47edcc2e44a4301dcfe",
+        "bytes": 1465382,
+        "oldRoute": 24191.449739867836,
+        "newRoute": 24736.436362390337
+      },
+      {
+        "profile": 0,
+        "preset": "courtyard",
+        "seed": 2,
+        "mapSha256": "9a24599b61ea843cdad1cef1dfd7c731614dfe46835f10cd8dfc4287e9001141",
+        "bytes": 1297432,
+        "oldRoute": 27794.389056797932,
+        "newRoute": 28407.938768002226
+      },
+      {
+        "profile": 0,
+        "preset": "overpass",
+        "seed": 1,
+        "mapSha256": "14a1511ab2a14b1e46d1895c9f677c8575ff3b8e5173acc2980a1f0c98613edb",
+        "bytes": 1504242,
+        "oldRoute": 24816.880349845444,
+        "newRoute": 25312.902123703814
+      },
+      {
+        "profile": 0,
+        "preset": "overpass",
+        "seed": 2,
+        "mapSha256": "3fee05352568071fa4e2fdafb8830e7bc5860123d67e9b73f4f59385782fd61d",
+        "bytes": 1358717,
+        "oldRoute": 32767.605901286093,
+        "newRoute": 33491.15231905848
+      },
+      {
+        "profile": 0,
+        "preset": "mall",
+        "seed": 1,
+        "mapSha256": "de53b6fa49556eb083a16aea754861bd6e3f55b3b5f9c243c4549097221236db",
+        "bytes": 900788,
+        "oldRoute": 11562.308833296827,
+        "newRoute": 12028.07321668188
+      },
+      {
+        "profile": 0,
+        "preset": "mall",
+        "seed": 2,
+        "mapSha256": "f569dc67614ba97e5ce3311d062e89709df857fe539f49558049fec7e09057db",
+        "bytes": 946559,
+        "oldRoute": 13899.802749896899,
+        "newRoute": 14365.567133281951
+      },
+      {
+        "profile": 0,
+        "preset": "evacuation",
+        "seed": 1,
+        "mapSha256": "9a2a0a9c88635de99128901b9b86858d3df4392d46462a5cdceaa55d533d6e12",
+        "bytes": 1514242,
+        "oldRoute": 26902.9787235941,
+        "newRoute": 27358.02801142214
+      },
+      {
+        "profile": 0,
+        "preset": "evacuation",
+        "seed": 2,
+        "mapSha256": "74d739cce66c7bfefe63841fa9e3aa70d88d8c269fff3e3f456c3a8fecb63ffe",
+        "bytes": 1202123,
+        "oldRoute": 27399.59499876355,
+        "newRoute": 27854.64428659159
+      },
+      {
+        "profile": 1,
+        "preset": "checkpoint",
+        "seed": 1,
+        "mapSha256": "28c9f75bfe6f8e4b8e33eccce2c827fc89cfe349aff37260a9d324a3561c1fbb",
+        "bytes": 1507904,
+        "oldRoute": 10872.90275179892,
+        "newRoute": 10986.434507827951
+      },
+      {
+        "profile": 1,
+        "preset": "checkpoint",
+        "seed": 2,
+        "mapSha256": "93b53a71a8b003d8f7f5d8fe3466abe308d061c52d78ec3c64133cfbb5726577",
+        "bytes": 1237794,
+        "oldRoute": 9626.476859467206,
+        "newRoute": 9716.414194161656
+      },
+      {
+        "profile": 1,
+        "preset": "hospital",
+        "seed": 1,
+        "mapSha256": "e98747f6c3a5ac5722e488573123adfaabbcb8b9aee646c9028bc8642286d32a",
+        "bytes": 1297147,
+        "oldRoute": 13384.309033638508,
+        "newRoute": 13652.31095610141
+      },
+      {
+        "profile": 1,
+        "preset": "hospital",
+        "seed": 2,
+        "mapSha256": "f51180b58fc4cda33202a691a2c0ed49c6199dbe3dddcbc3b8b3035e3092affd",
+        "bytes": 1345714,
+        "oldRoute": 14577.372418677105,
+        "newRoute": 14838.279949585249
+      },
+      {
+        "profile": 1,
+        "preset": "metro",
+        "seed": 1,
+        "mapSha256": "5bddfcfc7187de214bf496aa809d06f40e1db000db919815cf04def0ba750df5",
+        "bytes": 662596,
+        "oldRoute": 12650.07013380001,
+        "newRoute": 12744.923515698174
+      },
+      {
+        "profile": 1,
+        "preset": "metro",
+        "seed": 2,
+        "mapSha256": "8ca4c0495f9a4193ab630dbfaf823b3bb8e12707f7c109ae1909a5d2fb278b60",
+        "bytes": 674798,
+        "oldRoute": 14889.251330507977,
+        "newRoute": 14984.104712406142
+      },
+      {
+        "profile": 1,
+        "preset": "factory",
+        "seed": 1,
+        "mapSha256": "0c3ba95ba38eae8c3c5a7831f5c505f56646f246ad11aaf08895895fde567a49",
+        "bytes": 1687879,
+        "oldRoute": 16003.715813471621,
+        "newRoute": 16098.569195369782
+      },
+      {
+        "profile": 1,
+        "preset": "factory",
+        "seed": 2,
+        "mapSha256": "12d1262b904ff99f382028b6b7ed16139d5a986f9d6cd49fc483d8599fcab4a0",
+        "bytes": 1685628,
+        "oldRoute": 15930.43031758809,
+        "newRoute": 16025.283699486254
+      },
+      {
+        "profile": 1,
+        "preset": "courtyard",
+        "seed": 1,
+        "mapSha256": "350511092939f6aecf758610e834003598a8e0cc0798d52ba659ac5dffe68cde",
+        "bytes": 1465377,
+        "oldRoute": 24191.449739867836,
+        "newRoute": 24736.436362390337
+      },
+      {
+        "profile": 1,
+        "preset": "courtyard",
+        "seed": 2,
+        "mapSha256": "d00b45aa1ea0814fab3c64bc19ad725b8d26dea15ab008c460439d50ce109bb2",
+        "bytes": 1297427,
+        "oldRoute": 27794.389056797932,
+        "newRoute": 28407.938768002226
+      },
+      {
+        "profile": 1,
+        "preset": "overpass",
+        "seed": 1,
+        "mapSha256": "b20725c5abea422cde43f0421f0022ef1eece512f3af1b9c341c28c8c48b28e4",
+        "bytes": 1504237,
+        "oldRoute": 24816.880349845444,
+        "newRoute": 25312.902123703814
+      },
+      {
+        "profile": 1,
+        "preset": "overpass",
+        "seed": 2,
+        "mapSha256": "755102872e6f71b42f239fa5c039ae469e7528c0209f838f8aac22b7afa3bba2",
+        "bytes": 1358712,
+        "oldRoute": 32767.605901286093,
+        "newRoute": 33491.15231905848
+      },
+      {
+        "profile": 1,
+        "preset": "mall",
+        "seed": 1,
+        "mapSha256": "967b7ee036cbcb81ad1d278ed02685a15ab19bda2aab4a2fe379b2958853afc6",
+        "bytes": 900783,
+        "oldRoute": 11562.308833296827,
+        "newRoute": 12028.07321668188
+      },
+      {
+        "profile": 1,
+        "preset": "mall",
+        "seed": 2,
+        "mapSha256": "2c429da09b3030d47010ccb6216a3d5fb62cc91577e52ab12344b2caca8e8330",
+        "bytes": 946554,
+        "oldRoute": 13899.802749896899,
+        "newRoute": 14365.567133281951
+      },
+      {
+        "profile": 1,
+        "preset": "evacuation",
+        "seed": 1,
+        "mapSha256": "358d760da7c856c8b7a8be52316b7f10bf0847aa99578b4ad6f5fc89c03328f3",
+        "bytes": 1514237,
+        "oldRoute": 26902.9787235941,
+        "newRoute": 27358.02801142214
+      },
+      {
+        "profile": 1,
+        "preset": "evacuation",
+        "seed": 2,
+        "mapSha256": "d093f688012eeb16e1bb57cf658519c553340b70f2042630e02431f61b603686",
+        "bytes": 1202118,
+        "oldRoute": 27399.59499876355,
+        "newRoute": 27854.64428659159
+      }
+    ]
+  },
+  "cityFullWalk": {
+    "method": "Actual compiled BSP in Ironwail with original game code; actual OS forward/turn keys from the real spawn along the entire collision-validated route. No setpos, no noclip, no position modification, no fake callbacks. Position receipts are fresh engine viewpos outputs. Automated walkthrough, not a claim of human playtest.",
+    "records": [
+      {
+        "preset": "evacuation-supported",
+        "start": [
+          823.0,
+          0.0,
+          24.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "actualDestination": [
+          -490.0,
+          -1127.0,
+          24.0,
+          0.0,
+          326.0,
+          0.0
+        ],
+        "requiredRouteWaypoints": 169,
+        "bspSha256": "6be3fb810b47c033f028c3600ac9cd99013ab17acd79d60e261f15c3f137e46a"
+      }
+    ]
+  },
+  "finalContracts": 414,
+  "windowsModulePayloadProof": {
+    "payloadBytes": 3820,
+    "fixtureBytes": 3852,
+    "exportedBytes": 3820,
+    "exportMatchesActualJsonPayload": true,
+    "fixtureDiffersOnlyByCRLF": true,
+    "payloadSha256": "b1cfc755ffec853d676929ba1b8f9382c50339fcd35d2fd5c85ecd47c383d73c",
+    "exportSha256": "b1cfc755ffec853d676929ba1b8f9382c50339fcd35d2fd5c85ecd47c383d73c"
+  }
+}

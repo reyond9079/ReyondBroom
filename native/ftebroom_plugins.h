@@ -200,8 +200,10 @@ static void pluginsTick(){
   cvars->SetFloat("ftebroom_plugins_loaded",std::count_if(editorPlugins.begin(),editorPlugins.end(),[](auto& p){return p.api!=nullptr;}));
 }
 static void pluginsMenu(){
-  if(ImGui::BeginMenu("Plugins")){
+  const bool opened=ImGui::BeginMenu("Plugins");runUiRecordGlobal("menu/Plugins");
+  if(opened){
     if(ImGui::MenuItem("World Architect..."))worldOpen();
+    runUiRecordGlobal("Menu/Plugins/World Architect...");
     if(ImGui::MenuItem("Manage plugins..."))pluginManagerOpen=true;
     for(auto& p:editorPlugins)if(p.api&&p.id!="org.reyondbroom.autolevel"&&p.id!="org.reyondbroom.levelgen")if(ImGui::MenuItem(p.name.c_str()))p.open=true;
     if(ImGui::BeginMenu("Legacy generators")){

@@ -4,11 +4,15 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--scenarios-only',action='store_true');p.add_argument('--local-only',action='store_true');p.add_argument('--modules-only',action='store_true');p.add_argument('--quality-only',action='store_true');p.add_argument('--exterior-light-only',action='store_true');p.add_argument('--planning-only',action='store_true');p.add_argument('--gates-only',action='store_true');p.add_argument('--gates-build-only',action='store_true');p.add_argument('--gate-fixtures',type=Path);p.add_argument('--module-fixtures',type=Path);p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
-assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only,a.scenarios_only,a.local_only,a.modules_only,a.quality_only,a.exterior_light_only,a.planning_only,a.gates_only,a.gates_build_only])<=1,'Select one focused authoring scenario'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--scenarios-only',action='store_true');p.add_argument('--local-only',action='store_true');p.add_argument('--modules-only',action='store_true');p.add_argument('--quality-only',action='store_true');p.add_argument('--exterior-light-only',action='store_true');p.add_argument('--planning-only',action='store_true');p.add_argument('--gates-only',action='store_true');p.add_argument('--gates-build-only',action='store_true');p.add_argument('--gate-fixtures',type=Path);p.add_argument('--module-fixtures',type=Path);p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);p.add_argument('--menu-only',action='store_true');a=p.parse_args()
+assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only,a.scenarios_only,a.local_only,a.modules_only,a.quality_only,a.exterior_light_only,a.planning_only,a.gates_only,a.gates_build_only,a.menu_only])<=1,'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
-(data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
+registry=data/'world-architect/registry.json'
+if a.menu_only:
+ registry_bytes=registry.read_bytes()
+ registry.unlink()
+(data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\n'+('set ftebroom_world_menu_qa 1\n' if a.menu_only else 'in 12 ftebroom_world_architect qa\n'))
 engine=a.engine.resolve() if a.engine else root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');stream=(out/'editor.log').open('wb');render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 proc=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','world-qa.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
 checks=[]
@@ -28,8 +32,8 @@ def check(value,name):
  assert value,name
  checks.append(name);(out/'results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
 ui=NativeInput(proc,state,live,wait,out,focus_required=True)
-def click(key):
- r=wait(lambda:live()['widgets'].get(key));ui.click(r['x']+r['width']/2,r['y']+r['height']/2)
+def click(key,group='widgets'):
+ r=wait(lambda:live()[group].get(key));ui.click(r['x']+r['width']/2,r['y']+r['height']/2)
 def drag(start,end):
  ui.move(*start)
  if os.name=='nt':ui.user.mouse_event(2,0,0,0,0)
@@ -78,6 +82,19 @@ def verify_paint(existing):
  painted=live()['settings']['influences'][-1];check(painted['kind']=='damage' and all(b>a for a,b in zip(painted['low'],painted['high'])),'dragging the floor plan creates a real bounded influence volume')
  click('undo-settings');wait(lambda:len(live()['settings']['influences'])==existing);check(True,'painted volumes participate in settings Undo')
 try:
+ if a.menu_only:
+  wait(lambda:'menu/Plugins' in live()['globalWidgets']);ui.position()
+  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
+  click('menu/Plugins','globalWidgets');click('Menu/Plugins/World Architect...','globalWidgets')
+  missing=wait(lambda:live() if live()['open'] and 'reload-registry' in live()['widgets'] else None)
+  check('registry is missing' in missing['error'],'Plugins opens a visible error when the registry is missing')
+  registry.write_bytes(b'{invalid')
+  click('reload-registry');wait(lambda:'parse_error' in live()['error'])
+  check('reload-registry' in live()['widgets'],'corrupt registry can be retried in the same window')
+  registry.write_bytes(registry_bytes)
+  click('reload-registry');wait(lambda:live()['open'] and 'generate' in live()['widgets'])
+  check(not live()['error'],'Reload opens the actual World Architect after package repair')
+  sys.exit(0)
  wait(lambda:live()['open'] and 'generate' in live()['widgets']);ui.position()
  # Xvfb has no window manager to transfer focus after an external engine exits.
  # Acquire actual OS keyboard focus before the first console shortcut.
@@ -369,6 +386,7 @@ try:
  for path in [before,generated,applied,undone,redone]:shutil.copy2(path,out/path.name)
  (out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect UI:',len(checks),'checks passed',flush=True)
 finally:
+ if a.menu_only:registry.write_bytes(registry_bytes)
  try:ImageGrab.grab().save(out/'last-desktop.png');(out/'last-state.json').write_text(json.dumps(live(),indent=2))
  except Exception:pass
  if proc.poll() is None:

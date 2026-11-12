@@ -1,4 +1,6 @@
 from pathlib import Path
+from ctypes import WinDLL, get_last_error
+from ctypes.wintypes import BOOL, DWORD, HANDLE, LPCWSTR, LPVOID
 import tempfile,zipfile,subprocess,json,hashlib
 root=Path(tempfile.mkdtemp(prefix='ReyondBroom-update-test-'))
 (root/'ftebroom').mkdir();(root/'fteqw64.exe').write_bytes(b'old engine');(root/'ftebroom/appearance.cfg').write_text('4 1 1');(root/'ftebroom/maps').mkdir();(root/'ftebroom/maps/mine.map').write_text('user map');(root/'ftebroom-game-profile.txt').write_text('my mod path')
@@ -33,12 +35,30 @@ for name in ('stage-old','backup-old'):
 (updates/'ReyondBroom-0.5.0-alpha.20-Windows-x64.zip.part').write_text('partial')
 (updates/'notes.txt').write_text('keep')
 package=root/'fixture.zip'
+plugin=root/'plugins/autolevel/autolevel.dll'
+plugin.parent.mkdir(parents=True)
+plugin.write_bytes(b'unchanged plugin')
+legacy_tmp=plugin.with_name(plugin.name+'.ftebroom-update.tmp')
+legacy_tmp.write_bytes(b'old failed update residue')
 with zipfile.ZipFile(package,'w') as z:
  for name,data in [('fteqw64.exe',b'new engine'),('fteplug_ftebroom_x64.dll',b'new plugin'),('ftebroom/appearance.cfg',b'0 0 0'),('ftebroom-game-profile.txt',b'wrong'),('ftebroom/new.txt',b'new file')]:z.writestr('ReyondBroom-Windows-x64/'+name,data)
  z.writestr('ReyondBroom-Windows-x64/ftebroom/custom.wad',b'new stock wad')
  z.writestr('ReyondBroom-Windows-x64/ftebroom/defaults.cfg',b'new defaults')
  for name,value in game_defaults.items():z.writestr('ReyondBroom-Windows-x64/'+name,value)
-r=subprocess.run(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File','runtime/update-ftebroom.ps1','-Root',str(root),'-CurrentVersion','0.5.0-alpha.29','-LocalPackage',str(package)],capture_output=True,text=True)
+ z.writestr('ReyondBroom-Windows-x64/plugins/autolevel/autolevel.dll',plugin.read_bytes())
+ z.writestr('ReyondBroom-Windows-x64/ftebroom/world-architect/registry.json','{}')
+kernel32=WinDLL('kernel32',use_last_error=True)
+kernel32.CreateFileW.argtypes=[LPCWSTR,DWORD,DWORD,LPVOID,DWORD,DWORD,HANDLE]
+kernel32.CreateFileW.restype=HANDLE
+kernel32.CloseHandle.argtypes=[HANDLE]
+kernel32.CloseHandle.restype=BOOL
+# Permit reading the loaded plugin, while denying write and delete sharing.
+handle=kernel32.CreateFileW(str(plugin),0x80000000,1,None,3,0,None)
+assert handle not in (None,HANDLE(-1).value),get_last_error()
+try:
+ r=subprocess.run(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File','runtime/update-ftebroom.ps1','-Root',str(root),'-CurrentVersion','0.5.0-alpha.29','-LocalPackage',str(package)],capture_output=True,text=True)
+finally:
+ kernel32.CloseHandle(handle)
 print(r.returncode,r.stdout,r.stderr);print((root/'updates/status.txt').read_text())
 assert r.returncode==0
 assert not (updates/'stage-old').exists() and not (updates/'backup-old').exists()
@@ -46,6 +66,9 @@ assert not (updates/'ReyondBroom-0.5.0-alpha.20-Windows-x64.zip.part').exists()
 assert (updates/'notes.txt').read_text()=='keep' and package.exists()
 assert len(list(updates.glob('backup-*')))==1 and not list(updates.glob('stage-*'))
 assert (root/'fteqw64.exe').read_bytes()==b'new engine'
+assert plugin.read_bytes()==b'unchanged plugin'
+assert legacy_tmp.read_bytes()==b'old failed update residue'
+assert (root/'ftebroom/world-architect/registry.json').read_text()=='{}'
 assert (root/'ftebroom/appearance.cfg').read_text()=='4 1 1'
 assert (root/'ftebroom-game-profile.txt').read_text()=='my mod path'
 assert (root/'ftebroom/maps/mine.map').read_text()=='user map'

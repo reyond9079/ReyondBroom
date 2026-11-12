@@ -31,7 +31,7 @@ if windows:
  exe=out/'restart-probe.exe';code='using System;using System.IO;class WelcomeProbe {static void Main(){File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"restarted.txt"),"restarted");}}'
  exe.unlink(missing_ok=True)
  ps=out/'build-probe.ps1';ps.write_text("Add-Type -TypeDefinition '"+code+"' -OutputAssembly '"+str(exe).replace("'","''")+"' -OutputType ConsoleApplication\n")
- subprocess.run([a.powershell,'-NoProfile','-File',str(ps)],check=True,capture_output=True);launcher=exe.read_bytes()
+ subprocess.run([a.powershell,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(ps)],check=True,capture_output=True);launcher=exe.read_bytes()
 files={'fteqw64.exe' if windows else 'fteqw-gl64':b'installed fixture engine',module_name:b'installed fixture module',
        'ReyondBroom.exe' if windows else 'Launch-ReyondBroom.sh':launcher,'payload.bin':os.urandom(8*1024*1024)}
 files['distribution-manifest.json']=json.dumps({n:hashlib.sha256(d).hexdigest() for n,d in files.items()}).encode()
@@ -145,6 +145,11 @@ try:
  click('recovery/recover');wait(lambda:not live()['windowOpen'] and not live()['recoveryOpening'])
  check(live()['document']=='','Recover opens the autosave as an unsaved document')
  ui.console('ftebroom_test_desktop welcome132updates');wait(lambda:live()['stage']=='available' and 'update/start' in live()['widgets'])
+ r=live()['widgets']['welcome/window'];ui.click(r['x']+r['width']-14,r['y']+14)
+ wait(lambda:not live()['windowOpen'])
+ click('menu/Help',True);click('Menu/Help/Updates...',True)
+ wait(lambda:live()['windowOpen'] and live()['welcomeStage']=='updates' and 'update/start' in live()['widgets'])
+ check('update/skip' not in live()['widgets'],'Help > Updates opens a focused manual update window')
  click('update/start');wait(lambda:live()['committed'] and live()['stage']=='downloading')
  progress=[];deadline=time.monotonic()+35
  while time.monotonic()<deadline:

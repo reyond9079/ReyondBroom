@@ -53,6 +53,7 @@ def main():
         run('world_core' if 'world_core' in suites else 'world_ui', 'scripts/test-world-modules.py', root, out/'world/modules', *fixture_args, gui=False)
         run('world_core' if 'world_core' in suites else 'world_ui', 'scripts/test-world-gates.py', root, out/'world/gates', *fixture_args, gui=False)
     if 'world_ui' in suites:
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/menu-ui', '--menu-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/ui')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/metro-ui', '--preset', 'metro')
         run('world_ui', 'scripts/test-world-applied.py', root/'tools/q3map2'/('q3map2.exe' if os.name=='nt' else 'q3map2'),

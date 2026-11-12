@@ -12,7 +12,9 @@ void FteBroomTranslate(const char*& text,const char*& end)
   const char* visible=text;while((!end||visible<end)&&*visible&&!(visible[0]=='#'&&visible[1]=='#'))++visible;
   static const auto lookup=[](){std::map<std::string,size_t,std::less<>> result;for(size_t i=0;i<sizeof(uiTranslations)/sizeof(*uiTranslations);i++)result.emplace(uiTranslations[i][0],i);return result;}();
   auto found=lookup.find(std::string_view(text,visible-text));if(found==lookup.end())return;
-  text=uiTranslations[found->second][uiLanguage];end=text+std::strlen(text);
+  if(const char* translation=uiTranslations[found->second][uiLanguage]){
+    text=translation;end=text+std::strlen(text);
+  }
 }
 // Translate formats before substitution, and custom-drawn text before measurement.
 // Keep the original labels for ImGui widget IDs.
@@ -22,7 +24,7 @@ static void uiBuildGlyphRanges()
 {
   ImFontGlyphRangesBuilder builder;
   builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesCyrillic());
-  for(auto& row:uiTranslations)for(auto text:row)builder.AddText(text);
+  for(auto& row:uiTranslations)for(auto text:row)if(text)builder.AddText(text);
   for(auto name:uiLanguageNames)builder.AddText(name);
   builder.BuildRanges(&uiCJKRanges);
 }

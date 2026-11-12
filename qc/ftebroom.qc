@@ -675,7 +675,7 @@ float() ftebroom_command =
     }
     // Editing a document always restores its world before touching geometry.
     if(fb_build_preview_active && substring(argv(0),0,9)=="ftebroom_" &&
-        substring(argv(0),0,16)!="ftebroom_camera_" && argv(0)!="ftebroom_camera") {
+        substring(argv(0),0,16)!="ftebroom_camera_" && argv(0)!="ftebroom_camera" && argv(0)!="ftebroom_context") {
         if(argv(0)=="ftebroom_pointer" && argv(1)!="down" && argv(1)!="dblclick" && argv(1)!="drill")return TRUE;
         fb_build_preview_leave();
     }

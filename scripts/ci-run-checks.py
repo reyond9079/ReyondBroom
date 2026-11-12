@@ -98,6 +98,7 @@ def main():
             run('placement', 'scripts/test-viewport-create.py', root, out/f'create-{theme}-{width}',
                 '--theme', theme, '--width', width, '--height', height)
     if 'viewport' in suites:
+        run('viewport', 'scripts/test-bsp-preview-input.py', root, out/'bsp-preview-input')
         if selected['flags'].get('input') or selected['mode'] == 'full':
             run('viewport', 'scripts/test-engine-viewport.py', root, out/'engine-viewport', '--probe', a.probe.resolve())
         cases = [('dark', 1920, 1080), ('light', 1920, 1080), ('dark', 1024, 768), ('light', 1024, 768)] if 'matrix_ui' in suites else [('dark', 1920, 1080)]
@@ -110,6 +111,7 @@ def main():
         run('onboarding', 'scripts/test-editor133-input.py', root, out/'input-onboarding')
     if 'updater' in suites:
         run('updater', 'tests/test-welcome-updater.py', '--platform', a.platform, '--output', out/'updater', '--runtime', root, gui=False)
+        run('updater', 'scripts/test-rb10-welcome.py', root, out/'update-splash', '--require-splash')
     (out/'scope.json').write_text(json.dumps({'plan': selected, 'completed': completed}, indent=2))
 
 

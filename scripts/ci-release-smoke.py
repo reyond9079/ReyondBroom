@@ -58,7 +58,7 @@ def verify(release, platform, version):
     assert info.startswith('ReyondBroom '+version+'\n') and '\nPlatform: '+platform+'\n' in info
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     assert '\nEditor revision: '+revision+'\n' in info, 'Wrong packaged source revision'
-    names = ['ftebroom/csaddon.dat', 'bin/fteqw64.exe' if windows else 'fteqw-gl64',
+    names = ['ftebroom/csaddon.dat', 'ftebroom/ui/update-splash.png', 'bin/fteqw64.exe' if windows else 'fteqw-gl64',
              'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so']
     for name in names:
         assert name in manifest
@@ -69,6 +69,8 @@ def verify(release, platform, version):
         for name in ('sources/fteqw-source.zip', 'sources/bullet-source.zip',
                      'sources/imgui-source.zip', 'sources/ftebroom/native/ftebroom.cpp'):
             assert name in z.namelist(), 'Missing corresponding source: '+name
+        with z.open('sources/ftebroom/runtime/ui/update-splash.png') as stream:
+            assert digest(stream)==manifest['ftebroom/ui/update-splash.png'], 'Splash artwork differs from corresponding source'
     return release/root_name, {'platform': platform, 'version': version, 'revision': revision,
                                'manifest_files': len(manifest), 'components': {n:manifest[n] for n in names}}
 

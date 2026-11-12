@@ -10,7 +10,7 @@ int fb_tutorial_brushes()
 }
 void fb_tutorial_stage_check()
 {
-    int step=cvar("ftebroom_tour_step"),expected=(step==1 || step==8)?0:1;
+    int step=cvar("ftebroom_tour_step"),expected=(step==1 || step==12)?0:1;
     int actual=fb_tutorial_brushes(),selected=selectedbrushcount;
     print(sprintf("FTEBROOM_TUTORIAL_STATE step=%i brushes=%i selected=%i expected=%i view=%g\n",step,actual,selected,expected,cvar("ca_brush_view")));
     int clipFixture=TRUE;
@@ -21,6 +21,7 @@ void fb_tutorial_stage_check()
             clipFixture=vlen(bounds[1]-bounds[0]-'96 96 64')<0.01;
         }
     }
+    if(step>=7)clipFixture&=cvar("ca_grid")==16;
     fb_tutorial_expect(cvar("ftebroom_tour_fixture_ready")==step+1 && actual==expected && cvar("ca_brush_view")==0 && clipFixture,strcat("native_stage_fixture_",itos(step)));
 }
 float fb_tutorial_testcommand()
@@ -60,20 +61,22 @@ float fb_tutorial_testcommand()
     }else if(mode=="empty"){
         cvar_set("ftebroom_tour_active","1");fb_tutorial_prepare(5);
         fb_tutorial_expect(fb_tutorial_brushes()==1 && !selectedbrushcount,"grid_stage_has_only_reference_brush");
-        fb_tutorial_prepare(6);fb_tutorial_expect(fb_tutorial_brushes()==0 && !selectedbrushcount,"tools_stage_starts_empty");
+        fb_tutorial_prepare(12);fb_tutorial_expect(fb_tutorial_brushes()==0 && !selectedbrushcount,"tools_stage_starts_empty");
     }
     if(mode=="stage")fb_tutorial_stage_check();
     if(mode=="clean"){
         cvar_set("ftebroom_tour_active","1");
-        for(int step=0;step<7;step++){
+        for(int step=0;step<13;step++){
+            if(step>=7)cvar_set("ca_grid","128");
             // Reproduce practice leftovers and the old permanent floor.
             fb_createbox('0 0 -32','3072 3072 32');
             fb_createbox('256 0 32','64 64 64');
             fb_createbox('512 0 32','64 64 64');
             fb_tutorial_prepare(step);
-            int count=(step==1 || step==6)?0:1;
+            int count=(step==1 || step==12)?0:1;
+            if(step>=7)fb_tutorial_expect(cvar("ca_grid")==16,strcat("stage_restores_demo_grid_",itos(step)));
             fb_tutorial_expect(fb_tutorial_brushes()==count,strcat("stage_clean_",itos(step)));
-            fb_tutorial_expect(selectedbrushcount==(step>=2 && step<=4?1:0),strcat("stage_target_selection_",itos(step)));
+            fb_tutorial_expect(selectedbrushcount==((step>=2 && step<=4)||(step>=7 && step<=9)?1:0),strcat("stage_target_selection_",itos(step)));
             fb_tutorial_prepare(step);
             fb_tutorial_expect(fb_tutorial_brushes()==count,strcat("stage_replay_clean_",itos(step)));
         }

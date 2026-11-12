@@ -54,3 +54,23 @@ Generation, actual MAP compilation and editor roundtrip are verified for Quake 1
 Original procedural materials/props require no paid asset download. Their GPL notices and the reused MIT convex-kernel notices are retained. Export bundles contain required generated textures/WAD/shaders; copyrighted game PAKs used for private game testing are not distributed. Assets have versioned identities and differing existing files are not overwritten. Existing maps, legacy settings and authored modules remain intact. No Qt was added.
 
 Final platform acceptance includes focused Windows/Linux/Linux SDL2 source checks and, for the published version, mandatory packaged startup/version/archive/source/checksum gates on all three platforms. After promotion, the rebuilt SDL editor passed 26 workspace/Apply/history/save checks. Actual OS clicks reopened World Architect through its primary entry and AutoLevel through Legacy generators. [Primary menu](world-architect-acceptance/plugins-menu.png), [legacy submenu](world-architect-acceptance/legacy-menu.png), [legacy workspace](world-architect-acceptance/legacy-workspace.png). Thirty-two CI policy contracts passed. A source test-driver failure is distinguished from a product failure; prepared binary reuse verifies matching native, QC, engine and build recipe inputs before running corrected OS input.
+
+
+## Windows module-source assertion
+
+The complete Windows source job passed legacy, generation, Apply/history,
+regional updates, pins, designer controls, all six World art themes, scenarios,
+road authoring, quality, planning, stair lights and physical gates. Its authored
+module assertion then compared against the wrong fixture representation:
+`original-module.map` was written by a C++ text stream and gained CRLF, while
+the imported JSON's MAP payload retained LF. The actual exported source was
+3820 bytes and matched that JSON payload exactly (SHA-256
+`b1cfc755ffec853d676929ba1b8f9382c50339fcd35d2fd5c85ecd47c383d73c`);
+the auxiliary text fixture was 3852 bytes.
+
+The assertion now compares to the actual imported payload without normalizing
+exported bytes. The focused continuation reuses the verified unchanged compiled
+editor and portable fixtures, then runs the complete corrected module/history/
+reopen case and the remaining single dark/1280 placement case. Its final result
+is recorded in PR45. The editor/exporter was unchanged by this CI correction;
+all normal build recipes and native/QC/engine inputs must match before reuse.

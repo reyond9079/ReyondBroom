@@ -22,6 +22,7 @@ name: Compilation profile parity
         - none
         - local
         - remaining
+        - finish
         default: none
       plant_scene_only:
         description: Focus a prepared Windows run on plant map rendering diagnostics
@@ -109,15 +110,15 @@ jobs:
         $runtime = 'bundle/ReyondBroom-Windows-x64'
         if (!(Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue)) { throw 'World input fixture requires a 1920x1080 test desktop' }
         Set-DisplayResolution -Width 1920 -Height 1080 -Force
-        New-Item -ItemType Directory -Force "$runtime/ftebroom/world-architect" | Out-Null
-        Copy-Item runtime/world-architect/* "$runtime/ftebroom/world-architect" -Recurse -Force
+        python scripts/ci-stage-assets.py $runtime
+        if ($LASTEXITCODE) { throw 'Current prepared runtime assets could not be staged' }
         python tests/make-linux-build-fixture.py $runtime
         if ($LASTEXITCODE) { throw 'World Architect input fixture failed' }
         if ('${{ inputs.world_authoring_case }}' -eq 'local') {
           python scripts/test-world-architect-ui.py $runtime qa/world/local-ui --local-only
           if ($LASTEXITCODE) { throw 'Prepared World Architect local input failed' }
         }
-        if ('${{ inputs.world_authoring_case }}' -eq 'remaining') {
+        if ('${{ inputs.world_authoring_case }}' -in @('remaining','finish')) {
           gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Linux-x64 --dir prepared-fixtures
           if ($LASTEXITCODE) { throw 'Matching portable World fixtures unavailable' }
           $gateFile = Get-ChildItem prepared-fixtures -Recurse -Filter gate-project-1.world.json | Select-Object -First 1
@@ -127,16 +128,22 @@ jobs:
           $moduleDir = $moduleFile.DirectoryName
           python scripts/ci-verify-prepared.py --fixtures $gateDir $moduleDir
           if ($LASTEXITCODE) { throw 'Prepared fixture sources differ from current code' }
-          foreach ($case in @('quality','planning','exterior-light')) {
-            python scripts/test-world-architect-ui.py $runtime "qa/world/$case-ui" "--$case-only"
-            if ($LASTEXITCODE) { throw "Prepared World Architect $case failed" }
+          if ('${{ inputs.world_authoring_case }}' -eq 'remaining') {
+            foreach ($case in @('quality','planning','exterior-light')) {
+              python scripts/test-world-architect-ui.py $runtime "qa/world/$case-ui" "--$case-only"
+              if ($LASTEXITCODE) { throw "Prepared World Architect $case failed" }
+            }
+            python scripts/test-world-architect-ui.py $runtime qa/world/gates-ui --gates-only --gate-fixtures $gateDir
+            if ($LASTEXITCODE) { throw 'Prepared World Architect gates failed' }
+            python scripts/test-world-gates.py $runtime qa/world/gates-applied --applied qa/world/gates-ui --fixture-texture "$runtime/ftebroom/textures/ftebroom/qa_blue.tga"
+            if ($LASTEXITCODE) { throw 'Prepared World Architect actual gate BSP failed' }
           }
-          python scripts/test-world-architect-ui.py $runtime qa/world/gates-ui --gates-only --gate-fixtures $gateDir
-          if ($LASTEXITCODE) { throw 'Prepared World Architect gates failed' }
-          python scripts/test-world-gates.py $runtime qa/world/gates-applied --applied qa/world/gates-ui --fixture-texture "$runtime/ftebroom/textures/ftebroom/qa_blue.tga"
-          if ($LASTEXITCODE) { throw 'Prepared World Architect actual gate BSP failed' }
           python scripts/test-world-architect-ui.py $runtime qa/world/modules-ui --modules-only --module-fixtures $moduleDir
           if ($LASTEXITCODE) { throw 'Prepared World Architect modules failed' }
+          if ('${{ inputs.world_authoring_case }}' -eq 'finish') {
+            python scripts/test-viewport-create.py $runtime qa/world/create-dark-1280 --theme dark --width 1280 --height 800
+            if ($LASTEXITCODE) { throw 'Prepared viewport placement integration failed' }
+          }
         }
     - name: Exercise the prepared Plant Editor with OS input
       shell: pwsh

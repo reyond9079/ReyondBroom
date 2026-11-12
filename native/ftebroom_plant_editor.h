@@ -3,6 +3,7 @@
 #include "plant/export.h"
 #include "ftebroom_plant_export.h"
 #include "plant/presets.h"
+#include "plant/scale.h"
 #include "plant/thumbnail.h"
 #include <future>
 #include <memory>
@@ -31,6 +32,7 @@ struct PlantState {
   bool floor=true,axes=false,handles=false,qa=false,closeRequest=false,allowFteQ1=false;
   bool gamePreview=true,gameAtlasUploaded=false;
   int lod=0,display=0,selected=1,category=-1,filter=0,thumbSlot=0;
+  int libraryProfile=-1;
   ftebroom::plantExport::Format exportFormat=ftebroom::plantExport::Format::Glb;
   bool exportRequest=false;
   double yaw=135,pitch=18,zoom=1,sun=-120,nextGenerate=0,lastUpload=0;
@@ -80,7 +82,7 @@ static void plantLibrarySave() {
   catch(const std::exception& e){s.error=e.what();}
 }
 static void plantLibraryLoad() {
-  auto& s=plantState;s.library=plants::presets();s.userFiles.clear();
+  auto& s=plantState;s.library=plants::presetsForProfile(gameProfile);s.libraryProfile=gameProfile;s.userFiles.clear();
   try {
     auto settings=plantFolder()/"library.json";
     if(std::filesystem::exists(settings)){auto j=plants::Json::parse(q1Read(settings));s.favorites=j.value("favorites",std::vector<std::string>{});s.recent=j.value("recent",std::vector<std::string>{});s.advanced=j.value("advanced",false);}
@@ -253,7 +255,8 @@ static void plantShow() {
   auto& s=plantState;
   cvars->GetNVFDG("ftebroom_plant_active","0",0,"Plant Editor preview","ReyondBroom");
   cvars->GetNVFDG("ftebroom_plant_background","0.075 0.09 0.11",0,"Plant Editor background","ReyondBroom");
-  if(!s.open){plantLibraryLoad();if(!s.revision)s.saved=plants::serialize(s.doc).dump();s.open=true;s.gamePreview=true;plantSchedule(true);}
+  if(s.libraryProfile!=gameProfile)plantLibraryLoad();
+  if(!s.open){if(!s.revision){s.doc=plants::presetsForProfile(gameProfile).front();s.saved=plants::serialize(s.doc).dump();}s.open=true;s.gamePreview=true;plantSchedule(true);}
   s.hidden=false;plantResumePreview();input->SetMenuFocus(qtrue,"",0,0,1);
 }
 static void plantReleasePreview() {

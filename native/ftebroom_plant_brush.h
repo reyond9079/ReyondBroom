@@ -81,7 +81,7 @@ static void plantBrushNewPlant()
     if(plantBrushActive())action("ftebroom_tool_deactivate\n");
     placementCancel(plantPlacement);
     plantShow();
-    auto draft=plants::presets().front();
+    auto draft=plants::presetsForProfile(gameProfile).front();
     draft.name="Untitled oak";
     draft.seed=uint32_t(plants::mix(draft.seed,plantState.revision+1));
     plantSelect(draft);
@@ -97,7 +97,13 @@ static void plantBrushBakeTick()
   auto& s=plantBrush;
   if(!plantBrushContextValid()){
     const bool mapChanged=s.epoch>=0&&s.epoch!=organizationMapEpoch;
+    const bool profileChanged=s.profile>=0&&s.profile!=gameProfile;
     plantBrushInvalidateAsset();
+    if(plantState.libraryProfile!=gameProfile)plantLibraryLoad();
+    if(profileChanged&&s.plant&&!s.selection.empty()&&s.selection[0]!='@'){
+      auto found=std::find_if(plantState.library.begin(),plantState.library.end(),[&](const auto& d){return d.preset==s.selection;});
+      if(found!=plantState.library.end())s.plant=*found;
+    }
     s.epoch=organizationMapEpoch;s.profile=gameProfile;s.root=baseq3;
     s.geometry=s.resourceRevision=-1;
     s.scene.clear();s.sceneSources.clear();s.filter.clear();s.filtered=false;

@@ -25,7 +25,7 @@ struct WorldArchitectState {
   wa::V eye{};wa::Settings settings;wa::Registry registry;wa::Json registrySource;std::optional<uint64_t> desiredSeed;
   std::future<wa::CandidateBatch> job;std::shared_ptr<WorldArchitectWork> work;
   std::shared_ptr<wa::PrefixCache> prefixCache=std::make_shared<wa::PrefixCache>();
-  wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request;
+  wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request,previewIdentity;std::set<uint64_t> openedGates;
   std::string project,requestMode,requestRegion;uint64_t detailRegion=0,detailSeed=1;
   uint64_t missionNode=0,dragMission=0,roadSelection=0,detailRoom=0;int missionEdge=0,planFloor=0,maskSelection=-1,legacyModule=0,legacyMaterial=1;
   int roadDragKind=-1;uint64_t roadDragId=0;wa::V roadDragStart{};
@@ -135,7 +135,7 @@ s.requestAt=ImGui::GetTime();s.requestPath=documentPath("data/wa-import-"+s.requ
 static void worldTick(){
   auto& s=worldArchitect;
   if(s.job.valid()&&s.job.wait_for(std::chrono::seconds(0))==std::future_status::ready){
-    worldAction([&]{s.batch=s.job.get();s.generated=s.pendingKey;s.selected=0;s.dirty=true;if(s.desiredSeed){for(size_t i=0;i<s.batch.worlds.size();i++)if(s.batch.worlds[i].seed==*s.desiredSeed)s.selected=int(i);s.desiredSeed.reset();}if(s.batch.worlds.empty())s.error=s.batch.rejects.empty()?"No accepted candidate":"No accepted candidate: "+s.batch.rejects.front();else{s.message=std::to_string(s.batch.worlds.size())+" candidates passed physical validation; "+std::to_string(s.batch.rejects.size())+" rejected.";if(s.open)worldClaim();}});
+    worldAction([&]{s.batch=s.job.get();s.previewIdentity.clear();s.generated=s.pendingKey;s.selected=0;s.dirty=true;if(s.desiredSeed){for(size_t i=0;i<s.batch.worlds.size();i++)if(s.batch.worlds[i].seed==*s.desiredSeed)s.selected=int(i);s.desiredSeed.reset();}if(s.batch.worlds.empty())s.error=s.batch.rejects.empty()?"No accepted candidate":"No accepted candidate: "+s.batch.rejects.front();else{s.message=std::to_string(s.batch.worlds.size())+" candidates passed physical validation; "+std::to_string(s.batch.rejects.size())+" rejected.";if(s.open)worldClaim();}});
   }
   if(!s.request.empty()){
     char ack[128]={},status[128]={};cvars->GetString("ftebroom_world_apply_ack",ack,sizeof ack);cvars->GetString("ftebroom_world_apply_status",status,sizeof status);
@@ -150,13 +150,14 @@ static void worldTick(){
     }
   }
 }
-static std::string worldPreviewBuffer(const wa::WorldPlan& world,int cutaway){
+static std::string worldPreviewBuffer(const wa::WorldPlan& world,int cutaway,const std::set<uint64_t>* opened=nullptr){
   using namespace ftebroom;std::map<std::string,std::vector<std::array<wa::V,3>>> batches;
-  for(const auto& element:world.architecture.elements){
-    if(element.kind.find("sealed sky")!=std::string::npos)continue;auto poly=al::polyhedron(element.brush);
-    if(cutaway>=0&&(poly.min.z>=double((cutaway+1)*256-20)||poly.max.z<double(cutaway*256-20)))continue;
-    for(size_t f=0;f<poly.polygons.size();f++){const auto& polygon=poly.polygons[f];for(size_t i=1;i+1<polygon.size();i++)batches[element.brush.faces[f].material].push_back({polygon[0],polygon[i],polygon[i+1]});}
-  }
+  auto emit=[&](const al::Brush& brush){auto poly=al::polyhedron(brush);
+    if(cutaway>=0&&(poly.min.z>=double((cutaway+1)*256-20)||poly.max.z<double(cutaway*256-20)))return;
+    for(size_t f=0;f<poly.polygons.size();f++){const auto& polygon=poly.polygons[f];for(size_t i=1;i+1<polygon.size();i++)batches[brush.faces[f].material].push_back({polygon[0],polygon[i],polygon[i+1]});}
+  };
+  for(const auto& element:world.architecture.elements)if(element.kind.find("sealed sky")==std::string::npos)emit(element.brush);
+  for(const auto& entity:world.architecture.brushEntities)if(entity.entity.fields.at("classname")=="func_door"&&(!opened||!opened->count(std::stoull(entity.entity.fields.at("_wa_gate")))))for(const auto& brush:entity.brushes)emit(brush);
   unsigned count=0;for(const auto& [name,tris]:batches)count+=unsigned((tris.size()+21844)/21845);std::string out="RBB1";bb::word(out,count);
   for(const auto& [name,tris]:batches)for(size_t start=0;start<tris.size();start+=21845){size_t n=std::min<size_t>(21845,tris.size()-start);bb::word(out,unsigned(n*3));bb::word(out,unsigned(n*3));auto texture="bbtex/"+(name==wa::materialId(world,6)?wa::assetId(world,6):name)+".tga";out+=texture;out.append(128-texture.size(),0);
     for(size_t i=start;i<start+n;i++){
@@ -170,12 +171,13 @@ static void worldPreview(){
   if(s.owner&&(bbActive||modelViewerOpen||plantState.owner))s.owner=false;
   if(!s.owner){ImGui::TextUnformatted("Another authoring tool owns the preview.");if(worldButton("Resume world preview","resume-preview"))worldClaim();return;}
   auto api=bbAPI();auto images=bbImageAPI();if(!api||!images){ImGui::TextUnformatted("Dynamic preview interface unavailable");return;}
+  auto identity=s.project+"/"+std::to_string(world->seed)+"/"+world->architectureKey;if(s.previewIdentity!=identity){s.previewIdentity=identity;s.openedGates.clear();if(s.walk){s.eye=world->navigation.nodes[world->navigation.mainRoute.front()].feet;s.yaw=s.pitch=0;}s.dirty=true;}
   if(s.dirty){
     bool water=std::any_of(world->architecture.elements.begin(),world->architecture.elements.end(),[](const auto& e){return e.kind=="floodwater";});
     for(int slot=0;slot<(water?7:6);slot++){auto image=wa::texture(s.registry.theme(world->theme),slot);images->upload(("bbtex/"+wa::assetId(*world,slot)+".tga").c_str(),image.rgba.data(),image.width,image.height);}
-    auto buffer=worldPreviewBuffer(*world,s.cutaway);if(!api->upload(buffer.data(),buffer.size()))throw std::runtime_error("Engine rejected World Architect preview geometry");s.dirty=false;
+    auto buffer=worldPreviewBuffer(*world,s.cutaway,&s.openedGates);if(!api->upload(buffer.data(),buffer.size()))throw std::runtime_error("Engine rejected World Architect preview geometry");s.dirty=false;
   }
-  if(worldButton(s.walk?"Orbit view":"Walk from spawn","walk")){s.walk=!s.walk;if(s.walk){s.eye=world->navigation.nodes[world->navigation.mainRoute.front()].feet;s.yaw=0;s.pitch=0;}}ImGui::SameLine();ImGui::Checkbox("Top view",&s.ortho);worldRect("top-view");
+  if(worldButton(s.walk?"Orbit view":"Walk from spawn","walk")){s.walk=!s.walk;if(s.walk){s.openedGates.clear();s.dirty=true;s.eye=world->navigation.nodes[world->navigation.mainRoute.front()].feet;s.yaw=0;s.pitch=0;}}ImGui::SameLine();ImGui::Checkbox("Top view",&s.ortho);worldRect("top-view");
   int cut=s.cutaway;ImGui::SameLine();ImGui::SetNextItemWidth(140*uiScale());if(ImGui::SliderInt("Cutaway floor",&cut,-1,4)){s.cutaway=cut;s.dirty=true;}worldRect("cutaway");
   auto size=ImGui::GetContentRegionAvail();size.x=std::max(80.f,size.x);size.y=std::max(100.f,size.y);auto pos=ImGui::GetCursorScreenPos();
   if(!modelViewerImage)modelViewerImage=draw->LoadImageShader("ftebroom/modelviewer-image","{ program default2d { map $rt:ftebroom_modelviewer rgbgen vertex alphagen vertex } }");
@@ -187,9 +189,10 @@ static void worldPreview(){
     if(s.walk){
       double angle=s.yaw*3.141592653589793/180;wa::V forward{std::cos(angle),std::sin(angle),0},right{-forward.y,forward.x,0},delta{};
       if(ImGui::IsKeyDown(ImGuiKey_W))delta=delta+forward;if(ImGui::IsKeyDown(ImGuiKey_S))delta=delta-forward;if(ImGui::IsKeyDown(ImGuiKey_D))delta=delta+right;if(ImGui::IsKeyDown(ImGuiKey_A))delta=delta-right;
-      if(al::length(delta)>.1){delta=al::unit(delta)*std::min(.05f,io.DeltaTime)*180;wa::Collision collision(*world);auto next=collision.move(s.eye,s.eye+delta,s.settings.player);if(next)s.eye=*next;}
+      if(al::length(delta)>.1){delta=al::unit(delta)*std::min(.05f,io.DeltaTime)*180;wa::Collision collision(*world,&s.openedGates,true);auto next=collision.move(s.eye,s.eye+delta,s.settings.player);if(next)s.eye=*next;}
     }
   }
+  if(s.walk&&wa::activateGates(*world,s.eye,s.settings.player,s.openedGates))s.dirty=true;
   cvars->SetFloat("ftebroom_bb_active",1);cvars->SetFloat("ftebroom_modelviewer_open",1);cvars->SetFloat("ftebroom_modeleditor_active",1);cvars->SetFloat("ftebroom_plant_active",0);
   cvars->SetFloat("ftebroom_modelviewer_width",size.x);cvars->SetFloat("ftebroom_modelviewer_height",size.y);cvars->SetFloat("ftebroom_modelviewer_yaw",s.yaw);cvars->SetFloat("ftebroom_modelviewer_pitch",s.pitch);cvars->SetFloat("ftebroom_modelviewer_zoom",s.zoom);
   cvars->SetString("ftebroom_bb_low",wa::vectorText(world->low).c_str());cvars->SetString("ftebroom_bb_high",wa::vectorText(world->high).c_str());
@@ -249,7 +252,7 @@ static void worldQa(){
   }
   char applyAck[128]={},applyStatus[128]={};cvars->GetString("ftebroom_world_apply_ack",applyAck,sizeof applyAck);cvars->GetString("ftebroom_world_apply_status",applyStatus,sizeof applyStatus);
   wa::Json j={{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"applyAck",applyAck},{"applyStatus",applyStatus},{"mapEpoch",int(cvars->GetFloat("ftebroom_map_instance"))},{"open",s.open},{"busy",s.job.valid()},{"settings",wa::serialize(s.settings)},{"widgets",s.widgets},{"error",s.error},{"message",s.message},{"selected",s.selected},{"request",s.request},{"candidates",s.batch.worlds.size()}};
-  j["projectId"]=s.project;j["detailRegion"]=s.detailRegion;
+  j["projectId"]=s.project;j["detailRegion"]=s.detailRegion;j["openedGates"]=s.openedGates;j["walkFeet"]=wa::vector(s.eye);
   j["legacySaved"]=s.legacySaved;if(s.legacy)j["legacy"]=s.legacy->report;
   j["inputTrace"]=s.inputTrace;
   j["candidateSeeds"]=wa::Json::array();for(const auto& world:s.batch.worlds)j["candidateSeeds"].push_back(world.seed);
@@ -281,7 +284,7 @@ static void worldPanel(){
     if(!restoredSettings)worldChanged(before);else s.gesture=0;ImGui::EndDisabled();
     if(s.job.valid()){ImGui::ProgressBar((s.work->stage.load()+.5f)/7,{-1,0},wa::stages[std::clamp(s.work->stage.load(),0,6)]);if(worldButton("Cancel generation","cancel"))s.work->cancel=true;}
     if(!s.batch.worlds.empty()){
-      ImGui::TextUnformatted("Validated candidates:");ImGui::SameLine();for(size_t i=0;i<s.batch.worlds.size();i++){ImGui::PushID(int(i));auto label=std::to_string(i+1)+" / "+std::to_string(s.batch.worlds[i].seed);if(ImGui::RadioButton(label.c_str(),s.selected==int(i))){s.selected=int(i);s.dirty=true;}worldRect("candidate/"+std::to_string(i));ImGui::SameLine();ImGui::PopID();}ImGui::NewLine();
+      ImGui::TextUnformatted("Validated candidates:");ImGui::SameLine();for(size_t i=0;i<s.batch.worlds.size();i++){ImGui::PushID(int(i));auto label=std::to_string(i+1)+" / "+std::to_string(s.batch.worlds[i].seed);if(ImGui::RadioButton(label.c_str(),s.selected==int(i))){s.selected=int(i);s.previewIdentity.clear();s.dirty=true;}worldRect("candidate/"+std::to_string(i));ImGui::SameLine();ImGui::PopID();}ImGui::NewLine();
     }
     if(ImGui::BeginTabBar("World Architect panels")){
       for(int tab=0;tab<9;tab++){const char* names[]={"Overview","Mission Graph","Site & Roads","Buildings","Architecture","Destruction","Dressing","Quality","Export"};bool active=ImGui::BeginTabItem(names[tab]);worldRect(std::string("tab/")+names[tab]);if(!active)continue;s.tab=tab;

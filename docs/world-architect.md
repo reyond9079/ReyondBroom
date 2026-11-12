@@ -94,8 +94,9 @@ In Mission Graph, drag a beat onto a functional room on the selected floor.
 The point snaps to that room's player anchor; generation reserves it before
 building the walls and reassigns unpinned beats around it. Add optional branches
 or edit mission transitions. Invalid disconnections and two pins in one room
-fail explicitly. Directed transitions constrain the validated mission traversal;
-they do not yet instantiate physical engine gates.
+fail explicitly. Directed transitions constrain the validated mission traversal. Activation
+prerequisites can also instantiate supported physical doors and zones as
+described below.
 
 Architecture changes the real circulation grammar, floor count, minimum room
 count, building dimensions and gallery width. These fields inherit the preset
@@ -197,3 +198,34 @@ endpoint or blue Bezier control to edit the recipe. Blue paths show edits;
 Generate validates their bounds, building clearance and physical navigation.
 In **Quality**, expand **Candidate count and quality weights** to tune accepted
 candidate ranking. These weights never relax hard geometry or route checks.
+
+## Activation prerequisites and doors
+
+In **Mission Graph → Gate prerequisites**, choose an activation beat for a
+transition's destination room. The prerequisite applies to every incoming
+transition to that destination. Add an accessible optional branch for a switch
+room where necessary; deadlocked activations and contradictory prerequisites
+fail before generation. The original graph and choice are saved in the project.
+
+**Gate realization** selects `auto`, `semantic` or `standard`. Auto realizes
+Quake 1 and Quake III doors. FTE Custom defaults to metadata because its game
+code is unknown; choose standard only with compatible `func_door` and
+`trigger_multiple` implementations. Q2/GoldSrc remain uncertified and retain
+semantic metadata with an explicit diagnostic. The standard backend opens the
+door when the activation zone is visited; a colored light marks that location.
+The door remains open. First-person preview blocks closed doors and unlocks them
+on zone overlap. The game uses its actual animated door behavior.
+
+Physical gates require an enclosed functional room. Garage entrances and mall
+service rooms with two entrances need a more specific composition and report an
+unsupported layout. Protected lining seals the gated room's windows, walls and
+ceiling against damage-based bypasses. It keeps a single real door opening.
+Engine targets are isolated per World Architect project so two applied worlds
+do not activate one another's doors.
+
+Apply/update preserves real door and trigger brush entities inside the owned
+region. One map Undo/Redo includes their models. Ownership survives normal
+save/reopen and rejects manual geometry or entity-property changes; generated
+model bookkeeping names are compared through actual geometry, rather than
+being mistaken for authored changes. One-way graph flags remain mission
+traversal metadata; they do not invent an irreversible engine controller.

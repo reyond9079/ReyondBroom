@@ -16,7 +16,7 @@ int main(int argc,char** argv)try{
       auto world=std::move(batch.worlds.front());auto proof=diagnostics(world);proof["attempted"]=settings.candidates;proof["rejected"]=batch.rejects;
       auto repeat=settings;repeat.seed=world.seed;auto replay=generate(repeat,registry);if(replay.map!=world.map)throw std::runtime_error("Seed regeneration mismatch");
       auto restored=deserialize(serialize(settings),registry);if(serialize(restored)!=serialize(settings))throw std::runtime_error("Project roundtrip mismatch");
-      auto parsed=al::parseMap(world.map);if(parsed.brushes.size()!=world.architecture.elements.size())throw std::runtime_error("MAP brush roundtrip mismatch");
+      auto parsed=al::parseMap(world.map);if(parsed.brushes.size()!=brushCount(world))throw std::runtime_error("MAP brush roundtrip mismatch");
       auto path=output/(preset.id+"-"+std::to_string(seed));
       if(seed==1){auto bundle=assetBundle(world,registry,ftebroom::defaultQuakePalette());
       for(const auto& [name,bytes]:bundle){auto asset=output/std::filesystem::u8path(name);std::filesystem::create_directories(asset.parent_path());std::ofstream(asset,std::ios::binary).write(bytes.data(),bytes.size());}

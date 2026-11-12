@@ -121,7 +121,7 @@ jobs:
           gh run download $env:PREPARED_RUN --repo $env:GITHUB_REPOSITORY --name compilation-Linux-x64 --dir prepared-fixtures
           if ($LASTEXITCODE) { throw 'Matching portable World fixtures unavailable' }
           $gateFile = Get-ChildItem prepared-fixtures -Recurse -Filter gate-project-1.world.json | Select-Object -First 1
-          $moduleFile = Get-ChildItem prepared-fixtures -Recurse -Filter module-pack.json | Select-Object -First 1
+          $moduleFile = Get-ChildItem prepared-fixtures -Recurse -Filter module-pack-1.json | Select-Object -First 1
           if (!$gateFile -or !$moduleFile) { throw 'Missing prepared gate/module fixtures' }
           $gateDir = $gateFile.DirectoryName
           $moduleDir = $moduleFile.DirectoryName

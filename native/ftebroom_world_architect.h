@@ -8,12 +8,14 @@
 #define FTEBROOM_WORLD_RESTORE_NEAR
 #endif
 #include "world_architect/assets.h"
+#include "world_architect/legacy.h"
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 // Reuse the validated MIT convex brush kernel. The external legacy AutoLevel
 // plugin retains its own ABI and data; no solver or legacy state is replaced.
 #include "../plugins/autolevel/al_brush.cpp"
+#include "../plugins/autolevel/al_storage.cpp"
 
 namespace wa=ftebroom::worldArchitect;
 struct WorldArchitectWork {std::atomic<bool> cancel{false};std::atomic<int> stage{0};};
@@ -27,6 +29,7 @@ struct WorldArchitectState {
   std::string project,requestMode,requestRegion;uint64_t detailRegion=0,detailSeed=1;
   uint64_t missionNode=0,dragMission=0,roadSelection=0;int missionEdge=0,planFloor=0,maskSelection=-1;
   bool painting=false;wa::V paintStart{};float paintStrength=1;int paintType=0;
+  std::optional<wa::LegacyMigration> legacy;bool legacySaved=false;
   double requestAt=0;std::filesystem::path requestPath;
   std::vector<wa::Json> undo,redo;
   std::map<std::string,std::string> pendingShaders;std::map<std::string,qhandle_t> materialHandles;
@@ -225,6 +228,7 @@ static void worldQa(){
   char applyAck[128]={},applyStatus[128]={};cvars->GetString("ftebroom_world_apply_ack",applyAck,sizeof applyAck);cvars->GetString("ftebroom_world_apply_status",applyStatus,sizeof applyStatus);
   wa::Json j={{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"applyAck",applyAck},{"applyStatus",applyStatus},{"mapEpoch",int(cvars->GetFloat("ftebroom_map_instance"))},{"open",s.open},{"busy",s.job.valid()},{"settings",wa::serialize(s.settings)},{"widgets",s.widgets},{"error",s.error},{"message",s.message},{"selected",s.selected},{"request",s.request},{"candidates",s.batch.worlds.size()}};
   j["projectId"]=s.project;j["detailRegion"]=s.detailRegion;
+  j["legacySaved"]=s.legacySaved;if(s.legacy)j["legacy"]=s.legacy->report;
   j["inputTrace"]=s.inputTrace;
   j["candidateSeeds"]=wa::Json::array();for(const auto& world:s.batch.worlds)j["candidateSeeds"].push_back(world.seed);
   if(auto world=worldSelected())j["world"]=wa::diagnostics(*world);worldAction([&]{bb::atomicWrite(documentPath("world-architect-ui-live.json"),j.dump());});
@@ -266,6 +270,7 @@ static void worldPanel(){
           if(worldButton("Save editable project...","save-project"))runUiChoose((documentPath("world-architect")/"project.world.json").u8string(),[](const std::string& name){auto path=std::filesystem::u8path(name);std::filesystem::create_directories(path.parent_path());bb::atomicWrite(path,worldProject().dump(2));},true);
           if(worldButton("Open project...","open-project"))runUiChoose(documentPath("world-architect").u8string(),worldLoadProject);
           ImGui::TextWrapped("Legacy AutoLevel settings and maps are preserved. This preview does not overwrite or silently migrate them.");
+          worldLegacyPanel();
           worldAction(worldPreview);
         }
         if(tab==1)worldAction(worldMissionPanel);

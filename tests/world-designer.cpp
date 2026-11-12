@@ -14,7 +14,7 @@ int main(int argc,char** argv)try{
       auto& b=initial.spatial.buildings.front();settings.influences.push_back({1,b.low-V{8,8,8},b.high+V{8,8,8},"preserve",1});
       const auto& room=b.rooms.back();MissionNode pin;pin.id=initial.mission.nodes[2].id;pin.position={(room.low.x+room.high.x)/2,(room.low.y+room.high.y)/2,room.low.z+1};settings.missionPins.push_back(pin);
     }else if(std::string(name)=="roads"){
-      settings.preset="evacuation";auto initial=generate(settings,registry);auto road=initial.spatial.roads.front();road.width=128;road.pinned=true;settings.roadPins.push_back(road);
+      settings.preset="evacuation";auto initial=generate(settings,registry);auto road=initial.spatial.roads.front();road.width=128;road.control=(road.a+road.b)*.5+V{0,32,0};road.pinned=true;settings.roadPins.push_back(road);
     }else{
       settings.preset="metro";settings.seed=9949357162622361994ULL;
     }

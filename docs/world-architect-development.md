@@ -196,8 +196,8 @@ different optional branches. More road patterns, archetype-specific interior
 families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
-Complete spline/volume editing, richer painted masks, physical gate realization,
-room-level regeneration, direct procedural use of
+More complete spline/volume constraint semantics, physical gate realization,
+direct procedural use of
 imported module packs, extension-pack validation, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.
 Malformed or incompatible pin recipes fail explicitly instead of silently ignoring
@@ -229,3 +229,22 @@ comparison checks, and 72 accepted input batches across Quake 1, Quake III and
 FTE (three input seeds per preset/profile). All six new representative scenarios
 compiled and lit on each profile: 18 actual BSP/light runs. The full 100-seed
 acceptance and compiled first-person review remain separate final gates.
+
+## Local authoring slice
+
+Quadratic Bezier road controls are stored with road recipes. Validation samples
+the complete bounded curve against the sealed site and buildings; geometry,
+curbs, navigation and both plan/comparison renderers share its tessellation.
+Straight legacy recipes retain their original geometry. Room furnishing overrides
+change only the chosen functional room's stream in the accepted Dressing recipe;
+unknown rooms and pinned buildings fail explicitly. Exact XYZ field bounds can
+be edited and undone atomically. This slice passed 367 core contracts and actual
+curved-road BSP/light compilation on Quake 1, Quake III and FTE.
+
+The native ImGui version prohibits EnterReturnsTrue on numeric scalar/vector
+inputs. Vector controls retain a local draft and commit on deactivation instead;
+this also avoids validating incomplete digit sequences as full site coordinates.
+
+Eight focused actual SDL2 input checks passed for room furnishing, exact project
+reopen, numeric Bezier controls, volume height and single-transaction Undo, with
+the active authored map unchanged.

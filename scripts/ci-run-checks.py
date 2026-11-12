@@ -58,6 +58,7 @@ def main():
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/designer-ui', '--designer-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/themes-ui', '--themes-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/scenarios-ui', '--scenarios-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/local-ui', '--local-only')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),
             *([] if 'atlas' in suites else ['--targeted']))

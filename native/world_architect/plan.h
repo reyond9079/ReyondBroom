@@ -41,7 +41,15 @@ struct MissionNode {uint64_t id=0;Role role=Role::Challenge;std::string name;V p
 struct MissionEdge {uint64_t a=0,b=0;bool optional=false,oneWay=false;std::string purpose;uint64_t prerequisite=0;};
 struct MissionGraph {std::vector<MissionNode> nodes;std::vector<MissionEdge> edges;};
 inline void validateMission(const MissionGraph& graph);
-struct Road {uint64_t id=0;V a,b;double width=160;std::string hierarchy="local";bool pinned=false;};
+struct Road {uint64_t id=0;V a,b;double width=160;std::string hierarchy="local";bool pinned=false;std::optional<V> control;};
+// Quadratic Bezier controls are optional, so old straight-road recipes retain
+// their exact geometry. Sweep, collision validation and plan rendering share
+// this bounded tessellation rather than drawing an unrelated preview curve.
+inline std::vector<V> roadPoints(const Road& road){
+  if(!road.control)return {road.a,road.b};
+  int steps=std::clamp(int(std::ceil((al::length(*road.control-road.a)+al::length(road.b-*road.control))/64)),8,128);
+  std::vector<V> result;for(int i=0;i<=steps;i++){double t=double(i)/steps;result.push_back(road.a*((1-t)*(1-t))+*road.control*(2*t*(1-t))+road.b*(t*t));}return result;
+}
 struct Lot {uint64_t id=0;V low,high;std::string zone;};
 struct Room {uint64_t id=0;V low,high,entry;std::string function;int floor=0;bool required=true;uint64_t mission=0;};
 struct Building {uint64_t id=0;V low,high;int floors=1;std::string archetype;bool pinned=false;std::vector<Room> rooms;double hall=72;bool atrium=false,parallel=false;std::vector<double> bays;};
@@ -82,7 +90,7 @@ struct Settings {
   // and Site stay frozen while pins exist to retain their lots and routes.
   std::map<uint64_t,std::array<Json,3>> regionRecipes;
   uint64_t pinnedRegistry=0;
-  std::map<uint64_t,uint64_t> regionSeeds;
+  std::map<uint64_t,uint64_t> regionSeeds,roomSeeds;
   std::vector<Influence> influences;
   std::map<std::string,double> weights{{"variety",1},{"route",1},{"circulation",1}};
 };
@@ -183,16 +191,17 @@ inline void validate(const Settings& s,const Registry& r,bool recipe=false){
     if(baseline.contains("stageLocks"))for(const auto& flag:baseline.at("stageLocks"))if(flag.get<bool>())throw std::runtime_error("A stage input must be a clean generation recipe");
     auto input=deserialize(baseline,r,true);if(i<=last&&(input.profile!=s.profile||input.preset!=s.preset))throw std::runtime_error("Unlock stages before changing the game profile or preset");
   }else if(i<=last)throw std::runtime_error("A stage lock has no accepted generation input");
-  if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
+  if(s.missionPins.size()>64||s.roadPins.size()>64||s.influences.size()>128||s.roomSeeds.size()>256||s.regionSeeds.size()>128||s.pinnedRegions.size()>128)throw std::runtime_error("Too many World Architect overrides");
   for(auto& [name,weight]:s.weights){safeToken(name);if(name!="variety"&&name!="route"&&name!="circulation")throw std::runtime_error("Unknown quality weight");finite(weight,0,10,"Score weight must be 0..10");}
   std::set<uint64_t> ids;for(const auto& p:s.missionPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate mission pin");for(int a=0;a<3;a++)finite(p.position[a],-30000,30000,"Invalid mission pin");}
-  ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}finite(p.width,48,512,"Invalid road width");if(al::length(p.a-p.b)<48||p.a.z!=0||p.b.z!=0)throw std::runtime_error("Road pins require a ground-plane segment of at least 48 units");}
+  ids.clear();for(const auto& p:s.roadPins){if(!p.id||!ids.insert(p.id).second)throw std::runtime_error("Duplicate road pin");for(int a=0;a<3;a++){finite(p.a[a],-30000,30000,"Invalid road pin");finite(p.b[a],-30000,30000,"Invalid road pin");}if(p.control){for(int a=0;a<3;a++)finite((*p.control)[a],-30000,30000,"Invalid road curve control");if(p.control->z!=0)throw std::runtime_error("Road curve controls must stay on the ground plane");}finite(p.width,48,512,"Invalid road width");if(al::length(p.a-p.b)<48||p.a.z!=0||p.b.z!=0)throw std::runtime_error("Road pins require a ground-plane segment of at least 48 units");}
   for(const auto& mask:s.influences){for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing")throw std::runtime_error("Unknown influence type");}
 }
 inline Json serialize(const Settings& s){
   Json j={{"schemaVersion",schemaVersion},{"worldSeed",s.seed},{"presetId",s.preset},{"profileId",s.profile},{"candidates",s.candidates},{"scale",s.scale},{"damage",s.damage},{"dressing",s.dressing},{"player",{{"radius",s.player.radius},{"height",s.player.height},{"step",s.player.step}}},{"stageLocks",s.locked},{"frozenStageInputs",s.frozen},{"frozenRegistry",s.frozenRegistry},{"qualityWeights",s.weights},{"pinnedRegions",s.pinnedRegions}};
   j["missionPins"]=Json::array();for(const auto& p:s.missionPins)j["missionPins"].push_back({{"id",p.id},{"position",vector(p.position)}});
-  j["roadPins"]=Json::array();for(const auto& p:s.roadPins)j["roadPins"].push_back({{"id",p.id},{"a",vector(p.a)},{"b",vector(p.b)},{"width",p.width}});
+  j["roadPins"]=Json::array();for(const auto& p:s.roadPins)j["roadPins"].push_back({{"id",p.id},{"a",vector(p.a)},{"b",vector(p.b)},{"width",p.width},{"control",p.control?vector(*p.control):Json(nullptr)}});
+  j["roomSeeds"]=Json::array();for(const auto& [id,seed]:s.roomSeeds)j["roomSeeds"].push_back({{"room",id},{"seed",seed}});
   j["regionSeeds"]=Json::array();for(const auto& [id,seed]:s.regionSeeds)j["regionSeeds"].push_back({{"region",id},{"seed",seed}});
   j["pinnedRegistry"]=s.pinnedRegistry;j["regionRecipes"]=Json::array();for(const auto& [id,recipes]:s.regionRecipes)j["regionRecipes"].push_back({{"region",id},{"inputs",recipes}});
   j["architecture"]={{"layout",s.layout},{"theme",s.theme},{"width",s.width},{"depth",s.depth},{"hall",s.hall},{"floors",s.floors},{"rooms",s.rooms},{"blocks",s.blocks}};
@@ -205,7 +214,8 @@ inline Settings deserialize(const Json& j,const Registry& r,bool recipe){
   const auto& p=j.at("player");s.player={p.at("radius"),p.at("height"),p.at("step")};s.locked=j.at("stageLocks").get<std::array<bool,7>>();s.weights=j.at("qualityWeights").get<std::map<std::string,double>>();s.pinnedRegions=j.value("pinnedRegions",std::vector<uint64_t>{});
   if(j.contains("frozenStageInputs"))s.frozen=j.at("frozenStageInputs").get<std::array<Json,5>>();s.frozenRegistry=j.value("frozenRegistry",uint64_t(0));
   for(const auto& p:j.at("missionPins")){MissionNode n;n.id=p.at("id");n.position=vector(p.at("position"));n.pinned=true;s.missionPins.push_back(n);}
-  for(const auto& p:j.at("roadPins")){Road road;road.id=p.at("id");road.a=vector(p.at("a"));road.b=vector(p.at("b"));road.width=p.at("width");road.pinned=true;s.roadPins.push_back(road);}
+  for(const auto& p:j.at("roadPins")){Road road;road.id=p.at("id");road.a=vector(p.at("a"));road.b=vector(p.at("b"));road.width=p.at("width");if(p.contains("control")&&!p.at("control").is_null())road.control=vector(p.at("control"));road.pinned=true;s.roadPins.push_back(road);}
+  if(j.contains("roomSeeds"))for(const auto& p:j.at("roomSeeds"))if(!s.roomSeeds.emplace(p.at("room").get<uint64_t>(),p.at("seed").get<uint64_t>()).second)throw std::runtime_error("Duplicate room seed");
   for(const auto& p:j.at("regionSeeds"))s.regionSeeds[p.at("region").get<uint64_t>()]=p.at("seed").get<uint64_t>();
   s.pinnedRegistry=j.value("pinnedRegistry",uint64_t(0));if(j.contains("regionRecipes"))for(const auto& p:j.at("regionRecipes"))if(!s.regionRecipes.emplace(p.at("region").get<uint64_t>(),p.at("inputs").get<std::array<Json,3>>()).second)throw std::runtime_error("Duplicate building recipe");
   if(j.contains("architecture")){const auto& a=j.at("architecture");s.layout=a.at("layout");s.theme=a.at("theme");s.width=a.at("width");s.depth=a.at("depth");s.hall=a.at("hall");s.floors=a.at("floors");s.rooms=a.at("rooms");s.blocks=a.at("blocks");}
@@ -263,6 +273,7 @@ inline Json diagnostics(const WorldPlan& world){
   Json j={{"schemaVersion",schemaVersion},{"seed",world.seed},{"preset",world.preset},{"profile",world.profile},{"valid",world.diagnostics.valid},{"rejects",world.diagnostics.rejects},{"warnings",world.diagnostics.warnings},{"timingMs",world.diagnostics.timing},{"cachedStages",world.diagnostics.cachedStages},{"scores",world.diagnostics.score},{"brushes",world.diagnostics.brushes},{"mapBytes",world.diagnostics.mapBytes},{"routeLength",world.diagnostics.routeLength},{"stageSeeds",world.seeds},{"reachable",world.navigation.reachable},{"navigationNodes",world.navigation.nodes.size()}};
   j["missionNodes"]=Json::array();for(const auto& n:world.mission.nodes)j["missionNodes"].push_back({{"id",n.id},{"role",roleName(n.role)},{"required",n.required},{"room",n.room},{"floor",n.floor},{"position",vector(n.position)}});
   j["missionEdges"]=Json::array();for(const auto& e:world.mission.edges)j["missionEdges"].push_back({{"a",e.a},{"b",e.b},{"purpose",e.purpose},{"optional",e.optional},{"oneWay",e.oneWay},{"prerequisite",e.prerequisite}});
+  j["roads"]=Json::array();for(const auto& road:world.spatial.roads){Json points=Json::array();for(auto p:roadPoints(road))points.push_back(vector(p));j["roads"].push_back({{"id",road.id},{"width",road.width},{"points",points}});}
   j["artTheme"]=world.theme;j["assetKey"]=world.assetKey;j["bounds"]={{"low",vector(world.low)},{"high",vector(world.high)}};j["rooms"]=Json::array();for(const auto& b:world.spatial.buildings)for(const auto& room:b.rooms)j["rooms"].push_back({{"id",room.id},{"building",b.id},{"floor",room.floor},{"low",vector(room.low)},{"high",vector(room.high)},{"function",room.function},{"mission",room.mission}});return j;
 }
 }

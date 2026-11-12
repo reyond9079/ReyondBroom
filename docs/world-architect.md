@@ -99,8 +99,9 @@ they do not yet instantiate physical engine gates.
 
 Architecture changes the real circulation grammar, floor count, minimum room
 count, building dimensions and gallery width. These fields inherit the preset
-until overridden. Site & Roads changes street width and segment endpoints;
-road brushes, curbs and navigation change together. Edits that cross a building,
+until overridden. Site & Roads changes street width and segment endpoints. Enable **Bezier road
+curve** and edit its XY control to bend the actual swept street; road brushes,
+curbs, collision checks and navigation use the same tessellated path. Edits that cross a building,
 leave the sealed site or disconnect required navigation are rejected. Unlock
 the relevant upstream stage before editing it.
 
@@ -173,3 +174,17 @@ preserved with an explicit inspection diagnostic.
 For extension authors, see the [registry interface](world-architect-registry.md).
 Original procedural assets are distributed under GPL-3.0-or-later. The reused
 convex brush kernel retains its AutoLevel MIT notices.
+
+## Local furnishing and exact volumes
+
+Dressing's **Local room furnishing** chooses a real functional room and a new
+furnishing seed. Previewing retains the accepted mission, site, architecture,
+damage and other rooms. The frozen Dressing recipe changes only that room's
+stream. After review, **Update selected building only** applies the owning group
+through the existing manual-edit and Undo guards. Pinned buildings reject room
+regeneration. A narrow room or zero density can legitimately have no eligible
+placements; changing the seed does not bypass clearance/preserve requirements.
+
+Saved influence fields expose exact minimum/maximum XYZ coordinates. Commit a
+numeric edit by Enter or by leaving the field. Invalid/inverted volumes are
+rejected without changing the saved settings; a successful edit is one Undo.

@@ -21,7 +21,7 @@ for profile in [2,0,1]:
  record={'profile':profile,'accepted_batches':len(results),'attempts':sum(r['attempted'] for r in results),'rejections':sum(len(r['rejected']) for r in results),'compiled':[]}
  if a.runtime:
   runtime=a.runtime.resolve()
-  for preset in ['hospital','checkpoint','evacuation','metro']:
+  for preset in ['hospital','checkpoint','evacuation','metro','factory','courtyard','overpass','mall']:
    source=folder/(preset+'-1.map')
    if profile==2:
     for tool in ['qbsp','light']:

@@ -4,8 +4,8 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
-assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only])<=1,'Select one focused authoring scenario'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--scenarios-only',action='store_true');p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
+assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only,a.scenarios_only])<=1,'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
@@ -86,6 +86,15 @@ try:
  check(True,'the first workspace tab click is received after actual OS activation')
  click('tab/Overview')
  before=save('wa-before');baseline=planes(before)
+ if a.scenarios_only:
+  from PIL import ImageStat
+  records=[]
+  for preset in ['checkpoint','factory','courtyard','overpass','mall','evacuation']:
+   click('preset');click('preset/'+preset);click('generate');wait(lambda:live()['candidates'] and not live()['busy'] and live()['world']['preset']==preset);assert not live()['error'],live()['error']
+   click('tab/Overview');ui.settle();time.sleep(.3);desktop=ImageGrab.grab().convert('RGB');r=live()['widgets']['preview'];ox,oy=ui.position();sx,sy=getattr(ui,'scale',(1,1));crop=desktop.crop((int(ox+r['x']*sx),int(oy+r['y']*sy),int(ox+(r['x']+r['width'])*sx),int(oy+(r['y']+r['height'])*sy)));crop.save(out/('scenario-'+preset+'.png'));check(max(ImageStat.Stat(crop).var)>20,'actual '+preset+' scenario has textured rendered architecture')
+   records.append(live()['world']);click('tab/Quality');wait(lambda:'compare-plan/0' in live()['widgets']);count=min(4,live()['candidates']);check(count>=2 and all('compare-plan/'+str(i) in live()['widgets'] for i in range(count)),preset+' shows multiple actual candidate plans for comparison')
+   chosen=count-1;click('compare-select/'+str(chosen));wait(lambda:live()['selected']==chosen);check(live()['world']['seed']==live()['candidateSeeds'][chosen],preset+' comparison selects the corresponding validated world')
+  ImageGrab.grab().save(out/'world-candidate-comparison.png');check(planes(save('wa-scenario-preview'))==baseline,'scenario previews and candidate comparison preserve the authored scene');(out/'scenario-results.json').write_text(json.dumps(records,indent=2));print('World Architect scenarios UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.themes_only or a.art_update_only:
   from PIL import ImageStat
   records=[];shared=out/'shared-packs'

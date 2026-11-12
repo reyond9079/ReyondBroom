@@ -174,7 +174,7 @@ static void worldPreview(){
     auto buffer=worldPreviewBuffer(*world,s.cutaway);if(!api->upload(buffer.data(),buffer.size()))throw std::runtime_error("Engine rejected World Architect preview geometry");s.dirty=false;
   }
   if(worldButton(s.walk?"Orbit view":"Walk from spawn","walk")){s.walk=!s.walk;if(s.walk){s.eye=world->navigation.nodes[world->navigation.mainRoute.front()].feet;s.yaw=0;s.pitch=0;}}ImGui::SameLine();ImGui::Checkbox("Top view",&s.ortho);worldRect("top-view");
-  int cut=s.cutaway;ImGui::SameLine();ImGui::SetNextItemWidth(140*uiScale());if(ImGui::SliderInt("Cutaway floor",&cut,-1,3)){s.cutaway=cut;s.dirty=true;}worldRect("cutaway");
+  int cut=s.cutaway;ImGui::SameLine();ImGui::SetNextItemWidth(140*uiScale());if(ImGui::SliderInt("Cutaway floor",&cut,-1,4)){s.cutaway=cut;s.dirty=true;}worldRect("cutaway");
   auto size=ImGui::GetContentRegionAvail();size.x=std::max(80.f,size.x);size.y=std::max(100.f,size.y);auto pos=ImGui::GetCursorScreenPos();
   if(!modelViewerImage)modelViewerImage=draw->LoadImageShader("ftebroom/modelviewer-image","{ program default2d { map $rt:ftebroom_modelviewer rgbgen vertex alphagen vertex } }");
   if(modelViewerImage)ImGui::Image((ImTextureID)modelViewerImage,size);else ImGui::Dummy(size);worldRect("preview");
@@ -279,6 +279,7 @@ static void worldPanel(){
         if(tab==5)worldAction([]{worldInfluencePanel(false);});
         if(tab==6)worldAction([]{auto& s=worldArchitect;auto before=wa::serialize(s.settings);auto p=wa::stagePreset(s.settings,s.registry);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());bool themesOpen=ImGui::BeginCombo("Art theme",p.theme.c_str());worldRect("art-theme");if(themesOpen){for(const auto& theme:s.registry.themes){if(ImGui::Selectable(theme.id.c_str(),p.theme==theme.id))s.settings.theme=theme.id;worldRect("art-theme/"+theme.id);}ImGui::EndCombo();}ImGui::EndDisabled();worldChanged(before);worldInfluencePanel(true);});
         if(tab==7){
+          worldCandidateComparison();
           if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& stage:world->diagnostics.cachedStages)ImGui::Text("Reused frozen stage: %s",stage.c_str());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms%s",name.c_str(),ms,std::find(world->diagnostics.cachedStages.begin(),world->diagnostics.cachedStages.end(),name)!=world->diagnostics.cachedStages.end()?" (original build time)":"");for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
           for(const auto& reject:s.batch.rejects)ImGui::TextWrapped("Rejected: %s",reject.c_str());
         }

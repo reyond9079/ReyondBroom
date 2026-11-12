@@ -175,8 +175,10 @@ inline void floorplan(WorldPlan& w,const Settings& s,const Preset& preset){
       double y0=side?cy+b.hall:b.low.y,y1=side?b.high.y:cy-b.hall;
       if(y1-y0<96)throw std::runtime_error("Room program leaves insufficient occupied depth; increase scale or reduce gallery width");
       Room room;room.id=b.id*10000+floor*100+side*pairs+i;room.low={x0+8,y0+8,floor*256.};room.high={x1-8,y1-8,floor*256.+240};room.floor=floor;room.entry={(x0+x1)/2,side?y0:y1,floor*256.+1};
+      if(preset.scenario=="mall"&&side&&!floor){room.high.y-=112;if(room.high.y-room.low.y<96)throw std::runtime_error("Mall service corridor needs a deeper room envelope; increase depth or scale");}
       const auto& functions=preset.roomFunctions;
       room.function=functions[(floor*pairs*2+side*pairs+i)%functions.size()];b.rooms.push_back(room);
+      if(preset.scenario=="courtyard"&&!floor&&!side&&!i)b.rooms.back().function="garage";
     }
   }
   // Vectors are complete before taking pointers: no later room append may
@@ -252,6 +254,13 @@ inline void shell(WorldPlan& w){
   }
 }
 inline double influence(const Settings& settings,V p,const std::string& kind,double fallback);
+inline std::vector<std::array<double,2>> facadeGaps(const Building& b,int floor,int side){
+  std::vector<std::array<double,2>> gaps;if(floor)return gaps;double cy=(b.low.y+b.high.y)/2;
+  for(const auto& room:b.rooms)if(room.floor==floor&&room.function=="garage"&&int(room.low.y>cy)==side){double x=(room.low.x+room.high.x)/2;gaps.push_back({x-48,x+48});}std::sort(gaps.begin(),gaps.end());return gaps;
+}
+inline void facadeStrip(WorldPlan& w,const Building& b,const std::string& kind,int floor,int side,double bottom,double top,double depth,int slot,double overhang=0){
+  double y=side?b.high.y:b.low.y,cursor=b.low.x-overhang;for(auto gap:facadeGaps(b,floor,side)){box(w,b.id,kind,{cursor,y-depth,bottom},{gap[0],y+depth,top},slot);cursor=gap[1];}box(w,b.id,kind,{cursor,y-depth,bottom},{b.high.x+overhang,y+depth,top},slot);
+}
 inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Building& b,const std::atomic<bool>* cancel){
   const auto low=b.low,high=b.high;const double cy=(low.y+high.y)/2,hall=b.hall,stairX=high.x-320,returnOffset=std::max(144.,hall+64);
   const bool collapsed=preset.ruinEvent=="collapsed-stair"&&influence(s,{stairX,cy,0},"damage",s.damage)>.2&&influence(s,{stairX,cy,0},"preserve",0)==0;
@@ -287,13 +296,14 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
       double y=side?high.y:low.y;std::vector<std::array<double,4>> windows;
       int bays=std::max(3,int(width/(preset.archetype=="factory"?192:128)));
       for(int bay=0;bay<bays;bay++){double center=width*(bay+.5)/bays;windows.push_back({center-30,center+30,z+72,z+168});}
+      for(auto gap:facadeGaps(b,floor,side)){double a=gap[0]-low.x,c=gap[1]-low.x;windows.erase(std::remove_if(windows.begin(),windows.end(),[&](const auto& window){return window[0]<c&&window[1]>a;}),windows.end());windows.push_back({a,c,z,z+112});}
       wall(w,b.id,{low.x,y,0},{high.x,y,0},z,z+240,16,1,windows);
-      box(w,b.id,"window sill course",{low.x-8,y-13,z+60},{high.x+8,y+13,z+72},2);
+      facadeStrip(w,b,"window sill course",floor,side,z+60,z+72,13,2,8);
       box(w,b.id,"floor facade cornice",{low.x-12,y-14,z+236},{high.x+12,y+14,z+252},2);
     }
     std::vector<std::array<double,4>> entrance{{depth/2-48,depth/2+48,z,z+112}};
     wall(w,b.id,{low.x,low.y,0},{low.x,high.y,0},z,z+240,16,1,entrance);
-    wall(w,b.id,{high.x,low.y,0},{high.x,high.y,0},z,z+240,16,1,floor?std::vector<std::array<double,4>>{}:entrance);
+    wall(w,b.id,{high.x,low.y,0},{high.x,high.y,0},z,z+240,16,1,(!floor||(preset.scenario=="overpass"&&floor==1))?entrance:std::vector<std::array<double,4>>{});
     const auto hallLeft=navNode(w,{low.x+40,cy,z+1},b.id),hallRight=navNode(w,{stairX-40,cy,z+1},b.id);
     if(!floor||!openCourt)navEdge(w,hallLeft,hallRight);halls.push_back(hallRight);
     std::array<size_t,2> laneLeft{},laneRight{};
@@ -314,18 +324,18 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
     if(!floor){auto outside=navNode(w,{low.x-56,cy,1},b.id);navEdge(w,outside,hallLeft);}
     for(int side=0;side<2;side++)for(int i=0;i<roomPairs;i++){
       double x0=splits[i],x1=splits[i+1],door=(x0+x1)/2;
-      double y0=side?cy+hall:low.y,y1=side?high.y:cy-hall,inner=side?y0:y1;
-      if(i)wall(w,b.id,{x0,y0,0},{x0,y1,0},z,z+240,12,1);
       auto& room=b.rooms.at(size_t(floor*roomPairs*2+side*roomPairs+i));
+      double y0=side?cy+hall:low.y,y1=side?room.high.y+8:cy-hall,inner=side?y0:y1;
+      if(i)wall(w,b.id,{x0,y0,0},{x0,y1,0},z,z+240,12,1);
       double halfDoor=std::min((x1-x0-32)/2,room.mission?56.:40.);
       if(halfDoor<s.player.radius+8)throw std::runtime_error("Functional room door does not clear the configured player hull");
       wall(w,b.id,{x0,inner,0},{x1,inner,0},z,z+240,12,1,{{door-x0-halfDoor,door-x0+halfDoor,z,z+112}});
       const double lane=cy+(side?1:-1)*(hall-32);
-      const auto corridor=navNode(w,{door,lane,z+1},b.id),entry=navNode(w,room.entry,b.id),center=navNode(w,{door,(y0+y1)/2,z+1},b.id);
+      const auto corridor=navNode(w,{door,lane,z+1},b.id),entry=navNode(w,room.entry,b.id),center=navNode(w,{door,(room.low.y+room.high.y)/2,z+1},b.id);
       navEdge(w,laneLeft[side],corridor);navEdge(w,corridor,laneRight[side]);navEdge(w,corridor,entry);navEdge(w,entry,center);
       // Lighting follows the room function, with warmer public spaces and
       // cooler service rooms. No game-specific enemy/entity vocabulary.
-      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(y0+y1)/2,z+192})},{"light",preset.archetype=="station"?"180":"240"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 240";w.architecture.entities.push_back({b.id,light});
+      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(room.low.y+room.high.y)/2,z+192})},{"light",preset.archetype=="station"?"180":"240"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 240";w.architecture.entities.push_back({b.id,light});
     }
     // Rectangular room partitions end before the stairwell; a service lobby
     // and a pair of columns distinguish the larger terminal spatial beat.
@@ -452,6 +462,7 @@ inline double influence(const Settings& settings,V p,const std::string& kind,dou
   double result=fallback;for(const auto& mask:settings.influences)if(mask.kind==kind&&inside(p,mask.low,mask.high))result=mask.strength;return result;
 }
 #include "theme_kits.h"
+#include "scenario_kits.h"
 inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* cancel,const Registry& registry){
   for(const auto& building:w.spatial.buildings){
     const auto s=regionInput(input,building.id,3,registry);
@@ -621,6 +632,14 @@ inline void exportMap(WorldPlan& w,const Settings& settings){
 }
 // Editor groups carry stable ownership independently of engine entity/model
 // indices. Both supported compilers merge func_group brushes into worldspawn.
+inline uint64_t missionRegion(const WorldPlan& w,const MissionNode& beat){
+  if(beat.room)return beat.room/10000;
+  // Roofs and galleries are building-owned even when they are not rooms.
+  // Keep street markers in the shared region so local replacement cannot
+  // remove another building's approach or the global spawn.
+  for(const auto& b:w.spatial.buildings)if(inside(beat.position,b.low-V{0,0,32},b.high+V{0,0,80}))return b.id;
+  return 0;
+}
 inline std::string groupedMap(const WorldPlan& w,const std::string& project,std::optional<uint64_t> onlyRegion={}){
   safeToken(project);if(project.size()>64)throw std::runtime_error("Project ownership identifier exceeds 64 bytes");if(w.architectureKey.empty())throw std::runtime_error("Missing architecture provenance");if(!w.diagnostics.valid)throw std::runtime_error("Cannot group an unvalidated world");
   std::map<uint64_t,std::vector<const ArchitectureElement*>> groups;
@@ -637,7 +656,7 @@ inline std::string groupedMap(const WorldPlan& w,const std::string& project,std:
   auto entity=[&](al::PointEntity e,uint64_t region){auto parent=parents.find(region);if(parent==parents.end())return;e.fields["_tb_group"]=std::to_string(parent->second);out<<al::writeEntity(e);};
   for(const auto& e:w.architecture.entities)entity(e.entity,e.region);
   if(!onlyRegion){auto spawn=w.navigation.nodes[w.navigation.mainRoute.front()].feet+V{0,0,24};entity({{{"classname",capability(w.profile).spawn},{"origin",vectorText(spawn)},{"angle","0"}}},0);}
-  for(const auto& beat:w.mission.nodes)entity({{{"classname","info_null"},{"origin",vectorText(beat.position+V{0,0,32})},{"_wa_role",roleName(beat.role)},{"_wa_id",std::to_string(beat.id)}}},beat.room/10000);
+  for(const auto& beat:w.mission.nodes)entity({{{"classname","info_null"},{"origin",vectorText(beat.position+V{0,0,32})},{"_wa_role",roleName(beat.role)},{"_wa_id",std::to_string(beat.id)}}},missionRegion(w,beat));
   auto result=out.str();if(result.size()>16*1024*1024)throw std::runtime_error("Grouped world exceeds the MAP import budget");auto parsed=al::parseMap(result);size_t count=0;for(const auto& group:groups)count+=group.second.size();if(parsed.brushes.size()!=count)throw std::runtime_error("Grouped world brush roundtrip failed");return result;
 }
 struct PrefixCache {std::array<std::string,5> keys;std::array<std::shared_ptr<const WorldPlan>,5> plans;};
@@ -685,8 +704,8 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
     if(n<=last&&cache){cache->keys[n]=keys[n];cache->plans[n]=std::make_shared<const WorldPlan>(w);}
   };
   stage(0,[&](const auto& input){w.mission=mission(input,stagePreset(input,registry));validateMission(w.mission);});
-  stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);floorplan(w,input,p);});
-  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
+  stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);scenarioSite(w,input,p);floorplan(w,input,p);scenarioMission(w,p);});
+  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);scenarioArchitecture(w,local,p,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
   stage(3,[&](const auto& input){damage(w,input,cancel,registry);});
   stage(4,[&](const auto& input){dressing(w,input,stagePreset(input,registry),cancel,registry);});
   stage(5,[&](const auto& input){navigation(w,input,cancel);});

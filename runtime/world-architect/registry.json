@@ -285,7 +285,8 @@
         "office",
         "service"
       ],
-      "hallHalfWidth": 72
+      "hallHalfWidth": 72,
+      "scenario": "checkpoint"
     },
     {
       "id": "hospital",
@@ -371,7 +372,8 @@
         "control",
         "maintenance"
       ],
-      "hallHalfWidth": 128
+      "hallHalfWidth": 128,
+      "scenario": "factory"
     },
     {
       "id": "courtyard",
@@ -399,7 +401,8 @@
         "utility",
         "stair-lobby"
       ],
-      "hallHalfWidth": 72
+      "hallHalfWidth": 72,
+      "scenario": "courtyard"
     },
     {
       "id": "overpass",
@@ -425,7 +428,8 @@
         "dispatch",
         "maintenance"
       ],
-      "hallHalfWidth": 72
+      "hallHalfWidth": 72,
+      "scenario": "overpass"
     },
     {
       "id": "mall",
@@ -453,7 +457,8 @@
         "security",
         "retail"
       ],
-      "hallHalfWidth": 192
+      "hallHalfWidth": 192,
+      "scenario": "mall"
     },
     {
       "id": "evacuation",
@@ -481,7 +486,8 @@
         "shelter",
         "utility"
       ],
-      "hallHalfWidth": 72
+      "hallHalfWidth": 72,
+      "scenario": "evacuation"
     }
   ]
 }

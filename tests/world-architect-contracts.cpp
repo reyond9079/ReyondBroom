@@ -94,6 +94,33 @@ int main(int argc,char** argv)try{
  for(const auto& beat:world.mission.nodes)if(beat.required)check(std::any_of(world.navigation.mainRoute.begin(),world.navigation.mainRoute.end(),[&](size_t at){return al::length(world.navigation.nodes[at].feet-beat.position)<.01;}),"physical main route visits the planned required mission room");
  check(al::length(world.navigation.nodes[world.navigation.mainRoute.front()].feet-world.mission.nodes.front().position)<.01,"exported route starts at the planned mission start");
  auto countKind=[&](const WorldPlan& w,const std::string& kind){return std::count_if(w.architecture.elements.begin(),w.architecture.elements.end(),[&](const auto& element){return element.kind==kind;});};
+ for(const auto& id:{"checkpoint","courtyard","factory","mall","overpass","evacuation"}){
+   auto input=settings;input.preset=id;input.damage=registry.preset(id).damage;auto scene=generate(input,registry);Collision hull(scene);const auto& b=scene.spatial.buildings.front();double cy=(b.low.y+b.high.y)/2;
+   auto landmark=std::find_if(scene.mission.nodes.begin(),scene.mission.nodes.end(),[](const auto& n){return n.role==Role::Landmark;});
+   check(scene.diagnostics.valid,"scenario-specific architecture retains a valid complete mission route");
+   if(input.preset=="checkpoint"||input.preset=="courtyard"){
+     check(countKind(scene,"roof escape tread")==16*b.floors&&landmark!=scene.mission.nodes.end()&&landmark->position.z==b.high.z+1,"roof landmark has full-height physical fire-stair access");
+     check(missionRegion(scene,*landmark)==b.id,"roof mission marker belongs to the building during regional replacement");
+     auto localMap=groupedMap(scene,"roof-qa",b.id);check(localMap.find("\"_wa_id\" \""+std::to_string(landmark->id)+"\"")!=localMap.npos,"regional MAP includes the roof marker instead of losing it in the shared group");
+   }
+   if(input.preset=="checkpoint")check(countKind(scene,"checkpoint concrete barrier")==1&&countKind(scene,"sentry booth roof")==1,"checkpoint has a physical barricade and a separate sentry booth");
+   if(input.preset=="courtyard"){
+     const auto& garage=*std::find_if(b.rooms.begin(),b.rooms.end(),[](const auto& r){return r.function=="garage";});double x=(garage.low.x+garage.high.x)/2;
+     check(countKind(scene,"raised garage shutter")>0&&bool(hull.move({x,b.low.y-48,17},{x,b.low.y+48,1},input.player)),"garage aperture admits the configured player beneath the raised shutter");
+   }
+   if(input.preset=="factory")check(countKind(scene,"gantry crane rail")==2&&countKind(scene,"production press head")>0&&countKind(scene,"ivy leaf cluster")==24&&countKind(scene,"broken industrial roof frame")>0,"factory has production machinery, a crane, fractured roof and original brush ivy");
+   if(input.preset=="mall"){
+     V a{b.low.x+48,b.high.y-64,1},z{b.bays.back()-48,b.high.y-64,1};
+     check(!hull.blocked(a,z,input.player)&&hull.supported(a,input.player)&&hull.supported(z,input.player),"mall service corridor is continuously clear across room partitions");
+     check(countKind(scene,"service corridor lamp")>0&&countKind(scene,"retail fascia sign")>0&&landmark->position.z==257,"mall has lit retail/service circulation and a usable upper gallery");
+   }
+   if(input.preset=="overpass"){
+     const auto& second=scene.spatial.buildings[1];V gap{(b.high.x+second.low.x)/2,(cy+(second.low.y+second.high.y)/2)/2,257};
+     check(countKind(scene,"broken overpass deck")==2&&!hull.supported(gap,input.player),"overpass has two true partial decks and an unsupported central gap");
+     check(std::any_of(scene.navigation.nodes.begin(),scene.navigation.nodes.end(),[&](const auto& n){return n.feet.x>b.high.x&&n.feet.z==257;})&&std::any_of(scene.navigation.nodes.begin(),scene.navigation.nodes.end(),[&](const auto& n){return n.feet.x<second.low.x&&n.feet.z==257&&n.feet.x>b.high.x;}),"both sides of the broken span expose reachable navigation anchors");
+   }
+   if(input.preset=="evacuation")check(countKind(scene,"shelter assembly canopy")==1&&countKind(scene,"evacuation beacon tower")==4&&countKind(scene,"evacuation pennant")==1,"evacuation destination has an assembly portico and a skyline beacon");
+ }
  check(countKind(world,"broken stair remnant")==7&&countKind(world,"exterior fire stair")==32,"hospital has a physically broken central flight and two real exterior flights");
  check(countKind(world,"semicircular reception floor")==1&&std::any_of(world.architecture.elements.begin(),world.architecture.elements.end(),[](const auto& e){return e.kind=="semicircular reception floor"&&e.brush.faces.size()>6;}),"hospital contains convex non-rectangular reception architecture");
  auto exit=std::find_if(world.mission.nodes.begin(),world.mission.nodes.end(),[](const auto& n){return n.role==Role::Exit;});

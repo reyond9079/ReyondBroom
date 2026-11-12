@@ -5,13 +5,35 @@ import os
 import time
 
 
+def _open_ui_snapshot(path):
+ # The producer atomically replaces these files. Windows readers must allow
+ # delete-sharing or a QA read can make MoveFileEx fail inside the editor.
+ if os.name!='nt':return path.open(encoding='utf-8')
+ import msvcrt
+ from ctypes import wintypes
+ kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+ kernel.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,wintypes.LPVOID,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]
+ kernel.CreateFileW.restype=wintypes.HANDLE
+ kernel.CloseHandle.argtypes=[wintypes.HANDLE];kernel.CloseHandle.restype=wintypes.BOOL
+ handle=kernel.CreateFileW(str(path),0x80000000,0x7,None,3,0x80,None)
+ if handle==ctypes.c_void_p(-1).value:raise ctypes.WinError(ctypes.get_last_error())
+ try:fd=msvcrt.open_osfhandle(handle,os.O_RDONLY|os.O_BINARY)
+ except BaseException:
+  kernel.CloseHandle(handle);raise
+ try:return os.fdopen(fd,'r',encoding='utf-8')
+ except BaseException:
+  os.close(fd);raise
+
+
 def read_ui_json(path,timeout=2):
  # The engine periodically replaces these read-only QA snapshots. Windows can
  # briefly deny access during replacement; existence alone is not a read ack.
  # Retry only the file read, never a user action or a failed UI assertion.
  deadline=time.monotonic()+timeout
  while True:
-  try:return json.loads(path.read_text(encoding='utf-8'))
+  try:
+   with _open_ui_snapshot(path) as stream:text=stream.read()
+   return json.loads(text)
   except (FileNotFoundError,PermissionError,json.JSONDecodeError):
    if time.monotonic()>=deadline:raise
    time.sleep(.02)

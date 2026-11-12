@@ -332,10 +332,11 @@ class PreparedReuseTests(unittest.TestCase):
 
     def test_fixture_provenance_rejects_changed_inputs_and_path_escape(self):
         with tempfile.TemporaryDirectory() as temporary:
-            repo=Path(temporary);(repo/'native').mkdir();source=repo/'native/core.h';source.write_text('first')
+            repo=Path(temporary);(repo/'native').mkdir();source=repo/'native/core.h';source.write_text('first\nline\n')
             fixture=repo/'fixture';fixture.mkdir();manifest=fixture/'provenance.json'
             manifest.write_text(json.dumps({'sourceHashes':{'native/core.h':hashlib.sha256(source.read_bytes()).hexdigest()}}))
             prepared.verify_fixture(fixture,repo)
+            source.write_bytes(b'first\r\nline\r\n');prepared.verify_fixture(fixture,repo)
             source.write_text('changed')
             with self.assertRaises(AssertionError): prepared.verify_fixture(fixture,repo)
             manifest.write_text(json.dumps({'sourceHashes':{'../other':'invalid'}}))

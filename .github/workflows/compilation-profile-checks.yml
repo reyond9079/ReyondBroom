@@ -107,6 +107,8 @@ jobs:
       shell: pwsh
       run: |
         $runtime = 'bundle/ReyondBroom-Windows-x64'
+        if (!(Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue)) { throw 'World input fixture requires a 1920x1080 test desktop' }
+        Set-DisplayResolution -Width 1920 -Height 1080 -Force
         New-Item -ItemType Directory -Force "$runtime/ftebroom/world-architect" | Out-Null
         Copy-Item runtime/world-architect/* "$runtime/ftebroom/world-architect" -Recurse -Force
         python tests/make-linux-build-fixture.py $runtime

@@ -371,9 +371,8 @@ still pending; AutoLevel remains the default.
 
 The `f46537e` Linux/SDL2 jobs passed. Windows passed generation, actual Apply,
 metro, regional updates, pins, designer controls, themes and all scenario
-previews, then stopped in the road-sketch test. Its start point sampled a short
-radial road and fell within an existing endpoint handle at Windows font/canvas
-sizes. The fixture now draws through empty central space and checks pixel
+previews, then stopped in the road-sketch test. Its sampled radial-road arc produced a 4.94-pixel drag at Windows font/canvas
+sizes, below ImGui's six-pixel threshold. The fixture now draws through empty central space and checks pixel
 clearance/drag distance before sending input. Nine actual SDL local-authoring
 checks passed with the replacement gesture.
 
@@ -385,3 +384,10 @@ changes therefore do not require rebuilding an unchanged editor; changed build
 inputs explicitly reject reuse. Thirty CI policy contracts pass. These focused
 runs complement the production revision's Linux/SDL2 and earlier Windows checks;
 they are not a replacement for the mandatory packaged release gates.
+
+The first prepared reproduction also exposed a test-machine setup difference:
+its desktop stayed at 1024×768, clipping the planned 1920×1080 input canvas.
+Prepared World cases now set the same desktop size as the normal Windows job.
+Fixture-source verification permits exact bytes or LF-normalized text; the
+actual Windows artifact confirmed CRLF checkout differences from Linux's Git
+blob hashes. Changed source content and compiler recipes still reject reuse.

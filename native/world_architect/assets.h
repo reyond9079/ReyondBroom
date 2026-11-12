@@ -5,8 +5,8 @@
 #include "../ftebroom_quake_palette.h"
 
 namespace ftebroom::worldArchitect {
-inline std::string wadFilename(const WorldPlan& w,const std::string& palette){return "world-architect-"+w.theme+"-"+(w.assetKey.empty()?"legacy":w.assetKey)+"-p"+std::to_string(w.profile)+"-"+shortKey(hash(palette))+".wad";}
-inline std::string shaderStem(const WorldPlan& w){return "world-architect-"+w.theme+(w.assetKey.empty()?"":"-"+w.assetKey);}
+inline std::string wadFilename(const WorldPlan& w,const std::string& palette){return "world-architect-"+w.theme+"-"+(w.assetKey.empty()?"legacy":w.assetKey)+(w.gates.empty()?"":"-gates")+"-p"+std::to_string(w.profile)+"-"+shortKey(hash(palette))+".wad";}
+inline std::string shaderStem(const WorldPlan& w){return "world-architect-"+w.theme+(w.assetKey.empty()?"":"-"+w.assetKey)+(w.gates.empty()?"":"-gates");}
 struct Image {unsigned width=128,height=128;std::vector<unsigned char> rgba;};
 inline Image texture(const ArtTheme& theme,int slot){
   if(slot<0||slot>6)throw std::runtime_error("Unknown architectural material slot");
@@ -44,6 +44,7 @@ inline std::map<std::string,std::string> shaderDefinitions(const WorldPlan& w){
     auto id=assetId(w,6);shaders["textures/"+id]="{\nqer_editorimage textures/"+id+".tga\nqer_trans 0.72\nsurfaceparm water\nsurfaceparm trans\nsurfaceparm nonsolid\nsurfaceparm nolightmap\n{\nmap textures/"+id+".tga\nblendfunc blend\nrgbgen identity\nalphagen const 0.72\ntcmod turb 0 0.03 0 0.1\n}\n}\n";
   }
   shaders["textures/"+skyMaterial(w)]="{\nqer_editorimage textures/sky.tga\nsurfaceparm sky\nsurfaceparm nolightmap\nq3map_sun 1 0.88 0.7 80 120 50\nskyParms - 512 -\n{\nmap textures/sky.tga\ntcmod scale 2 2\nrgbgen identity\n}\n}\n";
+  if(!w.gates.empty())shaders["textures/wa_gate_trigger"]="{\nqer_editorimage textures/wa_gate_trigger.tga\nsurfaceparm nodraw\nsurfaceparm nonsolid\nsurfaceparm trans\n}\n";
   return shaders;
 }
 inline std::map<std::string,std::string> assetBundle(const WorldPlan& w,const Registry& registry,const std::string& palette){
@@ -56,6 +57,9 @@ inline std::map<std::string,std::string> assetBundle(const WorldPlan& w,const Re
     if(w.profile==2){PaletteQuantizer opaque(palette,224);for(size_t i=0;i<indexed.pixels.size();i++)indexed.pixels[i]=opaque.nearest(image.rgba[i*4],image.rgba[i*4+1],image.rgba[i*4+2]);}
     wad=addWadTexture(wad,std::move(indexed),palette,false,hl);
     bundle["textures/"+name+".tga"]=tga(image);
+  }
+  if(!w.gates.empty()){
+    Image image;image.rgba.assign(128*128*4,255);for(size_t i=0;i<128*128;i++){image.rgba[i*4]=128;image.rgba[i*4+1]=64;image.rgba[i*4+2]=160;}auto trigger=quantizeFolderImage(image.rgba.data(),image.width,image.height,palette,"trigger");wad=addWadTexture(wad,std::move(trigger),palette,false,hl);bundle["textures/wa_gate_trigger.tga"]=tga(image);
   }
   // Original sky pixels are deliberately included in the WAD: real qbsp/light
   // validation must not depend on the user's installed texture packs.

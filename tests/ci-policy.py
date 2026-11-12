@@ -31,6 +31,10 @@ class ScopeTests(unittest.TestCase):
         p = planner.plan(['native/world_architect/generator.h'])
         self.assertEqual(set(p['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})
 
+    def test_authored_modules_and_gate_contracts_keep_the_world_scope(self):
+        for path in ['tests/world-modules.cpp', 'tests/world-gates.cpp', 'scripts/test-world-gates.py']:
+            self.assertEqual(set(planner.plan([path])['suites']), {'world_core', 'world_ui', 'world_legacy', 'placement'})
+
     def test_legacy_codec_has_focused_migration_checks(self):
         p = planner.plan(['native/world_architect/legacy.h'])
         self.assertEqual(set(p['suites']), {'world_legacy'})
@@ -221,6 +225,15 @@ class RunnerTests(unittest.TestCase):
                     with self.assertRaises(subprocess.CalledProcessError): runner.main()
                 else: runner.main()
                 return [list(map(str, c.args[0])) for c in calls.call_args_list]
+
+    def test_ui_only_world_changes_prepare_fixtures_without_core_bsp_repeats(self):
+        for paths, fixtures_only in [(['qc/fb_world_architect.qc'], True), (['native/world_architect/gates.h'], False)]:
+            commands = self.run_plan(paths)
+            for script in ['test-world-modules.py', 'test-world-gates.py']:
+                standalone = [cmd for cmd in commands if any(arg.endswith('/'+script) for arg in cmd) and '--applied' not in cmd]
+                self.assertEqual(len(standalone), 1)
+                self.assertEqual('--fixtures-only' in standalone[0], fixtures_only)
+            self.assertTrue(any('--applied' in cmd and any(arg.endswith('/test-world-gates.py') for arg in cmd) for cmd in commands))
 
     def test_profiles_execute_import_migration_files_paths_real_compiler_and_launch_only(self):
         calls = self.run_plan(['native/ftebroom_run.h'])

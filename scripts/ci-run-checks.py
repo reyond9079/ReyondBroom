@@ -49,7 +49,9 @@ def main():
             '--seeds', '100' if selected['mode'] == 'full' else '3', gui=False)
         run('world_core', 'scripts/test-world-designer.py', root, out/'world/designer-core', gui=False)
     if suites & {'world_core', 'world_ui'}:
-        run('world_core' if 'world_core' in suites else 'world_ui', 'scripts/test-world-modules.py', root, out/'world/modules', gui=False)
+        fixture_args = () if 'world_core' in suites else ('--fixtures-only',)
+        run('world_core' if 'world_core' in suites else 'world_ui', 'scripts/test-world-modules.py', root, out/'world/modules', *fixture_args, gui=False)
+        run('world_core' if 'world_core' in suites else 'world_ui', 'scripts/test-world-gates.py', root, out/'world/gates', *fixture_args, gui=False)
     if 'world_ui' in suites:
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/ui')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/metro-ui', '--preset', 'metro')
@@ -62,6 +64,8 @@ def main():
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/scenarios-ui', '--scenarios-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/local-ui', '--local-only')
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/quality-ui', '--quality-only')
+        run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/gates-ui', '--gates-only', '--gate-fixtures', out/'world/gates')
+        run('world_ui', 'scripts/test-world-gates.py', root, out/'world/gates-applied', '--applied', out/'world/gates-ui', '--fixture-texture', root/'ftebroom/textures/ftebroom/qa_blue.tga', gui=False)
         run('world_ui', 'scripts/test-world-architect-ui.py', root, out/'world/modules-ui', '--modules-only', '--module-fixtures', out/'world/modules')
     if 'compilation' in suites:
         run('compilation', 'scripts/test-compilation-runtime.py', root, out/'profiles', '--probe', a.probe.resolve(),

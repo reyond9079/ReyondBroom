@@ -196,9 +196,9 @@ different optional branches. More road patterns, archetype-specific interior
 families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
-More complete spline/volume constraint semantics, physical gate realization,
+More complete spline/volume constraint semantics,
 broader authored-module shell/socket semantics, collision/gameplay metrics beyond the
-initial anchors, and complete three-profile compile/play evidence remain open.
+existing measurements, and complete three-profile compile/play evidence remain open.
 Malformed or incompatible pin recipes fail explicitly instead of silently ignoring
 designer intent. Quake II/GoldSrc compilation is not certified. No default AutoLevel menu
 entry may be retired before the complete Definition of Done is met.
@@ -287,3 +287,28 @@ path. The active map remains unchanged until explicit Apply/update.
 
 This slice passed 377 core contracts, seven actual SDL2 quality control/selection/
 reopen checks and nine actual SDL2 room/road-sketch/volume/history checks.
+
+## Physical gate realization and owned brush models
+
+Typed brush entities now represent real target-linked doors and one-shot
+activation zones. Prerequisites lock the destination across all graph edges;
+optional gated destinations are also checked for a possible activation route.
+Protected room lining prevents window/damage/roof bypasses. Standard entities
+are profile-aware and unknown FTE game code uses semantic metadata by default.
+Native walk preview uses closed-door collision and actual activation overlap.
+
+The owned importer validates only the supported brush-entity classes. Regional
+replacement copies their nested brushes with remapped source parents. Snapshots
+compare actual geometry and authored properties while excluding generated model
+bookkeeping names. Trigger solid bookkeeping is canonicalized before stamping,
+matching the ordinary MAP loader; other contents/properties remain strict.
+
+Seventeen gate contracts and real three-profile BSP/light/model inspection pass.
+The actual Ironwail server blocks a player at the closed door and allows OS
+keyboard movement through it after activating the trigger. Console setpos is
+used only for controlled setup; its automatic noclip mode is explicitly disabled
+before collision/activation checks. Thirteen actual SDL2 gate controls/Apply/
+update/history/reopen/manual-edit checks pass. Four additional UI checks capture
+the production ExportMap after executed Apply; that unchanged snapshot compiles
+and lights with both actual brush models. Twenty-eight CI policy tests verify
+scope and fixture-only preparation for UI-only changes.

@@ -16,7 +16,7 @@ inline void spatialQuality(WorldPlan& w,const Settings& settings,const Collision
     for(const auto& beat:w.mission.nodes)if(beat.role==Role::Landmark&&al::length(beat.position-feet)<=1024){landmarkTests++;if(!collision.blocked(origin,beat.position+V{0,0,eye},ray))visibleLandmarks++;}
   }
   double entropy=0;for(int count:ranges)if(count){double p=double(count)/(samples*8);entropy-=p*std::log(p);}
-  scores["visibility"]=entropy/std::log(3.);scores["shortSightlines"]=double(ranges[0])/(samples*8);scores["mediumSightlines"]=double(ranges[1])/(samples*8);scores["longSightlines"]=double(ranges[2])/(samples*8);
+  scores["visibility"]=std::clamp(entropy/std::log(3.),0.,1.);scores["shortSightlines"]=double(ranges[0])/(samples*8);scores["mediumSightlines"]=double(ranges[1])/(samples*8);scores["longSightlines"]=double(ranges[2])/(samples*8);
   scores["cover"]=double(cover)/samples;scores["landmarkVisibility"]=landmarkTests?double(visibleLandmarks)/landmarkTests:0;
   double low=1e30,high=-1e30;size_t choices=0;for(size_t i=0;i<nav.nodes.size();i++){
     const auto p=nav.nodes[i].feet;low=std::min(low,p.z);high=std::max(high,p.z);std::set<int> directions;
@@ -30,5 +30,6 @@ inline void spatialQuality(WorldPlan& w,const Settings& settings,const Collision
   scores["damageRouteIntegrity"]=nav.reachable==nav.nodes.size()?1:0;
   int transitions=0;auto interior=[&](V p){for(const auto& b:w.spatial.buildings)if(inside(p,b.low,b.high))return true;return false;};
   for(size_t i=1;i<nav.mainRoute.size();i++)if(interior(nav.nodes[nav.mainRoute[i-1]].feet)!=interior(nav.nodes[nav.mainRoute[i]].feet))transitions++;scores["indoorOutdoorTransitions"]=transitions;
+  scores["physicalGates"]=double(w.gates.size());if(!w.gates.empty())w.diagnostics.warnings.push_back("Sightline/cover preferences use static geometry; moving door visibility is not evaluated in this heuristic.");
   w.diagnostics.warnings.push_back("Visibility uses up to 32 physical anchors and eight eye-height rays each (64-unit samples, 1024-unit cap). Cover means low obstruction with clear eye-height view. Choice anchors group neighbor directions; these are static brush heuristics, not enemy AI, lighting or proof of enjoyable gameplay.");
 }

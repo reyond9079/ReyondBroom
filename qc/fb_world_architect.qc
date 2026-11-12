@@ -18,7 +18,10 @@ string fb_world_fields_digest(hashtable fields)
     strbuf values=buf_create();
     for(int i=0;;i++){
         string key=hash_getkey(fields,i);if isnull(key)break;
-        if(key=="model"&&fields["classname"]=="func_group"&&fields["_tb_type"]=="_tb_group")continue;
+        if(key=="model"){
+            if(fields["classname"]=="func_group"&&fields["_tb_type"]=="_tb_group")continue;
+            if((fields["classname"]=="func_door"||fields["classname"]=="trigger_multiple")&&fields["_wa_gate"]!="")continue;
+        }
         if(fb_world_snapshot_key(key)||key=="_tb_id"||key=="_tb_group"||key=="_tb_layer"||key=="_tb_layer_hidden"||key=="_tb_layer_locked")continue;
         bufstr_add(values,strcat(fb_map_quote(key)," ",fb_map_quote(fields[key])),TRUE);
     }
@@ -31,6 +34,21 @@ int fb_world_unique_fields(string fields)
     hashtable keys=hash_createtab(32,EV_INTEGER);int valid=TRUE;
     for(int i=0;i<count;i+=2){if((int)keys[argv(i)])valid=FALSE;keys[argv(i)]=1i;}
     hash_destroytab(keys);return valid;
+}
+int fb_world_source_group(string owner,string identity)
+{
+    if(identity=="")return -1;
+    for(int p=0;p<fb_map_count;p++)if(fb_map_items[p].kind==FB_NODE_ENTITY&&fb_clip_field(fb_map_items[p].fields,"classname")=="func_group"&&fb_clip_field(fb_map_items[p].fields,"_wa_project")==owner&&fb_clip_field(fb_map_items[p].fields,"_tb_id")==identity)return p;
+    return -1;
+}
+int fb_world_source_brush_entity(int index)
+{
+    if(index<0||index>=fb_map_count||fb_map_items[index].kind!=FB_NODE_ENTITY)return FALSE;
+    string classname=strzone(fb_clip_field(fb_map_items[index].fields,"classname"));int supported=classname=="func_door"||classname=="trigger_multiple";strunzone(classname);
+    if(!supported||cvar("ftebroom_game_profile")>2)return FALSE;
+    string gate=strzone(fb_clip_field(fb_map_items[index].fields,"_wa_gate"));int id=stoi(gate),valid=id>=1&&id<=16&&gate==itos(id);strunzone(gate);
+    int brushes=0;for(int child=0;child<fb_map_count;child++)if(fb_map_items[child].parent==index){if(fb_map_items[child].kind!=FB_NODE_BRUSH)valid=FALSE;brushes++;}
+    return valid&&brushes==1&&fb_clip_field(fb_map_items[index].fields,"model")=="";
 }
 int fb_world_import_scope(string owner,string region)
 {
@@ -49,16 +67,22 @@ int fb_world_import_scope(string owner,string region)
                 for(int p=0;p<i;p++)if(fb_map_items[p].kind==FB_NODE_ENTITY&&fb_clip_field(fb_map_items[p].fields,"_tb_id")==id)valid=FALSE;
                 strunzone(id);strunzone(own);strunzone(part);groups++;
             }else{
-                if(classname!="light"&&classname!="info_null"&&classname!="info_player_start"&&classname!="info_player_deathmatch")valid=FALSE;
-                string parent=strzone(fb_clip_field(item->fields,"_tb_group"));int found=FALSE;
-                for(int p=0;p<fb_map_count;p++)if(fb_map_items[p].kind==FB_NODE_ENTITY&&fb_clip_field(fb_map_items[p].fields,"_wa_project")==owner&&fb_clip_field(fb_map_items[p].fields,"_tb_id")==parent)found=TRUE;
+                int brushEntity=fb_world_source_brush_entity(i);
+                if(!brushEntity&&classname!="light"&&classname!="info_null"&&classname!="info_player_start"&&classname!="info_player_deathmatch")valid=FALSE;
+                string parent=strzone(fb_clip_field(item->fields,"_tb_group"));int found=fb_world_source_group(owner,parent)>=0;
                 if(!found||fb_clip_field(item->fields,"model")!=""||fb_clip_field(item->fields,"_tb_id")!="")valid=FALSE;strunzone(parent);
             }
             strunzone(classname);if(!valid)return FALSE;
         }else{
             if(item->kind!=FB_NODE_BRUSH)return FALSE;
             if(item->parent<0||item->parent>=fb_map_count)return FALSE;
-            if(fb_clip_field(fb_map_items[item->parent].fields,"_wa_project")!=owner||fb_clip_field(fb_map_items[item->parent].fields,"classname")!="func_group")return FALSE;
+            int brushParent=item->parent;
+            if(fb_clip_field(fb_map_items[brushParent].fields,"classname")=="func_group"){
+                if(fb_clip_field(fb_map_items[brushParent].fields,"_wa_project")!=owner)return FALSE;
+            }else{
+                if(!fb_world_source_brush_entity(brushParent))return FALSE;
+                string identity=strzone(fb_clip_field(fb_map_items[brushParent].fields,"_tb_group"));int owned=fb_world_source_group(owner,identity)>=0;strunzone(identity);if(!owned)return FALSE;
+            }
         }
     }
     return worlds==1&&groups>0&&groups<=64&&(region=="all"||groups==1);
@@ -69,6 +93,11 @@ void fb_world_liquid_contents()
     // must still become the editor's real water contents after import.
     for(int i=0;i<fb_map_count;i++)if(fb_map_items[i].kind==FB_NODE_BRUSH){
         fb_map_item_t *item=&fb_map_items[i];if(item->count<4)continue;
+        // The engine's ordinary MAP loader retains a solid bookkeeping bit on
+        // trigger brush models. Canonicalize it before stamping ownership, so
+        // save/reopen does not masquerade as a manual contents edit. Runtime
+        // trigger_multiple still assigns its own non-blocking trigger solidity.
+        if(item->parent>=0&&fb_clip_field(fb_map_items[item->parent].fields,"classname")=="trigger_multiple")item->contents=item->contents|CONTENTBIT_SOLID;
         string name=strzone(item->faces[0].shadername);int liquid=substring(name,0,3)=="*wa"||substring(name,0,3)=="!wa";
         for(int f=1;f<item->count;f++)if(item->faces[f].shadername!=name)liquid=FALSE;
         if(liquid)item->contents=CONTENTBIT_WATER;strunzone(name);
@@ -100,11 +129,13 @@ int fb_world_paste_group(int source,int destination)
     fb_map_item_t *whole=fb_map_items;int wholeCount=fb_map_count;
     string identity=strzone(fb_clip_field(whole[source].fields,"_tb_id"));
     fb_map_item_t *part=memalloc(sizeof(fb_map_item_t)*wholeCount);part[0]=whole[source];part[0].parent=-1;int number=1;
+    int *indices=memalloc(sizeof(int)*wholeCount);for(int i=0;i<wholeCount;i++)indices[i]=-1;indices[source]=0;
     for(int i=0;i<wholeCount;i++)if(i!=source){
-        int include=whole[i].parent==source;
+        int include=whole[i].parent>=0&&indices[whole[i].parent]>=0;
         if(whole[i].kind==FB_NODE_ENTITY&&fb_clip_field(whole[i].fields,"_tb_group")==identity)include=TRUE;
-        if(include){part[number]=whole[i];part[number].parent=whole[i].kind==FB_NODE_ENTITY?-1:0;number++;}
+        if(include){part[number]=whole[i];part[number].parent=-1;if(whole[i].parent>=0)part[number].parent=indices[whole[i].parent];indices[i]=number;number++;}
     }
+    memfree(indices);
     string replacement="";
     if(destination>=0){
         // Paste into the retained model, keeping its entity, parent/layer and

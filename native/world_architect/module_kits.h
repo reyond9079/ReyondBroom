@@ -24,7 +24,7 @@ inline bool authoredRoom(WorldPlan& w,const Settings& settings,const Building& b
     auto origin=entity.fields.find("origin");if(origin==entity.fields.end())throw std::runtime_error("Authored module point entity needs an origin");std::istringstream text(origin->second);V point;if(!(text>>point.x>>point.y>>point.z)||!inside(point,room.low,room.high))throw std::runtime_error("Authored module point entity leaves its room");
     for(auto it=entity.fields.begin();it!=entity.fields.end();)if(it->first.find("_tb_")==0||it->first.find("_wa_")==0)it=entity.fields.erase(it);else ++it;
   }
-  if(w.architecture.elements.size()+candidate.architecture.elements.size()>16000)throw std::runtime_error("Authored modules exceed the world brush budget");
+  if(brushCount(w)+candidate.architecture.elements.size()>16000)throw std::runtime_error("Authored modules exceed the world brush budget");
   for(auto& element:candidate.architecture.elements)w.architecture.elements.push_back(std::move(element));
   for(auto& entity:geometry.entities)w.architecture.entities.push_back({b.id,std::move(entity)});
   auto key=module.id.substr(0,48)+"-"+std::to_string(hash(moduleJson(module).dump()));w.authoredSources.emplace(key,module);

@@ -20,7 +20,7 @@ inline Settings regionInput(const Settings& s,uint64_t id,int stage,const Regist
 inline size_t navNode(WorldPlan& w,V p,uint64_t region,bool required=true){if(w.navigation.nodes.size()>=4096)throw std::runtime_error("World Architect navigation exceeds 4096 nodes");w.navigation.nodes.push_back({p,region,required});return w.navigation.nodes.size()-1;}
 inline void navEdge(WorldPlan& w,size_t a,size_t b){if(a!=b)w.navigation.edges.push_back({a,b});}
 inline void addBrush(WorldPlan& w,uint64_t region,const std::string& kind,al::Brush brush){
-  if(w.architecture.elements.size()>=16000)throw std::runtime_error("World Architect exceeds the 16000 brush budget");al::validateBrush(brush);
+  if(brushCount(w)>=16000)throw std::runtime_error("World Architect exceeds the 16000 brush budget");al::validateBrush(brush);
   const auto poly=al::polyhedron(brush);const double limit=capability(w.profile).coordinateLimit;for(int axis=0;axis<3;axis++)if(poly.min[axis]<-limit||poly.max[axis]>limit)throw std::runtime_error("Architectural brush exceeds profile coordinate limits");
   w.architecture.elements.push_back({region,kind,std::move(brush)});
 }
@@ -34,18 +34,19 @@ class Collision {
   struct Solid {V low,high;std::vector<std::pair<V,double>> planes;};
   std::vector<Solid> solids;
 public:
-  explicit Collision(const WorldPlan& w){
-    solids.reserve(w.architecture.elements.size());
-    for(const auto& element:w.architecture.elements){
-      if(element.kind=="floodwater")continue; // Liquid contents are not a solid hull.
-      auto poly=al::polyhedron(element.brush);Solid solid;solid.low=poly.min;solid.high=poly.max;
+  explicit Collision(const WorldPlan& w,const std::set<uint64_t>* opened=nullptr,bool closedDoors=false){
+    std::vector<const al::Brush*> brushes;for(const auto& element:w.architecture.elements)if(element.kind!="floodwater")brushes.push_back(&element.brush);
+    if(closedDoors)for(const auto& entity:w.architecture.brushEntities)if(entity.entity.fields.at("classname")=="func_door"&&(!opened||!opened->count(std::stoull(entity.entity.fields.at("_wa_gate")))))for(const auto& brush:entity.brushes)brushes.push_back(&brush);
+    solids.reserve(brushes.size());
+    for(const auto* brush:brushes){
+      auto poly=al::polyhedron(*brush);Solid solid;solid.low=poly.min;solid.high=poly.max;
       auto axis=[&](V direction){
         if(al::length(direction)<1e-8)return;direction=al::unit(direction);
         if(std::any_of(solid.planes.begin(),solid.planes.end(),[&](const auto& plane){return al::near(plane.first,direction,1e-7);}))return;
         if(solid.planes.size()>=256)throw std::runtime_error("Convex collision axis budget exceeded");
         double distance=-1e30;for(auto p:poly.vertices)distance=std::max(distance,al::dot(direction,p));solid.planes.push_back({direction,distance});
       };
-      for(const auto& face:element.brush.faces)axis(face.normal());
+      for(const auto& face:brush->faces)axis(face.normal());
       const V boxAxes[]={{1,0,0},{0,1,0},{0,0,1}};for(auto direction:boxAxes){axis(direction);axis(direction*-1);}
       std::vector<V> directions;
       for(const auto& polygon:poly.polygons)for(size_t i=0;i<polygon.size();i++){
@@ -465,6 +466,7 @@ inline double influence(const Settings& settings,V p,const std::string& kind,dou
 #include "theme_kits.h"
 #include "scenario_kits.h"
 #include "module_kits.h"
+#include "gates.h"
 inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* cancel,const Registry& registry){
   for(const auto& building:w.spatial.buildings){
     const auto s=regionInput(input,building.id,3,registry);
@@ -632,13 +634,14 @@ inline void exportMap(WorldPlan& w,const Settings& settings){
   if(settings.profile>=2)out<<"\"_sunlight\" \"110\"\n\"_sunlight_color\" \"1 0.9 0.75\"\n\"_sun_mangle\" \"120 -50 0\"\n";
   for(const auto& element:w.architecture.elements)out<<al::writeBrush(element.brush);out<<"}\n";
   for(const auto& entity:w.architecture.entities)out<<al::writeEntity(entity.entity);
+  for(const auto& entity:w.architecture.brushEntities)out<<writeBrushEntity(entity);
   auto spawn=w.navigation.nodes[w.navigation.mainRoute.front()].feet+V{0,0,24};
   out<<al::writeEntity({{{"classname",capability(settings.profile).spawn},{"origin",vectorText(spawn)},{"angle","0"}}});
   // Markers are editor metadata; they do not invent unsupported game entities.
   for(const auto& beat:w.mission.nodes)out<<al::writeEntity({{{"classname","info_null"},{"origin",vectorText(beat.position+V{0,0,32})},{"_wa_role",roleName(beat.role)},{"_wa_id",std::to_string(beat.id)}}});
   w.map=out.str();if(w.map.size()>16*1024*1024)throw std::runtime_error("Generated MAP exceeds the 16 MiB import budget");
-  auto roundtrip=al::parseMap(w.map);if(roundtrip.brushes.size()!=w.architecture.elements.size())throw std::runtime_error("Quantized MAP brush roundtrip failed");
-  w.diagnostics.mapBytes=w.map.size();w.diagnostics.brushes=w.architecture.elements.size();
+  auto roundtrip=al::parseMap(w.map);if(roundtrip.brushes.size()!=brushCount(w))throw std::runtime_error("Quantized MAP brush roundtrip failed");
+  w.diagnostics.mapBytes=w.map.size();w.diagnostics.brushes=brushCount(w);
 }
 // Editor groups carry stable ownership independently of engine entity/model
 // indices. Both supported compilers merge func_group brushes into worldspawn.
@@ -665,9 +668,13 @@ inline std::string groupedMap(const WorldPlan& w,const std::string& project,std:
   }
   auto entity=[&](al::PointEntity e,uint64_t region){auto parent=parents.find(region);if(parent==parents.end())return;e.fields["_tb_group"]=std::to_string(parent->second);out<<al::writeEntity(e);};
   for(const auto& e:w.architecture.entities)entity(e.entity,e.region);
+  for(auto brushEntity:w.architecture.brushEntities){auto parent=parents.find(brushEntity.region);if(parent==parents.end())continue;brushEntity.entity.fields["_tb_group"]=std::to_string(parent->second);
+    for(const auto* key:{"target","targetname"}){auto field=brushEntity.entity.fields.find(key);if(field!=brushEntity.entity.fields.end()&&field->second.find("wa_gate_")==0)field->second="wa_"+std::to_string(hash(project))+"_gate_"+field->second.substr(8);}
+    out<<writeBrushEntity(brushEntity);
+  }
   if(!onlyRegion){auto spawn=w.navigation.nodes[w.navigation.mainRoute.front()].feet+V{0,0,24};entity({{{"classname",capability(w.profile).spawn},{"origin",vectorText(spawn)},{"angle","0"}}},0);}
   for(const auto& beat:w.mission.nodes)entity({{{"classname","info_null"},{"origin",vectorText(beat.position+V{0,0,32})},{"_wa_role",roleName(beat.role)},{"_wa_id",std::to_string(beat.id)}}},missionRegion(w,beat));
-  auto result=out.str();if(result.size()>16*1024*1024)throw std::runtime_error("Grouped world exceeds the MAP import budget");auto parsed=al::parseMap(result);size_t count=0;for(const auto& group:groups)count+=group.second.size();if(parsed.brushes.size()!=count)throw std::runtime_error("Grouped world brush roundtrip failed");return result;
+  auto result=out.str();if(result.size()>16*1024*1024)throw std::runtime_error("Grouped world exceeds the MAP import budget");auto parsed=al::parseMap(result);size_t count=0;for(const auto& group:groups)count+=group.second.size();for(const auto& e:w.architecture.brushEntities)if(parents.count(e.region))count+=e.brushes.size();if(parsed.brushes.size()!=count)throw std::runtime_error("Grouped world brush roundtrip failed");return result;
 }
 struct PrefixCache {std::array<std::string,5> keys;std::array<std::shared_ptr<const WorldPlan>,5> plans;};
 inline Settings freezeThrough(Settings settings,const WorldPlan& accepted,const Registry& registry,int stage){
@@ -721,7 +728,7 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
   };
   stage(0,[&](const auto& input){w.mission=mission(input,stagePreset(input,registry));validateMission(w.mission);});
   stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);scenarioSite(w,input,p);floorplan(w,input,p);scenarioMission(w,p);});
-  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);scenarioArchitecture(w,local,p,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
+  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);scenarioArchitecture(w,local,p,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}realizeGates(w,input,registry);std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);for(const auto& e:w.architecture.brushEntities)structure+=writeBrushEntity(e);w.architectureKey=std::to_string(hash(structure));});
   stage(3,[&](const auto& input){damage(w,input,cancel,registry);});
   stage(4,[&](const auto& input){dressing(w,input,stagePreset(input,registry),cancel,registry);});
   stage(5,[&](const auto& input){navigation(w,input,cancel);});

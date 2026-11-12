@@ -23,7 +23,7 @@ static void worldCandidateComparison(){
   if(ImGui::BeginTable("Candidate comparison",count,ImGuiTableFlags_BordersInnerV|ImGuiTableFlags_SizingStretchSame)){
     for(int i=0;i<count;i++){
       ImGui::TableNextColumn();ImGui::PushID(i);const auto& w=s.batch.worlds[size_t(i)];
-      auto label="Select seed "+std::to_string(w.seed);if(worldButton(label.c_str(),("compare-select/"+std::to_string(i)).c_str())){s.selected=i;s.dirty=true;}
+      auto label="Select seed "+std::to_string(w.seed);if(worldButton(label.c_str(),("compare-select/"+std::to_string(i)).c_str())){s.selected=i;s.previewIdentity.clear();s.dirty=true;}
       if(i==s.selected)ImGui::TextUnformatted("Selected");else ImGui::TextUnformatted(" ");
       auto pos=ImGui::GetCursorScreenPos();ImVec2 size{std::max(48.f,ImGui::GetContentRegionAvail().x),180*uiScale()};ImGui::InvisibleButton("Candidate spatial plan",size);worldRect("compare-plan/"+std::to_string(i));
       auto* drawList=ImGui::GetWindowDrawList();drawList->AddRectFilled(pos,{pos.x+size.x,pos.y+size.y},IM_COL32(25,32,34,255));
@@ -46,7 +46,7 @@ static void worldQualityControls(){
   for(const auto* name:{"variety","route","circulation","visibility","cover","verticality"}){float value=float(s.settings.weights.count(name)?s.settings.weights.at(name):0);ImGui::SetNextItemWidth(220*uiScale());if(ImGui::SliderFloat(name,&value,0,10,"%.2f",ImGuiSliderFlags_AlwaysClamp))s.settings.weights[name]=value;worldRect(std::string("quality-weight/")+name);}
   ImGui::EndDisabled();worldChanged(before);
   ImGui::TextWrapped("Weights rank accepted candidates; they never relax collision, support, route or export validity. Existing projects retain their stored weights. Regenerate after changing weights.");
-  ImGui::BeginDisabled(s.batch.worlds.empty()||s.generated!=worldInputKey());if(worldButton("Select best accepted candidate","select-best")){s.selected=0;s.dirty=true;}ImGui::EndDisabled();
+  ImGui::BeginDisabled(s.batch.worlds.empty()||s.generated!=worldInputKey());if(worldButton("Select best accepted candidate","select-best")){s.selected=0;s.previewIdentity.clear();s.dirty=true;}ImGui::EndDisabled();
 }
 static void worldLegacyPanel(){
   auto& s=worldArchitect;bool show=ImGui::CollapsingHeader("Legacy AutoLevel migration");worldRect("legacy-panel");if(!show)return;
@@ -115,7 +115,7 @@ static void worldArchitecturePanel(){
 static void worldMissionPanel(){
   auto& s=worldArchitect;auto* world=worldSelected();if(!world){ImGui::TextUnformatted("Generate a candidate to edit its mission.");return;}
   ImGui::BeginDisabled(s.job.valid()||s.settings.locked[0]);
-  const auto& graph=s.settings.authoredMission?*s.settings.authoredMission:world->mission;
+  const auto graph=s.settings.authoredMission?*s.settings.authoredMission:world->mission;
   auto selected=std::find_if(graph.nodes.begin(),graph.nodes.end(),[&](const auto& n){return n.id==s.missionNode;});if(selected==graph.nodes.end()){s.missionNode=graph.nodes.front().id;selected=graph.nodes.begin();}
   if(ImGui::BeginCombo("Mission beat",selected->name.c_str())){for(const auto& n:graph.nodes){auto label=std::to_string(n.id)+" / "+n.name;if(ImGui::Selectable(label.c_str(),s.missionNode==n.id))s.missionNode=n.id;}ImGui::EndCombo();}worldRect("mission-node");
   bool required=selected->required;ImGui::BeginDisabled(selected->role==wa::Role::Start||selected->role==wa::Role::Exit);
@@ -129,7 +129,15 @@ static void worldMissionPanel(){
     if(ImGui::BeginCombo("Transition",label.c_str())){for(size_t i=0;i<edges.size();i++){auto text=std::to_string(i+1)+": "+std::to_string(edges[i].a)+" -> "+std::to_string(edges[i].b);if(ImGui::Selectable(text.c_str(),s.missionEdge==int(i)))s.missionEdge=int(i);}ImGui::EndCombo();}
     bool oneWay=edge.oneWay;if(ImGui::Checkbox("One-way mission transition",&oneWay))worldEdit([&](auto& next){if(!next.authoredMission)next.authoredMission=world->mission;next.authoredMission->edges[size_t(s.missionEdge)].oneWay=oneWay;});worldRect("mission-one-way");
     if(worldButton("Remove transition","mission-remove-edge"))worldEdit([&](auto& next){if(!next.authoredMission)next.authoredMission=world->mission;auto& e=next.authoredMission->edges;e.erase(e.begin()+s.missionEdge);});
-    ImGui::TextWrapped("Transitions constrain the validated mission traversal. They do not yet create physical engine gate entities. Edits that disconnect required beats are rejected.");
+    bool gatesOpen=ImGui::CollapsingHeader("Gate prerequisites");worldRect("gate-panel");if(gatesOpen){
+    std::string activation="None";for(const auto& node:graph.nodes)if(node.id==edge.prerequisite)activation=std::to_string(node.id)+" / "+node.name;
+    if(ImGui::BeginCombo("Destination activation beat",activation.c_str())){
+      if(ImGui::Selectable("None",!edge.prerequisite))worldEdit([&](auto& next){if(!next.authoredMission)next.authoredMission=world->mission;for(auto& transition:next.authoredMission->edges)if(transition.b==edge.b)transition.prerequisite=0;});worldRect("gate-prerequisite/none");
+      for(const auto& node:graph.nodes){ImGui::BeginDisabled(node.id==edge.b);auto name=std::to_string(node.id)+" / "+node.name;if(ImGui::Selectable(name.c_str(),node.id==edge.prerequisite))worldEdit([&](auto& next){if(!next.authoredMission)next.authoredMission=world->mission;for(auto& transition:next.authoredMission->edges)if(transition.b==edge.b)transition.prerequisite=node.id;});worldRect("gate-prerequisite/"+std::to_string(node.id));ImGui::EndDisabled();}ImGui::EndCombo();
+    }worldRect("gate-prerequisite");
+    ImGui::BeginDisabled(wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());if(ImGui::BeginCombo("Gate realization",s.settings.gateMode.c_str())){for(const auto* mode:{"auto","semantic","standard"}){if(ImGui::Selectable(mode,s.settings.gateMode==mode))worldEdit([&](auto& next){next.gateMode=mode;});worldRect(std::string("gate-mode/")+mode);}ImGui::EndCombo();}worldRect("gate-mode");ImGui::EndDisabled();
+    ImGui::TextWrapped("Activation locks the destination room across all incoming transitions. Auto uses standard doors/zones for Quake 1 and Quake III; FTE Custom defaults to semantic metadata. Choose standard only for compatible func_door / trigger_multiple game code. One-way flags constrain mission traversal. Invalid or multi-entrance gate layouts are rejected.");
+    }
   }
   ImGui::EndDisabled();ImGui::SetNextItemWidth(120*uiScale());ImGui::SliderInt("Plan floor",&s.planFloor,0,4);worldRect("plan-floor");
   ImGui::TextWrapped("Drag a beat onto a functional room on this floor. It snaps to that room's player anchor; other unpinned beats are reassigned around it. Unlock Mission to edit.");

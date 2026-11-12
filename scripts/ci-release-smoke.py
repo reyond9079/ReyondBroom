@@ -79,7 +79,9 @@ def launch(root, output):
         shutil.copytree(root, clone)
         data = clone/'ftebroom'
         (data/'qconsole.log').unlink(missing_ok=True)
-        (data/'ci-release-smoke.cfg').write_text('exec ftebroom.cfg\nset ftebroom_skip_setup 1\nin 4 echo RB_RELEASE_SMOKE_BOOT\nin 6 quit force\n')
+        # SDL can spend several seconds retrying OpenGL without multisampling
+        # before the first ImGui frame on a software-rendered runner.
+        (data/'ci-release-smoke.cfg').write_text('exec ftebroom.cfg\nset ftebroom_skip_setup 1\nin 4 echo RB_RELEASE_SMOKE_BOOT\nin 18 quit force\n')
         engine = clone/('bin/fteqw64.exe' if os.name == 'nt' else 'fteqw-gl64')
         render = ['+set', 'vid_renderer', os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
         with (output/'startup.log').open('wb') as stream:

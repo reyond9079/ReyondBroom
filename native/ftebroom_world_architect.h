@@ -25,6 +25,8 @@ struct WorldArchitectState {
   std::shared_ptr<wa::PrefixCache> prefixCache=std::make_shared<wa::PrefixCache>();
   wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request;
   std::string project,requestMode,requestRegion;uint64_t detailRegion=0,detailSeed=1;
+  uint64_t missionNode=0,dragMission=0,roadSelection=0;int missionEdge=0,planFloor=0,maskSelection=-1;
+  bool painting=false;wa::V paintStart{};float paintStrength=1;int paintType=0;
   double requestAt=0;std::filesystem::path requestPath;
   std::vector<wa::Json> undo,redo;
   std::map<std::string,std::string> pendingShaders;std::map<std::string,qhandle_t> materialHandles;
@@ -195,10 +197,24 @@ static void worldPlanCanvas(bool roads){
   double scale=std::min((size.x-32)/(world->high.x-world->low.x),(size.y-32)/(world->high.y-world->low.y));
   auto point=[&](wa::V p){return ImVec2{pos.x+16+float((p.x-world->low.x)*scale),pos.y+16+float((p.y-world->low.y)*scale)};};
   for(const auto& road:world->spatial.roads)drawList->AddLine(point(road.a),point(road.b),IM_COL32(80,84,78,255),float(road.width*scale));
-  for(const auto& b:world->spatial.buildings){drawList->AddRectFilled(point(b.low),point(b.high),IM_COL32(102,112,94,200));for(const auto& r:b.rooms){if(r.floor)continue;drawList->AddRect(point(r.low),point(r.high),IM_COL32(170,165,140,255));}}
-  for(const auto& e:world->mission.edges){const auto find=[&](uint64_t id)->const wa::MissionNode&{for(const auto& n:world->mission.nodes)if(n.id==id)return n;throw std::runtime_error("Missing mission node");};drawList->AddLine(point(find(e.a).position),point(find(e.b).position),e.optional?IM_COL32(140,150,230,255):IM_COL32(240,180,70,255),2);}
-  for(const auto& node:world->mission.nodes){auto p=point(node.position);drawList->AddCircleFilled(p,5,IM_COL32(240,180,70,255));drawList->AddText({p.x+7,p.y-8},IM_COL32(240,240,225,255),wa::roleName(node.role));}
+  for(const auto& b:world->spatial.buildings){drawList->AddRectFilled(point(b.low),point(b.high),IM_COL32(102,112,94,200));if(s.settings.regionRecipes.count(b.id))drawList->AddRect(point(b.low),point(b.high),IM_COL32(250,210,70,255),0,0,3);for(const auto& r:b.rooms){if(r.floor!=s.planFloor)continue;drawList->AddRect(point(r.low),point(r.high),IM_COL32(170,165,140,255));}}
+  auto graph=s.settings.authoredMission?*s.settings.authoredMission:world->mission;
+  for(auto& node:graph.nodes){auto old=std::find_if(world->mission.nodes.begin(),world->mission.nodes.end(),[&](const auto& n){return n.id==node.id;});if(old!=world->mission.nodes.end()){node.position=old->position;node.floor=old->floor;}else node.position=(world->low+world->high)*.5;
+    for(const auto& pin:s.settings.missionPins)if(pin.id==node.id){node.position=pin.position;node.floor=int(pin.position.z/256);node.pinned=true;}}
+  for(const auto& e:graph.edges){const auto find=[&](uint64_t id)->const wa::MissionNode&{for(const auto& n:graph.nodes)if(n.id==id)return n;throw std::runtime_error("Missing mission node");};drawList->AddLine(point(find(e.a).position),point(find(e.b).position),e.optional?IM_COL32(140,150,230,255):IM_COL32(240,180,70,255),2);}
+  for(const auto& node:graph.nodes){auto p=point(node.position);drawList->AddCircleFilled(p,node.id==s.missionNode?8.f:5.f,node.pinned?IM_COL32(100,220,180,255):IM_COL32(240,180,70,255));if(node.floor==s.planFloor)drawList->AddText({p.x+7,p.y-8},IM_COL32(240,240,225,255),node.name.c_str());}
+  for(const auto& mask:s.settings.influences){if(mask.high.z<s.planFloor*256||mask.low.z>(s.planFloor+1)*256)continue;auto color=mask.kind=="preserve"?IM_COL32(80,220,160,180):mask.kind=="avoid"?IM_COL32(250,80,80,180):IM_COL32(220,140,60,180);drawList->AddRect(point(mask.low),point(mask.high),color,0,0,2);}
+  if(!roads&&!s.settings.locked[0]&&!s.job.valid()){
+    auto mouse=ImGui::GetIO().MousePos;
+    if(ImGui::IsItemHovered()&&ImGui::IsMouseClicked(0)){double distance=15;for(const auto& node:graph.nodes){if(node.floor!=s.planFloor)continue;auto p=point(node.position);double d=std::hypot(mouse.x-p.x,mouse.y-p.y);if(d<distance){distance=d;s.dragMission=s.missionNode=node.id;}}}
+    if(s.dragMission&&ImGui::IsMouseReleased(0)){
+      auto id=s.dragMission;s.dragMission=0;wa::V target{world->low.x+(mouse.x-pos.x-16)/scale,world->low.y+(mouse.y-pos.y-16)/scale,double(s.planFloor*256)+1};
+      const wa::Room* room=nullptr;for(const auto& b:world->spatial.buildings)for(const auto& r:b.rooms)if(r.floor==s.planFloor&&target.x>=r.low.x&&target.x<=r.high.x&&target.y>=r.low.y&&target.y<=r.high.y)room=&r;
+      if(room&&ImGui::IsMouseDragPastThreshold(0))worldAction([&]{auto next=s.settings;if(!next.authoredMission)next.authoredMission=world->mission;wa::MissionNode pin;pin.id=id;pin.position={(room->low.x+room->high.x)/2,(room->low.y+room->high.y)/2,room->low.z+1};auto found=std::find_if(next.missionPins.begin(),next.missionPins.end(),[&](const auto& n){return n.id==id;});if(found==next.missionPins.end())next.missionPins.push_back(pin);else *found=pin;wa::validate(next,s.registry);auto before=wa::serialize(s.settings);s.settings=std::move(next);worldChanged(before);});
+    }
+  }
 }
+#include "ftebroom_world_authoring.h"
 static void worldQa(){
   auto& s=worldArchitect;if(!s.qa)return;if(runUiBrowseOpen)for(auto it=runUiBrowseRects.begin();it!=runUiBrowseRects.end();++it)s.widgets[it.key()]=it.value();
   auto& io=ImGui::GetIO();auto& context=*ImGui::GetCurrentContext();static bool previousDown=false;
@@ -242,20 +258,26 @@ static void worldPanel(){
       ImGui::TextUnformatted("Validated candidates:");ImGui::SameLine();for(size_t i=0;i<s.batch.worlds.size();i++){ImGui::PushID(int(i));auto label=std::to_string(i+1)+" / "+std::to_string(s.batch.worlds[i].seed);if(ImGui::RadioButton(label.c_str(),s.selected==int(i))){s.selected=int(i);s.dirty=true;}worldRect("candidate/"+std::to_string(i));ImGui::SameLine();ImGui::PopID();}ImGui::NewLine();
     }
     if(ImGui::BeginTabBar("World Architect panels")){
-      for(int tab=0;tab<5;tab++){const char* names[]={"3D preview","Mission & site","Quality","Project","Export"};bool active=ImGui::BeginTabItem(names[tab]);worldRect("tab/"+std::to_string(tab));if(!active)continue;s.tab=tab;
+      for(int tab=0;tab<9;tab++){const char* names[]={"Overview","Mission Graph","Site & Roads","Buildings","Architecture","Destruction","Dressing","Quality","Export"};bool active=ImGui::BeginTabItem(names[tab]);worldRect(std::string("tab/")+names[tab]);if(!active)continue;s.tab=tab;
         ImGui::BeginChild("World content",{0,-70*uiScale()});
-        if(tab==0)worldAction(worldPreview);
-        if(tab==1)worldAction([]{worldPlanCanvas(true);});
-        if(tab==2){
-          if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& stage:world->diagnostics.cachedStages)ImGui::Text("Reused frozen stage: %s",stage.c_str());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms%s",name.c_str(),ms,std::find(world->diagnostics.cachedStages.begin(),world->diagnostics.cachedStages.end(),name)!=world->diagnostics.cachedStages.end()?" (original build time)":"");for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
-          for(const auto& reject:s.batch.rejects)ImGui::TextWrapped("Rejected: %s",reject.c_str());
-        }
-        if(tab==3){
+        if(tab==0){
           ImGui::Text("Project profile: %s / active map: %s",wa::capability(s.settings.profile).name,wa::capability(gameProfile).name);
           if(s.settings.profile!=gameProfile&&worldButton("Retarget to the active game profile","retarget")){auto previous=wa::serialize(s.settings);s.settings.profile=gameProfile;worldChanged(previous);}
           if(worldButton("Save editable project...","save-project"))runUiChoose((documentPath("world-architect")/"project.world.json").u8string(),[](const std::string& name){auto path=std::filesystem::u8path(name);std::filesystem::create_directories(path.parent_path());bb::atomicWrite(path,worldProject().dump(2));},true);
           if(worldButton("Open project...","open-project"))runUiChoose(documentPath("world-architect").u8string(),worldLoadProject);
           ImGui::TextWrapped("Legacy AutoLevel settings and maps are preserved. This preview does not overwrite or silently migrate them.");
+          worldAction(worldPreview);
+        }
+        if(tab==1)worldAction(worldMissionPanel);
+        if(tab==2)worldAction(worldRoadPanel);
+        if(tab==4)worldAction(worldArchitecturePanel);
+        if(tab==5)worldAction([]{worldInfluencePanel(false);});
+        if(tab==6)worldAction([]{auto& s=worldArchitect;auto before=wa::serialize(s.settings);auto p=wa::stagePreset(s.settings,s.registry);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=2||!s.settings.pinnedRegions.empty());if(ImGui::BeginCombo("Art theme",p.theme.c_str())){for(const auto& theme:s.registry.themes){if(ImGui::Selectable(theme.id.c_str(),p.theme==theme.id))s.settings.theme=theme.id;}ImGui::EndCombo();}ImGui::EndDisabled();worldChanged(before);worldInfluencePanel(true);});
+        if(tab==7){
+          if(auto world=worldSelected()){ImGui::Text("%zu brushes / %.2f MiB MAP / %.0f unit route through required mission rooms",world->diagnostics.brushes,world->map.size()/1048576.,world->diagnostics.routeLength);ImGui::Text("%zu / %zu physical navigation nodes reachable",world->navigation.reachable,world->navigation.nodes.size());for(const auto& stage:world->diagnostics.cachedStages)ImGui::Text("Reused frozen stage: %s",stage.c_str());for(const auto& [name,value]:world->diagnostics.score)ImGui::Text("%s: %.3f",name.c_str(),value);for(const auto& [name,ms]:world->diagnostics.timing)ImGui::Text("%s: %.1f ms%s",name.c_str(),ms,std::find(world->diagnostics.cachedStages.begin(),world->diagnostics.cachedStages.end(),name)!=world->diagnostics.cachedStages.end()?" (original build time)":"");for(const auto& warning:world->diagnostics.warnings)ImGui::TextWrapped("%s",warning.c_str());}
+          for(const auto& reject:s.batch.rejects)ImGui::TextWrapped("Rejected: %s",reject.c_str());
+        }
+        if(tab==3){
           if(auto world=worldSelected()){
             if(std::none_of(world->spatial.buildings.begin(),world->spatial.buildings.end(),[&](const auto& b){return b.id==s.detailRegion;}))s.detailRegion=world->spatial.buildings.front().id;
             ImGui::SeparatorText("Building details");ImGui::BeginDisabled(s.job.valid());
@@ -270,7 +292,7 @@ static void worldPanel(){
             ImGui::TextWrapped("This keeps the selected candidate's architecture and every other region's detail streams. Review the preview, then update only the selected building in Export.");
           }
         }
-        if(tab==4){
+        if(tab==8){
           ImGui::BeginDisabled(!worldSelected()||s.job.valid()||!s.request.empty());
           if(worldButton("Export MAP and original assets...","export"))runUiChoose((documentPath("world-architect")/"world.map").u8string(),[](const std::string& path){worldExport(std::filesystem::u8path(path));},true);
           if(worldButton("Apply to current map","apply"))worldAction([]{worldApply();});

@@ -144,6 +144,14 @@ inline void site(WorldPlan& w,const Settings& s,const Preset& preset){
     for(const auto& pin:s.roadPins){bool found=false;for(auto& road:w.spatial.roads)if(road.id==pin.id){road=pin;found=true;}if(!found)w.spatial.roads.push_back(pin);}
   }
   for(int a=0;a<3;a++)if(std::max(std::abs(w.low[a]),std::abs(w.high[a]))>capability(s.profile).coordinateLimit)throw std::runtime_error("World exceeds the selected classic BSP profile bounds; reduce scale or choose FTE / Quake III");
+  for(const auto& road:s.roadPins){
+    if(interior)throw std::runtime_error("Road authoring requires a city or mixed site");
+    double margin=road.width/2+12;int samples=std::max(1,int(std::ceil(al::length(road.b-road.a)/16)));
+    for(int i=0;i<=samples;i++){auto p=road.a+(road.b-road.a)*(double(i)/samples);
+      if(p.x-margin<w.low.x||p.x+margin>w.high.x||p.y-margin<w.low.y||p.y+margin>w.high.y)throw std::runtime_error("Designer road leaves the sealed site boundary");
+      for(const auto& b:w.spatial.buildings)if(p.x>b.low.x-margin&&p.x<b.high.x+margin&&p.y>b.low.y-margin&&p.y<b.high.y+margin)throw std::runtime_error("Designer road intersects a building envelope; move the road or revise the site");
+    }
+  }
   for(const auto& mask:s.influences)if(mask.kind=="avoid")for(const auto& b:w.spatial.buildings)if(overlap(b.low,b.high,mask.low,mask.high))throw std::runtime_error("Building overlaps a designer keep-out volume; move it or reduce the generation scope");
 }
 // Establish room programs before producing any brushes. Mission beats reserve
@@ -175,7 +183,12 @@ inline void floorplan(WorldPlan& w,const Settings& s,const Preset& preset){
   if(rooms.size()+1<w.mission.nodes.size())throw std::runtime_error("Mission needs more distinct functional rooms than this site can provide");
   std::vector<Room*> available=rooms;
   std::stable_sort(available.begin(),available.end(),[](auto a,auto b){return std::tie(a->floor,a->id)<std::tie(b->floor,b->id);});
-  std::vector<MissionNode*> required;for(auto& node:w.mission.nodes)if(node.role!=Role::Start&&node.required)required.push_back(&node);
+  for(auto& node:w.mission.nodes)if(node.pinned&&node.role!=Role::Start){
+    auto found=std::find_if(available.begin(),available.end(),[&](auto r){return node.position.x>=r->low.x&&node.position.x<=r->high.x&&node.position.y>=r->low.y&&node.position.y<=r->high.y&&std::abs(node.position.z-r->low.z-1)<18;});
+    if(found==available.end())throw std::runtime_error("Pinned mission beat must occupy its own functional room on the selected floor");
+    auto* room=*found;room->mission=node.id;room->required=node.required;node.room=room->id;node.floor=room->floor;node.position={(room->low.x+room->high.x)/2,(room->low.y+room->high.y)/2,room->low.z+1};available.erase(found);
+  }
+  std::vector<MissionNode*> required;for(auto& node:w.mission.nodes)if(node.role!=Role::Start&&node.required&&!node.pinned)required.push_back(&node);
   for(size_t i=0;i<required.size();i++){
     auto* node=required[i];size_t index=std::min(available.size()-1,i*(available.size()-1)/std::max(size_t(1),required.size()-1));
     auto* room=available[index];room->mission=node->id;node->room=room->id;node->floor=room->floor;
@@ -183,7 +196,7 @@ inline void floorplan(WorldPlan& w,const Settings& s,const Preset& preset){
   }
   for(auto& node:w.mission.nodes){
     if(node.role==Role::Start){const auto& b=w.spatial.buildings.front();if(!node.pinned)node.position={b.low.x-56,(b.low.y+b.high.y)/2,1};continue;}
-    if(node.required)continue;
+    if(node.required||node.pinned)continue;
     auto found=std::find_if(available.rbegin(),available.rend(),[](auto r){return !r->mission;});if(found==available.rend())throw std::runtime_error("Optional mission branch has no unreserved room");
     auto* room=*found;room->mission=node.id;node.room=room->id;node.floor=room->floor;room->required=false;
     if(!node.pinned)node.position={(room->low.x+room->high.x)/2,(room->low.y+room->high.y)/2,room->low.z+1};
@@ -539,8 +552,8 @@ inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<b
     std::vector<size_t> result;for(size_t at=to;;at=parent[at]){result.push_back(at);if(at==from)break;if(parent[at]==SIZE_MAX)throw std::runtime_error("Broken mission path predecessor");}std::reverse(result.begin(),result.end());return result;
   };
   nav.mainRoute={start};
-  for(const auto& beat:w.mission.nodes)if(beat.required&&beat.role!=Role::Start){
-    auto leg=path(nav.mainRoute.back(),beats.at(beat.id));for(size_t i=1;i<leg.size();i++){w.diagnostics.routeLength+=al::length(nav.nodes[leg[i]].feet-nav.nodes[leg[i-1]].feet);nav.mainRoute.push_back(leg[i]);}
+  for(auto beat:missionTraversal(w.mission)){
+    auto leg=path(nav.mainRoute.back(),beats.at(beat));for(size_t i=1;i<leg.size();i++){w.diagnostics.routeLength+=al::length(nav.nodes[leg[i]].feet-nav.nodes[leg[i-1]].feet);nav.mainRoute.push_back(leg[i]);}
   }
   // Count a circulation alternative only if it stays spatially separated
   // from the complete primary polyline. Dense links along one corridor do
@@ -668,11 +681,11 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
     if(n<first)return;cancelled(cancel);if(progress)progress->store(n);w.seeds[stages[n]]=subSeed(inputs[n].seed,stages[n]);w.stageInputs[n]=std::make_shared<const Settings>(inputs[n]);auto before=std::chrono::steady_clock::now();action(inputs[n]);w.diagnostics.timing[stages[n]]=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count();
     if(n<=last&&cache){cache->keys[n]=keys[n];cache->plans[n]=std::make_shared<const WorldPlan>(w);}
   };
-  stage(0,[&](const auto& input){w.mission=mission(input,preset);validateMission(w.mission);});
-  stage(1,[&](const auto& input){site(w,input,preset);floorplan(w,input,preset);});
-  stage(2,[&](const auto& input){shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);building(w,local,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
+  stage(0,[&](const auto& input){w.mission=mission(input,stagePreset(input,registry));validateMission(w.mission);});
+  stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);floorplan(w,input,p);});
+  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
   stage(3,[&](const auto& input){damage(w,input,cancel,registry);});
-  stage(4,[&](const auto& input){dressing(w,input,preset,cancel,registry);});
+  stage(4,[&](const auto& input){dressing(w,input,stagePreset(input,registry),cancel,registry);});
   stage(5,[&](const auto& input){navigation(w,input,cancel);});
   stage(6,[&](const auto& input){exportMap(w,input);});
   for(auto& b:w.spatial.buildings)b.pinned=settings.regionRecipes.count(b.id)!=0;

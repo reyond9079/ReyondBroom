@@ -90,8 +90,23 @@ Shared Mission/Site recipes stay frozen while pins exist; every other building
 can still vary under new downstream seeds. Clean bounded recipes are portable
 in project JSON, registry/profile mismatches and recursive payloads are rejected,
 and pin/unpin participates in settings Undo/Redo. Unpinning drops stale later
-stage freezes while retaining other pins. This is building-level preservation,
-not the still-pending room, graph and road authoring interface.
+stage freezes while retaining other pins. Building-level preservation is separate
+from the broader designer toolkit described below.
+
+The authoring slice adds the nine requested primary panels. Architecture inputs
+override actual per-stage floor programs and dimensions rather than editing the
+global registry. A frozen stage retains its own overrides and art palette.
+Authored mission topology, directed transitions and room-position pins are saved
+in project JSON. Pins reserve rooms before geometry, and the physical route now
+follows a valid prerequisite-aware logical traversal rather than node-list order.
+Road endpoint/width overrides alter street/curb geometry and navigation; edits
+crossing building envelopes or leaving the sealed site are rejected.
+
+Destruction/Dressing support bounded rectangular field painting and full-building
+preserve volumes. Preserve affects structural stair events, masonry damage and
+semantic room props. These controls do not claim the complete spline/volume
+toolkit, engine gate entities, room-level replacement or six finished theme
+grammars. Original palette selection remains a material choice.
 
 Physical checks sweep the configured player hull against expanded convex brush
 planes, verify support along links, handle stair risers, and require all generated
@@ -129,6 +144,12 @@ actual SDL2 pin scenarios, including manual
 edit protection, save/reopen, parent preservation and whole-project changes.
 The executed metro Apply also passes its production ExportMap snapshot through
 real BSP/lighting compilation; binary inspection confirms liquid brush contents.
+The subsequent authoring slice passed 334 contracts, ten actual SDL2 designer
+scenarios and four focused SDL2 painting scenarios. The designer cases check
+changed exported planes, dimension Undo, dragging a beat into its real room,
+directed mission authoring, preserve fields and exact save/reopen replay. Six
+authored interior/road MAPs compiled and lit across Quake 1, Quake III and FTE;
+the dimension case was also rerun with a width distinct from the preset.
 These checks do not certify the complete eight-preset acceptance or final art
 quality. Rerun the relevant stages after changes, and the final corpus before
 replacing AutoLevel.
@@ -140,7 +161,7 @@ different optional branches. More road patterns, archetype-specific interior
 families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
-Graph/road/volume editing, painted masks,
+Complete spline/volume editing, richer painted masks, physical gate realization,
 room-level regeneration, candidate comparison panes, legacy module
 migration, extension-pack validation, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.

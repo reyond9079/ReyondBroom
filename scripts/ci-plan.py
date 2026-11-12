@@ -33,8 +33,8 @@ SUITES = {'world_core', 'world_ui', 'profile_core', 'compilation', 'compilation_
           'updater', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
 RULES = [
     (['native/world_architect/**', 'runtime/world-architect/**',
-      'tests/world-architect*', 'scripts/test-world-architect.py'], {'world_core'}),
-    (['native/ftebroom_world_architect.h'], {'world_ui', 'input'}),
+      'tests/world-architect*', 'tests/world-designer.cpp', 'scripts/test-world-architect.py', 'scripts/test-world-designer.py'], {'world_core'}),
+    (['native/ftebroom_world_architect.h', 'native/ftebroom_world_authoring.h'], {'world_ui', 'input'}),
     (['qc/fb_world_architect.qc', 'qc/fb_world_baseline.qc', 'scripts/test-world-architect-ui.py', 'scripts/test-world-applied.py'], {'world_ui'}),
     (['AGENTS.md', 'docs/**', '*.md'], {'docs'}),
     (['.github/**', 'scripts/ci-*', 'tests/ci-*'], {'ci'}),

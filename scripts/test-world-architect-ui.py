@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Exercise the developing World Architect through actual OS input in a private runtime."""
-import argparse,hashlib,json,os,shutil,subprocess,time
+import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro'],default='hospital');a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--engine',type=Path);a=p.parse_args()
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
-engine=root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');stream=(out/'editor.log').open('wb');render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
+engine=a.engine.resolve() if a.engine else root/('bin/fteqw64.exe' if os.name=='nt' else 'fteqw-gl64');stream=(out/'editor.log').open('wb');render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 proc=subprocess.Popen([str(engine),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1920','-height','1080','-basedir',str(root),'+exec','world-qa.cfg'],cwd=root,stdout=stream,stderr=subprocess.STDOUT,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'})
 checks=[]
 module=root/('fteplug_ftebroom_x64.dll' if os.name=='nt' else 'fteplug_ftebroom_amd64.so')
-(out/'provenance.json').write_text(json.dumps({'moduleSha256':hashlib.sha256(module.read_bytes()).hexdigest(),'qcSha256':hashlib.sha256((data/'csaddon.dat').read_bytes()).hexdigest(),'runtimeBuildInfo':(root/'build-info.txt').read_text(),'method':'Actual OS input; live read-only telemetry; generated MAP/texture assets; real executed import and history transactions'},indent=2)+'\n')
+(out/'provenance.json').write_text(json.dumps({'moduleSha256':hashlib.sha256(module.read_bytes()).hexdigest(),'engineSha256':hashlib.sha256(engine.read_bytes()).hexdigest(),'qcSha256':hashlib.sha256((data/'csaddon.dat').read_bytes()).hexdigest(),'runtimeBuildInfo':(root/'build-info.txt').read_text(),'method':'Actual OS input; live read-only telemetry; generated MAP/texture assets; real executed import and history transactions'},indent=2)+'\n')
 def live():return read_ui_json(state)
 def wait(fn,timeout=60):
  end=time.monotonic()+timeout
@@ -37,12 +37,94 @@ def planes(path):return sorted(line.strip() for line in path.read_text(errors='r
 def choose(path):
  text=path.as_posix();r=wait(lambda:live()['widgets'].get('file-path'));ui.click(r['x']+r['width']*.4,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(text)
  wait(lambda:read_ui_json(data/'placement-ui-live.json')['browsePath']==text);ui.key('enter');click('file-choose');wait(lambda:'file-path' not in live()['widgets'])
+def entities(path):
+ text=path.read_text();level=0;start=0;result=[];header=[]
+ for match in re.finditer(r'"(?:\\.|[^"\\])*"|//[^\n]*|[{}]',text):
+  token=match.group()
+  if token=='{':
+   if level==0:start=match.start();header=[]
+   level+=1
+  elif token=='}':
+   level-=1
+   if level==0:
+    block=text[start:match.end()];fields={};assert len(header)%2==0
+    for key,value in zip(header[::2],header[1::2]):
+     try:fields[json.loads(key)]=json.loads(value)
+     except json.JSONDecodeError:fields[key[1:-1]]=value[1:-1]
+    result.append((fields,sorted(line.strip() for line in block.splitlines() if line.lstrip().startswith('( ')),block))
+  elif token.startswith('"') and level==1:header.append(token)
+ assert level==0
+ return result
+def regions(path):
+ rows=entities(path);result={}
+ for fields,geometry,block in rows:
+  if '_wa_region' not in fields or fields.get('_wa_project')!=live()['projectId']:continue
+  children=sorted(json.dumps(f,sort_keys=True) for f,g,b in rows if f.get('_tb_group')==fields.get('_tb_id'))
+  result[fields['_wa_region']]={'fields':fields,'geometry':geometry,'points':children}
+ return result
 try:
  wait(lambda:live()['open'] and 'generate' in live()['widgets']);ui.position()
  # Xvfb has no window manager to transfer focus after an external engine exits.
  # Acquire actual OS keyboard focus before the first console shortcut.
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
+ click('tab/3');wait(lambda:'save-project' in live()['widgets'])
+ check(True,'the first workspace tab click is received after actual OS activation')
+ click('tab/0')
  before=save('wa-before');baseline=planes(before)
+ if a.regions_only:
+  assert a.preset=='evacuation','Regional fixture needs multiple buildings'
+  click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);seeds=live()['candidateSeeds'];assert 1 in seeds;click('candidate/'+str(seeds.index(1)))
+  click('tab/4');click('apply');wait(lambda:live()['applyStatus']=='ok' and not live()['request']);original=save('wa-regions-original');old=regions(original)
+  check({'100','101','102','103'}<=set(old),'actual editor imports four separately owned building groups')
+  check(all(len(v['fields'].get('_wa_baseline',''))==64 for v in old.values()),'ownership baselines are computed from the executed editor contents')
+  click('tab/3');click('detail-building');click('detail-building/101');r=live()['widgets']['detail-seed'];ui.click(r['x']+r['width']*.4,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text('57');ui.key('enter')
+  click('regenerate-region');wait(lambda:live()['candidates']==1 and not live()['busy']);click('tab/4');click('update-region');wait(lambda:live()['applyStatus']=='ok' and not live()['request']);updated=save('wa-regions-updated');new=regions(updated)
+  check(new['101']['geometry']!=old['101']['geometry'],'selected building details change in the actual map')
+  check(len(new['101']['geometry'])>100,'regenerated building retains real brushes inside its owned group')
+  check(entities(original)[0][:2]==entities(updated)[0][:2],'regional replacement preserves worldspawn geometry and properties exactly')
+  check(all(new[k]==v for k,v in old.items() if k!='101'),'regional Apply preserves every unselected group, point entity and brush')
+  check(new['101']['fields']['_tb_id']==old['101']['fields']['_tb_id'],'regional Apply retains the original group identity')
+  check(all(line in planes(updated) for line in baseline),'regional Apply retains the original authored scene')
+  click('apply');wait(lambda:live()['applyStatus']=='exists' and not live()['request']);check(regions(save('wa-regions-duplicate'))==new,'adding a duplicate project fails without changing the map')
+  console('ftebroom_undo');check(regions(save('wa-regions-undo'))==old,'one Undo restores the complete previous regional contents')
+  console('ftebroom_redo');check(regions(save('wa-regions-redo'))==new,'one Redo restores only the regenerated region')
+  tree=[shlex.split(line) for line in (data/'data/ftebroom-ui-tree.txt').read_text().splitlines()];target=next(row[1] for row in tree if row[0]=='2' and row[5]=='World Architect region 101');console('ftebroom_cancel');console('ftebroom_organize focus '+target);console('ftebroom_move 8 0 0');manual=save('wa-regions-manual');manual_regions=regions(manual);check(manual_regions['101']['geometry']!=new['101']['geometry'],'ordinary editor transform creates real manual region edits')
+  click('update-region');wait(lambda:live()['applyStatus']=='modified' and not live()['request']);check(regions(save('wa-regions-rejected'))==manual_regions,'manual region edits are rejected before replacement')
+  console('ftebroom_undo');check(regions(save('wa-regions-rejected-undo'))==new,'rejected replacement creates no additional Undo transaction')
+  epoch=live()['mapEpoch'];console('mapedit maps/wa-regions-updated.map');wait(lambda:live()['mapEpoch']!=epoch)
+  reopened=save('wa-regions-reopened');click('update-region');wait(lambda:not live()['request'])
+  check(live()['applyStatus']=='ok','saved and reopened generated regions retain a valid replacement baseline')
+  check(entities(reopened)[0][:2]==entities(save('wa-regions-reopened-update'))[0][:2],'reopened regional update leaves worldspawn unchanged')
+  tree=[shlex.split(line) for line in (data/'data/ftebroom-ui-tree.txt').read_text().splitlines()];target=next(row[1] for row in tree if row[0]=='2' and row[5]=='World Architect region 101')
+  console('ftebroom_cancel');console('ftebroom_organize focus '+target);console('ftebroom_group "Authored container"');parented=save('wa-regions-parented');parent=regions(parented)['101']['fields'].get('_tb_group')
+  check(parent and any(f.get('_tb_id')==parent and f.get('_tb_name')=='Authored container' for f,g,b in entities(parented)),'ordinary grouping places the generated building inside an authored container')
+  click('update-region');wait(lambda:not live()['request']);parented=save('wa-regions-parented-updated')
+  check(live()['applyStatus']=='ok' and regions(parented)['101']['fields'].get('_tb_group')==parent,'regional update retains authored parent membership')
+  # Lock a saved generated group and load it through the ordinary map command.
+  locked=data/'maps/wa-regions-locked.map';text=updated.read_text()
+  for fields,geometry,block in entities(updated):
+   if fields.get('_wa_region')=='101':text=text.replace(block,block.replace('{','{\n"_tb_layer_locked" "1"',1),1)
+  locked.write_text(text);epoch=live()['mapEpoch'];console('mapedit maps/wa-regions-locked.map');wait(lambda:live()['mapEpoch']!=epoch);locked_before=planes(save('wa-regions-locked-before'));click('update-region');wait(lambda:live()['applyStatus']=='locked' and not live()['request'])
+  check(planes(save('wa-regions-lock-rejected'))==locked_before,'locked generated regions survive a replacement request')
+  custom=data/'maps/wa-regions-custom-model.map';text=updated.read_text();changed=False
+  for fields,geometry,block in entities(updated):
+   if fields.get('_tb_group')==new['101']['fields']['_tb_id'] and fields.get('classname')=='light':
+    text=text.replace(block,block.replace('{','{\n"model" "models/qa-custom.mdl"',1),1);changed=True;break
+  assert changed,'Missing point entity for ownership negative control'
+  custom.write_text(text);epoch=live()['mapEpoch'];console('mapedit maps/wa-regions-custom-model.map');wait(lambda:live()['mapEpoch']!=epoch);custom_before=regions(save('wa-regions-custom-before'));click('update-region');wait(lambda:not live()['request'])
+  check(live()['applyStatus']=='modified' and regions(save('wa-regions-custom-rejected'))==custom_before,'manual point-entity model properties cannot be overwritten by region replacement')
+  tampered=data/'maps/wa-regions-tampered.map';text=updated.read_text()
+  for fields,geometry,block in entities(updated):
+   if fields.get('_wa_region')=='101':text=text.replace(block,re.sub(r'("_wa_snapshot_0"\s+")[^"]',r'\g<1>X',block,count=1),1)
+  tampered.write_text(text);epoch=live()['mapEpoch'];console('mapedit maps/wa-regions-tampered.map');wait(lambda:live()['mapEpoch']!=epoch);tampered_before=planes(save('wa-regions-tampered-before'));click('update-region');wait(lambda:not live()['request'])
+  check(live()['applyStatus']=='modified' and planes(save('wa-regions-tampered-rejected'))==tampered_before,'a corrupt ownership snapshot cannot authorize replacement')
+  epoch=live()['mapEpoch'];console('mapedit maps/wa-regions-parented-updated.map');wait(lambda:live()['mapEpoch']!=epoch);whole_before=save('wa-whole-before')
+  click('freeze');click('freeze/0');click('preset');click('preset/hospital');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);click('tab/4');click('update-world');wait(lambda:not live()['request']);whole=save('wa-whole-hospital')
+  check(live()['applyStatus']=='ok' and set(regions(whole))=={'0','100'},'whole-project update removes obsolete building and street regions')
+  check(entities(whole_before)[0][:2]==entities(whole)[0][:2] and any(f.get('_tb_id')==parent and f.get('_tb_name')=='Authored container' for f,g,b in entities(whole)),'whole-project update retains worldspawn and the emptied authored container')
+  click('preset');click('preset/evacuation');click('generate');wait(lambda:live()['candidates'] and not live()['busy']);click('tab/4');click('update-world');wait(lambda:not live()['request']);expanded=save('wa-whole-evacuation')
+  check(live()['applyStatus']=='ok' and {'100','101','102','103'}<=set(regions(expanded)),'whole-project update adds newly generated building regions')
+  ImageGrab.grab().save(out/'world-regions.png');(out/'world-state.json').write_text(json.dumps(live(),indent=2));print('World Architect regional UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.preset=='hospital':
   def seed(value):
    click('seed');ui.key('a',('ctrl',));ui.text(str(value));ui.key('enter');wait(lambda:live()['settings']['worldSeed']==value)
@@ -72,6 +154,7 @@ try:
  click('apply');wait(lambda:'One map Undo' in live()['message']);check(not live()['request'],'Apply waits for an executed QC map transaction acknowledgment')
  applied=save('wa-applied');check(len(planes(applied))>len(baseline)+100,'Apply inserts editable generated brushes')
  check(all(line in planes(applied) for line in baseline),'Apply retains every original authored brush plane')
+ compile_map=data/'data/export-map.map';compile_map.unlink(missing_ok=True);console('ftebroom_export_map');wait(compile_map.exists);shutil.copy2(compile_map,out/'wa-compile.map')
  console('ftebroom_undo');undone=save('wa-undone');check(planes(undone)==baseline,'one Undo restores the original scene')
  console('ftebroom_redo');redone=save('wa-redone');check(planes(redone)==planes(applied),'one Redo restores the complete generated world')
  token='99999999999999999999';console('ftebroom_world_apply '+token+' -1 '+str(live()['settings']['profileId']));wait(lambda:live()['applyAck']==token)

@@ -41,6 +41,12 @@ class ScopeTests(unittest.TestCase):
         self.assertTrue(p['flags']['compilation_ui'] and p['flags']['onboarding'])
         self.assertFalse(p['flags']['plant_core'])
 
+    def test_world_scoped_clipboard_allocator_keeps_legacy_changes_conservative(self):
+        before = 'int id=terrain_edit(TEREDIT_ENT_ADD,"");entities[i]=id;\n'
+        after = 'int fb_world_importing;\n'+before.replace('terrain_edit(', 'fb_world_importing?fb_tx_empty_entity():(int)terrain_edit(')
+        self.assertEqual(planner.world_host_scope('qc/fb_clipboard.qc', before, after), {'world_ui'})
+        self.assertIsNone(planner.world_host_scope('qc/fb_clipboard.qc', before, after.replace('entities[i]=id', 'entities[i]=0')))
+
     def test_windows_release_build_creates_its_output_when_audio_tests_are_skipped(self):
         import re
         import shlex

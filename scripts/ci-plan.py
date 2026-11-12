@@ -35,7 +35,7 @@ RULES = [
     (['native/world_architect/**', 'runtime/world-architect/**',
       'tests/world-architect*', 'scripts/test-world-architect.py'], {'world_core'}),
     (['native/ftebroom_world_architect.h'], {'world_ui', 'input'}),
-    (['qc/fb_world_architect.qc', 'scripts/test-world-architect-ui.py'], {'world_ui'}),
+    (['qc/fb_world_architect.qc', 'qc/fb_world_baseline.qc', 'scripts/test-world-architect-ui.py', 'scripts/test-world-applied.py'], {'world_ui'}),
     (['AGENTS.md', 'docs/**', '*.md'], {'docs'}),
     (['.github/**', 'scripts/ci-*', 'tests/ci-*'], {'ci'}),
     (['scripts/setup-ci-renderer.ps1'], {'ci'}),
@@ -138,6 +138,8 @@ WORLD_HOST_ADDITIONS = {
         '||worldArchitectFocused()', '&&!worldArchitectFocused()', 'worldPanel();',
     ],
     'qc/fb_clipboard.qc': [
+        'int fb_world_importing;\n',
+        'fb_world_importing?fb_tx_empty_entity():(int)',
         '#include "fb_world_architect.qc"\n',
         '    if(argv(0)=="ftebroom_world_apply"){fb_world_architect_apply();return TRUE;}\n',
     ],

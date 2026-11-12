@@ -75,8 +75,14 @@ unlocking. Settings Undo/Redo covers independent edits and freezing controls.
 Apply uses an independent staging filename and an acknowledged QC transaction,
 with execution-time map-epoch/profile guards. Missing/invalid files and stale
 requests report errors rather than success. One Undo/Redo covers the complete
-insertion; existing authored geometry is retained. Region replacement is not
-exposed yet.
+insertion; existing authored geometry is retained. Building detail regeneration
+now retains all upstream recipes and other regions' streams. Owned groups allow
+atomic regional or whole-project replacement, including save/reopen, one
+Undo/Redo, and preflight rejection of manual edits, hidden/locked groups,
+duplicate insertion and incompatible architecture. Portable numerical snapshots
+inside group properties distinguish MAP float reconstruction error from edits.
+Entity-slot reuse is scoped to this import path; ordinary clipboard behavior
+retains its existing allocation path.
 
 Physical checks sweep the configured player hull against expanded convex brush
 planes, verify support along links, handle stair risers, and require all generated
@@ -103,13 +109,19 @@ brush parser. Only the first representative MAP/assets per configuration are
 written; the complete metrics/rejections are in `results.json`. An optional sixth
 CLI argument selects the game profile (0 Q3, 1 FTE, 2 Q1, 3 Q2, 4 GoldSrc).
 
-The current development evidence (external QA folder, not a public release)
-records 800/800 input batches with at least one accepted candidate, 6 rejected
+An earlier foundation corpus (external QA folder, not a public release)
+recorded 800/800 input batches with at least one accepted candidate, 6 rejected
 attempts out of 3200, and a real Quake 1 hospital `qbsp`/`light` run with no leak
 and no empty lightmaps. Real UI generation/export, Apply acknowledgment,
 authored-content preservation and one Undo/Redo have passed on native Linux.
-These results do not certify a finished generator, Windows/SDL2 parity or art
-quality. The tests must be rerun for subsequent changes in the relevant stages.
+That corpus predates subsequent architecture and regional work. The regional
+slice has passed 308 contracts and 24 actual SDL2 scenarios, including manual
+edit protection, save/reopen, parent preservation and whole-project changes.
+The executed metro Apply also passes its production ExportMap snapshot through
+real BSP/lighting compilation; binary inspection confirms liquid brush contents.
+These checks do not certify the complete eight-preset acceptance or final art
+quality. Rerun the relevant stages after changes, and the final corpus before
+replacing AutoLevel.
 
 ## Remaining acceptance work
 
@@ -119,7 +131,7 @@ families, non-box massing, hero ruin events, material/weathering detail,
 and the eight finished presets still need implementation and visual evaluation.
 
 Pinned-region preservation, graph/road/volume editing, painted masks,
-selection-safe regional replacement, candidate comparison panes, legacy module
+room-level regeneration, candidate comparison panes, legacy module
 migration, extension-pack validation, collision/gameplay metrics beyond the
 initial anchors, and complete three-profile compile/play evidence remain open.
 Unsupported pinned-region fields fail explicitly instead of silently ignoring

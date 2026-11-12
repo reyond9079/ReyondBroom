@@ -21,7 +21,7 @@ int main(int argc,char** argv)try{
       if(seed==1){auto bundle=assetBundle(world,registry,ftebroom::defaultQuakePalette());
       for(const auto& [name,bytes]:bundle){auto asset=output/std::filesystem::u8path(name);std::filesystem::create_directories(asset.parent_path());std::ofstream(asset,std::ios::binary).write(bytes.data(),bytes.size());}
       {auto list=output/"scripts/shaderlist.txt";std::string text;if(std::ifstream previous{list};previous)text.assign(std::istreambuf_iterator<char>(previous),{});auto name="world-architect-"+world.theme;if(text.find(name)==text.npos)std::ofstream(list,std::ios::app)<<name<<'\n';}
-      std::ofstream(path.string()+".map")<<withWad(world.map,world,(std::filesystem::absolute(output)/("world-architect-"+world.theme+".wad")).generic_string());std::ofstream(path.string()+".json")<<proof.dump(2);}
+      std::ofstream(path.string()+".map")<<withWad(argc>6?groupedMap(world,argv[6]):world.map,world,(std::filesystem::absolute(output)/("world-architect-"+world.theme+".wad")).generic_string());std::ofstream(path.string()+".json")<<proof.dump(2);}
       results.push_back(proof);
       std::cout<<"PASS "<<preset.id<<" seed "<<seed<<" brushes "<<world.diagnostics.brushes<<" route "<<world.diagnostics.routeLength<<'\n'<<std::flush;
     }

@@ -15,7 +15,7 @@ run([out/('world-architect-contracts'+suffix),repo/'runtime/world-architect/regi
 proof=[]
 for profile in [2,0,1]:
  folder=out/('profile-'+str(profile))/('baseq3' if profile<2 else 'maps-and-assets')
- run([out/('world-architect'+suffix),repo/'runtime/world-architect/registry.json',folder,'*',a.seeds,profile],out/('profile-'+str(profile)+'.log'))
+ run([out/('world-architect'+suffix),repo/'runtime/world-architect/registry.json',folder,'*',a.seeds,profile,'qa-world'],out/('profile-'+str(profile)+'.log'))
  results=json.loads((folder/'results.json').read_text());assert len(results)==8*a.seeds
  record={'profile':profile,'accepted_batches':len(results),'attempts':sum(r['attempted'] for r in results),'rejections':sum(len(r['rejected']) for r in results),'compiled':[]}
  if a.runtime:

@@ -273,7 +273,7 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
       navEdge(w,hallLeft,laneLeft[side]);navEdge(w,laneLeft[side],laneRight[side]);navEdge(w,laneRight[side],hallRight);
       for(double x=low.x+96;x<stairX-32;x+=192){
         box(w,b.id,"circulation light fixture",{x-24,lane-20,z+208},{x+24,lane+20,z+240},2);
-        al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({x,lane,z+192})},{"light","320"},{"_color",side?"0.82 0.9 1":"1 0.9 0.72"}};if(s.profile==4)light.fields["_light"]="255 235 205 320";w.architecture.entities.push_back(light);
+        al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({x,lane,z+192})},{"light","320"},{"_color",side?"0.82 0.9 1":"1 0.9 0.72"}};if(s.profile==4)light.fields["_light"]="255 235 205 320";w.architecture.entities.push_back({b.id,light});
       }
     }
     if(b.parallel&&preset.ruinEvent!="flooded-platform"){
@@ -295,7 +295,7 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
       navEdge(w,laneLeft[side],corridor);navEdge(w,corridor,laneRight[side]);navEdge(w,corridor,entry);navEdge(w,entry,center);
       // Lighting follows the room function, with warmer public spaces and
       // cooler service rooms. No game-specific enemy/entity vocabulary.
-      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(y0+y1)/2,z+192})},{"light",preset.archetype=="station"?"180":"240"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 240";w.architecture.entities.push_back(light);
+      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(y0+y1)/2,z+192})},{"light",preset.archetype=="station"?"180":"240"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 240";w.architecture.entities.push_back({b.id,light});
     }
     // Rectangular room partitions end before the stairwell; a service lobby
     // and a pair of columns distinguish the larger terminal spatial beat.
@@ -400,12 +400,12 @@ inline void receptionAnnex(WorldPlan& w,const Settings& s,const Building& b){
   double turnY=cy+std::max(144.,b.hall+64);
   auto hall=navNode(w,{x-360,cy,1},b.id),turn=navNode(w,{x-360,turnY,1},b.id),back=navNode(w,{x-24,turnY,1},b.id),inner=navNode(w,{x-24,cy,1},b.id),entry=navNode(w,{x+24,cy,17},b.id),center=navNode(w,{x+128,cy,17},b.id),door=navNode(w,{x+216,cy,17},b.id),outside=navNode(w,{x+296,cy,1},b.id);
   for(auto edge:std::vector<std::array<size_t,2>>{{hall,turn},{turn,back},{back,inner},{inner,entry},{entry,center},{center,door},{door,outside}})navEdge(w,edge[0],edge[1]);
-  al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({x+128,cy,192})},{"light","320"},{"_color","1 0.85 0.64"}};w.architecture.entities.push_back(light);
+  al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({x+128,cy,192})},{"light","320"},{"_color","1 0.85 0.64"}};w.architecture.entities.push_back({b.id,light});
 }
 inline void floodedPlatform(WorldPlan& w,const Settings& s,const Building& b){
   const double cy=(b.low.y+b.high.y)/2,x0=b.low.x+144,x1=b.bays.back()-128;
   if(x1-x0<160)throw std::runtime_error("Flooded station requires a longer platform envelope");
-  box(w,b.id,"floodwater",{x0,cy-56,0},{x1,cy+56,24},6);
+  auto water=al::box({x0,cy-56,0},{x1,cy+56,24},material(w,6));if(w.profile<2)for(auto& face:water.faces)face.attributes="32 0 0";addBrush(w,b.id,"floodwater",std::move(water));
   // The critical route uses either dry platform. Physical curb walls keep
   // navigation out of the flood rather than assuming swimming capabilities.
   for(int sign:{-1,1})box(w,b.id,"platform flood barrier",{x0-8,cy+sign*64-8,0},{x1+8,cy+sign*64+8,32},5);
@@ -589,7 +589,7 @@ inline void exportMap(WorldPlan& w,const Settings& settings){
   std::ostringstream out;out.imbue(std::locale::classic());out<<"{\n\"classname\" \"worldspawn\"\n\"_wa_schema\" \"1\"\n\"_wa_seed\" \""<<w.seed<<"\"\n\"_wa_preset\" \""<<w.preset<<"\"\n";
   if(settings.profile>=2)out<<"\"_sunlight\" \"110\"\n\"_sunlight_color\" \"1 0.9 0.75\"\n\"_sun_mangle\" \"120 -50 0\"\n";
   for(const auto& element:w.architecture.elements)out<<al::writeBrush(element.brush);out<<"}\n";
-  for(const auto& entity:w.architecture.entities)out<<al::writeEntity(entity);
+  for(const auto& entity:w.architecture.entities)out<<al::writeEntity(entity.entity);
   auto spawn=w.navigation.nodes[w.navigation.mainRoute.front()].feet+V{0,0,24};
   out<<al::writeEntity({{{"classname",capability(settings.profile).spawn},{"origin",vectorText(spawn)},{"angle","0"}}});
   // Markers are editor metadata; they do not invent unsupported game entities.
@@ -598,27 +598,56 @@ inline void exportMap(WorldPlan& w,const Settings& settings){
   auto roundtrip=al::parseMap(w.map);if(roundtrip.brushes.size()!=w.architecture.elements.size())throw std::runtime_error("Quantized MAP brush roundtrip failed");
   w.diagnostics.mapBytes=w.map.size();w.diagnostics.brushes=w.architecture.elements.size();
 }
-struct PrefixCache {std::string key;std::shared_ptr<const WorldPlan> plan;};
+// Editor groups carry stable ownership independently of engine entity/model
+// indices. Both supported compilers merge func_group brushes into worldspawn.
+inline std::string groupedMap(const WorldPlan& w,const std::string& project,std::optional<uint64_t> onlyRegion={}){
+  safeToken(project);if(project.size()>64)throw std::runtime_error("Project ownership identifier exceeds 64 bytes");if(w.architectureKey.empty())throw std::runtime_error("Missing architecture provenance");if(!w.diagnostics.valid)throw std::runtime_error("Cannot group an unvalidated world");
+  std::map<uint64_t,std::vector<const ArchitectureElement*>> groups;
+  for(const auto& e:w.architecture.elements)if(!onlyRegion||e.region==*onlyRegion)groups[e.region].push_back(&e);
+  if(groups.empty())throw std::runtime_error("Selected World Architect region is empty");
+  auto firstBrush=w.map.find("{",w.map.find("\n")+1);if(firstBrush==w.map.npos)throw std::runtime_error("Generated worldspawn has no brush boundary");
+  std::ostringstream out;out.imbue(std::locale::classic());out<<w.map.substr(0,firstBrush)<<"}\n";
+  std::map<uint64_t,size_t> parents;size_t next=0;
+  for(const auto& [region,elements]:groups){
+    parents[region]=++next;
+    out<<"{\n\"classname\" \"func_group\"\n\"_tb_type\" \"_tb_group\"\n\"_tb_id\" \""<<next<<"\"\n\"_tb_name\" \"World Architect region "<<region<<"\"\n\"_wa_project\" \""<<project<<"\"\n\"_wa_region\" \""<<region<<"\"\n\"_wa_structure\" \""<<w.architectureKey<<"\"\n";
+    for(auto e:elements)out<<al::writeBrush(e->brush);out<<"}\n";
+  }
+  auto entity=[&](al::PointEntity e,uint64_t region){auto parent=parents.find(region);if(parent==parents.end())return;e.fields["_tb_group"]=std::to_string(parent->second);out<<al::writeEntity(e);};
+  for(const auto& e:w.architecture.entities)entity(e.entity,e.region);
+  if(!onlyRegion){auto spawn=w.navigation.nodes[w.navigation.mainRoute.front()].feet+V{0,0,24};entity({{{"classname",capability(w.profile).spawn},{"origin",vectorText(spawn)},{"angle","0"}}},0);}
+  for(const auto& beat:w.mission.nodes)entity({{{"classname","info_null"},{"origin",vectorText(beat.position+V{0,0,32})},{"_wa_role",roleName(beat.role)},{"_wa_id",std::to_string(beat.id)}}},beat.room/10000);
+  auto result=out.str();if(result.size()>16*1024*1024)throw std::runtime_error("Grouped world exceeds the MAP import budget");auto parsed=al::parseMap(result);size_t count=0;for(const auto& group:groups)count+=group.second.size();if(parsed.brushes.size()!=count)throw std::runtime_error("Grouped world brush roundtrip failed");return result;
+}
+struct PrefixCache {std::array<std::string,5> keys;std::array<std::shared_ptr<const WorldPlan>,5> plans;};
 inline Settings freezeThrough(Settings settings,const WorldPlan& accepted,const Registry& registry,int stage){
   if(!accepted.diagnostics.valid||accepted.profile!=settings.profile||accepted.preset!=settings.preset||stage<0||stage>4)throw std::runtime_error("Freeze requires a current accepted candidate and a generative stage");
   settings.locked.fill(false);settings.frozen.fill(Json(nullptr));settings.frozenRegistry=registry.fingerprint;
   for(int i=0;i<=stage;i++){if(!accepted.stageInputs[i])throw std::runtime_error("Accepted candidate is missing its stage recipe");settings.locked[i]=true;settings.frozen[i]=serialize(cleanSettings(*accepted.stageInputs[i]));}
   validate(settings,registry);return settings;
 }
+inline Settings regenerateDetails(Settings settings,const WorldPlan& accepted,const Registry& registry,uint64_t region,uint64_t seed){
+  if(std::none_of(accepted.spatial.buildings.begin(),accepted.spatial.buildings.end(),[&](const auto& b){return b.id==region;}))throw std::runtime_error("Select an existing building for detail regeneration");
+  settings=freezeThrough(settings,accepted,registry,4);settings.seed=accepted.seed;settings.candidates=1;
+  // Only the requested building's Damage/Dressing streams change. Every
+  // upstream recipe and every other region's original stream remain intact.
+  for(int stage=3;stage<=4;stage++){auto input=deserialize(settings.frozen[stage],registry);input.regionSeeds[region]=seed;settings.frozen[stage]=serialize(cleanSettings(input));}
+  validate(settings,registry);return settings;
+}
 inline WorldPlan generate(const Settings& settings,const Registry& registry,const std::atomic<bool>* cancel=nullptr,std::atomic<int>* progress=nullptr,PrefixCache* cache=nullptr){
   validate(settings,registry);WorldPlan w;w.seed=settings.seed;w.profile=settings.profile;w.preset=settings.preset;const auto& preset=registry.preset(settings.preset);w.theme=preset.theme;
   const int last=lockedThrough(settings);std::array<Settings,7> inputs;for(int n=0;n<7;n++)inputs[n]=n<=last?deserialize(settings.frozen[n],registry):cleanSettings(settings);
-  std::string key;int first=0;
-  if(last>=0){Json recipes=Json::array();for(int n=0;n<=last;n++)recipes.push_back(settings.frozen[n]);key=std::to_string(registry.fingerprint)+recipes.dump();
-    if(cache&&cache->plan&&cache->key==key){w=*cache->plan;w.seed=settings.seed;first=last+1;for(int n=0;n<=last;n++)w.diagnostics.cachedStages.push_back(stages[n]);}
+  std::array<std::string,5> keys;int first=0;
+  if(last>=0){Json recipes=Json::array();for(int n=0;n<=last;n++){recipes.push_back(settings.frozen[n]);keys[n]=std::to_string(registry.fingerprint)+recipes.dump();}
+    if(cache)for(int n=last;n>=0;n--)if(cache->plans[n]&&cache->keys[n]==keys[n]){w=*cache->plans[n];w.seed=settings.seed;w.diagnostics.cachedStages.clear();first=n+1;for(int i=0;i<=n;i++)w.diagnostics.cachedStages.push_back(stages[i]);break;}
   }
   auto stage=[&](int n,auto action){
     if(n<first)return;cancelled(cancel);if(progress)progress->store(n);w.seeds[stages[n]]=subSeed(inputs[n].seed,stages[n]);w.stageInputs[n]=std::make_shared<const Settings>(inputs[n]);auto before=std::chrono::steady_clock::now();action(inputs[n]);w.diagnostics.timing[stages[n]]=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count();
-    if(n==last&&cache){cache->key=key;cache->plan=std::make_shared<const WorldPlan>(w);}
+    if(n<=last&&cache){cache->keys[n]=keys[n];cache->plans[n]=std::make_shared<const WorldPlan>(w);}
   };
   stage(0,[&](const auto& input){w.mission=mission(input,preset);validateMission(w.mission);});
   stage(1,[&](const auto& input){site(w,input,preset);floorplan(w,input,preset);});
-  stage(2,[&](const auto& input){shell(w);streets(w);for(auto& b:w.spatial.buildings){building(w,input,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,input,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,input,b);}});
+  stage(2,[&](const auto& input){shell(w);streets(w);for(auto& b:w.spatial.buildings){building(w,input,preset,b,cancel);if(preset.ruinEvent=="collapsed-stair")receptionAnnex(w,input,b);if(preset.ruinEvent=="flooded-platform")floodedPlatform(w,input,b);}std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);w.architectureKey=std::to_string(hash(structure));});
   stage(3,[&](const auto& input){damage(w,input,cancel);});
   stage(4,[&](const auto& input){dressing(w,input,preset,cancel);});
   stage(5,[&](const auto& input){navigation(w,input,cancel);});

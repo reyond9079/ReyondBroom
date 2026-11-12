@@ -10,6 +10,9 @@ void fb_tutorial_prepare(int step)
     fb_cancel();fb_tool_deactivate();fb_selection_clear();
     // Loading a map can restore its last projection after the native layout reset.
     cvar_set("ca_brush_view","0");
+    // The grid lesson lets users choose any spacing. Clip points and Vertex
+    // drags need a known grid or both demo targets can snap to the same point.
+    if(step>=7)cvar_set("ca_grid","16");
     // This command only operates in the lesson's disposable map. Clear both
     // the map's fixture and any practice geometry before preparing a stage.
     static int ids[128];static vector axes[1];static float distances[1];

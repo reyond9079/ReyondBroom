@@ -148,11 +148,12 @@ inline void site(WorldPlan& w,const Settings& s,const Preset& preset){
   for(int a=0;a<3;a++)if(std::max(std::abs(w.low[a]),std::abs(w.high[a]))>capability(s.profile).coordinateLimit)throw std::runtime_error("World exceeds the selected classic BSP profile bounds; reduce scale or choose FTE / Quake III");
   for(const auto& road:s.roadPins){
     if(interior)throw std::runtime_error("Road authoring requires a city or mixed site");
-    double margin=road.width/2+12;int samples=std::max(1,int(std::ceil(al::length(road.b-road.a)/16)));
-    for(int i=0;i<=samples;i++){auto p=road.a+(road.b-road.a)*(double(i)/samples);
+    double margin=road.width/2+12;const auto points=roadPoints(road);
+    for(size_t segment=1;segment<points.size();segment++){auto a=points[segment-1],b=points[segment];int samples=std::max(1,int(std::ceil(al::length(b-a)/16)));
+    for(int i=0;i<=samples;i++){auto p=a+(b-a)*(double(i)/samples);
       if(p.x-margin<w.low.x||p.x+margin>w.high.x||p.y-margin<w.low.y||p.y+margin>w.high.y)throw std::runtime_error("Designer road leaves the sealed site boundary");
       for(const auto& b:w.spatial.buildings)if(p.x>b.low.x-margin&&p.x<b.high.x+margin&&p.y>b.low.y-margin&&p.y<b.high.y+margin)throw std::runtime_error("Designer road intersects a building envelope; move the road or revise the site");
-    }
+    }}
   }
   for(const auto& mask:s.influences)if(mask.kind=="avoid")for(const auto& b:w.spatial.buildings)if(overlap(b.low,b.high,mask.low,mask.high))throw std::runtime_error("Building overlaps a designer keep-out volume; move it or reduce the generation scope");
 }
@@ -496,10 +497,11 @@ inline void damage(WorldPlan& w,const Settings& input,const std::atomic<bool>* c
 }
 inline void dressing(WorldPlan& w,const Settings& input,const Preset&,const std::atomic<bool>* cancel,const Registry& registry){
   const auto& theme=registry.theme(w.theme);
+  for(const auto& [id,seed]:input.roomSeeds){bool found=false;for(const auto& b:w.spatial.buildings)for(const auto& room:b.rooms)if(room.id==id)found=true;if(!found)throw std::runtime_error("Room seed refers to a room outside the current floor plan");}
   for(const auto& building:w.spatial.buildings){
     cancelled(cancel);const auto settings=regionInput(input,building.id,4,registry);std::vector<V> occupied;
     for(const auto& room:building.rooms){
-      Random rng(subSeed(regionSeed(settings,building.id,"Dressing"),"Room",room.id));
+      auto override=settings.roomSeeds.find(room.id);Random rng(subSeed(override==settings.roomSeeds.end()?regionSeed(settings,building.id,"Dressing"):override->second,"Room",room.id));
       for(auto p:std::array<V,4>{{{room.low.x+48,room.low.y+48,room.low.z},{room.high.x-48,room.low.y+48,room.low.z},{room.low.x+48,room.high.y-48,room.low.z},{room.high.x-48,room.high.y-48,room.low.z}}}){
         const double density=influence(settings,p,"dressing",settings.dressing);if(rng.unit()>=density||influence(settings,p,"preserve",0)>0||protectedRoute(w,p,90))continue;
         if(p.x<room.low.x+32||p.x>room.high.x-32||p.y<room.low.y+32||p.y>room.high.y-32)continue;
@@ -511,13 +513,16 @@ inline void dressing(WorldPlan& w,const Settings& input,const Preset&,const std:
 }
 inline void streets(WorldPlan& w){
   for(const auto& road:w.spatial.roads){
-    const V delta=road.b-road.a;const double length=al::length(delta);if(length<1)continue;
-    wall(w,road.id,road.a,road.b,-4,0,road.width,0);
+    const auto points=roadPoints(road);size_t previous=SIZE_MAX;
+    for(size_t segment=1;segment<points.size();segment++){
+    auto a=points[segment-1],b=points[segment];const V delta=b-a;const double length=al::length(delta);if(length<1)throw std::runtime_error("Road curve contains a degenerate segment");
+    wall(w,road.id,a,b,-4,0,road.width,0);
     V side=al::unit(al::cross(delta,{0,0,1}));
     // Curbs remain below step height, with pedestrian access at every frontage.
-    for(int sign:{-1,1}){auto offset=side*(sign*(road.width*.5+12));wall(w,road.id,road.a+offset,road.b+offset,0,8,24,2);}
-    size_t previous=SIZE_MAX;int count=std::max(1,int(std::ceil(length/128)));
-    for(int i=0;i<=count;i++){size_t node=navNode(w,road.a+delta*(double(i)/count)+V{0,0,1},road.id);if(previous!=SIZE_MAX)navEdge(w,previous,node);previous=node;}
+    for(int sign:{-1,1}){auto offset=side*(sign*(road.width*.5+12));wall(w,road.id,a+offset,b+offset,0,8,24,2);}
+    int count=std::max(1,int(std::ceil(length/128)));
+    for(int i=0;i<=count;i++){size_t node=navNode(w,a+delta*(double(i)/count)+V{0,0,1},road.id);if(previous!=SIZE_MAX)navEdge(w,previous,node);previous=node;}
+    }
   }
 }
 inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<bool>* cancel){
@@ -674,6 +679,12 @@ inline Settings regenerateDetails(Settings settings,const WorldPlan& accepted,co
   // upstream recipe and every other region's original stream remain intact.
   for(int stage=3;stage<=4;stage++){auto input=deserialize(settings.frozen[stage],registry,true);input.regionSeeds[region]=seed;settings.frozen[stage]=serialize(cleanSettings(input));}
   validate(settings,registry);return settings;
+}
+inline Settings regenerateRoomDressing(Settings settings,const WorldPlan& accepted,const Registry& registry,uint64_t room,uint64_t seed){
+  bool found=false;for(const auto& b:accepted.spatial.buildings)for(const auto& r:b.rooms)if(r.id==room){if(settings.regionRecipes.count(b.id))throw std::runtime_error("Unpin the building before regenerating a room");found=true;}
+  if(!found)throw std::runtime_error("Select an existing functional room for furnishing regeneration");
+  settings=freezeThrough(settings,accepted,registry,4);settings.seed=accepted.seed;settings.candidates=1;
+  auto input=deserialize(settings.frozen[4],registry,true);input.roomSeeds[room]=seed;settings.frozen[4]=serialize(cleanSettings(input));validate(settings,registry);return settings;
 }
 inline Settings pinBuilding(Settings settings,const WorldPlan& accepted,const Registry& registry,uint64_t region){
   if(settings.regionRecipes.count(region))throw std::runtime_error("This building is already pinned");

@@ -4,6 +4,13 @@
 template<class F>static void worldEdit(F edit){
   auto& s=worldArchitect;worldAction([&]{auto next=s.settings;edit(next);wa::validate(next,s.registry);auto previous=wa::serialize(s.settings);s.settings=std::move(next);worldChanged(previous);});
 }
+static std::optional<wa::V> worldVectorInput(const char* label,wa::V value,int dimensions,const std::string& key){
+  auto& draft=worldArchitect.vectorDrafts[key];if(!draft.second)draft.first={float(value.x),float(value.y),float(value.z)};
+  if(dimensions==2)ImGui::InputFloat2(label,draft.first.data(),"%.0f");else ImGui::InputFloat3(label,draft.first.data(),"%.0f");worldRect(key);
+  // This ImGui version forbids EnterReturnsTrue on numeric scalar/vector
+  // widgets. Retain the edit draft and commit the group when editing ends.
+  bool commit=ImGui::IsItemDeactivatedAfterEdit();draft.second=ImGui::IsItemActive();if(commit)return wa::V{draft.first[0],draft.first[1],dimensions==2?value.z:draft.first[2]};return {};
+}
 static void worldCandidateComparison(){
   auto& s=worldArchitect;if(s.batch.worlds.empty())return;
   ImGui::SeparatorText("Compare validated candidates");
@@ -18,7 +25,7 @@ static void worldCandidateComparison(){
       auto* drawList=ImGui::GetWindowDrawList();drawList->AddRectFilled(pos,{pos.x+size.x,pos.y+size.y},IM_COL32(25,32,34,255));
       double scale=std::min((size.x-12)/(w.high.x-w.low.x),(size.y-12)/(w.high.y-w.low.y));
       auto point=[&](wa::V p){return ImVec2{pos.x+6+float((p.x-w.low.x)*scale),pos.y+6+float((p.y-w.low.y)*scale)};};
-      for(const auto& road:w.spatial.roads)drawList->AddLine(point(road.a),point(road.b),IM_COL32(100,104,98,255),std::max(1.f,float(road.width*scale)));
+      for(const auto& road:w.spatial.roads){auto points=wa::roadPoints(road);for(size_t n=1;n<points.size();n++)drawList->AddLine(point(points[n-1]),point(points[n]),IM_COL32(100,104,98,255),std::max(1.f,float(road.width*scale)));}
       for(const auto& b:w.spatial.buildings){drawList->AddRectFilled(point(b.low),point(b.high),IM_COL32(102,112,94,220));for(const auto& room:b.rooms)if(!room.floor)drawList->AddRect(point(room.low),point(room.high),IM_COL32(180,180,160,255));}
       for(size_t n=1;n<w.navigation.mainRoute.size();n++)drawList->AddLine(point(w.navigation.nodes[w.navigation.mainRoute[n-1]].feet),point(w.navigation.nodes[w.navigation.mainRoute[n]].feet),IM_COL32(250,190,70,255),1.5f);
       ImGui::Text("%zu brushes / %.0f route units",w.diagnostics.brushes,w.diagnostics.routeLength);
@@ -38,6 +45,18 @@ static void worldLegacyPanel(){
   ImGui::Text("Module records: %zu",report.at("convertedModules").size());
   if(worldButton("Save migration report and backup...","legacy-save"))runUiChoose((documentPath("world-architect")/("legacy-"+s.legacy->report.at("contentIdentity").get<std::string>())/"report.json").u8string(),[](const std::string& name){worldAction([&]{auto& state=worldArchitect;if(!state.legacy)throw std::runtime_error("No inspected legacy source");auto path=std::filesystem::u8path(name);path.replace_extension(".json");auto bundle=state.legacy->files;if(path.filename()!=std::filesystem::path("report.json")){auto text=bundle.at("report.json");bundle.erase("report.json");bundle[path.filename().u8string()]=std::move(text);}worldPublish(path.parent_path(),bundle);for(const auto& [relative,bytes]:bundle)if(q1Read(path.parent_path()/std::filesystem::u8path(relative))!=bytes)throw std::runtime_error("Migration bundle verification failed");state.legacySaved=true;state.message="Legacy backup and module MAPs saved and verified. Original files and map geometry were retained.";});},true);
   ImGui::BeginDisabled(!s.legacySaved||!s.legacy->seed||s.job.valid());if(worldButton("Copy suggested builder seed","legacy-seed"))worldEdit([&](auto& next){next.seed=*s.legacy->seed;});ImGui::EndDisabled();
+}
+static void worldRoomDressingPanel(){
+  auto& s=worldArchitect;auto* world=worldSelected();if(!world)return;
+  ImGui::SeparatorText("Local room furnishing");
+  std::vector<const wa::Room*> rooms;for(const auto& b:world->spatial.buildings)for(const auto& room:b.rooms)rooms.push_back(&room);
+  if(rooms.empty())return;auto current=std::find_if(rooms.begin(),rooms.end(),[&](auto r){return r->id==s.detailRoom;});if(current==rooms.end()){current=rooms.begin();s.detailRoom=(*current)->id;}
+  auto label=std::to_string(s.detailRoom)+" / "+(*current)->function;
+  if(ImGui::BeginCombo("Furnishing room",label.c_str())){for(auto r:rooms){auto name=std::to_string(r->id)+" / floor "+std::to_string(r->floor+1)+" / "+r->function;if(ImGui::Selectable(name.c_str(),r->id==s.detailRoom))s.detailRoom=r->id;worldRect("furnishing-room/"+std::to_string(r->id));}ImGui::EndCombo();}worldRect("furnishing-room");
+  ImGui::SetNextItemWidth(180*uiScale());ImGui::InputScalar("Room furnishing seed",ImGuiDataType_U64,&s.detailSeed);worldRect("room-seed");
+  ImGui::BeginDisabled(s.job.valid()||s.generated!=worldInputKey()||s.settings.regionRecipes.count(s.detailRoom/10000));
+  if(worldButton("Preview this room's furnishing","regenerate-room"))worldAction([&]{auto before=wa::serialize(s.settings);s.settings=wa::regenerateRoomDressing(s.settings,*world,s.registry,s.detailRoom,s.detailSeed);s.detailRegion=s.detailRoom/10000;worldChanged(before);worldGenerate();});ImGui::EndDisabled();
+  ImGui::TextWrapped("Keeps mission, architecture, damage and every other room unchanged. Review the preview, then Update selected building in Export. Settings Undo restores the previous room seed.");
 }
 static void worldArchitecturePanel(){
   auto& s=worldArchitect;const auto p=wa::stagePreset(s.settings,s.registry);auto before=wa::serialize(s.settings);
@@ -86,10 +105,12 @@ static void worldRoadPanel(){
     auto selected=std::find_if(world->spatial.roads.begin(),world->spatial.roads.end(),[&](const auto& r){return r.id==s.roadSelection;});if(selected==world->spatial.roads.end()){s.roadSelection=world->spatial.roads.front().id;selected=world->spatial.roads.begin();}
     auto label=std::to_string(selected->id)+" / "+selected->hierarchy;if(ImGui::BeginCombo("Road",label.c_str())){for(const auto& road:world->spatial.roads){auto text=std::to_string(road.id)+" / "+road.hierarchy;if(ImGui::Selectable(text.c_str(),road.id==s.roadSelection))s.roadSelection=road.id;}ImGui::EndCombo();}
     auto road=*selected;for(const auto& pin:s.settings.roadPins)if(pin.id==road.id)road=pin;
-    float a[]={float(road.a.x),float(road.a.y)},b[]={float(road.b.x),float(road.b.y)},width=float(road.width);bool changed=false;
-    if(ImGui::InputFloat2("Start XY",a,"%.0f",ImGuiInputTextFlags_EnterReturnsTrue)){road.a={a[0],a[1],0};changed=true;}worldRect("road-start");
-    if(ImGui::InputFloat2("End XY",b,"%.0f",ImGuiInputTextFlags_EnterReturnsTrue)){road.b={b[0],b[1],0};changed=true;}
+    float width=float(road.width);bool changed=false;
+    if(auto value=worldVectorInput("Start XY",road.a,2,"road-start")){road.a=*value;changed=true;}
+    if(auto value=worldVectorInput("End XY",road.b,2,"road-end")){road.b=*value;changed=true;}
     if(ImGui::SliderFloat("Road width",&width,48,384,"%.0f",ImGuiSliderFlags_AlwaysClamp)){road.width=width;changed=true;}worldRect("road-width");
+    bool curved=bool(road.control);if(ImGui::Checkbox("Bezier road curve",&curved)){road.control=curved?std::optional<wa::V>{(road.a+road.b)*.5}:std::nullopt;changed=true;}worldRect("road-curved");
+    if(road.control)if(auto value=worldVectorInput("Curve control XY",*road.control,2,"road-control")){road.control=*value;changed=true;}
     if(changed)worldEdit([&](auto& next){road.pinned=true;auto& pins=next.roadPins;auto found=std::find_if(pins.begin(),pins.end(),[&](const auto& p){return p.id==road.id;});if(found==pins.end())pins.push_back(road);else *found=road;});
     if(worldButton("Release road override","road-unpin"))worldEdit([&](auto& next){auto& pins=next.roadPins;pins.erase(std::remove_if(pins.begin(),pins.end(),[&](const auto& p){return p.id==s.roadSelection;}),pins.end());});
   }else ImGui::TextUnformatted("Choose a city or mixed preset for street authoring.");
@@ -104,6 +125,8 @@ static void worldInfluencePanel(bool dressing){
   if(!s.settings.influences.empty()){
     s.maskSelection=std::clamp(s.maskSelection,0,int(s.settings.influences.size()-1));const auto mask=s.settings.influences[size_t(s.maskSelection)];auto label=std::to_string(mask.id)+" / "+mask.kind;
     if(ImGui::BeginCombo("Saved fields",label.c_str())){for(size_t i=0;i<s.settings.influences.size();i++){const auto& m=s.settings.influences[i];auto name=std::to_string(m.id)+" / "+m.kind;if(ImGui::Selectable(name.c_str(),s.maskSelection==int(i)))s.maskSelection=int(i);}ImGui::EndCombo();}
+    if(auto value=worldVectorInput("Volume minimum XYZ",mask.low,3,"volume-min"))worldAction([&]{auto next=s.settings;next.influences[size_t(s.maskSelection)].low=*value;wa::validate(next,s.registry);s.settings=std::move(next);});
+    if(auto value=worldVectorInput("Volume maximum XYZ",mask.high,3,"volume-max"))worldAction([&]{auto next=s.settings;next.influences[size_t(s.maskSelection)].high=*value;wa::validate(next,s.registry);s.settings=std::move(next);});
     if(worldButton("Remove selected field","mask-remove"))s.settings.influences.erase(s.settings.influences.begin()+s.maskSelection);
   }
   ImGui::EndDisabled();worldChanged(before);

@@ -4,8 +4,8 @@ import argparse,hashlib,json,os,re,shlex,shutil,subprocess,sys,time
 from pathlib import Path
 from PIL import ImageGrab
 from editor_os_input import NativeInput,read_ui_json
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--scenarios-only',action='store_true');p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
-assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only,a.scenarios_only])<=1,'Select one focused authoring scenario'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--preset',choices=['hospital','metro','evacuation'],default='hospital');p.add_argument('--regions-only',action='store_true');p.add_argument('--pins-only',action='store_true');p.add_argument('--designer-only',action='store_true');p.add_argument('--paint-only',action='store_true');p.add_argument('--themes-only',action='store_true');p.add_argument('--scenarios-only',action='store_true');p.add_argument('--local-only',action='store_true');p.add_argument('--art-update-only',action='store_true');p.add_argument('--legacy-only',action='store_true');p.add_argument('--legacy-fixtures',type=Path);p.add_argument('--engine',type=Path);a=p.parse_args()
+assert sum([a.regions_only,a.pins_only,a.designer_only,a.paint_only,a.legacy_only,a.themes_only,a.art_update_only,a.scenarios_only,a.local_only])<=1,'Select one focused authoring scenario'
 root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);data=root/'ftebroom';state=data/'world-architect-ui-live.json';state.unlink(missing_ok=True)
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_world_architect qa\n')
@@ -86,6 +86,20 @@ try:
  check(True,'the first workspace tab click is received after actual OS activation')
  click('tab/Overview')
  before=save('wa-before');baseline=planes(before)
+ if a.local_only:
+  def local_generate():
+   click('generate');wait(lambda:live()['candidates'] and not live()['busy']);assert not live()['error'],live()['error']
+  def local_export(name):
+   click('tab/Export');dest=out/name/'world.map';click('export');choose(dest);wait(dest.exists);return dest
+  local_generate();fixture=live()['candidateSeeds'].index(1);click('candidate/'+str(fixture));wait(lambda:live()['world']['seed']==1);original=local_export('original');click('tab/Dressing');r=live()['widgets']['room-seed'];ui.click(r['x']+r['width']*.3,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text('57');ui.key('enter');click('regenerate-room');wait(lambda:live()['candidates']==1 and not live()['busy']);assert not live()['error'],live()['error'];changed=local_export('room-changed')
+  check(planes(changed)!=planes(original),'local room furnishing changes actual exported brush geometry')
+  seeds=live()['settings']['frozenStageInputs'][4]['roomSeeds'];check(len(seeds)==1 and seeds[0]['seed']==57,'room regeneration stores only the selected room seed in its frozen dressing recipe')
+  click('tab/Overview');project=out/'room.world.json';click('save-project');choose(project);wait(project.exists);click('open-project');choose(project);wait(lambda:live()['candidates']==0);local_generate();replayed=local_export('room-replayed');check(planes(replayed)==planes(changed),'room furnishing project reopens to the same actual brush geometry')
+  click('freeze');click('freeze/0');click('preset');click('preset/evacuation');local_generate();click('tab/Site & Roads');road=live()['world']['roads'][0];points=road['points'];mid=[(points[0][i]+points[-1][i])/2 for i in range(3)];click('road-curved');wait(lambda:live()['settings']['roadPins'] and live()['settings']['roadPins'][0]['control'] is not None)
+  r=live()['widgets']['road-control'];ui.click(r['x']+r['width']*.15,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(str(round(mid[0])));ui.key('enter');r=live()['widgets']['road-control'];ui.click(r['x']+r['width']*.55,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(str(round(mid[1]+32)));ui.key('enter');local_generate()
+  check(len(live()['world']['roads'][0]['points'])>2 and live()['world']['valid'],'Bezier controls generate a physically validated curved road in the actual editor');ImageGrab.grab().save(out/'world-curved-road.png')
+  click('tab/Destruction');click('mask-preserve-building');wait(lambda:len(live()['settings']['influences'])==1);r=live()['widgets']['volume-max'];old=live()['settings']['influences'][0]['high'][2];ui.click(r['x']+r['width']*.72,r['y']+r['height']/2);ui.key('a',('ctrl',));ui.text(str(round(old+64)));ui.key('enter');wait(lambda:live()['settings']['influences'][0]['high'][2]==round(old+64));check(True,'volume height editing updates the saved XYZ field rather than only the plan rectangle')
+  click('undo-settings');wait(lambda:live()['settings']['influences'][0]['high'][2]==old);check(True,'numeric volume edits undo in one settings transaction');check(planes(save('wa-local-preview'))==baseline,'local authoring and export preserve the active authored scene');print('World Architect local authoring UI:',len(checks),'checks passed',flush=True);sys.exit(0)
  if a.scenarios_only:
   from PIL import ImageStat
   records=[]

@@ -112,6 +112,21 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(planner.onboarding_host_scope(path, before, after), {'onboarding'})
         self.assertIsNone(planner.onboarding_host_scope(path, before, after.replace('drawExistingPoints', 'drawDifferentPoints')))
 
+    def test_lesson_host_scopes_reject_unrelated_changes(self):
+        for path, replacements in planner.LESSON_HOST_REPLACEMENTS.items():
+            before='\n'.join(old for old,new in replacements)+'\nordinary dispatch stays unchanged\n'
+            after=before
+            for old,new in replacements:after=after.replace(old,new)
+            expected={'viewport'} if path=='qc/ftebroom.qc' else {'onboarding'}
+            self.assertEqual(planner.lesson_host_scope(path,before,after),expected)
+            self.assertIsNone(planner.lesson_host_scope(path,before,after.replace('ordinary dispatch stays unchanged','ordinary dispatch changed')))
+
+    def test_lesson_and_splash_checks_exclude_unrelated_generators(self):
+        p=planner.plan(['native/ftebroom_tutorial.h','qc/fb_tutorial.qc','scripts/test-tutorial-linux.sh',
+                        'native/ftebroom_update.h','runtime/ui/update-splash.png','scripts/test-bsp-preview-input.py'])
+        self.assertEqual(set(p['suites']),{'onboarding','updater','viewport'})
+        self.assertFalse(p['flags']['catalog'] or p['flags']['plant_core'] or p['flags']['world_core'] or p['flags']['atlas'] or p['flags']['matrix_ui'])
+
     def test_windows_release_build_creates_its_output_when_audio_tests_are_skipped(self):
         import re
         import shlex

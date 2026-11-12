@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Lessons run in a disposable map and consume the normal editor input/tools.
-static constexpr int tourViewportStep=6,tourClipStep=7,tourToolsStep=8,tourStepCount=9;
+static constexpr int tourViewportStep=6,tourClipStep=7,tourVertexSelectStep=8,tourVertexStep=9,
+  tourMaterialStep=10,tourFaceStep=11,tourToolsStep=12,tourStepCount=13;
 static int tourStep=0,tourSavedLayout=1,tourSavedFocus=0,tourSavedMax=-1;
 static std::array<int,4> tourSavedViewTypes;
 static bool tourDemo=false,tourDemoPressed=false,tourDone=false,tourWaitingForMap=false;
@@ -13,6 +14,8 @@ static float tourCameraStart[7]{};
 static bool tourCameraBaseline=false,tourCameraMoved=false,tourCameraLooked=false;
 static ImVec2 tourSkipCenter,tourNextCenter,tourDemoStart;
 static nlohmann::json tourQaItems=nlohmann::json::object();
+static std::vector<std::string> tourAddedMaterials;
+static void tourMaterialsClear(){for(const auto& name:tourAddedMaterials)materials.erase(name);tourAddedMaterials.clear();++materialDataRevision;}
 static bool tourQaEnabled(){return cvars->GetFloat("ftebroom_skip_setup")&&cvars->GetFloat("ftebroom_followup133_qa");}
 static void tourQaItem(const std::string& name){
   if(!tourQaEnabled())return;
@@ -24,7 +27,16 @@ static void tourPrepare(int step){
   cancelGesture();cameraEnd();tourStep=step;tourDone=false;tourCameraBaseline=tourCameraMoved=tourCameraLooked=false;
   tourChangedLayout=tourClipChosen=false;tourClipDemoAction=0;
   viewSetLayout(1);viewFocusArmed=false;
-  tourStepTime=ImGui::GetTime();tourDemo=step>=1&&step<=4;tourDemoPressed=false;tourInputReady=tourStepTime+.6;
+  tourStepTime=ImGui::GetTime();tourDemo=(step>=1&&step<=4)||step==tourVertexStep||step==tourMaterialStep||step==tourFaceStep;tourDemoPressed=false;tourInputReady=tourStepTime+.6;
+  if(step==tourMaterialStep||step==tourFaceStep){
+    // The same browser and assignment path as the editor, with bundled examples
+    // that work even before the user has installed a game or a texture pack.
+    for(const char* color:{"blue","green","red"}){
+      std::string name=std::string("textures/ftebroom/qa_")+color;
+      if(!materials.count(name)){MaterialEntry entry;entry.name=name;materials.emplace(name,entry);tourAddedMaterials.push_back(name);}
+    }
+    ++materialDataRevision;
+  }
   cvars->SetFloat("ftebroom_tour_fixture_ready",0);cvars->SetFloat("ftebroom_tour_step",step);cvars->SetFloat("ftebroom_tour_result",0);cvars->SetFloat("ftebroom_tour_demo",tourDemo);
   cvars->SetFloat("ftebroom_shift",0);cvars->SetFloat("ftebroom_alt",0);
   command("ftebroom_tool_toggle default\n");cvars->SetFloat("ftebroom_tool",0);
@@ -50,6 +62,7 @@ static void tourBegin(){
 static void tourFinish(bool skipped){
   cancelGesture();cameraEnd();tourActive=false;tourDemo=false;tourWaitingForMap=false;tourOfferPending=false;
   cvars->SetFloat("ftebroom_tour_active",0);cvars->SetFloat("ftebroom_tour_demo",0);cvars->SetFloat("ftebroom_shift",0);cvars->SetFloat("ftebroom_alt",0);
+  tourMaterialsClear();
   cvars->SetFloat("ca_grid",tourSavedGrid);cvars->SetFloat("ftebroom_wheel_grid",tourSavedWheel);
   cvars->SetFloat("ftebroom_clip_keep",tourSavedClipKeep);cvars->SetFloat("ftebroom_tool",0);
   viewLayout=tourSavedLayout;viewMax=tourSavedMax;cvars->SetFloat("ftebroom_view_layout",viewLayout);
@@ -62,7 +75,7 @@ static void tourOfferPanel(){
   if(tourOfferPending){tourOfferPending=false;if(!std::filesystem::exists(documentPath("onboarding-v1.txt")))ImGui::OpenPopup("Learn ReyondBroom");}
   if(uiDialog("Learn ReyondBroom",{600,300})){
     ImGui::TextUnformatted("Learn the basics in a few minutes");
-    ImGui::TextWrapped("Practice camera movement, brush editing, the grid, viewport layouts, and Clip. You can skip the lesson at any time.");
+    ImGui::TextWrapped("Practice camera movement, brush editing, the grid, viewport layouts, Clip, Vertex, and materials. You can skip the lesson at any time.");
     if(ImGui::Button("Start onboarding")){ImGui::CloseCurrentPopup();documentRequest("__tour");}
     if(ImGui::GetWindowPos().x+ImGui::GetWindowContentRegionMax().x-ImGui::GetItemRectMax().x>=ImGui::CalcTextSize(uiTr("Skip onboarding")).x+ImGui::GetStyle().FramePadding.x*2+ImGui::GetStyle().ItemSpacing.x)ImGui::SameLine();
     if(ImGui::Button("Skip onboarding")){tourRecord("declined");ImGui::CloseCurrentPopup();}
@@ -76,7 +89,7 @@ static ImVec2 tourAnchor(float w,float h){
   return {x,y};
 }
 static void tourPointer(const char* phase,ImVec2 p){
-  char text[192];int alt=tourStep==3,shift=tourStep==4;
+  char text[192];int alt=tourStep==3,shift=tourStep==4||tourStep==tourFaceStep;
   cvars->SetFloat("ftebroom_shift",shift);cvars->SetFloat("ftebroom_alt",alt);
   std::snprintf(text,sizeof text,"ftebroom_pointer %s %.3f %.3f %d 0 %d\n",phase,p.x,p.y,alt,shift?2:0);command(text);
 }
@@ -98,6 +111,10 @@ static bool tourKey(int key,bool down,bool inScene,int hit){
     }
     return true;
   }
+  if(tourStep==tourVertexSelectStep)return true;
+  if(tourStep==tourVertexStep)return key!=mouseKeys[0]||tourDone;
+  if(tourStep==tourMaterialStep||tourStep==tourFaceStep)
+    return (key!=mouseKeys[0]&&key!=input->GetKeyCode("shift",nullptr))||tourDone;
   return tourStep==tourToolsStep;
 }
 static void tourDemoCursor(ImVec2 p,float scale,bool held,const char* key=nullptr){
@@ -118,7 +135,15 @@ static void tourDemoCursor(ImVec2 p,float scale,bool held,const char* key=nullpt
 static bool tourClipPoints(ImVec2 (&points)[2]){
   char text[160]{};cvars->GetString("ftebroom_tour_clip_pixels",text,sizeof text);
   return std::sscanf(text,"%f %f %f %f",&points[0].x,&points[0].y,&points[1].x,&points[1].y)==4&&
-    viewHit(points[0].x,points[0].y)==0&&viewHit(points[1].x,points[1].y)==0;
+    viewHit(points[0].x,points[0].y)==0&&viewHit(points[1].x,points[1].y)==0&&
+    std::hypot(points[1].x-points[0].x,points[1].y-points[0].y)>18;
+}
+static bool tourVertexPoints(ImVec2 (&points)[2]){
+  char text[160]{};cvars->GetString("ftebroom_tour_vertex_pixels",text,sizeof text);
+  return std::sscanf(text,"%f %f %f %f",&points[0].x,&points[0].y,&points[1].x,&points[1].y)==4;
+}
+static ImVec2 tourFacePoint(){
+  char text[96]{};ImVec2 p{};cvars->GetString("ftebroom_tour_face_pixel",text,sizeof text);std::sscanf(text,"%f %f",&p.x,&p.y);return p;
 }
 static void tourQaPublish(float width,float height){
   if(!tourQaEnabled())return;
@@ -127,11 +152,41 @@ static void tourQaPublish(float width,float height){
   for(int i=0;i<viewLayout;i++){
     const auto& v=viewRects[i];views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});
   }
-  ImVec2 targets[2];if(tourStep==tourClipStep&&tourClipPoints(targets))for(auto p:targets)points.push_back({p.x,p.y});
+  ImVec2 targets[2];if((tourStep==tourClipStep&&tourClipPoints(targets))||(tourStep==tourVertexStep&&tourVertexPoints(targets)))for(auto p:targets)points.push_back({p.x,p.y});
+  if(tourStep==tourMaterialStep||tourStep==tourFaceStep){auto p=tourFacePoint();points.push_back({p.x,p.y});}
   const nlohmann::json state={{"display",{width,height}},{"step",tourStep},{"ready",tourFixtureReady()&&ImGui::GetTime()>=tourInputReady},
     {"demo",tourDemo},{"done",tourDone},{"chosen",tourClipChosen},{"tool",int(cvars->GetFloat("ftebroom_tool"))},
-    {"clipPoints",int(cvars->GetFloat("ftebroom_clip_points"))},{"targets",points},{"views",views},{"widgets",tourQaItems}};
+    {"clipPoints",int(cvars->GetFloat("ftebroom_clip_points"))},{"selected",int(cvars->GetFloat("ftebroom_selection_count"))},
+    {"faces",int(cvars->GetFloat("ftebroom_face_count"))},{"result",int(cvars->GetFloat("ftebroom_tour_result"))},
+    {"bspPreview",cvars->GetFloat("ftebroom_bsp_preview")!=0},{"targets",points},{"views",views},{"widgets",tourQaItems}};
   try{bb::atomicWrite(documentPath("onboarding-live.json"),state.dump());}catch(const std::exception&){}
+}
+static void tourPracticeAfterDemo(double now,const char* tool=""){
+  command((std::string("ftebroom_tour_restore\n")+tool+"set ftebroom_shift 0\nset ftebroom_tour_result 0\nset ftebroom_tour_demo 0\n").c_str());
+  tourDemo=false;tourInputReady=now+.4;
+}
+static void tourVertexDemo(double now,float scale){
+  ImVec2 points[2];if(!tourVertexPoints(points))return;
+  float elapsed=float(now-tourStepTime),t=std::clamp((elapsed-1.4f)/1.8f,0.f,1.f);t=t*t*(3-2*t);
+  ImVec2 p{points[0].x+(points[1].x-points[0].x)*t,points[0].y+(points[1].y-points[0].y)*t};
+  if(!tourDemoPressed&&elapsed>=1.4f){tourDemoStart=points[0];tourPointer("down",tourDemoStart);tourDemoPressed=true;}
+  if(tourDemoPressed&&elapsed<3.2f)tourPointer("move",p);
+  if(elapsed>=3.2f&&tourClipDemoAction==0){tourPointer("up",p);tourClipDemoAction=1;}
+  // Keep the deformed brush visible before restoring the practice fixture.
+  if(elapsed>=4.5f)tourPracticeAfterDemo(now,"ftebroom_tool_toggle vertex\n");
+  tourDemoCursor(p,scale,elapsed>=1.4f&&elapsed<3.2f);
+}
+static void tourMaterialDemo(double now,float scale){
+  const float elapsed=float(now-tourStepTime);ImVec2 p=tourFacePoint();
+  if(elapsed>=1.f&&tourClipDemoAction==0){tourPointer("down",p);tourPointer("up",p);tourClipDemoAction=1;}
+  if(tourStep==tourMaterialStep&&elapsed>=2.f){
+    auto found=materialTestItems.find("tile/textures/ftebroom/qa_green");
+    if(found==materialTestItems.end())return;
+    const float t=std::clamp((elapsed-2.f)/1.f,0.f,1.f);p={p.x+(found->second.x-p.x)*t,p.y+(found->second.y-p.y)*t};
+    if(elapsed>=3.f&&tourClipDemoAction==1){chooseMaterial("textures/ftebroom/qa_green");tourClipDemoAction=2;}
+  }
+  if(elapsed>=4.5f)tourPracticeAfterDemo(now);
+  tourDemoCursor(p,scale,(elapsed>=1.f&&elapsed<1.3f)||(elapsed>=3.f&&elapsed<3.3f),tourStep==tourFaceStep?"Shift + click":nullptr);
 }
 static void tourClipDemo(double now,float scale){
   ImVec2 points[2];if(!tourClipPoints(points))return;
@@ -172,8 +227,8 @@ static void tourWheelIndicator(float w,float h,double now,float scale){
 static void tourPanel(float w,float h){
   const double now=ImGui::GetTime();const float scale=uiScale();
   if(tourQaEnabled())tourQaItems=nlohmann::json::object();
-  static const char* titles[]={"Fly around the scene","Create a brush","Move a brush","Move vertically","Extrude a face","Change the grid","Work with multiple viewports","Cut a brush","Explore the tools"};
-  static const char* tasks[]={"Hold the right mouse button to look around. Use WASD to move. Try both movement and looking.","Click and drag on empty ground with the left mouse button to create your own brush. Its height follows the grid.","Click the example brush to select it. Hold the left mouse button and drag it across the horizontal plane.","Hold Alt while dragging the selected brush with the left mouse button to move it up or down.","Keep the brush selected. Hold left Shift and drag a face or silhouette edge to expand it.","Hover over the scene and turn the mouse wheel to change the grid size.","Choose a layout with multiple views. Hover over a viewport and press Space to change its projection.","Select Clip on the Tools panel to watch the demonstration.","The Tools panel lives above the viewport by default. Explore its tools at your own pace after the lesson."};
+  static const char* titles[]={"Fly around the scene","Create a brush","Move a brush","Move vertically","Extrude a face","Change the grid","Work with multiple viewports","Cut a brush","Select Vertex Tool","Move a vertex","Apply a material","Select a face","Explore the tools"};
+  static const char* tasks[]={"Hold the right mouse button to look around. Use WASD to move. Try both movement and looking.","Click and drag on empty ground with the left mouse button to create your own brush. Its height follows the grid.","Click the example brush to select it. Hold the left mouse button and drag it across the horizontal plane.","Hold Alt while dragging the selected brush with the left mouse button to move it up or down.","Keep the brush selected. Hold left Shift and drag a face or silhouette edge to expand it.","Hover over the scene and turn the mouse wheel to change the grid size.","Choose a layout with multiple views. Hover over a viewport and press Space to change its projection.","Select Clip on the Tools panel to watch the demonstration.","Choose Vertex on the Tools panel, then continue to watch how to move a vertex.","Drag a corner handle with the left mouse button to change the brush shape.","Click the brush to select it, then click a texture in the Material Browser to apply it to the brush.","Hold Shift and click a brush face with the left mouse button to select only that face.","The Tools panel lives above the viewport by default. Explore its tools at your own pace after the lesson."};
   static_assert(IM_ARRAYSIZE(titles)==tourStepCount&&IM_ARRAYSIZE(tasks)==tourStepCount);
   if(tourStep==0&&tourFixtureReady()&&now>tourInputReady){char text[512]{};cvars->GetString("ftebroom_camera_state",text,sizeof text);float v[7];if(cameraParse(text,v)){
     if(!tourCameraBaseline){std::copy(v,v+7,tourCameraStart);tourCameraBaseline=true;}
@@ -183,6 +238,8 @@ static void tourPanel(float w,float h){
   if(!tourDemo&&now>tourInputReady&&tourStep>=1&&tourStep<=4)tourDone|=cvars->GetFloat("ftebroom_tour_result")==tourStep;
   if(tourStep==5&&cvars->GetFloat("ca_grid")!=tourGrid)tourDone=true;
   if(tourStep==tourClipStep&&!tourDemo&&tourClipChosen)tourDone|=cvars->GetFloat("ftebroom_tour_result")==tourClipStep;
+  if(tourStep==tourVertexSelectStep&&tourClipChosen)tourDone=cvars->GetFloat("ftebroom_tool")==7;
+  if(tourStep>=tourVertexStep&&tourStep<=tourFaceStep&&!tourDemo&&now>tourInputReady)tourDone|=cvars->GetFloat("ftebroom_tour_result")==tourStep;
   if(tourStep==tourToolsStep&&tourFixtureReady())tourDone=true;
   ImGui::SetNextWindowPos({16*scale,16*scale});ImGui::SetNextWindowSize({std::max(200.f,w-32*scale),0});
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,8*scale);
@@ -228,7 +285,17 @@ static void tourPanel(float w,float h){
       draw->AddText({p.x+7*scale,p.y+4*scale},IM_COL32_WHITE,names[pane.type]);
     }
   }
+  if(tourStep==tourMaterialStep||tourStep==tourFaceStep){
+    const float width=std::min(430*scale,w*.35f);
+    ImGui::SetNextWindowPos({w-width-16*scale,toolsY});ImGui::SetNextWindowSize({width,std::max(150.f,h-toolsY-75*scale)});
+    ImGui::Begin("Material Browser##lesson",nullptr,ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
+    ImGui::BeginDisabled(tourDemo||!tourFixtureReady()||now<tourInputReady);materialBrowser(true);ImGui::EndDisabled();
+    for(const auto& item:materialTestItems)if(item.first.rfind("tile/",0)==0)tourQaItems[item.first]={item.second.x,item.second.y};
+    ImGui::End();
+  }
   if(tourDemo&&tourFixtureReady()&&tourStep==tourClipStep)tourClipDemo(now,scale);
+  else if(tourDemo&&tourFixtureReady()&&tourStep==tourVertexStep)tourVertexDemo(now,scale);
+  else if(tourDemo&&tourFixtureReady()&&(tourStep==tourMaterialStep||tourStep==tourFaceStep))tourMaterialDemo(now,scale);
   else if(tourDemo&&tourFixtureReady()){
     float elapsed=float(now-tourStepTime);float t=std::clamp((elapsed-1.4f)/1.8f,0.f,1.f);t=t*t*(3-2*t);
     if(!tourDemoPressed)tourDemoStart=tourAnchor(w,h);
@@ -243,23 +310,24 @@ static void tourPanel(float w,float h){
     if(tourStep>=3)ImGui::GetForegroundDrawList()->AddText({p.x+20*scale,p.y+50*scale},IM_COL32_WHITE,uiTr(tourStep==3?"Alt":"Left Shift"));
   }
   if(tourStep==5&&!tourWaitingForMap)tourWheelIndicator(w,h,now,scale);
-  if(tourStep==tourClipStep||tourStep==tourToolsStep){
+  if(tourStep==tourClipStep||tourStep==tourVertexSelectStep||tourStep==tourVertexStep||tourStep==tourToolsStep){
     ImGui::SetNextWindowPos({16*scale,toolsY});ImGui::SetNextWindowSize({w-32*scale,0});
     ImGui::Begin("Tools##lesson",nullptr,ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse);
     const float size=34*scale;
     for(int tool:{0,1,2,3,7,8,9,5,6}){
       if(tool&&ImGui::GetItemRectMax().x+size+ImGui::GetStyle().ItemSpacing.x<ImGui::GetWindowPos().x+ImGui::GetWindowWidth()-ImGui::GetStyle().WindowPadding.x)ImGui::SameLine();
-      const bool clip=tourStep==tourClipStep&&tool==2;
+      const bool clip=(tourStep==tourClipStep&&tool==2)||(tourStep==tourVertexSelectStep&&tool==7);
       ImGui::BeginDisabled(!clip||tourClipChosen||!tourFixtureReady()||now<tourInputReady);
       if(clip)ImGui::PushStyleColor(ImGuiCol_Button,ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
       const bool choose=FteIcons::button(("##lessonTool"+std::to_string(tool)).c_str(),tool,{size,size});
       tourQaItem("tool/"+std::to_string(tool));
       if(clip){
         ImGui::PopStyleColor();ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(),ImGui::GetItemRectMax(),IM_COL32(241,161,70,255),5*scale,0,2*scale);
-        if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))ImGui::SetTooltip("%s",uiTr("Clip"));
+        if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))ImGui::SetTooltip("%s",uiTr(tool==2?"Clip":"Vertex"));
       }
       ImGui::EndDisabled();
       if(clip&&choose){
+        if(tool==7){tourClipChosen=true;command("ftebroom_tool_toggle vertex\n");continue;}
         tourClipChosen=tourDemo=true;tourStepTime=now;tourClipDemoAction=0;
         command("set ftebroom_clip_keep 0\nset ftebroom_tour_demo 1\nftebroom_tool_toggle clip\n");
       }
@@ -268,7 +336,7 @@ static void tourPanel(float w,float h){
   }
   ImGui::SetNextWindowPos({w*.5f,h-18*scale},ImGuiCond_Always,{.5f,1});
   ImGui::Begin("##lessonNavigation",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDocking);
-  if((tourStep>=1&&tourStep<=4)||(tourStep==tourClipStep&&tourClipChosen&&!tourDemo)){if(ImGui::Button("Watch again"))tourPrepare(tourStep);ImGui::SameLine();}
+  if((tourStep>=1&&tourStep<=4)||(tourStep==tourClipStep&&tourClipChosen&&!tourDemo)||(tourStep>=tourVertexStep&&tourStep<=tourFaceStep&&!tourDemo)){if(ImGui::Button("Watch again"))tourPrepare(tourStep);tourQaItem("replay");ImGui::SameLine();}
   ImGui::BeginDisabled(!tourDone);if(ImGui::Button(tourStep==tourToolsStep?"Start editing":"Continue")){if(tourStep==tourToolsStep)tourFinish(false);else tourPrepare(tourStep+1);}a=ImGui::GetItemRectMin();b=ImGui::GetItemRectMax();tourNextCenter={(a.x+b.x)*.5f,(a.y+b.y)*.5f};tourQaItem("next");ImGui::EndDisabled();ImGui::End();
   if(tourActive)tourQaPublish(w,h);
 }

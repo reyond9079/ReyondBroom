@@ -75,8 +75,10 @@ RULES = [
       'native/*viewport*', 'native/*camera*', 'native/*grid*',
       'native/ftebroom_resolution*', 'scripts/test-viewport-appearance.py',
       'scripts/test-engine-viewport.py', 'tests/*grid*'], {'render'}),
-    (['native/*tutorial*', 'native/*onboarding*', 'qc/fb_tutorial*.qc', 'scripts/test-editor133-input.py'], {'onboarding'}),
-    (['runtime/update-*', 'scripts/*updater*', 'tests/*updater*',
+    (['native/*tutorial*', 'native/*onboarding*', 'qc/fb_tutorial*.qc', 'scripts/test-editor133-input.py',
+      'scripts/test-tutorial-linux.sh', 'tests/tutorial*.cfg'], {'onboarding'}),
+    (['scripts/test-bsp-preview-input.py'], {'viewport'}),
+    (['runtime/update-*', 'runtime/ui/update-splash.png', 'scripts/*updater*', 'scripts/test-rb10-welcome.py', 'tests/*updater*',
       'native/ftebroom_updat*', 'native/ftebroom_welcome*'], {'updater'}),
     (['native/*theme*', 'native/*translations*', 'native/*appearance*',
       'native/*fonts*', 'runtime/fonts/**'], {'ui'}),
@@ -205,6 +207,50 @@ ONBOARDING_HOST_REPLACEMENTS = {
     ],
 }
 
+# These are exact guarded host edits. Any additional change to ordinary tool
+# dispatch or browser behavior falls back to its shared dependency checks.
+LESSON_HOST_REPLACEMENTS = {
+    'qc/csaddon.qc': [
+        ('''        if(step113==7){
+            // Points on the top face of the 96 x 96 x 64 lesson brush.
+            vector clipStart=project('16 -32 64'),clipEnd=project('16 32 64');
+            cvar_set("ftebroom_tour_clip_pixels",sprintf("%g %g %g %g",clipStart_x,clipStart_y,clipEnd_x,clipEnd_y));
+        }''', '        fb_tutorial_project();'),
+        ('\tif (ftebroom_command()) return TRUE;',
+         '    int tutorialHistory=history;\n    if(ftebroom_command()){fb_tutorial_observe(tutorialHistory);return TRUE;}'),
+    ],
+    'qc/ftebroom.qc': [
+        ('substring(argv(0),0,16)!="ftebroom_camera_" && argv(0)!="ftebroom_camera")',
+         'substring(argv(0),0,16)!="ftebroom_camera_" && argv(0)!="ftebroom_camera" && argv(0)!="ftebroom_context")'),
+    ],
+    'native/ftebroom_materials.h': [
+        ('static void materialBrowser()\n{', 'static void materialBrowser(bool lesson=false)\n{\n  materialTestItems.clear();'),
+        ('  static float propertiesHeight=std::min(448*scale,room*.55f);',
+         '  static float propertiesHeight=std::min(448*scale,room*.55f);\n  const float savedPropertiesHeight=propertiesHeight;\n  if(lesson)propertiesHeight=std::min(180*scale,room*.32f);'),
+        ('  uiInspectorTopEnd("Material browser divider",propertiesHeight);',
+         '  uiInspectorTopEnd("Material browser divider",propertiesHeight);\n  if(lesson)propertiesHeight=savedPropertiesHeight;'),
+        ('auto query=std::string(filter)', 'auto query=std::to_string(lesson)+":"+std::string(filter)'),
+        ('      !removedCollections.count(materialFolder(pair.first))',
+         '      (lesson && (pair.first=="textures/ftebroom/qa_blue"||pair.first=="textures/ftebroom/qa_green"||pair.first=="textures/ftebroom/qa_red")) ||\n      (!lesson && !removedCollections.count(materialFolder(pair.first))'),
+        ('&& dimensionsMatch(pair.first))', '&& dimensionsMatch(pair.first)))'),
+        ('        if(ImGui::InvisibleButton("tile",{float(size+6),rowHeight-caption-4}))chooseMaterial(mat.name);',
+         '        if(ImGui::InvisibleButton("tile",{float(size+6),rowHeight-caption-4}))chooseMaterial(mat.name);\n        materialTestItems["tile/"+mat.name]={(ImGui::GetItemRectMin().x+ImGui::GetItemRectMax().x)*.5f,(ImGui::GetItemRectMin().y+ImGui::GetItemRectMax().y)*.5f};'),
+    ],
+}
+
+
+def lesson_host_scope(path, before, after):
+    replacements = LESSON_HOST_REPLACEMENTS.get(path)
+    if not replacements or before == after:
+        return None
+    for old, new in replacements:
+        if before.count(old) != 1:
+            return None
+        before = before.replace(old, new)
+    if before != after:
+        return None
+    return {'viewport'} if path == 'qc/ftebroom.qc' else {'onboarding'}
+
 
 def onboarding_host_scope(path, before, after):
     replacements = ONBOARDING_HOST_REPLACEMENTS.get(path)
@@ -230,12 +276,12 @@ def onboarding_host_scope(path, before, after):
 def semantic_scopes(base, head, paths):
     result = {}
     for path in paths:
-        if path not in WORLD_HOST_ADDITIONS and path not in ONBOARDING_HOST_REPLACEMENTS:
+        if path not in WORLD_HOST_ADDITIONS and path not in ONBOARDING_HOST_REPLACEMENTS and path not in LESSON_HOST_REPLACEMENTS:
             continue
         def read(ref):
             return subprocess.check_output(['git', 'show', ref+':'+path], stderr=subprocess.PIPE).decode()
         before, after = read(base), read(head)
-        groups = world_host_scope(path, before, after) or onboarding_host_scope(path, before, after)
+        groups = world_host_scope(path, before, after) or onboarding_host_scope(path, before, after) or lesson_host_scope(path, before, after)
         if groups:
             result[path] = groups
     return result

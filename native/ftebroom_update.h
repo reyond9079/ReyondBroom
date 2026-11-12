@@ -145,7 +145,7 @@ static void updateVersionCard(){
   if(!updateAvailable.empty()){ImGui::SameLine();ImGui::TextColored(ImVec4(.42f,.78f,.58f,1.f),"  ->  %s",updateAvailable.c_str());}
   ImGui::EndChild();ImGui::Spacing();
 }
-static bool welcomeUpdatePanel(){
+static bool welcomeUpdateContent(){
   ImGui::TextUnformatted(updateCommitted?"Update ReyondBroom":"Check for updates");updateVersionCard();
   ImGui::TextWrapped("%s",updateMessage.c_str());ImGui::Spacing();
   if(updateCommitted){
@@ -179,6 +179,25 @@ static bool welcomeUpdatePanel(){
     ImGui::EndDisabled();
   }
   return false;
+}
+static bool welcomeUpdatePanel(){
+  // Keep the artwork in the update window throughout checking, downloading,
+  // verification and the restart prompt. It never covers status or controls.
+  static qhandle_t splash=0;
+  if(!splash&&std::filesystem::is_regular_file(documentPath("ui/update-splash.png")))splash=draw->LoadImage("ui/update-splash.png");
+  float width=0,height=0;
+  if(!splash||draw->ImageSize(splash,&width,&height)<=0||width<=0||height<=0)return welcomeUpdateContent();
+  bool done=false;
+  if(ImGui::BeginTable("update-splash-layout",2,ImGuiTableFlags_SizingStretchSame)){
+    ImGui::TableNextColumn();
+    const auto room=ImGui::GetContentRegionAvail();
+    const float factor=std::min(room.x/width,std::max(1.f,room.y)/height);
+    const ImVec2 size{width*factor,height*factor};
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX()+std::max(0.f,(room.x-size.x)*.5f));
+    ImGui::Image((ImTextureID)splash,size);welcomeQaItem("update/splash");
+    ImGui::TableNextColumn();done=welcomeUpdateContent();ImGui::EndTable();
+  }
+  return done;
 }
 static void updatePanel(){
   ImGui::Text("ReyondBroom %s",editorVersion().c_str());

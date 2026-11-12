@@ -4,8 +4,7 @@ The current implementation and acceptance results are described in the
 [user guide](world-architect.md) and [acceptance report](world-architect-acceptance.md).
 The user accepted the demonstrated environment style after reviewing actual
 hospital, metro and city game captures. World Architect is now the primary
-Plugins entry; AutoLevel is retained under Legacy generators. Final merge and
-packaged release validation remain outstanding until recorded in the PR.
+Plugins entry; AutoLevel is retained under Legacy generators. Final platform, merge and release outcomes are recorded in PR45.
 
 The following sections are a chronological engineering journal. Statements
 about incomplete phases describe those earlier checkpoints, not current status.
@@ -396,3 +395,26 @@ Prepared World cases now set the same desktop size as the normal Windows job.
 Fixture-source verification permits exact bytes or LF-normalized text; the
 actual Windows artifact confirmed CRLF checkout differences from Linux's Git
 blob hashes. Changed source content and compiler recipes still reject reuse.
+
+
+### Final navigation repair and complete city walkthrough
+
+`88cce47` rejects automatic proximity links whose centre has no floor support,
+using eight-unit samples while retaining deliberate short stair/landing paths.
+A controlled game reproduction proved the former diagonal could fall into a
+stair shaft despite touching the adjacent landing with the hull corner. The
+new 169-point city route traverses the side landing and completed in Ironwail
+from the real spawn with OS input and no teleport/noclip. Hospital (108) and
+metro (60) complete route evidence is retained; the earlier checkpoint attempt
+is still explicitly partial.
+
+414 final contracts passed, including the actual city long-link regression.
+All eight best candidates passed executed editable Apply/Undo again (25 checks).
+The final repeated corpus accepted 2400 batches / 9600 attempts / 63 candidate
+rejections with no empty batch and 24 BSP/light builds across three formats.
+Independent old/new generator binaries produced byte-identical MAPs for 48
+fixed inputs, isolating the navigation repair from geometry/export. The first
+corpus pipeline began before the additional city regression was added; final
+414-contract evidence is independent and current. Complete measurements,
+source hashes, actual game receipts and screenshots are linked in the
+[acceptance report](world-architect-acceptance.md).

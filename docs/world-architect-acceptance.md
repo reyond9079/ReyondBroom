@@ -1,6 +1,6 @@
 # World Architect acceptance evidence
 
-This report supplements the [user guide](world-architect.md) and [RB-7 specification](specs/RB-7-world-architect-spec.md). Production geometry and navigation were frozen at `049be4c`; the subsequent promotion changes menu placement, window labels and documentation. Merge and release acceptance are recorded separately in PR45.
+This report supplements the [user guide](world-architect.md) and [RB-7 specification](specs/RB-7-world-architect-spec.md). Architecture/export were validated at `049be4c`; `88cce47` additionally repairs automatic navigation across stair-shaft corners. Independent old/new binaries produced byte-identical MAP output for 48 fixed preset/seed/profile inputs. Menu promotion preserves the explicit legacy route. Merge and release acceptance are recorded separately in PR45.
 
 ## Final generation and compiler corpus
 
@@ -8,28 +8,35 @@ The final post-repair corpus accepted **2400 batches / 9600 candidate attempts**
 
 Every preset produced 100 distinct room/architecture fingerprints. Urban presets also produced 100 distinct massing and road fingerprints; hospital, metro and mall intentionally retain their scenario envelope while varying interiors. Mission fingerprints vary across 80–92 of the 100 seeds, depending on preset. These measurements describe structural changes, not texture-only differences.
 
-The full pipeline took 1312.93 seconds, including fixture compilation, deterministic replay, validation and all representative BSP/light builds. Peak process-tree RSS was 741456 KiB and includes compilers. These are measurements from this Linux development container, not a universal performance promise. Quake 1 sample results:
+The profile pipelines took 605.01 seconds (Quake 1) and 1037.55 seconds (Quake III/FTE), running concurrently with actual editor/game QA. These clocks include fixture compilation, deterministic replay, validation and representative BSP/light builds. A standalone final-core evacuation/seed1 sample took 0.179 seconds and 9668 KiB peak RSS, excluding the editor, GL and compilers. These are development-container measurements, not a universal runtime promise. The earlier complete pipeline's compiler-inclusive memory/wall-clock baseline is retained in the JSON evidence. Quake 1 sample results:
 
 | Preset | Brush range | Mean MAP MiB | Mean generation ms | Sample BSP/light s |
 | --- | ---: | ---: | ---: | ---: |
-| checkpoint | 791–1137 | 1.36 | 135.2 | 2.66 |
-| courtyard | 771–1110 | 1.28 | 117.0 | 1.34 |
-| evacuation | 722–1164 | 1.20 | 97.7 | 1.76 |
-| factory | 982–1256 | 1.49 | 127.8 | 3.52 |
-| hospital | 965–1089 | 1.30 | 98.7 | 1.59 |
-| mall | 669–748 | 0.91 | 65.4 | 1.00 |
-| metro | 496–556 | 0.67 | 49.1 | 0.57 |
-| overpass | 789–1222 | 1.32 | 116.8 | 1.39 |
+| checkpoint | 791–1137 | 1.36 | 151.9 | 3.36 |
+| courtyard | 771–1110 | 1.28 | 169.7 | 1.86 |
+| evacuation | 722–1164 | 1.20 | 115.5 | 3.32 |
+| factory | 982–1256 | 1.49 | 171.8 | 4.65 |
+| hospital | 965–1089 | 1.30 | 104.1 | 2.06 |
+| mall | 669–748 | 0.91 | 75.0 | 1.86 |
+| metro | 496–556 | 0.67 | 57.7 | 0.68 |
+| overpass | 789–1222 | 1.32 | 167.8 | 2.36 |
 
 [Machine-readable measurements and capture provenance](world-architect-acceptance/measurements.json) include the other formats and detailed distributions. The pipeline uses asynchronous stages, cancellation, bounded candidate search and input-aware prefix caching.
 
 ## Real editor and game checks
 
-410 core contracts passed. Actual SDL editor checks include all eight presets applied as editable owned geometry and undone in one transaction (25 checks), six scenario previews and candidate comparisons (20), modes/counts/patterns/volumes (20), road sketch/curve/room furnishing/field editing (9), and stair-light export/Apply/Undo (8). Earlier focused runs also cover regional replacement, pins, migration, authored modules, physical gates and save/reopen; their checkpoint details remain in the engineering journal.
+414 final core contracts passed. Actual SDL editor checks include all eight presets applied as editable owned geometry and undone in one transaction (25 checks), six scenario previews and candidate comparisons (20), modes/counts/patterns/volumes (20), road sketch/curve/room furnishing/field editing (9), and stair-light export/Apply/Undo (8). Earlier focused runs also cover regional replacement, pins, migration, authored modules, physical gates and save/reopen; their checkpoint details remain in the engineering journal.
 
 A seven-face rubble brush was rejected by the editor despite compiler acceptance: a bevel passed 0.027 units from a corner, below engine clipping/merge tolerances. Construction now keeps a robust corner margin. The original and corrected brushes were imported independently, and every preset subsequently passed real Apply/Undo. The shared editor geometry validator was not weakened.
 
-Actual Ironwail 0.8.2 OS-input walkthroughs completed all 108 hospital and 60 metro waypoints without teleport or noclip. Checkpoint and city evidence initially remained partial: the automated controller stopped short of a stair landing or a waypoint threshold. Those attempts are not represented as complete route passes. The entire required route still passes independent collision/support/hull validation; further game evidence is recorded separately if completed. Controlled physical-door checks confirm blocked-before-activation and passage-after-activation. Their setup used setpos, then explicitly disabled noclip before collision tests.
+Actual Ironwail 0.8.2 OS-input walkthroughs completed all 108 hospital, 60 metro and 169 repaired city-route waypoints without teleport or noclip. The city used the current compiled Quake 1 geometry and the corrected navigation route from its real spawn to the mission destination. Checkpoint's earlier controller attempt remains partial and is not claimed as a full route pass.
+
+The original city walk exposed an unsafe diagonal after a stair flight. A controlled exact-position reproduction confirmed a real navigation defect: full-radius hull support could touch the adjacent landing while the player's centre was over the shaft. Automatically added proximity links now require centre support at eight-unit intervals; deliberate staircase links retain step/hull support. An adversarial support case and the real city's long-link regression pass. The corrected actual game walk passes the formerly failing landing and reaches the destination. All eight best candidates again passed real editable Apply/Undo (25 checks).
+
+Controlled physical-door checks confirm blocked-before-activation and passage-after-activation. Their setup used setpos, then explicitly disabled noclip before collision tests; they are separate from the complete no-teleport walks.
+
+[Repaired upper landing](world-architect-acceptance/city-landing-after-fix.png) · [City mission destination](world-architect-acceptance/city-destination.png). These two new captures are whole desktop frames with unchanged game pixels.
+
 
 The user reviewed real hospital, metro and city captures inline and replied **«Принимаю текущий стиль»** on 2026-11-12. This records visual-style acceptance; it does not claim a complete human walkthrough. Captures preserve game pixels; only blank desktop margins were removed. Hospital highlights remain bright in the demonstrated style.
 

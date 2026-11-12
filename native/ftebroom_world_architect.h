@@ -24,10 +24,12 @@ struct WorldArchitectState {
   std::future<wa::CandidateBatch> job;std::shared_ptr<WorldArchitectWork> work;
   std::shared_ptr<wa::PrefixCache> prefixCache=std::make_shared<wa::PrefixCache>();
   wa::CandidateBatch batch;std::string generated,pendingKey,error,message,request;
+  std::string project,requestMode,requestRegion;uint64_t detailRegion=0,detailSeed=1;
   double requestAt=0;std::filesystem::path requestPath;
   std::vector<wa::Json> undo,redo;
   std::map<std::string,std::string> pendingShaders;std::map<std::string,qhandle_t> materialHandles;
   wa::Json widgets=wa::Json::object();
+  wa::Json inputTrace=wa::Json::array();
 } worldArchitect;
 static bool worldArchitectFocused(){
   if(!worldArchitect.open||!ImGui::GetCurrentContext())return false;
@@ -39,22 +41,34 @@ static void worldRect(const std::string& key){if(!worldArchitect.qa)return;auto 
 static bool worldButton(const char* label,const char* key){bool clicked=ImGui::Button(label);worldRect(key);return clicked;}
 template<class F>static void worldAction(F action){try{action();}catch(const std::exception& e){worldArchitect.error=e.what();}}
 static wa::WorldPlan* worldSelected(){auto& s=worldArchitect;return s.selected>=0&&size_t(s.selected)<s.batch.worlds.size()?&s.batch.worlds[s.selected]:nullptr;}
+static std::string worldIdentity(){
+#ifdef _WIN32
+  const uint64_t process=GetCurrentProcessId();
+#else
+  const uint64_t process=uint64_t(getpid());
+#endif
+  static uint64_t next=wa::mix(process^uint64_t(std::chrono::steady_clock::now().time_since_epoch().count()));return std::to_string(++next);
+}
 static void worldRegistry(){
-  auto& s=worldArchitect;if(!s.registry.presets.empty())return;size_t size=0;auto raw=static_cast<char*>(files->LoadFile("world-architect/registry.json",&size));
+  auto& s=worldArchitect;if(s.project.empty())s.project="wa-"+worldIdentity();if(!s.registry.presets.empty())return;size_t size=0;auto raw=static_cast<char*>(files->LoadFile("world-architect/registry.json",&size));
   if(!raw)throw std::runtime_error("World Architect registry is missing from the editor package");std::string bytes(raw,size);core->Free(raw);if(size>1024*1024)throw std::runtime_error("World Architect registry exceeds 1 MiB");s.registrySource=wa::Json::parse(bytes);s.registry=wa::readRegistry(s.registrySource);s.settings.preset=s.registry.presets.front().id;for(const auto& preset:s.registry.presets)if(preset.id=="hospital")s.settings.preset=preset.id;s.settings.profile=gameProfile;s.error.clear();
 }
 static std::string worldInputKey(){return wa::serialize(worldArchitect.settings).dump()+worldArchitect.registrySource.dump();}
-static wa::Json worldProject(){auto& s=worldArchitect;auto json=wa::serialize(s.settings);json["registry"]=s.registrySource;if(auto world=worldSelected();world&&s.generated==worldInputKey()){json["selectedCandidateSeed"]=world->seed;json["diagnostics"]=wa::diagnostics(*world);}return json;}
+static wa::Json worldProject(){auto& s=worldArchitect;auto json=wa::serialize(s.settings);json["registry"]=s.registrySource;json["projectId"]=s.project;if(auto world=worldSelected();world&&s.generated==worldInputKey()){json["selectedCandidateSeed"]=world->seed;json["diagnostics"]=wa::diagnostics(*world);}return json;}
 static void worldLoadProject(const std::string& name){
-  if(worldArchitect.job.valid())throw std::runtime_error("Wait for generation to finish before opening a project");
+  if(worldArchitect.job.valid()||!worldArchitect.request.empty())throw std::runtime_error("Wait for generation and map insertion to finish before opening a project");
   auto path=std::filesystem::u8path(name);if(std::filesystem::file_size(path)>1024*1024)throw std::runtime_error("World project exceeds 1 MiB");
   const auto json=wa::Json::parse(q1Read(path));auto& s=worldArchitect;auto registry=json.contains("registry")?wa::readRegistry(json.at("registry")):s.registry;auto settings=wa::deserialize(json,registry);
-  s.registry=std::move(registry);if(json.contains("registry"))s.registrySource=json.at("registry");s.settings=std::move(settings);s.desiredSeed=json.contains("selectedCandidateSeed")?std::optional<uint64_t>{json.at("selectedCandidateSeed").get<uint64_t>()}:std::nullopt;s.batch={};s.undo.clear();s.redo.clear();s.selected=0;s.generated.clear();s.error.clear();s.message="Project loaded with its preset snapshot. Generate to restore its saved candidate.";
+  auto project=json.value("projectId","wa-"+worldIdentity());wa::safeToken(project);if(project.size()>64)throw std::runtime_error("Project identity exceeds its ownership budget");auto desired=json.contains("selectedCandidateSeed")?std::optional<uint64_t>{json.at("selectedCandidateSeed").get<uint64_t>()}:std::nullopt;
+  s.project=project;s.registry=std::move(registry);if(json.contains("registry"))s.registrySource=json.at("registry");s.settings=std::move(settings);s.desiredSeed=desired;s.batch={};s.undo.clear();s.redo.clear();s.selected=0;s.generated.clear();s.error.clear();s.message="Project loaded with its preset snapshot. Generate to restore its saved candidate.";
 }
 static void worldRelease(){auto& s=worldArchitect;if(!s.owner)return;s.owner=false;cvars->SetFloat("ftebroom_bb_active",0);cvars->SetFloat("ftebroom_modelviewer_open",0);cvars->SetFloat("ftebroom_modeleditor_active",0);cvars->SetFloat("ftebroom_modeleditor_freecamera",0);if(auto api=bbAPI())api->clear();}
 static void worldClaim(){
   if(modelEditorActive&&modelEditDirty)throw std::runtime_error("Export and close the edited model before taking the shared world preview.");
   if(modelConverterPending||modelImportJob.valid())throw std::runtime_error("Wait for model import / export to finish before taking the shared world preview.");
+  // Regeneration does not change preview ownership. Re-entering the model
+  // camera/menu focus path here can disturb an SDL2 mouse button transition.
+  if(worldArchitect.owner&&!bbActive&&!modelViewerOpen&&!modelEditorActive&&!plantState.owner){worldArchitect.dirty=true;worldArchitect.error.clear();return;}
   bbLeave([]{
     if(!worldArchitect.open)return;
     bbRegister();bbActive=false;modelViewerOpen=false;modelEditorActive=false;modelEditorCameraEnd();plantState.owner=false;cvars->SetFloat("ftebroom_plant_active",0);
@@ -82,37 +96,33 @@ static void worldPublish(const std::filesystem::path& root,const std::map<std::s
 static void worldExport(std::filesystem::path target){
   auto& s=worldArchitect;auto* selected=worldSelected();if(!selected||!selected->diagnostics.valid)throw std::runtime_error("Generate and select a valid candidate first");if(s.generated!=worldInputKey())throw std::runtime_error("Settings changed; regenerate before export");target.replace_extension(".map");
   const auto palette=gameProfile==2?q1Palette():ftebroom::defaultQuakePalette();auto bundle=wa::assetBundle(*selected,s.registry,palette);
-  bundle[target.filename().u8string()]=wa::withWad(selected->map,*selected,"world-architect-"+selected->theme+".wad");
+  bundle[target.filename().u8string()]=wa::withWad(wa::groupedMap(*selected,s.project),*selected,"world-architect-"+selected->theme+".wad");
   bundle[target.stem().u8string()+".world.json"]=worldProject().dump(2);
   worldPublish(target.parent_path(),bundle);s.message="Exported MAP, editable project and original texture assets.";
 }
-static void worldApply(){
+static void worldApply(bool replace=false,std::optional<uint64_t> region={}){
   auto& s=worldArchitect;auto* selected=worldSelected();
   if(!selected||!selected->diagnostics.valid||s.job.valid()||!s.request.empty())throw std::runtime_error("Select a validated current candidate before Apply");
   if(s.generated!=worldInputKey())throw std::runtime_error("Settings changed; regenerate before Apply");
   if(modEmbedded||documentTerrain||selected->profile!=gameProfile)throw std::runtime_error("Open a brush map with the candidate's game profile before Apply");
+  auto importMap=wa::groupedMap(*selected,s.project,region);s.error.clear();
   const auto palette=gameProfile==2?q1Palette():ftebroom::defaultQuakePalette();auto bundle=wa::assetBundle(*selected,s.registry,palette);
   placementPublish(bundle);
   if(gameWad()){
     auto wad=documentPath("world-architect-"+selected->theme+".wad").u8string();std::string list=gameProfile==4?hlWads:q1Wads;
     if(list.find(wad)==list.npos){if(!list.empty())list+='\n';list+=wad;if(list.size()>=sizeof q1Wads)throw std::runtime_error("Configured WAD list is full");std::snprintf(gameProfile==4?hlWads:q1Wads,sizeof q1Wads,"%s",list.c_str());q1FindWads(true);}
   }
-#ifdef _WIN32
-  const uint64_t process=GetCurrentProcessId();
-#else
-  const uint64_t process=uint64_t(getpid());
-#endif
-  static uint64_t next=wa::mix(process^uint64_t(std::chrono::steady_clock::now().time_since_epoch().count()));
-  do{s.request=std::to_string(++next);}while(std::filesystem::exists(documentPath("data/wa-import-"+s.request+".map")));
+  do{s.request=worldIdentity();}while(std::filesystem::exists(documentPath("data/wa-import-"+s.request+".map")));
+s.requestMode=replace?"replace":"add";s.requestRegion=region?std::to_string(*region):"all";
 s.requestAt=ImGui::GetTime();s.requestPath=documentPath("data/wa-import-"+s.request+".map");
   qhandle_t file;
   if(files->Open(("data/wa-import-"+s.request+".map").c_str(),&file,2)<0){s.request.clear();throw std::runtime_error("Cannot stage World Architect MAP");}
-  int written=files->Write(file,selected->map.data(),int(selected->map.size()));files->Close(file);
-  if(written!=int(selected->map.size())){s.request.clear();throw std::runtime_error("Incomplete World Architect MAP staging");}
+  int written=files->Write(file,importMap.data(),int(importMap.size()));files->Close(file);
+  if(written!=int(importMap.size())){s.request.clear();throw std::runtime_error("Incomplete World Architect MAP staging");}
   cvars->SetString("ftebroom_world_apply_ack","");cvars->SetString("ftebroom_world_apply_status","pending");
   s.pendingShaders=selected->profile<2?wa::shaderDefinitions(*selected):std::map<std::string,std::string>{};
   command(("ftebroom_world_architect materials "+s.request+"\n").c_str());
-  command(("ftebroom_world_apply "+s.request+" "+std::to_string(int(cvars->GetFloat("ftebroom_map_instance")))+" "+std::to_string(gameProfile)+"\n").c_str());
+  command(("ftebroom_world_apply "+s.request+" "+std::to_string(int(cvars->GetFloat("ftebroom_map_instance")))+" "+std::to_string(gameProfile)+" "+s.project+" "+s.requestRegion+" "+s.requestMode+"\n").c_str());
   s.message="Apply queued; waiting for the map transaction acknowledgment.";
 }
 static void worldTick(){
@@ -123,7 +133,11 @@ static void worldTick(){
   if(!s.request.empty()){
     char ack[128]={},status[128]={};cvars->GetString("ftebroom_world_apply_ack",ack,sizeof ack);cvars->GetString("ftebroom_world_apply_status",status,sizeof status);
     if(s.request==ack||ImGui::GetTime()-s.requestAt>20){
-      if(s.request==ack&&std::string(status)=="ok")s.message="World inserted. One map Undo removes the complete operation.";
+      if(s.request==ack&&std::string(status)=="ok")s.message=s.requestMode=="replace"?"Generated regions updated. One map Undo restores their previous contents.":"World inserted. One map Undo removes the complete operation.";
+      else if(s.request==ack&&std::string(status)=="modified")s.error="A generated region has manual edits or no ownership baseline. Nothing was replaced; keep it or export the preview.";
+      else if(s.request==ack&&std::string(status)=="locked")s.error="A generated region is hidden or locked. Nothing was replaced.";
+      else if(s.request==ack&&std::string(status)=="exists")s.error="This project's regions are already on the map. Use Update instead of adding a duplicate.";
+      else if(s.request==ack&&std::string(status)=="structure-changed")s.error="The preview has different architecture. Update the complete project first, or reopen its applied project before updating building details.";
       else s.error=s.request==ack?std::string("Apply was rejected: ")+status:"Apply acknowledgment timed out; inspect the map before retrying.";
       s.request.clear();std::error_code ec;std::filesystem::remove(s.requestPath,ec);
     }
@@ -187,8 +201,16 @@ static void worldPlanCanvas(bool roads){
 }
 static void worldQa(){
   auto& s=worldArchitect;if(!s.qa)return;if(runUiBrowseOpen)for(auto it=runUiBrowseRects.begin();it!=runUiBrowseRects.end();++it)s.widgets[it.key()]=it.value();
+  auto& io=ImGui::GetIO();auto& context=*ImGui::GetCurrentContext();static bool previousDown=false;
+  if(io.MouseDown[0]!=previousDown||ImGui::IsMouseClicked(0)||ImGui::IsMouseReleased(0)){
+    s.inputTrace.push_back({{"frame",ImGui::GetFrameCount()},{"down",io.MouseDown[0]},{"clicked",ImGui::IsMouseClicked(0)},{"released",ImGui::IsMouseReleased(0)},{"pos",{io.MousePos.x,io.MousePos.y}},{"capture",io.WantCaptureMouse},{"focusLost",io.AppFocusLost},{"active",context.ActiveId},{"nav",context.NavWindow?context.NavWindow->Name:""},{"hover",context.HoveredWindow?context.HoveredWindow->Name:""},{"tab",s.tab}});
+    if(s.inputTrace.size()>128)s.inputTrace.erase(s.inputTrace.begin());previousDown=io.MouseDown[0];
+  }
   char applyAck[128]={},applyStatus[128]={};cvars->GetString("ftebroom_world_apply_ack",applyAck,sizeof applyAck);cvars->GetString("ftebroom_world_apply_status",applyStatus,sizeof applyStatus);
   wa::Json j={{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"applyAck",applyAck},{"applyStatus",applyStatus},{"mapEpoch",int(cvars->GetFloat("ftebroom_map_instance"))},{"open",s.open},{"busy",s.job.valid()},{"settings",wa::serialize(s.settings)},{"widgets",s.widgets},{"error",s.error},{"message",s.message},{"selected",s.selected},{"request",s.request},{"candidates",s.batch.worlds.size()}};
+  j["projectId"]=s.project;j["detailRegion"]=s.detailRegion;
+  j["inputTrace"]=s.inputTrace;
+  j["candidateSeeds"]=wa::Json::array();for(const auto& world:s.batch.worlds)j["candidateSeeds"].push_back(world.seed);
   if(auto world=worldSelected())j["world"]=wa::diagnostics(*world);worldAction([&]{bb::atomicWrite(documentPath("world-architect-ui-live.json"),j.dump());});
 }
 static void worldPanel(){
@@ -234,12 +256,25 @@ static void worldPanel(){
           if(worldButton("Save editable project...","save-project"))runUiChoose((documentPath("world-architect")/"project.world.json").u8string(),[](const std::string& name){auto path=std::filesystem::u8path(name);std::filesystem::create_directories(path.parent_path());bb::atomicWrite(path,worldProject().dump(2));},true);
           if(worldButton("Open project...","open-project"))runUiChoose(documentPath("world-architect").u8string(),worldLoadProject);
           ImGui::TextWrapped("Legacy AutoLevel settings and maps are preserved. This preview does not overwrite or silently migrate them.");
+          if(auto world=worldSelected()){
+            if(std::none_of(world->spatial.buildings.begin(),world->spatial.buildings.end(),[&](const auto& b){return b.id==s.detailRegion;}))s.detailRegion=world->spatial.buildings.front().id;
+            ImGui::SeparatorText("Building details");ImGui::BeginDisabled(s.job.valid());
+            ImGui::SetNextItemWidth(260*uiScale());const auto& current=*std::find_if(world->spatial.buildings.begin(),world->spatial.buildings.end(),[&](const auto& b){return b.id==s.detailRegion;});
+            auto label=current.archetype+" / "+std::to_string(current.floors)+" floors / "+std::to_string(current.rooms.size())+" rooms";
+            bool buildingsOpen=ImGui::BeginCombo("Building",label.c_str());worldRect("detail-building");if(buildingsOpen){for(size_t i=0;i<world->spatial.buildings.size();i++){const auto& b=world->spatial.buildings[i];auto text="Building "+std::to_string(i+1)+" / "+b.archetype;if(ImGui::Selectable(text.c_str(),s.detailRegion==b.id))s.detailRegion=b.id;worldRect("detail-building/"+std::to_string(b.id));}ImGui::EndCombo();}
+            ImGui::SetNextItemWidth(180*uiScale());ImGui::InputScalar("Detail seed",ImGuiDataType_U64,&s.detailSeed);worldRect("detail-seed");
+            ImGui::BeginDisabled(s.generated!=worldInputKey());if(worldButton("Preview selected building details","regenerate-region"))worldAction([&]{auto previous=wa::serialize(s.settings);s.settings=wa::regenerateDetails(s.settings,*world,s.registry,s.detailRegion,s.detailSeed);worldChanged(previous);worldGenerate();});ImGui::EndDisabled();ImGui::EndDisabled();
+            ImGui::TextWrapped("This keeps the selected candidate's architecture and every other region's detail streams. Review the preview, then update only the selected building in Export.");
+          }
         }
         if(tab==4){
-          ImGui::BeginDisabled(!worldSelected()||s.job.valid());
+          ImGui::BeginDisabled(!worldSelected()||s.job.valid()||!s.request.empty());
           if(worldButton("Export MAP and original assets...","export"))runUiChoose((documentPath("world-architect")/"world.map").u8string(),[](const std::string& path){worldExport(std::filesystem::u8path(path));},true);
-          if(worldButton("Apply to current map","apply"))worldAction(worldApply);ImGui::EndDisabled();
+          if(worldButton("Apply to current map","apply"))worldAction([]{worldApply();});
+          if(worldButton("Update this project's regions","update-world"))worldAction([]{worldApply(true);});
+          ImGui::BeginDisabled(!s.detailRegion);if(worldButton("Update selected building only","update-region"))worldAction([&]{worldApply(true,s.detailRegion);});ImGui::EndDisabled();ImGui::EndDisabled();
           ImGui::TextWrapped("Apply adds editable brush geometry at its generated coordinates in one Undo transaction. Existing authored map content is retained. Preview and candidate generation do not change the map.");
+          ImGui::TextWrapped("Update replaces only this project's tracked regions. Hidden, locked or manually edited regions are preserved and report an error instead. Each update is one Undo/Redo transaction.");
         }
         ImGui::EndChild();ImGui::EndTabItem();
       }ImGui::EndTabBar();
@@ -248,7 +283,7 @@ static void worldPanel(){
     if(!s.generated.empty()&&s.generated!=worldInputKey())ImGui::TextUnformatted("Settings changed: regenerate to apply them to a candidate.");
   }ImGui::End();if(!s.open){if(s.work&&s.job.valid())s.work->cancel=true;worldRelease();}worldQa();
 }
-static void worldOpen(){worldAction([]{worldRegistry();worldArchitect.open=true;worldArchitect.focusRequest=true;});}
+static void worldOpen(){worldAction([]{worldRegistry();if(!worldArchitect.open)input->SetMenuFocus(qtrue,"",0,0,1);worldArchitect.open=true;worldArchitect.focusRequest=true;});}
 static void QDECL worldCommand(){
   char operation[64]={};commands->Argv(1,operation,sizeof operation);
   if(std::string(operation)=="materials"){
@@ -257,7 +292,7 @@ static void QDECL worldCommand(){
       auto handle=draw->LoadImageShader(name.c_str(),body.c_str());if(!handle){std::error_code ec;std::filesystem::remove(s.requestPath,ec);throw std::runtime_error("Material registration failed; generated map was not applied");}s.materialHandles[name]=handle;
     }s.pendingShaders.clear();});return;
   }
-  worldAction([]{worldRegistry();auto& s=worldArchitect;s.open=true;s.focusRequest=true;char action[256]={};commands->Argv(1,action,sizeof action);if(std::string(action)=="qa")s.qa=true;else if(std::string(action)=="generate")worldGenerate();else if(*action){s.registry.preset(action);s.settings.preset=action;worldGenerate();}});
+  worldAction([]{worldRegistry();auto& s=worldArchitect;if(!s.open)input->SetMenuFocus(qtrue,"",0,0,1);s.open=true;s.focusRequest=true;char action[256]={};commands->Argv(1,action,sizeof action);if(std::string(action)=="qa")s.qa=true;else if(std::string(action)=="generate")worldGenerate();else if(*action){s.registry.preset(action);s.settings.preset=action;worldGenerate();}});
 }
 #ifdef FTEBROOM_WORLD_RESTORE_NEAR
 #pragma pop_macro("near")

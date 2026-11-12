@@ -45,7 +45,8 @@ struct Room {uint64_t id=0;V low,high,entry;std::string function;int floor=0;boo
 struct Building {uint64_t id=0;V low,high;int floors=1;std::string archetype;bool pinned=false;std::vector<Room> rooms;double hall=72;bool atrium=false,parallel=false;std::vector<double> bays;};
 struct SpatialGraph {std::vector<Road> roads;std::vector<Lot> lots;std::vector<Building> buildings;};
 struct ArchitectureElement {uint64_t region=0;std::string kind;al::Brush brush;};
-struct ArchitecturePlan {std::vector<ArchitectureElement> elements;std::vector<al::PointEntity> entities;};
+struct ArchitectureEntity {uint64_t region=0;al::PointEntity entity;};
+struct ArchitecturePlan {std::vector<ArchitectureElement> elements;std::vector<ArchitectureEntity> entities;};
 struct DamageZone {uint64_t region=0;V origin;double radius=128,intensity=.4;std::string cause="blast";};
 struct DamageField {std::vector<DamageZone> zones;};
 struct AssetPlacement {uint64_t region=0;std::string rule,provenance="original procedural brush kit";V position;};
@@ -79,7 +80,7 @@ struct WorldPlan {
   V low,high;std::map<std::string,uint64_t> seeds;
   MissionGraph mission;SpatialGraph spatial;ArchitecturePlan architecture;
   DamageField damage;std::vector<AssetPlacement> assets;NavigationGraph navigation;Diagnostics diagnostics;
-  std::string map;
+  std::string map,architectureKey;
   std::array<std::shared_ptr<const Settings>,7> stageInputs;
 };
 struct ProfileCapability {const char* name;bool sky,patches,models,shaders;const char* spawn;double coordinateLimit;};

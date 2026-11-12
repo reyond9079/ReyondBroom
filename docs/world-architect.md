@@ -41,6 +41,28 @@ candidate never exempts new collision requirements.
 of map Undo/Redo. Changing configuration makes the old candidate stale; regenerate
 before export or Apply.
 
+## Regenerate a building's details
+
+Apply a selected candidate once. In **Project → Building details**, choose a
+building and detail seed, then click **Preview selected building details**.
+The mission, site and architecture recipes stay frozen; only that building's
+Damage/Dressing streams change. Other buildings retain their original streams.
+Review the candidate and use **Export → Update selected building only**.
+
+Generated regions have separate owned groups. Updating retains the group's
+identity and authored parent/layer; other groups and worldspawn stay intact.
+Hidden, locked or manually changed contents are rejected before replacement.
+Snapshots inside the MAP retain ownership across save/reopen without requiring
+external baseline files. Comparison allows reconstruction error at engine float
+precision (normally 1/1024 unit; eight float ULPs at large coordinates), while
+entity properties, materials, contents and topology must still match. This is
+not a force-overwrite operation. One map Undo/Redo covers the replacement.
+
+**Update this project's regions** replaces the complete tracked world, including
+added/removed regions. **Apply** adds a new project; trying to add the same
+project again is rejected. A project from a different preset/site cannot replace
+one building of an incompatible architecture; update the complete world instead.
+
 ## Files, profiles and troubleshooting
 
 - Export writes the MAP, `.world.json`, original TGA/WAD assets, shader definitions

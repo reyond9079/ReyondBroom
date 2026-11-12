@@ -1,4 +1,5 @@
 int fb_clip_q3_export;
+int fb_world_importing;
 // SPDX-License-Identifier: GPL-2.0-or-later
 string fb_clip_vec(vector p) {return sprintf("%.9g %.9g %.9g",p_x,p_y,p_z);}
 string fb_clip_face(brushface_t *face,int contents)
@@ -154,7 +155,7 @@ int fb_clip_insert(vector delta)
     for(int i=0;i<fb_map_count;i++) if(fb_map_items[i].kind==FB_NODE_ENTITY) {
         fb_map_item_t *item=&fb_map_items[i];
         if(fb_clip_field(item->fields,"classname")=="worldspawn") {models[i]=destination;continue;}
-        int id=terrain_edit(TEREDIT_ENT_ADD,"");entities[i]=id;
+        int id=fb_world_importing?fb_tx_empty_entity():(int)terrain_edit(TEREDIT_ENT_ADD,"");entities[i]=id;
         fb_tx_entity_set(id,item->fields,HIST_ENTITY);
         string oldIdentity=fb_clip_field(item->fields,"_tb_id");
         if(oldIdentity!="") {identities[i]=nextId++;fb_tx_set_key(id,"_tb_id",itos(identities[i]),HIST_TREE);}

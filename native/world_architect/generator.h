@@ -105,6 +105,19 @@ inline void site(WorldPlan& w,const Settings& s,const Preset& preset){
   const double totalW=cols*(preset.width*factor+256)+(cols+1)*street,totalD=rows*(preset.depth*factor+256)+(rows+1)*street;
   struct Parcel {V low,high;};std::vector<Parcel> parcels;
   if(interior)parcels.push_back({{-preset.width*factor/2-128,-preset.depth*factor/2-128,0},{preset.width*factor/2+128,preset.depth*factor/2+128,0}});
+  else if(preset.roadPattern=="radial"){
+    // Cardinal parcels face a real central gathering space. Connector streets
+    // follow parcel boundaries instead of crossing inaccessible building shells.
+    double hub=std::max(preset.width*factor,preset.depth*factor)/2+192,setback=street/2+72;
+    double halfW=preset.width*factor/2+setback,halfD=preset.depth*factor/2+setback;
+    for(int i=0;i<count;i++){V center=i==0?V{hub+halfW,0,0}:i==1?V{-hub-halfW,0,0}:i==2?V{0,hub+halfD,0}:V{0,-hub-halfD,0};parcels.push_back({center-V{halfW,halfD,0},center+V{halfW,halfD,0}});}
+    uint64_t id=1000;auto connect=[&](V a,V b){if(al::length(a-b)>1)w.spatial.roads.push_back({id++,a,b,street,"radial connector",false});};
+    for(size_t i=0;i<parcels.size();i++){const auto& parcel=parcels[i];double y=(parcel.low.y+parcel.high.y)/2;
+      if(!i)connect({0,0,0},{parcel.low.x,y,0});
+      else if(i==1){connect({0,0,0},{parcel.high.x,y,0});connect({parcel.high.x,y,0},parcel.high);connect(parcel.high,{parcel.low.x,parcel.high.y,0});connect({parcel.low.x,parcel.high.y,0},{parcel.low.x,y,0});}
+      else{connect({0,0,0},{parcel.low.x,0,0});connect({parcel.low.x,0,0},{parcel.low.x,y,0});}
+    }
+  }
   else{
     // Recursive binary parcel subdivision produces real T junctions and unequal
     // frontage/depth. Roads are the partition boundaries, not lines painted
@@ -144,10 +157,15 @@ inline void site(WorldPlan& w,const Settings& s,const Preset& preset){
   if(interior){w.low={-preset.width*factor/2-160,-preset.depth*factor/2-160,-64};w.high={-w.low.x,-w.low.y,high+256};if(preset.ruinEvent=="collapsed-stair"){w.low.x-=192;w.high.x+=192;}}
   else{
     w.low={-totalW/2-street/2,-totalD/2-street/2,-64};w.high={totalW/2+street/2,totalD/2+street/2,high+384};
+    if(preset.roadPattern=="radial"){w.low={-street,-street,-64};w.high={street,street,high+384};for(const auto& parcel:parcels){w.low.x=std::min(w.low.x,parcel.low.x-street);w.low.y=std::min(w.low.y,parcel.low.y-street);w.high.x=std::max(w.high.x,parcel.high.x+street);w.high.y=std::max(w.high.y,parcel.high.y+street);}}
+    if(preset.roadPattern=="organic"||preset.roadPattern=="hybrid")for(auto& road:w.spatial.roads)if(road.id<2000&&(preset.roadPattern=="organic"||road.hierarchy=="local")){
+      auto side=al::unit(al::cross(road.b-road.a,{0,0,1}));road.control=(road.a+road.b)*.5+side*rng.between(street*.12,street*.24);
+    }
+
     for(const auto& pin:s.roadPins){bool found=false;for(auto& road:w.spatial.roads)if(road.id==pin.id){road=pin;found=true;}if(!found)w.spatial.roads.push_back(pin);}
   }
   for(int a=0;a<3;a++)if(std::max(std::abs(w.low[a]),std::abs(w.high[a]))>capability(s.profile).coordinateLimit)throw std::runtime_error("World exceeds the selected classic BSP profile bounds; reduce scale or choose FTE / Quake III");
-  for(const auto& road:s.roadPins){
+  for(const auto& road:w.spatial.roads){
     if(interior)throw std::runtime_error("Road authoring requires a city or mixed site");
     double margin=road.width/2+12;const auto points=roadPoints(road);
     for(size_t segment=1;segment<points.size();segment++){auto a=points[segment-1],b=points[segment];int samples=std::max(1,int(std::ceil(al::length(b-a)/16)));
@@ -179,7 +197,12 @@ inline void floorplan(WorldPlan& w,const Settings& s,const Preset& preset){
       Room room;room.id=b.id*10000+floor*100+side*pairs+i;room.low={x0+8,y0+8,floor*256.};room.high={x1-8,y1-8,floor*256.+240};room.floor=floor;room.entry={(x0+x1)/2,side?y0:y1,floor*256.+1};
       if(preset.scenario=="mall"&&side&&!floor){room.high.y-=112;if(room.high.y-room.low.y<96)throw std::runtime_error("Mall service corridor needs a deeper room envelope; increase depth or scale");}
       const auto& functions=preset.roomFunctions;
-      room.function=functions[(floor*pairs*2+side*pairs+i)%functions.size()];b.rooms.push_back(room);
+      room.function=functions[(floor*pairs*2+side*pairs+i)%functions.size()];
+      // Functional suspended ceilings vary independently from the structural
+      // floor pitch. Public halls retain full height; service/occupied rooms
+      // have legal, seeded headroom rather than identical cubic cells.
+      if(room.function!="production"&&room.function!="retail"&&room.function!="food-court"&&room.function!="anchor-store")room.high.z=room.low.z+192+8*rng.integer(0,5);
+      b.rooms.push_back(room);
       if(preset.scenario=="courtyard"&&!floor&&!side&&!i)b.rooms.back().function="garage";
     }
   }
@@ -330,6 +353,7 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
       auto& room=b.rooms.at(size_t(floor*roomPairs*2+side*roomPairs+i));
       double y0=side?cy+hall:low.y,y1=side?room.high.y+8:cy-hall,inner=side?y0:y1;
       if(i)wall(w,b.id,{x0,y0,0},{x0,y1,0},z,z+240,12,1);
+      if(room.high.z<z+240)box(w,b.id,"functional suspended ceiling",{room.low.x,room.low.y,room.high.z},{room.high.x,room.high.y,z+240},2);
       double halfDoor=std::min((x1-x0-32)/2,room.mission?56.:40.);
       if(halfDoor<s.player.radius+8)throw std::runtime_error("Functional room door does not clear the configured player hull");
       wall(w,b.id,{x0,inner,0},{x1,inner,0},z,z+240,12,1,{{door-x0-halfDoor,door-x0+halfDoor,z,z+112}});
@@ -338,7 +362,7 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
       navEdge(w,laneLeft[side],corridor);navEdge(w,corridor,laneRight[side]);navEdge(w,corridor,entry);navEdge(w,entry,center);
       // Lighting follows the room function, with warmer public spaces and
       // cooler service rooms. No game-specific enemy/entity vocabulary.
-      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(room.low.y+room.high.y)/2,z+192})},{"light",preset.archetype=="station"?"280":"320"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 320";w.architecture.entities.push_back({b.id,light});
+      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(room.low.y+room.high.y)/2,std::min(z+192,room.high.z-32)})},{"light",preset.archetype=="station"?"280":"320"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 320";w.architecture.entities.push_back({b.id,light});
     }
     // Rectangular room partitions end before the stairwell; a service lobby
     // and a pair of columns distinguish the larger terminal spatial beat.
@@ -775,7 +799,7 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
   };
   stage(0,[&](const auto& input){w.mission=mission(input,stagePreset(input,registry));validateMission(w.mission);});
   stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);scenarioSite(w,input,p);floorplan(w,input,p);scenarioMission(w,p);reservePlanning(w,input);});
-  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);scenarioArchitecture(w,local,p,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}realizeGates(w,input,registry);std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);for(const auto& e:w.architecture.brushEntities)structure+=writeBrushEntity(e);w.architectureKey=std::to_string(hash(structure));});
+  stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);if(stagePreset(input,registry).roadPattern=="radial"&&!w.spatial.roads.empty()){double radius=std::min(240.,stagePreset(input,registry).width*input.scale*.12);std::vector<V> polygon;for(int i=0;i<8;i++){double angle=i*3.141592653589793/4;polygon.push_back({radius*std::cos(angle),radius*std::sin(angle),0});}addBrush(w,900,"radial gathering plaza",prism(polygon,-4,0,material(w,2)));}for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);scenarioArchitecture(w,local,p,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}realizeGates(w,input,registry);std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);for(const auto& e:w.architecture.brushEntities)structure+=writeBrushEntity(e);w.architectureKey=std::to_string(hash(structure));});
   stage(3,[&](const auto& input){damage(w,input,cancel,registry);});
   stage(4,[&](const auto& input){dressing(w,input,stagePreset(input,registry),cancel,registry);});
   stage(5,[&](const auto& input){navigation(w,input,cancel);});

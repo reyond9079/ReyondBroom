@@ -70,7 +70,7 @@ struct Preset {
   Scope scope=Scope::Interior;int floors=2,rooms=6,blocks=2;
   double width=1408,depth=832,street=192,damage=.4;
   double hallHalfWidth=72;std::vector<std::string> roomFunctions{"public","service","storage"};
-  std::string ruinEvent,scenario;
+  std::string ruinEvent,scenario,roadPattern="grid";
   Experience experience;
 };
 struct ArtTheme {std::string id,grammar="plain";std::array<std::array<unsigned char,3>,6> colors;double weathering=0,baySpacing=192;std::array<double,3> lightColor{1,.85,.7};};
@@ -97,7 +97,7 @@ inline std::vector<AuthoredModule> readModulePack(const Json& j){
   return result;
 }
 struct Settings {
-  uint64_t seed=1;std::string preset="hospital",gateMode="auto",experienceMode="preset";int profile=2,candidates=4;
+  uint64_t seed=1;std::string preset="hospital",gateMode="auto",experienceMode="preset",roadPattern;int profile=2,candidates=4,missionBeats=0,optionalBranches=-1,missionLoops=-1;
   double scale=1,damage=.4,dressing=.5,targetRoute=2500;Player player;
   std::array<bool,7> locked{};
   std::array<Json,5> frozen;uint64_t frozenRegistry=0;
@@ -160,6 +160,7 @@ inline Registry readRegistry(const Json& j){
     p.hallHalfWidth=item.value("hallHalfWidth",(p.layout=="atrium"||p.layout=="ring"||p.layout=="parallel")?128.:72.);finite(p.hallHalfWidth,64,224,"Gallery / corridor half-width must be 64..224");
     p.roomFunctions=item.value("roomFunctions",p.roomFunctions);if(p.roomFunctions.empty()||p.roomFunctions.size()>24)throw std::runtime_error("A room program needs 1..24 named functions");for(const auto& function:p.roomFunctions)safeToken(function);
     p.ruinEvent=item.value("ruinEvent",std::string{});if(!p.ruinEvent.empty()&&p.ruinEvent!="collapsed-stair"&&p.ruinEvent!="flooded-platform")throw std::runtime_error("Unsupported structural ruin event");
+    p.roadPattern=item.value("roadPattern",std::string("grid"));if(p.roadPattern!="grid"&&p.roadPattern!="organic"&&p.roadPattern!="hybrid"&&p.roadPattern!="radial")throw std::runtime_error("Unknown road pattern");
     p.scenario=item.value("scenario",std::string{});if(!p.scenario.empty()&&p.scenario!="checkpoint"&&p.scenario!="factory"&&p.scenario!="courtyard"&&p.scenario!="overpass"&&p.scenario!="mall"&&p.scenario!="evacuation")throw std::runtime_error("Unknown authored scenario kit");
     if(!ids.insert("preset/"+p.id).second)throw std::runtime_error("Duplicate preset");
     auto scope=item.at("scope").get<int>();finite(scope,0,3,"Invalid scope");p.scope=Scope(scope);
@@ -185,6 +186,11 @@ inline Preset stagePreset(const Settings& s,const Registry& registry){
   if(s.experienceMode=="adventure"){p.experience.beats=10;p.experience.branches=1;p.experience.loops=1;}
   if(s.experienceMode=="hub"||s.experienceMode=="arena"){p.experience.beats=s.experienceMode=="hub"?6:5;p.experience.branches=3;p.experience.loops=3;p.layout="ring";p.hallHalfWidth=std::max(128.,p.hallHalfWidth);}
 
+  if(s.missionBeats){finite(s.missionBeats,5,12,"Mission beats must be 5..12");p.experience.beats=s.missionBeats;}
+  finite(s.optionalBranches,-1,4,"Optional branches must be 0..4 or inherit");finite(s.missionLoops,-1,4,"Mission loops must be 0..4 or inherit");
+  if(s.optionalBranches>=0)p.experience.branches=s.optionalBranches;if(s.missionLoops>=0)p.experience.loops=s.missionLoops;
+  if(!s.roadPattern.empty())p.roadPattern=s.roadPattern;
+  if(p.roadPattern!="grid"&&p.roadPattern!="organic"&&p.roadPattern!="hybrid"&&p.roadPattern!="radial")throw std::runtime_error("Unknown road pattern");
   if(!s.layout.empty()){
     if(s.layout!="spine"&&s.layout!="ring"&&s.layout!="atrium"&&s.layout!="parallel"&&s.layout!="courtyard"&&s.layout!="offset"&&s.layout!="branched")throw std::runtime_error("Unknown designer layout grammar");p.layout=s.layout;
   }
@@ -240,7 +246,7 @@ inline void validate(const Settings& s,const Registry& r,bool recipe=false){
   ids.clear();for(const auto& mask:s.influences){if(!mask.id||!ids.insert(mask.id).second)throw std::runtime_error("Duplicate planning volume ID");for(int a=0;a<3;a++){finite(mask.low[a],-30000,30000,"Invalid influence bounds");finite(mask.high[a],-30000,30000,"Invalid influence bounds");if(mask.high[a]<=mask.low[a])throw std::runtime_error("Inverted influence bounds");}finite(mask.strength,0,1,"Invalid influence strength");if(mask.kind!="preserve"&&mask.kind!="avoid"&&mask.kind!="damage"&&mask.kind!="dressing"&&mask.kind!="must-pass"&&mask.kind!="vertical-link"&&mask.kind!="no-generation")throw std::runtime_error("Unknown influence type");}
 }
 inline Json serialize(const Settings& s){
-  Json j={{"schemaVersion",schemaVersion},{"worldSeed",s.seed},{"presetId",s.preset},{"profileId",s.profile},{"gateRealization",s.gateMode},{"experienceMode",s.experienceMode},{"targetRoute",s.targetRoute},{"candidates",s.candidates},{"scale",s.scale},{"damage",s.damage},{"dressing",s.dressing},{"player",{{"radius",s.player.radius},{"height",s.player.height},{"step",s.player.step}}},{"stageLocks",s.locked},{"frozenStageInputs",s.frozen},{"frozenRegistry",s.frozenRegistry},{"qualityWeights",s.weights},{"pinnedRegions",s.pinnedRegions}};
+  Json j={{"schemaVersion",schemaVersion},{"worldSeed",s.seed},{"presetId",s.preset},{"profileId",s.profile},{"gateRealization",s.gateMode},{"experienceMode",s.experienceMode},{"roadPattern",s.roadPattern},{"targetRoute",s.targetRoute},{"missionBeats",s.missionBeats},{"optionalBranches",s.optionalBranches},{"missionLoops",s.missionLoops},{"candidates",s.candidates},{"scale",s.scale},{"damage",s.damage},{"dressing",s.dressing},{"player",{{"radius",s.player.radius},{"height",s.player.height},{"step",s.player.step}}},{"stageLocks",s.locked},{"frozenStageInputs",s.frozen},{"frozenRegistry",s.frozenRegistry},{"qualityWeights",s.weights},{"pinnedRegions",s.pinnedRegions}};
   j["missionPins"]=Json::array();for(const auto& p:s.missionPins)j["missionPins"].push_back({{"id",p.id},{"position",vector(p.position)}});
   j["roadPins"]=Json::array();for(const auto& p:s.roadPins)j["roadPins"].push_back({{"id",p.id},{"a",vector(p.a)},{"b",vector(p.b)},{"width",p.width},{"control",p.control?vector(*p.control):Json(nullptr)}});
   j["authoredModules"]=Json::array();for(const auto& module:s.modules)j["authoredModules"].push_back(moduleJson(module));j["roomModules"]=Json::array();for(const auto& [room,module]:s.roomModules)j["roomModules"].push_back({{"room",room},{"module",module}});
@@ -253,7 +259,7 @@ inline Json serialize(const Settings& s){
 }
 inline Settings deserialize(const Json& j,const Registry& r,bool recipe){
   if(j.at("schemaVersion")!=schemaVersion)throw std::runtime_error("Unsupported World Architect project version");Settings s;
-  s.seed=j.at("worldSeed");s.preset=j.at("presetId");s.profile=j.at("profileId");s.gateMode=j.value("gateRealization",std::string("auto"));s.experienceMode=j.value("experienceMode",std::string("preset"));s.targetRoute=j.value("targetRoute",2500.);s.candidates=j.at("candidates");s.scale=j.at("scale");s.damage=j.at("damage");s.dressing=j.at("dressing");
+  s.seed=j.at("worldSeed");s.preset=j.at("presetId");s.profile=j.at("profileId");s.gateMode=j.value("gateRealization",std::string("auto"));s.experienceMode=j.value("experienceMode",std::string("preset"));s.roadPattern=j.value("roadPattern",std::string{});s.targetRoute=j.value("targetRoute",2500.);s.missionBeats=j.value("missionBeats",0);s.optionalBranches=j.value("optionalBranches",-1);s.missionLoops=j.value("missionLoops",-1);s.candidates=j.at("candidates");s.scale=j.at("scale");s.damage=j.at("damage");s.dressing=j.at("dressing");
   const auto& p=j.at("player");s.player={p.at("radius"),p.at("height"),p.at("step")};s.locked=j.at("stageLocks").get<std::array<bool,7>>();s.weights=j.at("qualityWeights").get<std::map<std::string,double>>();s.pinnedRegions=j.value("pinnedRegions",std::vector<uint64_t>{});
   if(j.contains("frozenStageInputs"))s.frozen=j.at("frozenStageInputs").get<std::array<Json,5>>();s.frozenRegistry=j.value("frozenRegistry",uint64_t(0));
   for(const auto& p:j.at("missionPins")){MissionNode n;n.id=p.at("id");n.position=vector(p.at("position"));n.pinned=true;s.missionPins.push_back(n);}
@@ -273,7 +279,7 @@ inline Settings deserialize(const Json& j,const Registry& r,bool recipe){
 }
 inline MissionGraph mission(const Settings& settings,const Preset& preset){
   MissionGraph graph;Random rng(subSeed(settings.seed,"Mission"));
-  int count=preset.experience.beats+rng.integer(0,2);
+  int count=preset.experience.beats+(settings.missionBeats?0:rng.integer(0,2));
   for(int i=0;i<count;i++){
     Role role=i==0?Role::Start:i==1?Role::Introduction:i==count-1?Role::Exit:i==count-2?Role::Landmark:i==count/2?Role::Reveal:Role::Challenge;
     MissionNode n;n.id=uint64_t(i+1);n.role=role;n.name=roleName(role);graph.nodes.push_back(n);

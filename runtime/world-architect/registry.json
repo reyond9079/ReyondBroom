@@ -286,7 +286,8 @@
         "service"
       ],
       "hallHalfWidth": 72,
-      "scenario": "checkpoint"
+      "scenario": "checkpoint",
+      "roadPattern": "organic"
     },
     {
       "id": "hospital",
@@ -315,7 +316,8 @@
         "staff"
       ],
       "hallHalfWidth": 128,
-      "ruinEvent": "collapsed-stair"
+      "ruinEvent": "collapsed-stair",
+      "roadPattern": "grid"
     },
     {
       "id": "metro",
@@ -344,7 +346,8 @@
         "service-tunnel"
       ],
       "hallHalfWidth": 128,
-      "ruinEvent": "flooded-platform"
+      "ruinEvent": "flooded-platform",
+      "roadPattern": "grid"
     },
     {
       "id": "factory",
@@ -373,7 +376,8 @@
         "maintenance"
       ],
       "hallHalfWidth": 128,
-      "scenario": "factory"
+      "scenario": "factory",
+      "roadPattern": "organic"
     },
     {
       "id": "courtyard",
@@ -402,7 +406,8 @@
         "stair-lobby"
       ],
       "hallHalfWidth": 72,
-      "scenario": "courtyard"
+      "scenario": "courtyard",
+      "roadPattern": "hybrid"
     },
     {
       "id": "overpass",
@@ -429,7 +434,8 @@
         "maintenance"
       ],
       "hallHalfWidth": 72,
-      "scenario": "overpass"
+      "scenario": "overpass",
+      "roadPattern": "hybrid"
     },
     {
       "id": "mall",
@@ -458,7 +464,8 @@
         "retail"
       ],
       "hallHalfWidth": 192,
-      "scenario": "mall"
+      "scenario": "mall",
+      "roadPattern": "grid"
     },
     {
       "id": "evacuation",
@@ -487,7 +494,8 @@
         "utility"
       ],
       "hallHalfWidth": 72,
-      "scenario": "evacuation"
+      "scenario": "evacuation",
+      "roadPattern": "radial"
     }
   ]
 }

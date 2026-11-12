@@ -76,3 +76,13 @@ rooms, galleries and stairs do not fit. Such a candidate is rejected and is
 never applied to the authored map. Run `scripts/test-world-architect.py` with
 the modified registry and inspect actual editor/compiled output before shipping
 an extension as a finished preset.
+
+`roadPattern` optionally selects `grid`, `organic`, `hybrid` or `radial`.
+Omitted values retain Grid behavior for existing registry snapshots. Patterns
+change actual road sweeps and parcel arrangements, with the same envelope and
+bounds constraints used for manually drawn roads. Radial parcels have a shared
+octagonal plaza. Experience modes and explicit beat/branch/shortcut overrides
+are saved per project; the registry remains the default program. Functional
+rooms can have seeded suspended ceilings at 192..232 usable units, independently
+of the 256-unit structural floor pitch; larger public/production spaces retain
+full height. Lights and authored-module fit tests use the actual room envelope.

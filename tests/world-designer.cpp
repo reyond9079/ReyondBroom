@@ -6,7 +6,7 @@
 using namespace ftebroom::worldArchitect;
 int main(int argc,char** argv)try{
   if(argc!=3)throw std::runtime_error("registry.json output-directory");Json json;std::ifstream(argv[1])>>json;auto registry=readRegistry(json);std::filesystem::path output=argv[2];Json results=Json::array();
-  for(int profile:{2,0,1})for(const auto& name:{"interior","roads","sky-seal"}){
+  for(int profile:{2,0,1})for(const auto& name:{"interior","roads","sky-seal","organic","hybrid","radial","planning"}){
     if(std::string(name)=="sky-seal"&&profile!=2)continue;
     Settings settings;settings.profile=profile;settings.candidates=1;
     if(std::string(name)=="interior"){
@@ -15,6 +15,10 @@ int main(int argc,char** argv)try{
       const auto& room=b.rooms.back();MissionNode pin;pin.id=initial.mission.nodes[2].id;pin.position={(room.low.x+room.high.x)/2,(room.low.y+room.high.y)/2,room.low.z+1};settings.missionPins.push_back(pin);
     }else if(std::string(name)=="roads"){
       settings.preset="evacuation";auto initial=generate(settings,registry);auto road=initial.spatial.roads.front();road.width=128;road.control=(road.a+road.b)*.5+V{0,32,0};road.pinned=true;settings.roadPins.push_back(road);
+    }else if(std::string(name)=="organic"||std::string(name)=="hybrid"||std::string(name)=="radial"){
+      settings.preset="evacuation";settings.roadPattern=name;
+    }else if(std::string(name)=="planning"){
+      auto initial=generate(settings,registry);const auto& b=initial.spatial.buildings[0];const auto& room=b.rooms.back();settings.influences.push_back({1,room.low+V{40,40,0},room.high-V{40,40,0},"must-pass",1});settings.influences.push_back({2,b.low-V{200,200,0},V{b.high.x+200,b.high.y+200,256},"vertical-link",1});
     }else{
       settings.preset="metro";settings.seed=9949357162622361994ULL;
     }

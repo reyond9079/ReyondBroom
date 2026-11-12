@@ -77,6 +77,7 @@ try:
   check('FTEBROOM_TUTORIAL_FAIL' not in logs(),f'onboarding stage {step} loads only its target fixture'+(' on replay' if previous else ''))
   time.sleep(.3);ui.settle()
   ImageGrab.grab().save(out/f'onboarding-stage-{step}.png')
+ ui.console('set ca_grid 128')
  ui.console('ftebroom_test_desktop rb10tourstage 6')
  wait(lambda:lesson_live()['step']==6 and lesson_live()['ready'] and len(lesson_live()['views'])==1)
  ui.move(860,500);ui.key('space')

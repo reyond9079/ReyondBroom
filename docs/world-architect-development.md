@@ -418,3 +418,15 @@ corpus pipeline began before the additional city regression was added; final
 414-contract evidence is independent and current. Complete measurements,
 source hashes, actual game receipts and screenshots are linked in the
 [acceptance report](world-architect-acceptance.md).
+
+
+### Windows source preservation fixture
+
+The final full Windows run reached authored modules after the previous World
+scenarios passed. Artifact inspection proved exported MAP bytes equal the
+actual JSON payload; only the separately written C++ text fixture had acquired
+32 CRLF bytes. The UI assertion now checks the actual input payload directly,
+without relaxing byte preservation. A prepared `finish` continuation runs only
+modules and the still-unexecuted single placement case on identical binaries.
+There is no production or compiler-recipe change. Final source/package and
+continuation outcomes are recorded in PR45.

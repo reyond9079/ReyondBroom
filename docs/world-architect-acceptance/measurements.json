@@ -1010,7 +1010,13 @@
     "production": 43171833201,
     "preparedWindowsLocal": 43176652194,
     "preparedWindowsRemaining": 43177426103,
-    "repairedSource": 43181102872
+    "repairedSource": 43181102872,
+    "windowsFullRun88": {
+      "run": 43181102872,
+      "status": "Stopped at a test-fixture-only byte comparison after preceding World scenarios passed",
+      "actualExport": "Byte-identical to imported JSON map payload; separate C++ text fixture had CRLF bytes on Windows",
+      "continuation": "Prepared matching Windows binaries; run only corrected authored-module UI and the remaining placement integration; final result linked from PR45"
+    }
   },
   "promotionEvidence": {
     "native": {
@@ -1634,5 +1640,14 @@
       }
     ]
   },
-  "finalContracts": 414
+  "finalContracts": 414,
+  "windowsModulePayloadProof": {
+    "payloadBytes": 3820,
+    "fixtureBytes": 3852,
+    "exportedBytes": 3820,
+    "exportMatchesActualJsonPayload": true,
+    "fixtureDiffersOnlyByCRLF": true,
+    "payloadSha256": "b1cfc755ffec853d676929ba1b8f9382c50339fcd35d2fd5c85ecd47c383d73c",
+    "exportSha256": "b1cfc755ffec853d676929ba1b8f9382c50339fcd35d2fd5c85ecd47c383d73c"
+  }
 }

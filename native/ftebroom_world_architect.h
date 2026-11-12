@@ -292,6 +292,9 @@ static void worldPanel(){
         if(tab==0){
           ImGui::Text("Project profile: %s / active map: %s",wa::capability(s.settings.profile).name,wa::capability(gameProfile).name);
           if(s.settings.profile!=gameProfile&&worldButton("Retarget to the active game profile","retarget")){auto previous=wa::serialize(s.settings);s.settings.profile=gameProfile;worldChanged(previous);}
+          auto modeBefore=wa::serialize(s.settings);ImGui::BeginDisabled(s.job.valid()||wa::lockedThrough(s.settings)>=0||!s.settings.pinnedRegions.empty()||s.settings.authoredMission.has_value());
+          ImGui::SetNextItemWidth(180*uiScale());bool modeOpen=ImGui::BeginCombo("Experience",s.settings.experienceMode.c_str());worldRect("experience-mode");if(modeOpen){for(const char* mode:{"preset","exploration","adventure","hub","arena"}){if(ImGui::Selectable(mode,s.settings.experienceMode==mode)){s.settings.experienceMode=mode;s.settings.weights=wa::experienceWeights(mode);}worldRect(std::string("experience-mode/")+mode);}ImGui::EndCombo();}ImGui::EndDisabled();
+          ImGui::SetNextItemWidth(220*uiScale());float targetRoute=float(s.settings.targetRoute);if(ImGui::SliderFloat("Target route (units)",&targetRoute,512,20000,"%.0f",ImGuiSliderFlags_AlwaysClamp))s.settings.targetRoute=targetRoute;worldRect("target-route");worldChanged(modeBefore);
           if(worldButton("Save editable project...","save-project"))runUiChoose((documentPath("world-architect")/"project.world.json").u8string(),[](const std::string& name){auto path=std::filesystem::u8path(name);std::filesystem::create_directories(path.parent_path());bb::atomicWrite(path,worldProject().dump(2));},true);
           if(worldButton("Open project...","open-project"))runUiChoose(documentPath("world-architect").u8string(),worldLoadProject);
           ImGui::TextWrapped("Legacy AutoLevel settings and maps are preserved. This preview does not overwrite or silently migrate them.");

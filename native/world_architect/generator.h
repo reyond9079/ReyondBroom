@@ -270,6 +270,7 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
   const auto& splits=b.bays;const int roomPairs=int(splits.size())-1;const double roomEnd=splits.back();
   const double voidX0=low.x+144,voidX1=roomEnd-128,voidY0=cy-hall+64,voidY1=cy+hall-64;
   const bool openCourt=b.atrium&&voidX1-voidX0>160;
+  const bool roofAccess=b.id==w.spatial.buildings.front().id&&(preset.scenario=="checkpoint"||preset.scenario=="courtyard");
   std::vector<size_t> halls;
   for(int floor=0;floor<b.floors;floor++){
     cancelled(cancel);double z=floor*256.;
@@ -337,14 +338,14 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
       navEdge(w,laneLeft[side],corridor);navEdge(w,corridor,laneRight[side]);navEdge(w,corridor,entry);navEdge(w,entry,center);
       // Lighting follows the room function, with warmer public spaces and
       // cooler service rooms. No game-specific enemy/entity vocabulary.
-      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(room.low.y+room.high.y)/2,z+192})},{"light",preset.archetype=="station"?"180":"240"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 240";w.architecture.entities.push_back({b.id,light});
+      al::PointEntity light;light.fields={{"classname","light"},{"origin",vectorText({door,(room.low.y+room.high.y)/2,z+192})},{"light",preset.archetype=="station"?"280":"320"},{"_color",side?"0.72 0.83 1":"1 0.82 0.59"}};if(s.profile==4)light.fields["_light"]="255 220 180 320";w.architecture.entities.push_back({b.id,light});
     }
     // Rectangular room partitions end before the stairwell; a service lobby
     // and a pair of columns distinguish the larger terminal spatial beat.
     wall(w,b.id,{roomEnd,low.y,0},{roomEnd,cy-hall,0},z,z+240,12,1);
     wall(w,b.id,{roomEnd,cy+hall,0},{roomEnd,high.y,0},z,z+240,12,1);
     for(int side:{-1,1})box(w,b.id,"structural column",{stairX-18,cy+side*(hall+24)-12,z},{stairX+2,cy+side*(hall+24)+12,z+240},2);
-    if(floor+1<b.floors){
+    if(floor+1<b.floors||roofAccess){
       if(!floor&&collapsed){
         // The missing central flight is visible geometry, not a fake blocked
         // graph edge. Its upper floors are reached by the exterior fire stair.
@@ -377,7 +378,14 @@ inline void building(WorldPlan& w,const Settings& s,const Preset& preset,Buildin
     }
   }
   // A roof with a retained frame. Later damage may open it to the sealed sky.
-  if(openCourt){
+  if(roofAccess){
+    box(w,b.id,"roof access slab",{low.x-16,low.y-16,high.z-16},{stairX,high.y+16,high.z},2);
+    box(w,b.id,"roof access side landing",{stairX,low.y-16,high.z-16},{high.x+16,cy-80,high.z},2);
+    box(w,b.id,"roof access side landing",{stairX,cy+80,high.z-16},{high.x+16,high.y+16,high.z},2);
+    box(w,b.id,"roof access end landing",{high.x-48,cy-80,high.z-16},{high.x+16,cy+80,high.z},2);
+    for(int side:{-1,1})box(w,b.id,"roof stairwell guard",{stairX,cy+side*80-3,high.z+36},{high.x-80,cy+side*80+3,high.z+44},3);
+    size_t previous=SIZE_MAX;int count=std::max(1,int(std::ceil((stairX-40-low.x-64)/192)));for(int i=0;i<=count;i++){auto n=navNode(w,{low.x+64+(stairX-40-low.x-64)*double(i)/count,cy,high.z+1},b.id);if(previous!=SIZE_MAX)navEdge(w,previous,n);previous=n;}
+  }else if(openCourt){
     box(w,b.id,"atrium roof frame",{low.x-16,low.y-16,high.z-16},{voidX0,high.y+16,high.z},2);
     box(w,b.id,"atrium roof frame",{voidX1,low.y-16,high.z-16},{high.x+16,high.y+16,high.z},2);
     box(w,b.id,"atrium roof frame",{voidX0,low.y-16,high.z-16},{voidX1,voidY0,high.z},2);
@@ -531,6 +539,22 @@ inline void streets(WorldPlan& w){
   }
 }
 #include "quality.h"
+// Hard planning constraints are retained with Site, so frozen/pinned recipes
+// cannot quietly adopt a different set of route or keep-out requirements.
+inline void reservePlanning(WorldPlan& w,const Settings& s){
+  for(const auto& volume:s.influences)if(volume.kind=="must-pass"||volume.kind=="vertical-link"||volume.kind=="no-generation"){
+    w.planningVolumes.push_back(volume);
+    if(volume.kind=="must-pass"){
+      V anchor{(volume.low.x+volume.high.x)/2,(volume.low.y+volume.high.y)/2,volume.low.z+1};uint64_t region=0;
+      for(const auto& building:w.spatial.buildings)for(const auto& room:building.rooms){V center{(room.low.x+room.high.x)/2,(room.low.y+room.high.y)/2,room.low.z+1};if(inside(center,volume.low,volume.high)){anchor=center;region=building.id;}}
+      auto node=navNode(w,anchor,region);w.passAnchors.emplace(volume.id,node);
+    }
+  }
+}
+inline bool intersectsVolume(const al::Brush& brush,const Influence& volume){
+  auto bounds=al::polyhedron(brush);if(!overlap(bounds.min,bounds.max,volume.low,volume.high))return false;
+  auto clipped=brush;for(int axis=0;axis<3;axis++)for(int side:{-1,1}){V normal{};normal[axis]=side;al::Brush next;if(!al::clipBrush(clipped,normal,side>0?volume.high[axis]:-volume.low[axis],next))return false;clipped=std::move(next);}return al::polyhedron(clipped).volume>.01;
+}
 inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<bool>* cancel){
   auto& nav=w.navigation;Collision collision(w);std::vector<std::array<size_t,2>> verified;
   for(auto& node:nav.nodes)if(collision.blocked(node.feet,node.feet,settings.player)){
@@ -576,9 +600,32 @@ inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<b
     if(!std::isfinite(distance[to]))throw std::runtime_error("Mission edge has no walkable spatial realization");
     std::vector<size_t> result;for(size_t at=to;;at=parent[at]){result.push_back(at);if(at==from)break;if(parent[at]==SIZE_MAX)throw std::runtime_error("Broken mission path predecessor");}std::reverse(result.begin(),result.end());return result;
   };
+  for(const auto& volume:w.planningVolumes)if(volume.kind=="no-generation"){
+    for(const auto& element:w.architecture.elements)if(element.region&&intersectsVolume(element.brush,volume))throw std::runtime_error("No-generation volume "+std::to_string(volume.id)+" intersects generated "+element.kind+"; move the volume or revise the site");
+    for(const auto& entity:w.architecture.entities){auto origin=entity.entity.fields.find("origin");if(origin!=entity.entity.fields.end()){V point;std::istringstream in(origin->second);if(in>>point.x>>point.y>>point.z&&inside(point,volume.low,volume.high))throw std::runtime_error("No-generation volume intersects a generated point entity");}}
+    for(const auto& entity:w.architecture.brushEntities)for(const auto& brush:entity.brushes)if(intersectsVolume(brush,volume))throw std::runtime_error("No-generation volume intersects a runtime brush entity");
+  }
+  std::vector<size_t> spatialStops;for(const auto& volume:w.planningVolumes){
+    if(volume.kind=="must-pass"){auto at=w.passAnchors.at(volume.id);if(!inside(nav.nodes[at].feet,volume.low,volume.high)||visited[at]<0)throw std::runtime_error("Must-pass volume has no reachable supported player anchor");spatialStops.push_back(at);}
+    if(volume.kind=="vertical-link"){
+      if(volume.high.z-volume.low.z<256)throw std::runtime_error("Required vertical-link volume must span at least one 256-unit floor");
+      std::set<size_t> examined;bool connected=false;
+      for(size_t first=0;first<nav.nodes.size()&&!connected;first++){
+        if(visited[first]<0||examined.count(first)||!inside(nav.nodes[first].feet,volume.low,volume.high+V{0,0,2}))continue;
+        size_t bottom=first,top=first;std::deque<size_t> pending{first};examined.insert(first);
+        while(!pending.empty()){auto at=pending.front();pending.pop_front();if(nav.nodes[at].feet.z<nav.nodes[bottom].feet.z)bottom=at;if(nav.nodes[at].feet.z>nav.nodes[top].feet.z)top=at;for(auto next:adjacency[at])if(!examined.count(next)&&inside(nav.nodes[next].feet,volume.low,volume.high+V{0,0,2})){examined.insert(next);pending.push_back(next);}}
+        if(nav.nodes[bottom].feet.z<=volume.low.z+settings.player.step+2&&nav.nodes[top].feet.z>=volume.high.z-settings.player.step-2){spatialStops.push_back(bottom);spatialStops.push_back(top);connected=true;}
+      }
+      if(!connected)throw std::runtime_error("Required vertical-link volume contains no continuous collision-verified stair connection");
+    }
+  }
   nav.mainRoute={start};
   for(auto beat:missionTraversal(w.mission)){
     auto leg=path(nav.mainRoute.back(),beats.at(beat));for(size_t i=1;i<leg.size();i++){w.diagnostics.routeLength+=al::length(nav.nodes[leg[i]].feet-nav.nodes[leg[i-1]].feet);nav.mainRoute.push_back(leg[i]);}
+  }
+  if(!spatialStops.empty()){
+    auto exit=nav.mainRoute.back();spatialStops.push_back(exit);for(auto stop:spatialStops){auto leg=path(nav.mainRoute.back(),stop);for(size_t i=1;i<leg.size();i++){w.diagnostics.routeLength+=al::length(nav.nodes[leg[i]].feet-nav.nodes[leg[i-1]].feet);nav.mainRoute.push_back(leg[i]);}}
+    w.diagnostics.score["planningStops"]=double(spatialStops.size()-1);
   }
   // Count a circulation alternative only if it stays spatially separated
   // from the complete primary polyline. Dense links along one corridor do
@@ -620,7 +667,7 @@ inline void navigation(WorldPlan& w,const Settings& settings,const std::atomic<b
     }
   }
   auto& scores=w.diagnostics.score;
-  scores["route"]=std::min(1.,w.diagnostics.routeLength/2500);
+  scores["route"]=std::min(1.,w.diagnostics.routeLength/settings.targetRoute);
   std::set<int> areas;for(const auto& b:w.spatial.buildings)for(const auto& r:b.rooms)areas.insert(int((r.high.x-r.low.x)*(r.high.y-r.low.y)/8192));
   scores["variety"]=std::min(1.,areas.size()/6.);
   scores["circulation"]=std::min(1.,double(alternatives));scores["separatedRoutes"]=alternatives;
@@ -727,7 +774,7 @@ inline WorldPlan generate(const Settings& settings,const Registry& registry,cons
     if(n<=last&&cache){cache->keys[n]=keys[n];cache->plans[n]=std::make_shared<const WorldPlan>(w);}
   };
   stage(0,[&](const auto& input){w.mission=mission(input,stagePreset(input,registry));validateMission(w.mission);});
-  stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);scenarioSite(w,input,p);floorplan(w,input,p);scenarioMission(w,p);});
+  stage(1,[&](const auto& input){const auto p=stagePreset(input,registry);site(w,input,p);scenarioSite(w,input,p);floorplan(w,input,p);scenarioMission(w,p);reservePlanning(w,input);});
   stage(2,[&](const auto& input){w.theme=stagePreset(input,registry).theme;w.assetKey=themeAssetKey(registry.theme(w.theme));shell(w);streets(w);for(auto& b:w.spatial.buildings){const auto local=regionInput(input,b.id,2,registry);const auto p=stagePreset(local,registry);building(w,local,p,b,cancel);if(p.ruinEvent=="collapsed-stair")receptionAnnex(w,local,b);if(p.ruinEvent=="flooded-platform")floodedPlatform(w,local,b);scenarioArchitecture(w,local,p,b);themeArchitecture(w,local,b,registry.theme(w.theme),cancel);}realizeGates(w,input,registry);std::string structure;for(const auto& e:w.architecture.elements)structure+=al::writeBrush(e.brush);for(const auto& e:w.architecture.entities)structure+=al::writeEntity(e.entity);for(const auto& e:w.architecture.brushEntities)structure+=writeBrushEntity(e);w.architectureKey=std::to_string(hash(structure));});
   stage(3,[&](const auto& input){damage(w,input,cancel,registry);});
   stage(4,[&](const auto& input){dressing(w,input,stagePreset(input,registry),cancel,registry);});

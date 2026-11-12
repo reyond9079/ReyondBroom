@@ -2,7 +2,7 @@
 """Compile actual MAPs produced by authored missions, fields, roads and dimensions."""
 import argparse, hashlib, json, os, subprocess
 from pathlib import Path
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--case',choices=['both','interior','roads'],default='both');a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('runtime',type=Path);p.add_argument('output',type=Path);p.add_argument('--case',choices=['both','interior','roads','sky-seal'],default='both');a=p.parse_args()
 repo=Path(__file__).resolve().parents[1];root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);suffix='.exe' if os.name=='nt' else ''
 sources=[*sorted((repo/'native/world_architect').glob('*.h')),repo/'tests/world-designer.cpp',repo/'plugins/autolevel/al_brush.cpp',repo/'runtime/world-architect/registry.json']
 (out/'provenance.json').write_text(json.dumps({'compiler':subprocess.check_output(['g++','--version'],text=True).splitlines()[0],'sourceHashes':{str(f.relative_to(repo)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sources}},indent=2)+'\n')

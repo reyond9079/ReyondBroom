@@ -104,9 +104,21 @@ In Destruction or Dressing, choose a field type and strength, then drag a
 rectangle on the floor plan. Preserve suppresses structural destruction and
 props; damage/dressing fields override their local amounts, and avoid volumes
 reject building overlaps. **Preserve selected building** paints its full
-envelope. Fields persist in the editable project. Dressing also selects the
-original art palette; a new palette requires unlocking Architecture and
-unpinning buildings. Rich theme-specific grammar remains in development.
+envelope. Fields persist in the editable project. Dressing also selects the art
+theme; changing it requires unlocking Architecture and unpinning buildings.
+
+Six theme grammars change real geometry: masonry arch surrounds and chimneys,
+exposed concrete buttresses, industrial pipes/flanges/stacks, clinical tile bands
+and louvres, reinforced concourse vaults, or civic piers/capitals/radio masts.
+Their original textures use different tile, panel, corrugation and weathering
+rules. Room functions select treatment beds, machinery, supply shelving,
+service counters, desks, benches and utility cabinets. Density controls actual
+placements with spatial exclusion and route clearance.
+
+Procedural materials and shader packs have versioned content identities; WAD
+filenames also identify profile and palette inputs. Updated packs can coexist
+with earlier exports. Existing differing files still fail preflight rather than
+being overwritten. Classic material names retain the 15-byte WAD limit.
 
 ## Explicit AutoLevel migration
 

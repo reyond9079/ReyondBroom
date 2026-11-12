@@ -105,8 +105,32 @@ crossing building envelopes or leaving the sealed site are rejected.
 Destruction/Dressing support bounded rectangular field painting and full-building
 preserve volumes. Preserve affects structural stair events, masonry damage and
 semantic room props. These controls do not claim the complete spline/volume
-toolkit, engine gate entities, room-level replacement or six finished theme
-grammars. Original palette selection remains a material choice.
+toolkit, engine gate entities or room-level replacement.
+
+The art slice now adds six configurable facade grammars, material patterns,
+weathering and semantic prop families. Masonry arches, concrete buttresses,
+industrial risers/flanges, clinical bands/louvres, concourse vaults and civic
+piers change actual convex geometry. Room functions select corresponding beds,
+presses, shelves, counters, desks, benches and cabinets. Density samples use
+stable room streams, spatial exclusion and protected navigation clearance.
+These are original brush kits; finished showcase composition and final art
+acceptance remain pending.
+
+Art dependency identities version material/shader names and profile/palette WAD
+files so new packs coexist with prior files. Classic names fit 15 bytes. A real
+metro compiler regression exposed a sky-volume flood path for seed
+9949357162622361994: changing names, disabling liquid contents or removing the
+new vaults did not fix it; opaque backing around the classic sky enclosure did.
+The seed now has a dedicated real BSP/light regression. Current checks pass 339
+generator contracts, eight asset coexistence contracts, 72 three-profile input
+batches and 12 representative BSP/light cases. FTE output was resumed after a
+workspace disk-capacity failure, verifying every compiled-source hash first;
+completed profile artifacts remain preserved in verified archives.
+All six grammars also rendered in the actual SDL2 editor. A separate four-case
+native export check verifies coexistence of old/new versions of one theme and
+unchanged prior files. Twenty metro UI cases pass with the new art resources;
+the executed Apply/production ExportMap snapshot passes real BSP/light and
+binary liquid-content inspection. Full showcase composition remains open.
 
 Explicit legacy migration now reads version 1 AutoLevel repositories, builders
 and editor settings using the existing storage codec. It produces a byte-exact

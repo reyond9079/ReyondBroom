@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <chrono>
 #include <utility>
 
 #ifdef _WIN32
@@ -26,6 +28,10 @@ namespace ftebroom::jam {
 struct HttpResponse {
   int status;
   std::string body;
+};
+
+struct DownloadInterrupted : std::runtime_error {
+  using std::runtime_error::runtime_error;
 };
 
 struct Endpoint {
@@ -126,7 +132,7 @@ inline std::string sha256(std::string_view bytes)
 template<class T> inline T curlSymbol(void* library, const char* name)
 {
   const auto proc = library ? dlsym(library, name) : nullptr;
-  if (!proc) throw std::runtime_error("HTTPS for Mapping Jams requires libcurl.so.4.");
+  if (!proc) throw std::runtime_error("Mapping Jams needs the system libcurl.so.4 and CA certificates. Install the libcurl and ca-certificates packages.");
   return reinterpret_cast<T>(proc);
 }
 
@@ -178,9 +184,9 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
   configure(CURLOPT_SSL_VERIFYPEER,1L);
   configure(CURLOPT_SSL_VERIFYHOST,2L);
   configure(CURLOPT_CONNECTTIMEOUT,6L);
-  configure(CURLOPT_TIMEOUT,90L);
-  configure(CURLOPT_LOW_SPEED_LIMIT,1L);
-  configure(CURLOPT_LOW_SPEED_TIME,15L);
+  configure(CURLOPT_TIMEOUT,method=="GET" && limit>512*1024 ? 600L : 60L);
+  configure(CURLOPT_LOW_SPEED_LIMIT,128L);
+  configure(CURLOPT_LOW_SPEED_TIME,30L);
   configure(CURLOPT_NOSIGNAL,1L);
   configure(CURLOPT_HTTPHEADER,list.value);
   configure(CURLOPT_USERAGENT,"ReyondBroom Mapping Jams");
@@ -194,10 +200,15 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
   const auto code = perform(handle.value);
   if (download.oversized) throw std::runtime_error("The Jam response exceeds its size limit.");
   if (code == CURLE_PEER_FAILED_VERIFICATION)
-    throw std::runtime_error("The Mapping Jam server's TLS certificate could not be verified.");
+    throw std::runtime_error("Could not verify the Mapping Jam server's TLS certificate. Check the system clock and CA certificates.");
+  if (code == CURLE_SSL_CACERT_BADFILE)
+    throw std::runtime_error("Mapping Jams could not read the system CA certificates. Check the ca-certificates package and certificate configuration.");
+  if (code == CURLE_OPERATION_TIMEDOUT || code == CURLE_PARTIAL_FILE ||
+      code == CURLE_RECV_ERROR || code == CURLE_SEND_ERROR || code == CURLE_HTTP2_STREAM)
+    throw DownloadInterrupted("The Mapping Jam download was interrupted or timed out.");
   long status = 0;
   if (code != CURLE_OK || info(handle.value,CURLINFO_RESPONSE_CODE,&status) != CURLE_OK || !status)
-    throw std::runtime_error("Cannot reach the Mapping Jam server over HTTPS.");
+    throw std::runtime_error("Cannot reach the Mapping Jam server over HTTPS (curl error "+std::to_string(code)+").");
   download.result.status = static_cast<int>(status);
   return std::move(download.result);
 }

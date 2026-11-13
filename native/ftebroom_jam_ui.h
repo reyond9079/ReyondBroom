@@ -104,6 +104,14 @@ void jamViewportToolbar()
       list->AddRectFilled(position,{position.x+panelWidth,position.y+size.y+12*u},IM_COL32(13,24,41,240),5*u);
       list->AddText(ImGui::GetFont(),font,{position.x+8*u,position.y+6*u},color,message.c_str(),nullptr,wrap);
       ImGui::Dummy({panelWidth,size.y+12*u});
+      if (error && jamLocal.inspectLocalBuild) {
+        ImGui::BeginDisabled(locked);
+        if (jamButton(jamText("Inspect compile locally","Проверить сборку локально"))) {
+          jamLocal.inspectLocalBuild = false;
+          buildBegin();
+        }
+        ImGui::EndDisabled();
+      }
     }
   }
   ImGui::End();
@@ -755,6 +763,7 @@ void jamAuthForm()
                    jamLocal.showPassword ? 0 : ImGuiInputTextFlags_Password);
       ImGui::Checkbox(jamText("Show password","Показать пароль"),&jamLocal.showPassword);
       if (registration) {
+        ImGui::TextWrapped("%s",jamPasswordRules());
         if (action(jamText("Register","Зарегистрироваться"),JamTone::Action)) jamRegister();
         bool generate, signIn;
         secondary(jamText("Generate password","Сгенерировать пароль"),back,generate,signIn);
@@ -802,6 +811,7 @@ void jamAuthForm()
         jamAuthField(jamText("Email","Почта"),jamLocal.email,sizeof jamLocal.email);
       jamAuthField(jamText("Recovery code","Код восстановления"),jamLocal.code,sizeof jamLocal.code);
       jamAuthField(jamText("New password","Новый пароль"),jamLocal.password,sizeof jamLocal.password,ImGuiInputTextFlags_Password);
+      ImGui::TextWrapped("%s",jamPasswordRules());
       jamAuthField(jamText("Confirm new password","Повтори новый пароль"),jamLocal.passwordConfirmation,
                    sizeof jamLocal.passwordConfirmation,ImGuiInputTextFlags_Password);
       if (action(jamText("Reset password","Сменить пароль"),JamTone::Action)) jamResetPassword();

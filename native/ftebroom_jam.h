@@ -59,6 +59,7 @@ struct JamLocal {
   std::optional<bool> alphaWarningAccepted;
   bool profileFirst = true;
   bool playCanceled = false;
+  bool inspectLocalBuild = false;
   char email[181]{}, password[513]{}, nickname[161]{}, bio[1601]{}, code[121]{};
   char passwordConfirmation[513]{}, avatarPath[4096]{}, reportNote[2401]{};
   bool showPassword = false;
@@ -79,6 +80,9 @@ struct JamLocal {
   std::string presenceToken;
   std::chrono::steady_clock::time_point nextPresence{}, lastPresence{};
   JamFs::path workspace, offlineMap;
+  std::optional<int> offlineProfile;
+  int offlineMapFormat = 0;
+  std::string offlineResourceDirectory;
   bool resourcesMounted = false;
   JamFileDialog fileDialog = JamFileDialog::None;
   std::vector<JamFs::path> openMaps;
@@ -181,6 +185,23 @@ void jamAssign(char* target, std::size_t size, const std::string& value)
   std::snprintf(target, size, "%s", value.c_str());
 }
 
+const char* jamPasswordRules()
+{
+  return jamText("Use 12 to 128 characters. Numbers, symbols and uppercase letters are optional.",
+                 "От 12 до 128 символов. Цифры, спецсимволы и заглавные буквы необязательны.");
+}
+
+bool jamValidNewPassword()
+{
+  const std::string_view password(jamLocal.password);
+  const auto length = std::count_if(password.begin(),password.end(),[](unsigned char byte) {
+    return (byte & 0xc0) != 0x80;
+  });
+  if (length >= 12 && length <= 128) return true;
+  jamLocal.error = jamPasswordRules();
+  return false;
+}
+
 void jamStart(std::string status, std::function<JamJson(jam::Client)> task,
               std::function<void(JamJson)> done)
 {
@@ -268,6 +289,7 @@ void jamJoin()
 
 void jamRegister()
 {
+  if (!jamValidNewPassword()) return;
   const JamJson form{{"email", jamLocal.email}, {"nickname", jamLocal.nickname}, {"password", jamLocal.password}};
   jamStart(jamText("Creating account…","Создание аккаунта…"), [form](auto client) {
     return client.json("POST", "/v1/auth/register", form);
@@ -319,6 +341,7 @@ void jamForgotPassword()
 
 void jamResetPassword()
 {
+  if (!jamValidNewPassword()) return;
   if (std::strcmp(jamLocal.password,jamLocal.passwordConfirmation) != 0) {
     jamLocal.error = jamText("The passwords do not match.","Пароли не совпадают.");
     return;
@@ -643,20 +666,29 @@ bool jamAcceptDocument(const std::string& next)
 
 void jamSignOut();
 
+void jamRestoreOfflineProfile()
+{
+  if (!jamLocal.offlineProfile) return;
+  gameProfile = *std::exchange(jamLocal.offlineProfile,std::nullopt);
+  q1MapFormat = jamLocal.offlineMapFormat;
+  std::snprintf(baseq3,sizeof baseq3,"%s",jamLocal.offlineResourceDirectory.c_str());
+  jamLocal.resourcesMounted = false;
+  gameMapModsKnown = false;
+  gameMapResourcePaths.clear();gameMapResourceRoot.clear();
+  q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();q1DocumentBspWad.clear();
+}
+
 void jamRouteDocument(std::string& next)
 {
   const bool signingOut = next=="__jam_signout";
   if (next!="__jam_offline" && !signingOut) return;
   const auto previous = std::move(jamLocal.offlineMap);
   jamLocal.offlineMap.clear();
-  if (!previous.empty() && ftebroom::pak::exists(previous)) next="@"+previous.u8string();
-  else next="__profile:2";
+  const bool returnToMap = !previous.empty() && ftebroom::pak::exists(previous);
+  next = returnToMap ? "@"+previous.u8string() : "__profile:"+std::to_string(jamLocal.offlineProfile.value_or(2));
   jamLocal.workspace.clear();
-  if (jamLocal.resourcesMounted) {
-    jamLocal.resourcesMounted = false;
-    q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();q1DocumentBspWad.clear();
-    if (next.rfind("@",0)==0) mountAssets();
-  }
+  jamRestoreOfflineProfile();
+  if (returnToMap) mountAssets();
   if (signingOut) {jamLocal.open=true;jamSignOut();}
 }
 
@@ -837,15 +869,26 @@ JamFs::path jamPreviewRuntime()
 bool jamDocumentResources(std::string& source)
 {
   if (!jamEnabled() || !jamMapPath(pendingDocumentFile)) return false;
-  if (gameProfile!=2 || jamLocal.pack.empty())
-    throw std::runtime_error("Select the Quake 1 profile and download the Jam resources first.");
+  if (jamLocal.pack.empty()) throw std::runtime_error("Download the Jam resources first.");
+  const bool entering = !jamLocal.offlineProfile;
+  if (entering) {
+    jamLocal.offlineProfile = gameProfile;
+    jamLocal.offlineMapFormat = q1MapFormat;
+    jamLocal.offlineResourceDirectory = baseq3;
+    gameMapModsKnown = false;
+    gameMapResourcePaths.clear();gameMapResourceRoot.clear();
+    q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();q1DocumentBspWad.clear();
+  }
+  gameProfile = 2;
   documentTerrain = false;
   q1MapFormat = ftebroom::quake1::valveMap(source) ? 1 : 0;
   if (!jamLocal.resourcesMounted) {
     jamLocal.resourcesMounted = true;
     if (!mountAssets()) {
-      jamLocal.resourcesMounted = false;
-      throw std::runtime_error(assetError);
+      const auto error = assetError;
+      jamRestoreOfflineProfile();
+      mountAssets();
+      throw std::runtime_error(error);
     }
   }
   std::size_t cursor=0;
@@ -928,10 +971,6 @@ bool jamSaveNamed()
 void jamOpenDraft()
 {
   try {
-    if (gameProfile != 2) {
-      jamLocal.error = jamText("Select the Quake 1 profile to edit a Jam map.","Для редактирования карты Jam выбери профиль Quake 1.");
-      return;
-    }
     auto draft = jamDraft(jamLocal.selection);
     if (jamEditing() && jamLocal.draftPlot==jamLocal.selection) {jamLocal.open=false;return;}
     auto modified = JamFs::file_time_type::min();
@@ -960,6 +999,7 @@ bool jamPublishing()
 
 void jamBeginPublish(const std::string& plot, bool play = false)
 {
+  jamLocal.inspectLocalBuild = false;
   if (!jamLocal.canPublish) {
     jamLocal.error = jamText("Publishing is closed. You can compile your draft locally.",
                              "Публикация закрыта. Черновик можно скомпилировать локально.");
@@ -1049,6 +1089,19 @@ void jamPollPublish()
       jamLocal.operation.clear();
       jamLocal.publishingMap = {};
       jamLocal.error = result.contains("error") ? jamField(result.at("error"), "title") : phase;
+      const auto code = result.contains("error") ? jamField(result["error"],"code") : "";
+      if (code=="BUILD_FAILED" || code=="MAP_LEAK" || code=="INVALID_GEOMETRY") {
+        jamLocal.inspectLocalBuild = true;
+        if (code=="MAP_LEAK")
+          jamLocal.error = jamText("The map leaks. Compile locally to see the route, then seal the opening before publishing.",
+                                   "Карта негерметична. Запусти локальную проверку, чтобы увидеть маршрут, и закрой утечку перед публикацией.");
+        else if (code=="INVALID_GEOMETRY")
+          jamLocal.error = jamText("The map has a degenerate face. Compile locally to see its coordinates in the log.",
+                                   "В карте есть вырожденная грань. Запусти локальную проверку, чтобы увидеть её координаты в журнале.");
+        else if (jamLocal.error=="qbsp failed. Inspect the local build log.")
+          jamLocal.error = jamText("The Jam server could not build the BSP. Compile locally to check for a leak and see the compiler error.",
+                                   "Сервер Jam не смог собрать BSP. Запусти локальную проверку, чтобы найти утечку и увидеть ошибку компилятора.");
+      }
       if (result.contains("error")) for (const auto& item : result["error"].value("violations",JamJson::array()))
         jamLocal.error += "\n" + jamField(item,"metric") + ": " + item.at("actual").dump() + " / " + item.at("limit").dump();
     } else {

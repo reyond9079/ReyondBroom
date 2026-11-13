@@ -11,7 +11,7 @@ Install runtime dependencies on Ubuntu 24.04:
 ```sh
 sudo apt install libgl1 libx11-6 libxrandr2 libxcursor1 libxi6 libasound2t64 libpulse0 \
   libpng16-16t64 libjpeg-turbo8 zlib1g libstdc++6 \
-  ffmpeg xdg-utils libwayland-client0 python3
+  ffmpeg xdg-utils libwayland-client0 python3 ca-certificates libcurl4t64
 ```
 
 Q3Map2 and Quake 1 qbsp/vis/light are bundled as native binaries. Q3Map2 has a

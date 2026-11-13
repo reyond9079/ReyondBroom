@@ -3,9 +3,12 @@ struct RecentMap { std::string path; int profile=-1; bool favorite=false; };
 static std::vector<RecentMap> recentMaps;
 static bool recentLoaded=false,recentWindow=false,recentFavorites=false,recentFocusRequested=false;
 static bool recentManualUpdates=false;
-enum class WelcomeStage { Updates, Recovery, Recent };
+enum class WelcomeStage { Updates, Jam, Recovery, Recent };
 static WelcomeStage recentStage=WelcomeStage::Recent;
 static bool welcomeUpdatePanel();
+static bool welcomeCheckingAutomatically();
+static bool welcomeUpdateSplash();
+namespace { bool jamEnabled(); bool jamOffer(); }
 static bool welcomeUpdateCommitted();
 static bool updateCommitRestart();
 static bool updateDiscardRestart();
@@ -52,11 +55,19 @@ static bool recentStar(const char* id,bool& value) {
 }
 static void recentPanel() {
   if(firstSetupStep>=0){recentWindow=false;welcomeQaPublish();return;}
-  if(!recentWindow){welcomeQaPublish();return;}recentLoad();ImGui::SetNextWindowSize({760,520},ImGuiCond_FirstUseEver);
+  if(!recentWindow){welcomeQaPublish();return;}
+  if(recentStage==WelcomeStage::Updates && welcomeCheckingAutomatically()){
+    if(welcomeUpdateSplash())recentStage=jamEnabled()?WelcomeStage::Jam:WelcomeStage::Recovery;
+    welcomeQaPublish();return;
+  }
+  recentLoad();ImGui::SetNextWindowSize({760,520},ImGuiCond_FirstUseEver);
   if(recentFocusRequested){ImGui::SetNextWindowFocus();recentFocusRequested=false;}
   if(ImGui::Begin("Welcome to ReyondBroom",&recentWindow,ImGuiWindowFlags_NoCollapse)) {
     welcomeQaWindow("welcome/window");
-    if(recentStage==WelcomeStage::Updates){if(welcomeUpdatePanel())recentStage=WelcomeStage::Recovery;}
+    if(recentStage==WelcomeStage::Updates){
+      if(welcomeUpdatePanel())recentStage=jamEnabled()&&!recentManualUpdates?WelcomeStage::Jam:WelcomeStage::Recovery;
+    }
+    else if(recentStage==WelcomeStage::Jam){if(jamOffer())recentStage=WelcomeStage::Recovery;}
     else if(recentStage==WelcomeStage::Recovery){if(welcomeRecoveryPanel())recentStage=WelcomeStage::Recent;}
     else {
     ImGui::TextUnformatted("Recently edited maps");recentStar("##favorites_only",recentFavorites);if(ImGui::IsItemHovered())ImGui::SetTooltip("Show favorites only");ImGui::SameLine();ImGui::AlignTextToFramePadding();ImGui::TextUnformatted("Favorites only");

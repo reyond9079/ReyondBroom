@@ -72,7 +72,7 @@ static bool mapModsMount(const std::vector<std::string>& mods) {
   mapModsResourceKey=key;gameMapModsError.clear();return true;
 }
 static void mapModsTick() {
-  if(!ready||gameProfile!=2||assetsLoading||savingDocument||savePakDetached||runActive||!pendingDocumentFile.empty())return;
+  if(!ready||gameProfile!=2||assetsLoading||savingDocument||savePakDetached||runActive||!pendingDocumentFile.empty()||!jamPreviewRuntime().empty())return;
   try {runLoad();std::vector<std::string> live;if(!mapModsReadLive(live)&&!gameMapModsKnown)return;mapModsMount(mapModsForDocument());}
   catch(const std::exception& error){gameMapModsError=error.what();}
 }

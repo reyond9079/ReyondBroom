@@ -85,6 +85,7 @@ typedef struct
 	//quick access for rendering.
 	float modelindex;
 	float isbsp;
+	int modelSpecified;
 	float alpha;
 	vector colourmod;
 	vector org;
@@ -161,7 +162,14 @@ trisoup_simple_vert_t *fb_entity_vertices(int index,int solid)
     return &editents[index].bboxverts[0];
 }
 string fb_entity_classname(int index){if(index>=0 && index<numents)return editents[index].fields["classname"];return "";}
-int fb_entity_has_model(int index){if(index<0 || index>=numents)return FALSE;return (editents[index].modelindex && !editents[index].isbsp)||editents[index].fields["classname"]=="light";}
+int fb_entity_light_icon(int index)
+{
+    if(index<0 || index>=numents || editents[index].modelSpecified || editents[index].modelindex || editents[index].isbsp)
+        return FALSE;
+    string classname=editents[index].fields["classname"];
+    return classname=="light" || substring(classname,0,6)=="light_";
+}
+int fb_entity_has_model(int index){if(index<0 || index>=numents)return FALSE;return (editents[index].modelindex && !editents[index].isbsp)||fb_entity_light_icon(index);}
 void fb_entity_draw_box(int index,vector colour,int solid,int wire,string shader)
 {
     if(index<0 || index>=numents)return;
@@ -184,7 +192,7 @@ vector fb_entity_color(int index) {if(!autocvar_ftebroom_entity_bounds_class_col
 void fb_entity_draw_model(int index)
 {
     if(index<0 || index>=numents)return;
-    if(editents[index].fields["classname"]=="light"&&!editents[index].modelindex){
+    if(fb_entity_light_icon(index)){
         static int cameraValid;static vector savedEye,savedAngles,savedFov,bulbForward,bulbRight,bulbUp;static float bulbTanX,bulbTanY;
         vector bulbEye=getproperty(VF_ORIGIN),cameraAngles=getproperty(VF_ANGLES),bulbFov=getproperty(VF_FOV),center=editents[index].org;
         if(!cameraValid||savedEye!=bulbEye||savedAngles!=cameraAngles||savedFov!=bulbFov){cameraValid=TRUE;savedEye=bulbEye;savedAngles=cameraAngles;savedFov=bulbFov;makevectors(cameraAngles);bulbForward=v_forward;bulbRight=v_right;bulbUp=v_up;bulbTanX=tan(bulbFov_x*M_PI/360);bulbTanY=tan(bulbFov_y*M_PI/360);}
@@ -450,6 +458,7 @@ void(entedit_t *nent) editor_ents_updated =
     nent->modelskin=stof(nent->fields["skin"]);nent->modelframe=stof(nent->fields["frame"]);
     nent->modelaxes='1 1 1';if(nent->fields["modelscale_vec"]!="")nent->modelaxes=stov(nent->fields["modelscale_vec"]);
 	nent->modelindex = modelindexforname(nent->fields["model"]);
+	nent->modelSpecified = nent->fields["model"]!="";
 	nent->mins = '-8 -8 -8';
 	nent->maxs = '8 8 8';
 	nent->org = stov(nent->fields["origin"]);
@@ -506,6 +515,7 @@ void(entedit_t *nent) editor_ents_updated =
 			if(nent->fields["model"]!="")model=nent->fields["model"];
             if(substring(model,0,1)==":")model=substring(model,1,-1);
             model=strreplace("\\","/",model);
+            nent->modelSpecified=nent->modelSpecified || model!="";
 			nent->modelindex=0;if(model!="")nent->modelindex=modelindexforname(model);
 		}
 	}

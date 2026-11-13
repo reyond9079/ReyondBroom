@@ -69,17 +69,23 @@ static bool buildValidBsp(const std::filesystem::path& path)
 {
   auto bytes=buildRead(path);return gameProfile>=3?ftebroom::quake1::gameBsp(bytes,gameProfile):ftebroom::quake1::bsp(bytes,gameProfile==2);
 }
-static std::filesystem::path buildHistoryFile(){
-  return ftebroom::pak::diskFolder(documentFile.parent_path())/"_ftebroom-build"/(backupStorageName()+"-"+gameProfileKey(gameProfile)+".last-build");
+static std::filesystem::path buildFolder(bool jamBuild){
+  if(jamBuild)return documentPath("cache/jam-builds");
+  return ftebroom::pak::diskFolder(documentDefaultFolder())/"_ftebroom-build";
+}
+static std::filesystem::path buildHistoryFile(bool jamBuild){
+  return buildFolder(jamBuild)/(backupStorageName()+"-"+gameProfileKey(gameProfile)+".last-build");
 }
 static void buildSaveHistory(){
-  try{auto file=buildHistoryFile();std::filesystem::create_directories(file.parent_path());std::ofstream output(file);
+  try{auto file=buildHistoryFile(jamEditing());std::filesystem::create_directories(file.parent_path());std::ofstream output(file);
     output<<gameProfile<<' '<<std::quoted(documentFile.generic_u8string())<<' '<<std::quoted(buildResult.generic_u8string())<<'\n';
   }catch(const std::exception& e){core->Print((std::string("ReyondBroom: cannot save build history: ")+e.what()+"\n").c_str());}
 }
 static void buildRestoreHistory(){
   if(documentFile.empty()||(!buildResult.empty()&&buildResultDocument==documentFile&&buildResultProfile==gameProfile))return;
-  try{std::ifstream input(buildHistoryFile());int profile=-1;std::string document,result;
+  try{const bool jamBuild=jamEditing();std::ifstream input(buildHistoryFile(jamBuild));
+    if(!input && jamBuild)input.open(buildHistoryFile(false));
+    int profile=-1;std::string document,result;
     if(!(input>>profile>>std::quoted(document)>>std::quoted(result))||profile!=gameProfile||document!=documentFile.generic_u8string())return;
     auto path=std::filesystem::u8path(result);if(!std::filesystem::is_regular_file(path)||!buildValidBsp(path))return;
     buildResult=path;buildResultDocument=documentFile;buildResultProfile=profile;buildResultRevision=-1;buildResultContentRevision=-1;buildResultGeneration=0;buildResultSourceMap.clear();
@@ -114,32 +120,36 @@ static void buildEdit()
   command("ftebroom_bsp edit\n");buildRestoreLayout();buildUnlitPreview=false;buildPreviewRequested=0;
 }
 static void traceEditingView(){if(cvars->GetFloat("ftebroom_bsp_preview"))buildEdit();}
-static void buildShow()
+static void buildShowArtifact(const std::filesystem::path& artifact,const std::string& model)
 {
-  if(buildResult.empty() || (buildResultDocument!=documentFile || buildResultProfile!=gameProfile))return;
   cancelGesture();cameraEnd();
   if(!buildWasPreview){buildSavedLayout=viewLayout;buildSavedFocus=viewFocus;buildSavedMax=viewMax;
     std::copy(std::begin(viewTypes),std::end(viewTypes),buildSavedTypes);buildWasPreview=true;}
   viewLayout=1;viewFocus=0;viewMax=-1;viewTypes[0]=0;cvars->SetFloat("ftebroom_view_layout",1);viewActivate(0);
   try {
-    auto snapshot=buildResult.parent_path()/"snapshot.map";
-    if(std::filesystem::is_regular_file(snapshot))stageGeneratedModels(buildRead(snapshot),documentPath("ftebroom.cfg").parent_path(),buildResult.parent_path());
-    auto cache=documentPath(buildResultModel).parent_path();std::filesystem::create_directories(cache);
-    for(const auto& file:std::filesystem::directory_iterator(buildResult.parent_path()))
+    auto snapshot=artifact.parent_path()/"snapshot.map";
+    if(std::filesystem::is_regular_file(snapshot))stageGeneratedModels(buildRead(snapshot),documentPath("ftebroom.cfg").parent_path(),artifact.parent_path());
+    auto cache=documentPath(model).parent_path();std::filesystem::create_directories(cache);
+    for(const auto& file:std::filesystem::directory_iterator(artifact.parent_path()))
       if(file.path().extension()!=".map" && file.path().extension()!=".log")
         std::filesystem::copy(file.path(),cache/file.path().filename(),std::filesystem::copy_options::overwrite_existing|std::filesystem::copy_options::recursive);
     buildUnlitPreview=false;
-    if(gameProfile<2&&buildResult.extension()==".bsp"&&!std::filesystem::is_directory(buildResult.parent_path()/buildResult.stem())){
-      auto bytes=buildRead(buildResult);
+    if(gameProfile<2&&artifact.extension()==".bsp"&&!std::filesystem::is_directory(artifact.parent_path()/artifact.stem())){
+      auto bytes=buildRead(artifact);
       buildUnlitPreview=ftebroom::quake1::neutralizeBlackQ3Lightmaps(bytes);
-      if(buildUnlitPreview)buildWriteTexture(cache/buildResult.filename(),bytes);
+      if(buildUnlitPreview)buildWriteTexture(cache/artifact.filename(),bytes);
     }
     cvars->SetString("ftebroom_build_error","");
     buildPreviewRequested=ImGui::GetTime();
-    command(("fs_flush\nftebroom_bsp "+buildResultModel+(buildUnlitPreview?" unlit\n":"\n")).c_str());
+    command(("fs_flush\nftebroom_bsp "+model+(buildUnlitPreview?" unlit\n":"\n")).c_str());
     // World materials register lazily on their first rendered frame.
     if(!buildPlaceholderHandles.empty())command("in .2 ftebroom_build_placeholders\n");
   }catch(const std::exception& error){buildMessage=error.what();buildRestoreLayout();}
+}
+static void buildShow()
+{
+  if(!buildResult.empty() && buildResultDocument==documentFile && buildResultProfile==gameProfile)
+    buildShowArtifact(buildResult,buildResultModel);
 }
 static void mapGpuShow(){
   if(mapGpuResult.empty()||mapGpuResultDocument!=documentFile||mapGpuResultProfile!=gameProfile)return;
@@ -214,13 +224,21 @@ static void buildBegin(bool allowLeaks=false)
 {
   if(documentTerrain){buildMessage="FTE Engine terrain uses MAP plus section files; BSP compilation is unavailable for this document.";return;}
   if(runActive || runExclusive || buildRunning)return;
+  if(jamBeforeCompile(allowLeaks))return;
   if(documentFile.empty()){buildMessage="Save the map once before building.";return;}
   if(assetsLoading){buildMessage="Wait for game resources to finish loading before building.";return;}
   buildLeakOffer=false;buildLeakFound=false;buildMessage.clear();runLoad();buildLoadSettings();gameProfileLoad();
+  const bool jamBuild=jamEditing();
+  if(jamBuild){
+    buildGeometry=buildVis=buildLight=true;
+    for(auto& argument:buildArguments)argument.clear();
+  }
   buildOpenMap=allowLeaks;buildJobProfile=gameProfile;
   if(gameProfile==1 && gamePreviewAfterBuild){try{modValidate();}catch(const std::exception& e){buildMessage=e.what();return;}}
   std::error_code projectError;
-  if(!*baseq3 || !std::filesystem::is_directory(std::filesystem::u8path(baseq3),projectError)){buildMessage="Configure an existing game resource folder in Game / resources.";setupNeeded=true;return;}
+  auto resources=jamPreviewRuntime();
+  if(resources.empty())resources=std::filesystem::u8path(baseq3);
+  if(resources.empty() || !std::filesystem::is_directory(resources,projectError)){buildMessage="Configure an existing game resource folder in Game / resources.";setupNeeded=true;return;}
   if(documentFile.empty()){buildMessage="Save the map once before building.";return;}
   if(!buildGeometry&&!buildVis&&!buildLight){buildMessage="Select at least one build stage.";return;}
   if(gameProfile<2 && runVariables["q3map2"].empty()){buildMessage="Set the q3map2 executable path.";return;}
@@ -230,7 +248,7 @@ static void buildBegin(bool allowLeaks=false)
   try {
     auto stamp=std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::string relative="maps/ftebroom-build/"+std::to_string(stamp);
-    auto folder=ftebroom::pak::diskFolder(documentDefaultFolder())/"_ftebroom-build"/std::to_string(stamp);std::filesystem::create_directories(folder);
+    auto folder=buildFolder(jamBuild)/std::to_string(stamp);std::filesystem::create_directories(folder);
     buildPending=folder/"snapshot.bsp";buildPendingModel=relative+"/snapshot.bsp";buildDocument=documentFile;
     if(!buildGeometry){for(const auto& file:std::filesystem::directory_iterator(buildResult.parent_path()))
       if(file.is_regular_file() && file.path().extension()!=".map")std::filesystem::copy_file(file.path(),folder/file.path().filename());
@@ -267,9 +285,12 @@ static void buildBegin(bool allowLeaks=false)
     }else if(gameProfile==2) {
       const char* names[]={"qbsp","vis","light"};bool enabled[]={buildGeometry,visibility,buildLight};
       for(int i=0;i<3;i++)if(enabled[i]){
-        if(runVariables[names[i]].empty())throw std::runtime_error(std::string("Set the ")+names[i]+" executable path.");
-        std::string args=(i==0 && q1BspFormat==1?"-bsp2 ":"")+(i==0?geometryArguments:buildArguments[i])+" \"${WORK_DIR_PATH}/snapshot."+(i==0?"map":"bsp")+"\"";
-        profile.tasks.push_back({1,std::string("${")+names[i]+"}",args});buildStages.push_back(names[i]);
+        const auto compiler = jamBuild ? jamCompiler(names[i]) : std::string{};
+        if(jamBuild && compiler.empty())throw std::runtime_error(std::string("The Jam compiler is missing: ")+names[i]);
+        if(compiler.empty() && runVariables[names[i]].empty())throw std::runtime_error(std::string("Set the ")+names[i]+" executable path.");
+        std::string args=(i==0 && !jamBuild && q1BspFormat==1?"-bsp2 ":"")+(i==0?geometryArguments:buildArguments[i])+" \"${WORK_DIR_PATH}/snapshot."+(i==0?"map":"bsp")+"\"";
+        if(jamBuild && i==2)args="-lit "+args;
+        profile.tasks.push_back({1,compiler.empty() ? std::string("${")+names[i]+"}" : compiler,args});buildStages.push_back(names[i]);
       }
     } else {
     // q3map2 needs the same texture dimensions as the editor, including
@@ -284,8 +305,10 @@ static void buildBegin(bool allowLeaks=false)
     runExportHook=buildExported;runStageHook=buildStageFinished;runBegin(profile);runWindow=false;buildRunning=runActive;gameProfileLocked=buildRunning;buildStarted=ImGui::GetTime();
     if(allowLeaks)runAppend("Open-map compile: outside filling disabled where supported; VIS skipped. Saved compiler settings and source MAP are unchanged.\n");
     if(!buildRunning){runExportHook=nullptr;runStageHook=nullptr;buildMessage=runError;}
-    runSaveProfiles();
-    {std::ofstream settings(documentPath(buildSettingsFile()));settings<<buildGeometry<<' '<<buildVis<<' '<<buildLight;for(auto& argument:buildArguments)settings<<' '<<std::quoted(argument);if(gameProfile==4)settings<<' '<<std::quoted(buildCsgArguments);}
+    if(!jamBuild){
+      runSaveProfiles();
+      std::ofstream settings(documentPath(buildSettingsFile()));settings<<buildGeometry<<' '<<buildVis<<' '<<buildLight;for(auto& argument:buildArguments)settings<<' '<<std::quoted(argument);if(gameProfile==4)settings<<' '<<std::quoted(buildCsgArguments);
+    }
   }catch(const std::exception& error){buildMessage=error.what();runExportHook=nullptr;runStageHook=nullptr;}
 }
 static void mapGpuTestTick(){
@@ -337,7 +360,7 @@ static void buildTick()
     buildResultContentRevision=buildContentRevision;buildResultGeneration=buildGeneration;
     buildSaveHistory();
     buildMessage="Build complete. Ready to preview.";
-    if(!buildLeakFound && gameProfile!=0 && gameProfile!=3 && (gamePreviewAfterBuild||playAfterBuild))modPreview();
+    if(!jamEditing() && !buildLeakFound && gameProfile!=0 && gameProfile!=3 && (gamePreviewAfterBuild||playAfterBuild))modPreview();
     else if(!buildLeakFound)buildShow();
   }catch(const std::exception& error){buildMessage=error.what();}
 }
@@ -467,18 +490,20 @@ static void buildToolbar(ImVec2 cell,Place place,bool inlineTools,bool compactRa
       runUiRecordGlobal(std::string("tools/")+label);
       return clicked;
     };
-    ImGui::BeginDisabled(runActive||buildRunning);
-    ImGui::PushStyleColor(ImGuiCol_Button,uiModern()?uiModernPalette().action:uiColor(47,99,160));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiModern()?uiModernPalette().actionHover:uiColor(58,122,195));
-    ImGui::PushStyleColor(ImGuiCol_Text,uiColor(255,255,255));
-    const bool compile=control("Compile",0);placementRect("build/compile");
-    if(compile)buildBegin();
-    ImGui::PopStyleColor(3);ImGui::EndDisabled();
-    if(control("Setup compile",1))buildWindow=true;
+    if(!jamEditing()){
+      ImGui::BeginDisabled(runActive||buildRunning);
+      ImGui::PushStyleColor(ImGuiCol_Button,uiModern()?uiModernPalette().action:uiColor(47,99,160));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiModern()?uiModernPalette().actionHover:uiColor(58,122,195));
+      ImGui::PushStyleColor(ImGuiCol_Text,uiColor(255,255,255));
+      const bool compile=control("Compile",0);placementRect("build/compile");
+      if(compile)buildBegin();
+      ImGui::PopStyleColor(3);ImGui::EndDisabled();
+      if(control("Setup compile",1))buildWindow=true;
+    }
     if(preview){if(control(previewLabel,4))buildEdit();}
     else {ImGui::BeginDisabled(buildResult.empty()||(buildResultDocument!=documentFile || buildResultProfile!=gameProfile)||buildRunning);
       if(control(previewLabel,2))buildShow();ImGui::EndDisabled();}
-    if(canPlay){ImGui::BeginDisabled(runActive||runExclusive||buildRunning||assetsLoading);
+    if(canPlay&&!jamEditing()){ImGui::BeginDisabled(runActive||runExclusive||buildRunning||assetsLoading);
       if(control("Play mod",3))modPreview();ImGui::EndDisabled();}
     if(!tracePoints.empty()&&control("Leak route",5))traceWindow=true;
 }
@@ -487,7 +512,8 @@ static void buildOverlay()
   if(!buildRunning && !mapGpuRunning && !modLoading && buildMessage.empty())return;
   int pane=-1;for(int i=0;i<viewLayout;i++)if(viewRects[i].type==0&&viewRects[i].w>0){pane=i;break;}
   if(pane<0)return;auto r=viewRects[pane];float width=std::max(120.f,std::min(r.w-16,600.f*uiScale()));
-  ImGui::SetNextWindowPos({r.x+r.w*.5f,r.y+12*uiScale()},ImGuiCond_Always,{.5f,0});ImGui::SetNextWindowSize({width,0});ImGui::SetNextWindowBgAlpha(.97f);
+  const float top = jamEditing() && !modEmbedded ? 72 : 12;
+  ImGui::SetNextWindowPos({r.x+r.w*.5f,r.y+top*uiScale()},ImGuiCond_Always,{.5f,0});ImGui::SetNextWindowSize({width,0});ImGui::SetNextWindowBgAlpha(.97f);
   if(ImGui::Begin("##Build viewport status",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoNav)){
     if(modLoading){
       ImGui::TextUnformatted("Loading mod preview...");

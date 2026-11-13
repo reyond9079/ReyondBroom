@@ -4,8 +4,16 @@
 #include <cmath>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 namespace ftebroom::browser {
+inline std::string_view typedPath(std::string_view text) {
+  const auto first=text.find_first_not_of(" \t\r\n");
+  if(first==text.npos)return {};
+  text=text.substr(first,text.find_last_not_of(" \t\r\n")-first+1);
+  if(text.size()>=2&&text.front()=='"'&&text.back()=='"')text=text.substr(1,text.size()-2);
+  return text;
+}
 struct Segment { std::string label; std::filesystem::path path; };
 inline std::vector<Segment> ancestors(const std::filesystem::path& folder) {
   std::vector<Segment> result;auto path=folder.root_path();

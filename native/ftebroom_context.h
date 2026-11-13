@@ -45,7 +45,7 @@ static void sceneContextPanel()
   if (ImGui::BeginPopup("Scene context"))
   {
     if(gameProfile==1 && ImGui::MenuItem("Create FTE Engine terrain here...")){terrainCreateWindow=true;command(("ftebroom_terrain_position "+std::to_string(sceneContextX)+" "+std::to_string(sceneContextY)+"\n").c_str());}
-    bool create=ImGui::BeginMenu("Create");placementRect("context/create");if(create){bool model=ImGui::BeginMenu("Model");placementRect("context/model");if(model){
+    bool create=!jamEditing() && ImGui::BeginMenu("Create");if(!jamEditing())placementRect("context/create");if(create){bool model=ImGui::BeginMenu("Model");placementRect("context/model");if(model){
       if(ImGui::MenuItem("3d model"))placementCreate(false);placementRect("context/new-model");
       if(ImGui::MenuItem("Plant",nullptr,false,viewTypes[viewFocus]==0))plantBrushShow();placementRect("context/plant-brush");
       if(ImGui::MenuItem("New plant model..."))placementCreate(true);placementRect("context/new-plant");
@@ -55,7 +55,7 @@ static void sceneContextPanel()
     int group = (int)cvars->GetFloat("ftebroom_context_group"),
         owner = (int)cvars->GetFloat("ftebroom_context_entity"),
         layer = (int)cvars->GetFloat("ftebroom_context_layer");
-    if(ImGui::MenuItem("Export selected BSP model...",nullptr,false,cvars->GetFloat("ftebroom_selection_count")>0))bspModelShow();
+    if(!jamEditing()&&ImGui::MenuItem("Export selected BSP model...",nullptr,false,cvars->GetFloat("ftebroom_selection_count")>0))bspModelShow();
     if (ImGui::MenuItem("Group...", nullptr, false, selected))
     {
       organizationNameRequest = true;

@@ -58,7 +58,9 @@ static std::optional<std::filesystem::path> browserNavigation(const char* id,Bro
     if(state.focus){ImGui::SetKeyboardFocusHere();state.focus=false;}
     ImGui::SetNextItemWidth(-FLT_MIN);
     if(ImGui::InputText("##path",state.text,sizeof state.text,ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)){
-      if(*state.text)navigate=std::filesystem::u8path(state.text).lexically_normal();state.editing=false;
+      const auto path=ftebroom::browser::typedPath(state.text);
+      if(!path.empty())navigate=std::filesystem::u8path(path).lexically_normal();
+      state.editing=false;
     }
     browserQaItem(std::string("nav/")+id+"/input");
     if(ImGui::IsKeyPressed(ImGuiKey_Escape)||(ImGui::IsItemDeactivated()&&!ImGui::IsItemActive()))state.editing=false;

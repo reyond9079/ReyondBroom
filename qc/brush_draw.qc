@@ -135,8 +135,11 @@ void(brushface_t *faces, int numfaces, string shader, vector col, float alpha) D
 		if (!points)
 			continue;	//should probably warn somehow about this
 		R_BeginPolygon(shader);
+		vector faceColor=col;
+		if(shader=="ftebroom/shape-preview")
+			faceColor*=0.62+0.38*fabs(faces[f-1].planenormal*normalize('0.3 -0.5 1'));
 		for (point = 0; point < points; point++)
-			R_PolygonVertex(facepoints[point], '0 0', col, alpha);
+			R_PolygonVertex(facepoints[point], '0 0', faceColor, alpha);
 		R_EndPolygon();
 		if(gridAlpha)fb_preview_face_grid(&faces[f-1],points,spacing,gridAlpha);
 	}

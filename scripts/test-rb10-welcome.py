@@ -85,10 +85,8 @@ def click(key,global_=False,final=False):
 
 def shot(name):
  ui.settle();ImageGrab.grab().save(caseout/(name+'.png'));(caseout/(name+'.json')).write_text(json.dumps(live(),indent=2))
-def splash(label):
- if not a.require_splash:return
- r=wait(lambda:live()['widgets'].get('update/splash'));w,h=Image.open(original/'ftebroom/ui/update-splash.png').size
- check(r['width']>50 and r['height']>50 and abs(r['width']/r['height']-w/h)<.005,'uncropped original splash remains visible '+label)
+def no_splash(label):
+ if a.require_splash:check('update/splash' not in live()['widgets'],'startup splash is hidden '+label)
 def start(label):
  global process,stream,ui,root,data,state,caseout
  caseout=out/label;caseout.mkdir(exist_ok=True);root=caseout/'editor-runtime'
@@ -138,11 +136,14 @@ def wait_installed(restart):
 try:
  start('restart')
  if a.require_splash:
-  splash('when an update is offered')
-  release_gate.clear()
-  try:
-   ui.console('ftebroom_test_desktop welcome132updates');wait(lambda:live()['stage']=='checking');splash('through the pending update check');shot('00-checking-splash')
-  finally:release_gate.set()
+  no_splash('when an update is offered')
+  ui.console('ftebroom_test_desktop welcome132splash')
+  wait(lambda:'welcome132_startup_splash_centered' in (data/'qconsole.log').read_text(errors='replace'))
+  check('FTEBROOM_DESKTOP_FAIL welcome132_startup_splash' not in (data/'qconsole.log').read_text(errors='replace'),'startup splash is visible and centered')
+  ui.console('ftebroom_test_desktop welcome132check-error')
+  wait(lambda:'update/check' in live()['widgets'])
+  no_splash('after a failed check')
+  ui.console('ftebroom_test_desktop welcome132updates')
   wait(lambda:live()['stage']=='available' and 'update/start' in live()['widgets'])
  check(live()['currentVersion']==current and live()['availableVersion']==latest,'welcome clearly reports current and available versions')
  ui.console('ftebroom_test_desktop welcome132protocol');wait(lambda:'welcome132_verified_ready_status' in (data/'qconsole.log').read_text(errors='replace'))
@@ -165,7 +166,7 @@ try:
  wait(lambda:live()['windowOpen'] and live()['welcomeStage']=='updates' and 'update/start' in live()['widgets'])
  check('update/skip' not in live()['widgets'],'Help > Updates opens a focused manual update window')
  click('update/start');wait(lambda:live()['committed'] and live()['stage']=='downloading')
- splash('during downloading')
+ no_splash('during downloading')
  progress=[];deadline=time.monotonic()+35
  while time.monotonic()<deadline:
   value=live();progress.append(value['received'])
@@ -174,7 +175,7 @@ try:
  else:raise AssertionError('Update did not become ready')
  check(len(set(progress))>1 and max(progress)>0,'Update and continue displays actual advancing download bytes')
  check(live()['committed'] and live()['received']==live()['total'] and 'update/skip' not in live()['widgets'],'verified update requires Restart and provides no skip control')
- splash('after verification until restart')
+ no_splash('after verification until restart')
  click('menu/File',True);click('Menu/File/Open...',True)
  check(live()['welcomeStage']=='updates' and not live()['mapFilesOpen'],'File > Open cannot bypass a committed update')
  (caseout/'progress.json').write_text(json.dumps(progress));shot('05-restart-required')

@@ -133,7 +133,7 @@ static void entityPropertyTable()
     pending.clear();
   }
   auto startEdit = [&](const PropertyRow& row, int col) {
-    if (row.internal || (col == 0 && row.key == "classname"))
+    if (row.internal || (jamEditing()&&jamResourceProperty(row.key)) || (col == 0 && row.key == "classname"))
       return;
     selected = editing = row.key;
     column = editColumn = col;

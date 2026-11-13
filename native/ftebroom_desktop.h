@@ -14,7 +14,20 @@ static void textureFolderShow();
 static void importAddWads(const std::vector<std::filesystem::path>& paths){
  if(paths.empty())return;
  if(!gameWad())throw std::runtime_error("Select Quake 1 or Half-Life to use WAD materials.");auto destination=gameProfile==4?hlWads:q1Wads;std::string list=destination;
- for(const auto& path:paths){auto bytes=q1Read(path);if(bytes.compare(0,4,gameProfile==4?"WAD3":"WAD2"))throw std::runtime_error("WAD type does not match the active game profile.");ftebroom::quake1::wad(bytes);auto value=path.generic_u8string();if(value.find_first_of("\r\n;\"")!=value.npos)throw std::runtime_error("Unsupported WAD path.");if(list.find(value)==list.npos){if(!list.empty())list+='\n';list+=value;}}
+ for(const auto& selected:paths){
+   const auto path=std::filesystem::absolute(selected).lexically_normal();
+   if(!ftebroom::pak::exists(path))throw std::runtime_error("WAD file does not exist: "+path.u8string());
+   auto bytes=q1Read(path);
+   if(bytes.compare(0,4,gameProfile==4?"WAD3":"WAD2"))throw std::runtime_error("WAD type does not match the active game profile.");
+   ftebroom::quake1::wad(bytes);
+   const auto value=path.generic_u8string();
+   if(value.find_first_of("\r\n;\"")!=value.npos)throw std::runtime_error("Unsupported WAD path.");
+   std::istringstream configured(list);
+   std::string entry;
+   bool present=false;
+   while(std::getline(configured,entry))if(entry==value){present=true;break;}
+   if(!present){if(!list.empty())list+='\n';list+=value;}
+ }
  if(list.size()>=sizeof q1Wads)throw std::runtime_error("Too many WAD paths.");std::snprintf(destination,sizeof q1Wads,"%s",list.c_str());if(!gameProfileSave())throw std::runtime_error("Cannot save WAD settings.");mountAssets();
 }
 static std::vector<std::filesystem::path> desktopDrops;
@@ -53,7 +66,19 @@ static void desktopDetach(){if(desktopHost&&desktopPrevious&&IsWindow(desktopHos
 static std::vector<std::filesystem::path> importPick(bool save){
  std::vector<wchar_t> buffer(65536);OPENFILENAMEW dialog{};dialog.lStructSize=sizeof dialog;dialog.hwndOwner=desktopHost;dialog.lpstrFile=buffer.data();dialog.nMaxFile=buffer.size();dialog.lpstrFilter=L"Quake WAD2 (*.wad)\0*.wad\0\0";dialog.lpstrDefExt=L"wad";dialog.Flags=OFN_EXPLORER|OFN_NOCHANGEDIR|OFN_PATHMUSTEXIST|(save?0:OFN_FILEMUSTEXIST|OFN_ALLOWMULTISELECT);
  if(!(save?GetSaveFileNameW(&dialog):GetOpenFileNameW(&dialog)))return {};
- std::vector<std::filesystem::path> result;std::filesystem::path first(buffer.data());auto at=std::wcslen(buffer.data())+1;if(!buffer[at])result.push_back(first);else while(buffer[at]){result.push_back(first/std::filesystem::path(buffer.data()+at));at+=std::wcslen(buffer.data()+at)+1;}return result;
+ // In Explorer format nFileOffset is inside the first string for a single file,
+ // and points past the directory terminator for a multi-selection.
+ const auto firstEnd=std::find(buffer.begin(),buffer.end(),L'\0');
+ const std::filesystem::path first(std::wstring(buffer.begin(),firstEnd));
+ if(save || dialog.nFileOffset<firstEnd-buffer.begin())return {first};
+ std::vector<std::filesystem::path> result;
+ for(auto at=firstEnd+1;at<buffer.end()&&*at;){
+   const auto end=std::find(at,buffer.end(),L'\0');
+   if(end==buffer.end())break;
+   result.push_back(first/std::filesystem::path(std::wstring(at,end)));
+   at=end+1;
+ }
+ return result;
 }
 template<class T> struct ImportCom{T* p=nullptr;~ImportCom(){if(p)p->Release();}};
 static ftebroom::quake1::Texture importDecode(const std::filesystem::path& path,const std::string& palette,const std::string& textureName=importName,bool folderPolicy=false,const std::atomic<bool>* cancel=nullptr){
@@ -130,9 +155,11 @@ static void importSaveImage(){
  importAddWads({target});cvars->SetString("ftebroom_reveal_material",texture.name.c_str());importNotice="Added "+texture.name+" to "+target.u8string();importImages.erase(importImages.begin());importName[0]=0;
 }
 static void materialDropTarget(){
+ if(jamEditing())return;
  materialDropVisible=true;materialDropMin=ImGui::GetWindowPos();auto size=ImGui::GetWindowSize();materialDropMax={materialDropMin.x+size.x,materialDropMin.y+size.y};
 }
 static void importMaterialControls(){
+ if(jamEditing())return;
  if(gameWad()){
 #ifdef _WIN32
  if(ImGui::Button("Add WAD(s)...")){try{importAddWads(importPick(false));}catch(const std::exception& e){importError=e.what();}}
@@ -146,6 +173,7 @@ static void importMaterialControls(){
  if(!importError.empty()){ImGui::TextWrapped("%s",importError.c_str());if(ImGui::SmallButton("Dismiss import message"))importError.clear();}
 }
 static void importDialog(){
+ if(jamEditing()){desktopFileDrops.clear();desktopDrops.clear();return;}
  for(const auto& drop:desktopFileDrops)try {
   if(!drop.folder.empty()){if(modelImportSource(drop.path))modelImportEnqueue(drop.path,drop.folder);else modFileCopy(drop.path,drop.folder);continue;}
   auto folder=modFileRoot()/"models"/"imported";modFileValidate(folder);std::filesystem::create_directories(folder);

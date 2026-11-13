@@ -287,12 +287,14 @@ static void modFilesViewButton(bool tiles)
 static void editorStatusLine(const char* status,bool warning,bool reserveZoom=false)
 {
   const bool filesOpen=modFilesOpen;
-  if(ImGui::SmallButton(filesOpen?"Hide files":"Show files")){
-    modFilesOpen=!filesOpen;
-    modFilesRequestFocus=modFilesOpen;
+  if (!jamEditing()) {
+    if(ImGui::SmallButton(filesOpen?"Hide files":"Show files")){
+      modFilesOpen=!filesOpen;
+      modFilesRequestFocus=modFilesOpen;
+    }
+    browserQaItem(filesOpen?"files/hide":"files/show");
+    ImGui::SameLine();
   }
-  browserQaItem(filesOpen?"files/hide":"files/show");
-  ImGui::SameLine();
   const auto& style=ImGui::GetStyle();
   const float available=ImGui::GetContentRegionAvail().x;
   const float zoomWidth=reserveZoom?std::min(90.f,available*.28f)+ImGui::GetFrameHeight()+2*style.ItemSpacing.x:0;
@@ -337,7 +339,7 @@ static void modFilesPanel(const char* status,bool warning) {
   imageViewerPanel();
   modelConverterPanel();
   modFilesTextPanel();
-  modFilesVisible=false;if(cvars->GetFloat("ftebroom_skip_setup"))modFilesTestItems.clear();if(!modFilesOpen)return;
+  modFilesVisible=false;if(cvars->GetFloat("ftebroom_skip_setup"))modFilesTestItems.clear();if(!modFilesOpen||jamEditing())return;
   ImGui::SetNextWindowSize({650*uiScale(),450*uiScale()},ImGuiCond_FirstUseEver);
   if(modFilesRequestFocus){ImGui::SetNextWindowFocus();modFilesRequestFocus=false;}
   if(uiSoftPanelBegin(uiModFilesName,&modFilesOpen)) {

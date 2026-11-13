@@ -83,7 +83,7 @@ static void documentSelectProfile(const std::string& bytes)
   documentTerrain=header.terrain;if(header.profile==2&&header.format>=0)q1MapFormat=header.format;
   if(selected<0 || selected==gameProfile)return;
   if(gameProfile<2)q3Root=baseq3;
-  q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();
+  q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();q1DocumentBspWad.clear();
   gameProfile=selected;gameMapModsKnown=false;gameMapResourcePaths.clear();gameMapResourceRoot.clear();
   std::snprintf(baseq3,sizeof baseq3,"%s",gameProfile==3?q2Mod:gameWad()?q1Authoring().c_str():q3Root.c_str());
   gameProfileSave();if(!mountAssets())setupNeeded=true;
@@ -150,8 +150,9 @@ static void objSaveFinished()
 }
 static void documentProceed()
 {
-  const auto next = documentNext;
+  auto next = documentNext;
   documentNext.clear();
+  jamRouteDocument(next);
   if (documentIsExit(next)){
     // No restart token exists until compilation, model, plant and map-save
     // guards have all accepted this exact terminal request.
@@ -164,7 +165,7 @@ static void documentProceed()
     if(next.size()>=10 && next.compare(next.size()-10,10,":resources")==0)gameResourcesRequested=true;
     if(gameProfile<2)q3Root=baseq3;gameProfile=selected;gameMapModsKnown=false;gameMapResourcePaths.clear();gameMapResourceRoot.clear();
     std::snprintf(baseq3,sizeof baseq3,"%s",selected==3?q2Mod:(selected==2||selected==4)?q1Authoring().c_str():q3Root.c_str());
-    q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();
+    q1MapWads.clear();q1MissingMapWads.clear();q1DocumentPak.clear();q1DocumentBspWad.clear();
     gameProfileSave();if(!mountAssets())setupNeeded=true;
     documentTerrain=false;documentUntitled=true;documentFile.clear();pendingDocumentFile.clear();pendingDocumentAlias.clear();documentName="untitled";
     cvars->SetFloat("ftebroom_terrain_document",0);cvars->SetFloat("ftebroom_terrain_edit",0);
@@ -187,12 +188,14 @@ static void documentProceed()
       const auto prepareStarted=std::chrono::steady_clock::now();
       pendingDocumentFile = std::filesystem::u8path(next.substr(1));
       // Keep one immutable input snapshot for metadata, WAD resolution and staging.
-      const auto source=q1Read(pendingDocumentFile);
+      auto source=q1Read(pendingDocumentFile);
       profileLoad("map_read",prepareStarted);
-      documentSelectProfile(source);
-      mapModsOpenSource(source);
-      if(gameProfile==3)q2ReferenceMapMaterials(source);
-      if(gameWad()){std::string member;std::filesystem::path archive;ftebroom::pak::split(pendingDocumentFile,archive,member);bool changed=archive!=q1DocumentPak;q1DocumentPak=archive;if(gameProfile==2)q1MapFormat=ftebroom::quake1::valveMap(source)?1:0;if(q1DiscoverWads(source,pendingDocumentFile)||changed){gameProfileSave();mountAssets();}}
+      if(!jamDocumentResources(source)){
+        documentSelectProfile(source);
+        mapModsOpenSource(source);
+        if(gameProfile==3)q2ReferenceMapMaterials(source);
+        if(gameWad()){std::string member;std::filesystem::path archive;ftebroom::pak::split(pendingDocumentFile,archive,member);bool changed=archive!=q1DocumentPak;q1DocumentPak=archive;if(gameProfile==2)q1MapFormat=ftebroom::quake1::valveMap(source)?1:0;if(q1DiscoverWads(source,pendingDocumentFile)||changed){gameProfileSave();mountAssets();}}
+      }
       pendingDocumentAlias =
         "_ftebroom_open_"
         + std::to_string(std::chrono::system_clock::now().time_since_epoch().count())
@@ -222,6 +225,7 @@ static bool documentSave(
     savingDocument
     || (!safeName(name.c_str()) && documentFile.empty() && destination.empty()))
     return false;
+  if (!backup && !compile && !jamCanSaveTo(destination,name)) return false;
   documentError.clear();
   saveProfileStarted=std::chrono::steady_clock::now();
   const auto serial = std::chrono::system_clock::now().time_since_epoch().count();
@@ -344,7 +348,7 @@ static void documentSaveFinished()
     {
       documentIndexLines(target);
       documentFile = target;
-      recentRemember(target,gameProfile);
+      if (!jamEditing()) recentRemember(target,gameProfile);
       fileBrowserFolder=target.parent_path();
       cvars->SetString("ftebroom_document_path",target.u8string().c_str());
       documentName = target.stem().u8string();
@@ -356,6 +360,7 @@ static void documentSaveFinished()
         documentProceed();
       else
         documentNext.clear();
+      jamSaved(true);
     }
     if(cvars->GetFloat("ftebroom_profile_saves")) {
       const auto ended=std::chrono::steady_clock::now();
@@ -368,6 +373,7 @@ static void documentSaveFinished()
     restorePakMounts();
     documentError = error.what();
     documentNext.clear();
+    if (!savingBackup && !savingExport) jamSaved(false);
     core->Print(("ReyondBroom save failed: " + documentError + "\n").c_str());
   }
 }
@@ -375,6 +381,16 @@ static bool runBeforeDocument(const std::string& next);
 static bool plantBeforeDocument(const std::string& next);
 static void documentRequest(const std::string& next)
 {
+  if(next.rfind("@",0)==0){
+    const std::string_view original(next.data()+1,next.size()-1);
+    const auto trimmed=ftebroom::browser::typedPath(original);
+    if(trimmed!=original && !ftebroom::pak::exists(std::filesystem::u8path(original))){
+      if(trimmed.empty()){documentError="Choose a .map file.";return;}
+      documentRequest("@"+std::string(trimmed));
+      return;
+    }
+  }
+  if (!jamAcceptDocument(next)) return;
   if(runBeforeDocument(next))return;
   if(plantBeforeDocument(next))return;
   if(bbBeforeDocument(next))return;
@@ -386,7 +402,7 @@ static void documentRequest(const std::string& next)
     if(!ftebroom::pak::exists(path)){documentError="The requested map is missing or unreadable.";return;}
 
   }
-  else if (!documentIsExit(next) && next != "__new" && next != "__tour" && next.rfind("__profile:",0)!=0)
+  else if (!documentIsExit(next) && next != "__new" && next != "__tour" && next != "__jam_offline" && next != "__jam_signout" && next.rfind("__profile:",0)!=0)
   {
     qhandle_t handle;
     const int size = files->Open(("maps/" + next + ".map").c_str(), &handle, 1);
@@ -468,6 +484,7 @@ static bool welcomeRecoveryPanel()
 }
 static void documentDialogs()
 {
+  if (jamConfirmDocument()) return;
   if (confirmDocument)
   {
     ImGui::OpenPopup("Save changes?");
@@ -520,6 +537,7 @@ static void documentDialogs()
 }
 static void documentSaveCommand()
 {
+  if (jamSaveCommand()) return;
   char name[64];
   commands->Argv(1, name, sizeof name);
   documentSave(*name ? name : documentName);
@@ -573,6 +591,11 @@ static std::optional<std::filesystem::path> fileBrowserFolderTree(const std::fil
 }
 static void documentFileBrowser()
 {
+  if (jamEditing()) {
+    newMapRequest = openRequest = saveRequest = definitionsRequest = exportRequest = objRequest = false;
+    traceRequest = 0;
+    return;
+  }
   if (newMapRequest || openRequest || saveRequest || definitionsRequest || exportRequest || traceRequest || objRequest)
   {
     cancelGesture();
@@ -636,12 +659,20 @@ static void documentFileBrowser()
     ImGui::SameLine();bool refresh=browserNavigationButton(false);welcomeQaItem("files/refresh");if(refresh)fileBrowserTree.clear();
     static BrowserNavigationState navigation;
     if(auto folder=browserNavigation("map-path",navigation,fileBrowserFolder)) {
-      bool readable=false;try{ftebroom::pak::list(*folder);readable=true;}catch(...){}
-      if(readable) {
-        fileBrowserFolder=*folder;documentError.clear();
-        if(!fileBrowserSaving)fileBrowserName[0]=0;
-        std::snprintf(fileBrowserPath,sizeof fileBrowserPath,"%s",fileBrowserFolder.u8string().c_str());
-      }else documentError="Folder does not exist or cannot be read.";
+      auto extension=folder->extension().u8string();
+      std::transform(extension.begin(),extension.end(),extension.begin(),[](unsigned char c){return char(std::tolower(c));});
+      if(!fileBrowserSaving&&!fileBrowserDefinitions&&!fileBrowserTrace&&extension==".map"&&ftebroom::pak::exists(*folder)){
+        documentError.clear();
+        documentRequest("@"+folder->u8string());
+        if(documentError.empty())ImGui::CloseCurrentPopup();
+      }else{
+        bool readable=false;try{ftebroom::pak::list(*folder);readable=true;}catch(...){}
+        if(readable) {
+          fileBrowserFolder=*folder;documentError.clear();
+          if(!fileBrowserSaving)fileBrowserName[0]=0;
+          std::snprintf(fileBrowserPath,sizeof fileBrowserPath,"%s",fileBrowserFolder.u8string().c_str());
+        }else documentError="Folder does not exist or cannot be read.";
+      }
     }
     const char* definitionExtensions[]={"", ".fgd", ".def", ".ent"};
     if(fileBrowserDefinitions){
@@ -695,16 +726,17 @@ static void documentFileBrowser()
     if (error)
       ImGui::TextWrapped("Cannot read this folder: %s", error.message().c_str());
     ImGui::EndChild();
-    ImGui::InputText("File name", fileBrowserName, sizeof fileBrowserName);
+    const bool submitName=ImGui::InputText("File name",fileBrowserName,sizeof fileBrowserName,ImGuiInputTextFlags_EnterReturnsTrue);
     welcomeQaItem("files/name");
     if (!documentError.empty())
       ImGui::TextWrapped("%s", documentError.c_str());
     bool primaryClicked = ImGui::Button(fileBrowserNew ? "Create map" : fileBrowserSaving ? "Save" : "Open");
     fileBrowserTestItem("primary");
     welcomeQaItem("files/primary");
-    if (primaryClicked)
+    if (primaryClicked || submitName)
     {
-      auto target = fileBrowserFolder / std::filesystem::u8path(fileBrowserName);
+      const auto typed=ftebroom::browser::typedPath(fileBrowserName);
+      auto target=fileBrowserFolder/std::filesystem::u8path(typed);
       if (target.extension().empty() && !fileBrowserDefinitions)
         target += fileBrowserObj ? ".obj" : fileBrowserTrace == 1 ? ".lin" : fileBrowserTrace == 2 ? ".prt" : ".map";
       auto extension = target.extension().u8string();
@@ -724,7 +756,7 @@ static void documentFileBrowser()
           documentError = "Definition file does not exist.";
         else if(definitionsChoose(target,documentError))ImGui::CloseCurrentPopup();
       }
-      else if (!*fileBrowserName || extension != (fileBrowserObj ? ".obj" : ".map"))
+      else if (typed.empty() || extension != (fileBrowserObj ? ".obj" : ".map"))
         documentError = fileBrowserObj ? "Choose an .obj file." : "Choose a .map file.";
       else if(fileBrowserNew) {
         try {

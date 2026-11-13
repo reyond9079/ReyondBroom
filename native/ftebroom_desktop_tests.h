@@ -885,6 +885,27 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     expect(materials.count("textures/q1test")!=0,"map75_valid_wad_survives_missing_archives");
     expect(!q1MissingWads.empty(),"map75_missing_wads_reported");
   }
+  if(std::string(mode)=="jamOfflinePluginWindows"){
+    expect(!jamEditing(),"jam_offline_workspace");
+    pluginsTick();
+    for(const char* id:{"org.reyondbroom.autolevel","org.reyondbroom.ivy","org.reyondbroom.rubble","org.reyondbroom.levelgen"}){
+      const auto found=std::find_if(editorPlugins.begin(),editorPlugins.end(),[&](const auto& p){return p.id==id;});
+      if(found==editorPlugins.end()){
+        expect(std::string_view(id)=="org.reyondbroom.levelgen"&&std::filesystem::is_regular_file(settingsPath().parent_path()/"plugins/autolevel/plugin.ini"),
+               (std::string("jam_offline_plugin_present_")+id).c_str());
+        continue;
+      }
+      found->open=true;frame();frame();
+      const auto* window=ImGui::FindWindowByName(found->name.c_str());
+      expect(found->api&&found->error.empty()&&window&&window->Active,(std::string("jam_offline_plugin_window_")+id).c_str());
+      found->open=false;
+    }
+    worldOpen();frame();frame();
+    const auto* window=ImGui::FindWindowByName("World Architect");
+    expect(window&&window->Active,"jam_offline_world_architect_window");
+    worldArchitect.open=false;
+    return;
+  }
   if(std::string(mode)=="plugin72open"){
     pluginsTick();auto example=std::find_if(editorPlugins.begin(),editorPlugins.end(),[](const auto& p){return p.id=="org.reyondbroom.rubble";});expect(example!=editorPlugins.end()&&example->api&&example->module,"plugin72_external_module_loaded");
     if(example!=editorPlugins.end()){auto& p=*example;p.open=true;frame();if(auto window=ImGui::FindWindowByName(p.name.c_str())){ImGui::SetWindowPos(window,{10,40},ImGuiCond_Always);ImGui::SetWindowSize(window,{650,730},ImGuiCond_Always);}frame();if(auto window=ImGui::FindWindowByName(p.name.c_str()))ImGui::SetScrollY(window,window->ScrollMax.y);frame();}

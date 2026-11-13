@@ -1,0 +1,28 @@
+[Unit]
+Description=ReyondBroom Mapping Jams staging API
+After=network.target
+
+[Service]
+Type=simple
+User=mapping-jams
+Group=mapping-jams
+WorkingDirectory=/opt/mapping-jams
+StateDirectory=mapping-jams
+StateDirectoryMode=0700
+UMask=0077
+Environment=PYTHONPATH=/opt/mapping-jams/server
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/mapping-jams-venv/bin/python -m mapping_jams --data /var/lib/mapping-jams --tools /opt/mapping-jams-deps/ericw --librequake /opt/mapping-jams-deps/librequake/mod_lite/lq1 --plant-preset /opt/mapping-jams/runtime/plants/builtin/catalog.json --port 8765 --moderator-key-file /var/lib/mapping-jams/moderator.key
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

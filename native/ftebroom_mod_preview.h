@@ -42,9 +42,14 @@ static std::string modQuote(const std::string& text)
   if(text.find_first_of("\"\r\n")!=std::string::npos)throw std::runtime_error("A profile path contains a quote or newline.");
   return "\""+text+"\"";
 }
+static std::filesystem::path modRuntimeDirectory()
+{
+  auto jam = jamPreviewRuntime();
+  return jam.empty() ? std::filesystem::u8path(gameRuntime()) : jam;
+}
 static void modValidate()
 {
-  auto mod=std::filesystem::u8path(gameRuntime());
+  auto mod=modRuntimeDirectory();
   if(!std::filesystem::is_regular_file(runBundledEngine()))throw std::runtime_error("The bundled preview engine is missing.");
   if(!std::filesystem::is_directory(mod) || (gameProfile!=4 && !std::filesystem::is_regular_file(mod/"progs.dat") && !std::filesystem::is_regular_file(mod/"pak0.pak")))throw std::runtime_error("The runtime mod directory must contain progs.dat.");
   auto name=mod.filename().u8string();
@@ -62,7 +67,7 @@ static void modLaunch(const std::filesystem::path& source,bool raw)
     for(auto& c:name)if(!std::isalnum(static_cast<unsigned char>(c))||static_cast<unsigned char>(c)>127)c='_';
     if(name.empty())name="preview";
     if(name.size()>48)name.resize(48);
-    auto mod=std::filesystem::absolute(std::filesystem::u8path(gameRuntime())).lexically_normal();
+    auto mod=std::filesystem::absolute(modRuntimeDirectory()).lexically_normal();
     auto root=source.parent_path()/"mod-preview";
     auto home=root/"home", maps=home/mod.filename()/"maps";
     std::filesystem::create_directories(maps);
@@ -146,8 +151,9 @@ static void modPreviewChoose(int choice){
   if(runActive||runExclusive||buildRunning||assetsLoading)return;
   try{
     if(choice==0){
-      if(documentFile.empty())throw std::runtime_error("Save the map once before compiling it.");
       modValidate();
+      if(jamPreviewBeforeCompile()){modChoiceOpen=false;return;}
+      if(documentFile.empty())throw std::runtime_error("Save the map once before compiling it.");
       buildLoadSettings();buildGeometry=true;modCompilePending=true;buildBegin();
       if(!buildRunning){modCompilePending=false;throw std::runtime_error(buildMessage.empty()?"Cannot start compilation.":buildMessage);}
     }else if(choice==1){

@@ -231,8 +231,26 @@ static void action(const char* cmd)
 }
 static void cacheProjectIndexed();
 static void cacheProjectRemember();
+#include <filesystem>
+namespace {
+static bool jamEditing();
+static std::filesystem::path jamPreviewRuntime();
+static bool jamDocumentResources(std::string& source);
+}
 #include "ftebroom_assets.h"
 static bool bbBeforeDocument(const std::string& next);
+namespace {
+static bool jamAcceptDocument(const std::string& next);
+static void jamRouteDocument(std::string& next);
+static void jamDocumentLoaded();
+static bool jamSaveCommand();
+static bool jamCanSaveTo(const std::filesystem::path& destination, const std::string& name);
+static void jamSaved(bool success);
+static bool jamBeforeCompile(bool allowLeaks);
+static std::string jamCompiler(const char* name);
+static bool jamPreviewBeforeCompile();
+static bool jamConfirmDocument();
+}
 #include "ftebroom_document.h"
 #include "ftebroom_wall_browser.h"
 // Camera persistence depends on document paths and platform file helpers.
@@ -263,6 +281,9 @@ static bool terrainCreateWindow;
 #include "ftebroom_desktop.h"
 #include "ftebroom_shader_pack.h"
 #include "ftebroom_update.h"
+#include "ftebroom_jam.h"
+#include "ftebroom_jam_ui.h"
+#include "ftebroom_jam_qa.h"
 #include "ftebroom_cache_maintenance.h"
 #include "ftebroom_bsp_model.h"
 // Actions may focus the entity inspector.
@@ -349,13 +370,40 @@ static void panel(float w, float h)
   io.DeltaTime = lastTime ? std::max(.001f, (now - lastTime) / 1000.f) : 1.f / 60;
   lastTime = now;
   uiLoad();
+  uiJamTheme=jamEditing() || jamModeActive();
   uiApplyScale(w, h);
 #ifndef _WIN32
   linuxPlatformPump(ctrlHeld);
   io.MouseDrawCursor = false;
 #endif
-  if(runUiNavigation()||plantFocused()||worldArchitectFocused())io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
+  const bool startupCheck=recentWindow&&recentStage==WelcomeStage::Updates&&welcomeCheckingAutomatically();
+  if(runUiNavigation()||plantFocused()||worldArchitectFocused()||jamModeActive()||startupCheck)io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::NewFrame();
+  jamTick();
+  if(startupCheck && !jamModeActive()){
+    uiHasScene=false;
+    recentPanel();
+    uiCursorUpdate(false,uiCursorPercent/100.f);
+    render();
+    return;
+  }
+  if(jamModeActive()){
+    if(sceneDrag)cancelGesture();
+    cameraEnd();
+    viewSplitDrag=0;
+    uiHasScene=false;
+    std::fill(std::begin(moveHeld),std::end(moveHeld),false);
+    cvars->SetFloat("ftebroom_forward",0);
+    cvars->SetFloat("ftebroom_right",0);
+    cvars->SetFloat("ftebroom_up",0);
+    jamPanel();
+    jamEditorDialog();
+    jamQaTick();
+    uiCursorUpdate(false,uiCursorPercent/100.f);
+    cvars->SetFloat("ftebroom_text_input",io.WantTextInput&&input->HasMenuFocus());
+    render();
+    return;
+  }
   placementWidgets=nlohmann::json::object();
   browser132QaBegin();
   if(tourActive){
@@ -371,12 +419,13 @@ static void panel(float w, float h)
   const float gap=softChrome?ModernChrome::gutter*uiScale():0;
   const float workspaceY=menuHeight+(softChrome?6*uiScale():0);
   const float statusY=h-statusHeight-margin;
-  uiWorkspace(w,h,workspaceY,statusHeight,margin,gap,modFilesOpen,modFilesRequestFocus);
-  projectSetup();
+  uiWorkspace(w,h,workspaceY,statusHeight,margin,gap,modFilesOpen&&!jamEditing(),modFilesRequestFocus&&!jamEditing());
+  if (!jamEditing()) projectSetup();
   tourOfferPanel();
   modPreviewPanel();
   viewCompute(w, h);
   viewOverlay();
+  jamViewportToolbar();
   if ((int)cvars->GetFloat("ftebroom_tool") == 1)
   {
     auto overlay = ImGui::GetForegroundDrawList();
@@ -479,10 +528,13 @@ static void panel(float w, float h)
   if(softChrome)ImGui::PopStyleColor();
   if (mainMenuVisible)
   {
-    actionMenus();pluginsMenu();shaderPackMenu();
+    actionMenus();
+    if (!jamEditing()) {pluginsMenu();shaderPackMenu();}
+    if (jamEditing()) jamEditorMenu();
+    else if(jamEnabled() && ImGui::MenuItem("Mapping Jams")) jamLocal.open=true;
     if (ImGui::BeginMenu("Workspace"))
     {
-      ImGui::MenuItem("Mod file manager",nullptr,&modFilesOpen);
+      if (!jamEditing()) ImGui::MenuItem("Mod file manager",nullptr,&modFilesOpen);
       if (ImGui::MenuItem("Appearance..."))
         {preferencesRequest = true;preferencesAppearanceRequest=true;}
       if (ImGui::MenuItem("Lock panels", nullptr, &uiLocked))
@@ -1025,7 +1077,7 @@ static void panel(float w, float h)
   if (uiSoftPanelBegin("Face",nullptr,uiPanelFlags()))
     materialBrowser();
   ImGui::End();
-  plantBrushPanel();
+  if (!jamEditing()) plantBrushPanel();
   selectMapTab = selectMaterialTab = false;
   char selectionStatus[192]={}, statusText[512]={};
   cvars->GetString("ftebroom_selection_status",selectionStatus,sizeof selectionStatus);
@@ -1039,7 +1091,7 @@ static void panel(float w, float h)
       sceneDrag?(altHeld?"Z constraint | Esc cancels":"XY constraint | Esc cancels"):
       currentTool==2?"Place 2 or 3 points | Enter applies | Ctrl+Enter changes side | Esc removes last point":
       "Click selects | Drag creates / moves | Shift+Esc exits tool");
-  if(!uiStatusInFiles){
+  if(!uiStatusInFiles || jamEditing()){
     auto flags=ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove;
     if(softChrome)flags|=ImGuiWindowFlags_NoBackground;
     ImGui::SetNextWindowDockID(uiStatusDock,ImGuiCond_Always);
@@ -1058,21 +1110,22 @@ static void panel(float w, float h)
   }
   issuesPanel();
   viewOptionsPanel();
-  runPanel();
+  if (!jamEditing()) runPanel();
   runMissingPanel();
-  buildPanel();
-  bspModelPanel();
+  if (!jamEditing()) {buildPanel();bspModelPanel();}
   ImGui::EndDisabled();
   runUiConfirmClose();
   buildOverlay();
   buildLeakDialog();
   modControlsPanel();
   ImGui::BeginDisabled(modEmbedded);
-  placementTick();
+  if (!jamEditing()) placementTick();
   sceneContextPanel();
   documentFileBrowser();
   documentDialogs();
-  recentPanel();
+  jamEditorDialog();
+  if (!jamEditing()) recentPanel();
+  jamQaTick();
   cameraPositionDialog();
   selectLineDialog();
   replaceMaterialDialog();
@@ -1137,7 +1190,7 @@ static void panel(float w, float h)
       if(ImGui::Checkbox("Use entity class colors for bounds",&classColors))cvars->SetFloat("ftebroom_entity_bounds_class_colors",classColors);
       ImGui::EndTabItem();
     }
-    bool profileTab=ImGui::BeginTabItem("Game profile");runUiRecordGlobal("preferences-profile-tab");if(profileTab)
+    bool profileTab=!jamEditing() && ImGui::BeginTabItem("Game profile");if(!jamEditing())runUiRecordGlobal("preferences-profile-tab");if(profileTab)
     {
       int& chosen=chosenProfile;if(chosen<0)chosen=gameProfile;
       ImGui::Text("Active: %s",gameProfileName());
@@ -1156,7 +1209,7 @@ static void panel(float w, float h)
       ImGui::EndDisabled();
       ImGui::EndTabItem();
     }
-    if(ImGui::BeginTabItem("Backups"))
+    if(!jamEditing() && ImGui::BeginTabItem("Backups"))
     {
     preferencesBackups();
     ImGui::EndTabItem();
@@ -1185,13 +1238,16 @@ static void panel(float w, float h)
     nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
   tracePanel();
   terrainPanel();
-  shaderPackPanel();
-  modFilesPanel(statusText,selectionStatus[0]!=0);
-  modelViewerPanel();bbBenchTick();plantPanel();worldPanel();
-  plantBrushHover();
+  if (!jamEditing()) {
+    shaderPackPanel();
+    modFilesPanel(statusText,selectionStatus[0]!=0);
+    modelViewerPanel();bbBenchTick();plantPanel();worldPanel();
+    plantBrushHover();
+    pluginsPanel();pluginPreviewDraw();
+    textureFolderPanel();prefabPanel();
+  } else modFilesVisible=false;
   softLightGalleryPanel();
-  pluginsPanel();pluginPreviewDraw();
-  symmetryPanel();generatorPanel();arrayPanel();settlePanel();spawnMasterPanel();unityPanel();textureFolderPanel();prefabPanel();entityListPanel();
+  symmetryPanel();generatorPanel();arrayPanel();settlePanel();spawnMasterPanel();unityPanel();entityListPanel();
   importDialog();
   desktopAttach();
   uiFullscreenTick();
@@ -1214,11 +1270,12 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
 {
   initialize();
   auto& io = ImGui::GetIO();
+  const bool inJam = jamModeActive() || (recentWindow&&recentStage==WelcomeStage::Updates&&welcomeCheckingAutomatically());
   if(runUiLive&&(type==1||type==2)){
     if(runUiInputTrace.size()>=100)runUiInputTrace.erase(runUiInputTrace.begin());
     runUiInputTrace.push_back({{"type",type},{"key",key},{"unicode",unicode},{"ctrlCode",input->GetKeyCode("ctrl",nullptr)},{"backspaceCode",input->GetKeyCode("backspace",nullptr)},{"ctrl",io.KeyCtrl},{"active",ImGui::GetActiveID()},{"nav",runUiNavigation()}});
   }
-  if(modelEditorInput(type,key,x,y)){
+  if(!inJam && modelEditorInput(type,key,x,y)){
     if(type==0){io.AddMousePosEvent(modelEditCameraCursor.x,modelEditCameraCursor.y);panel(w,h);}
     return qtrue;
   }
@@ -1232,6 +1289,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
   // Engine patch delivers unbounded relative deltas as event type 3.
   if (type == 3)
   {
+    if (inJam) return qtrue;
     if(modEmbedded && modCaptured){modMouseX+=x;modMouseY+=y;return qtrue;}
     if (sceneLook)
     {
@@ -1271,7 +1329,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     return qtrue;
   }
   if (
-    type == 1 && key == mouseKeys[0] && !popupOpen && !sceneDrag && !sceneLook
+    type == 1 && key == mouseKeys[0] && !inJam && !popupOpen && !sceneDrag && !sceneLook
     && !uiBlocksScene(x, y))
   {
     viewSplitDrag = viewDivider(x, y, w, h);
@@ -1279,29 +1337,29 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
       return qtrue;
   }
   int hit = viewHit(x, y);
-  bool inScene = hit >= 0 && !popupOpen && !viewSplitDrag
+  bool inScene = !inJam && hit >= 0 && !popupOpen && !viewSplitDrag
                  && !uiBlocksScene(x, y, type == 2 && key == mouseKeys[0]);
   if(type==1||type==2){
     bool down=type==1;int mask=key==mouseKeys[0]?1:key==mouseKeys[1]?2:key==mouseKeys[2]?4:0;
     if(mask){if(down){pluginButtonsDown|=mask;pluginButtonsPressed|=mask;}else{pluginButtonsDown&=~mask;pluginButtonsReleased|=mask;}}
     for(int digit=0;digit<10;digit++){char name[2]={char('0'+digit),0};if(key==input->GetKeyCode(name,nullptr)){if(down)pluginDigitKeys|=1u<<digit;else pluginDigitKeys&=~(1u<<digit);}}
-    if(pluginViewportCapture&&key==input->GetKeyCode("escape",nullptr)){if(down)pluginViewportRelease(true);return qtrue;}
+    if(!inJam&&pluginViewportCapture&&key==input->GetKeyCode("escape",nullptr)){if(down)pluginViewportRelease(true);return qtrue;}
     if(pluginViewportCapture&&inScene&&!io.WantTextInput){
       if((mask==1||mask==2)&&!(mask==2&&altHeld)){io.AddMouseButtonEvent(mask==1?0:1,down);return qtrue;}
       if(key==input->GetKeyCode("1",nullptr)||key==input->GetKeyCode("3",nullptr))return qtrue;
     }
   }
-  if(type==1 && key==input->GetKeyCode("escape",nullptr)
+  if(!inJam && type==1 && key==input->GetKeyCode("escape",nullptr)
      && cvars->GetFloat("ftebroom_bsp_preview") && !popupOpen && !io.WantTextInput && captureShortcut.empty()) {
     cameraEnd();buildEdit();return qtrue;
   }
-  if(modEmbedded && (type==1 || type==2)) {
+  if(!inJam && modEmbedded && (type==1 || type==2)) {
     if(modControlCapture>=0){if(type==1 && key>0 && key<1024){
       if(key!=input->GetKeyCode("escape",nullptr)){int previous=modControls[modControlCapture].key;for(auto& binding:modControls)if(binding.key==key)binding.key=previous;modControls[modControlCapture].key=key;}
       modControlCapture=-1;}return qtrue;}
     if(key==input->GetKeyCode("escape",nullptr)){if(type==1){if(modMenuOpen)modMenuOpen=false;else modOpenControls();}return qtrue;}
   }
-  if(modEmbedded && modPlay && (type==1 || type==2)){
+  if(!inJam && modEmbedded && modPlay && (type==1 || type==2)){
     if(cvars->GetFloat("ftebroom_test_mod_input")){char trace[96];std::snprintf(trace,sizeof trace,"FTEBROOM_MOD_KEY %d %d captured=%d\n",key,type,modCaptured?1:0);core->Print(trace);}
     if(modCaptured){
       if(key==input->GetKeyCode("escape",nullptr)){if(type==1)modReleaseInput();return qtrue;}
@@ -1356,8 +1414,8 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
       io.AddKeyEvent(ImGuiMod_Alt, down);
       cvars->SetFloat("ftebroom_alt", down);
     }
-    if(tourActive&&tourKey(key,down,inScene,hit))return qtrue;
-    if (preferencesCaptureKey(key,down)) return qtrue;
+    if(!inJam&&tourActive&&tourKey(key,down,inScene,hit))return qtrue;
+    if (!inJam&&preferencesCaptureKey(key,down)) return qtrue;
     if (modEmbedded && inScene && key == mouseKeys[0])return qtrue;
     if (key == mouseKeys[0])
     {
@@ -1540,7 +1598,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    if (!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()))) dispatchAction(key, down, inScene, hit);
+    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()))) dispatchAction(key, down, inScene, hit);
   }
   return qtrue;
 }
@@ -1600,8 +1658,14 @@ static void mapReady()
     std::snprintf(mapName, sizeof mapName, "%s", documentName.c_str());
   }
   if(tourActive){documentUntitled=true;documentFile.clear();documentName="untitled";tourMapReady();}
+  jamDocumentLoaded();
+  if (jamEditing()) {
+    if (pluginViewportCapture) pluginViewportRelease(true);
+    if (cvars->GetFloat("ftebroom_tool")==plantBrushTool) command("ftebroom_tool_toggle default\n");
+  }
+  std::snprintf(mapName, sizeof mapName, "%s", documentName.c_str());
   documentIndexLines(documentFile);
-  if(!documentUntitled){recentRemember(documentFile,gameProfile);cacheProjectRemember();}
+  if(!documentUntitled&&!jamEditing()){recentRemember(documentFile,gameProfile);cacheProjectRemember();}
   if(!documentFile.empty())fileBrowserFolder=documentFile.parent_path();
   cvars->SetString("ftebroom_document_path",documentFile.u8string().c_str());
   cvars->SetString("ftebroom_document_title",documentName.c_str());
@@ -1651,7 +1715,7 @@ static void QDECL actionFocusTick(int)
   clipboardPump();
   documentTick();
   // Compiler jobs must advance even while the UI is occluded or another menu owns focus.
-  if(ready){mapModsTick();mapModsQaTick();runTick();buildTick();modPreviewTick();pluginsTick();bbImportTick();}
+  if(ready){mapModsTick();mapModsQaTick();runTick();buildTick();modPreviewTick();if(!jamEditing()){pluginsTick();bbImportTick();}}
   if (!ready || input->HasMenuFocus())
     return;
   modelEditorCameraEnd(false);

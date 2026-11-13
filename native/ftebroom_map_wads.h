@@ -27,12 +27,16 @@ MapWads mapWads(const std::string& source, const std::filesystem::path& map,
     std::replace(list.begin(),list.end(),'\\','/');
     std::istringstream entries(list);std::string entry;
     while(std::getline(entries,entry,';')) {
-      if(entry.empty())continue;
+      const auto first=entry.find_first_not_of(" \t\r\n");
+      if(first==entry.npos)continue;
+      entry=entry.substr(first,entry.find_last_not_of(" \t\r\n")-first+1);
       auto path=std::filesystem::u8path(entry);
       if(path.is_relative())path=map.parent_path()/path;
       path=path.lexically_normal();auto resolved=path;
       if(!exists(resolved))resolved=mod/path.filename();
       if(!exists(resolved))resolved=mod/"textures"/path.filename();
+      if(!exists(resolved))resolved=mod/"wads"/path.filename();
+      if(!exists(resolved))resolved=mod/"texture-wads"/path.filename();
       if(!exists(resolved)) {
         auto leaf=path.filename().u8string();
         std::transform(leaf.begin(),leaf.end(),leaf.begin(),[](unsigned char c){return std::tolower(c);});

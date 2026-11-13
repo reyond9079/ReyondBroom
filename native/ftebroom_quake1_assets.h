@@ -18,17 +18,23 @@ static std::vector<qhandle_t> q1ShaderHandles;
 static std::string q1Read(const std::filesystem::path& path) {return ftebroom::pak::read(path);}
 static std::vector<std::filesystem::path> q1ResolvedWads,q1MapWads;
 static std::vector<std::filesystem::path> q1MissingMapWads, q1MissingWads;
-static std::filesystem::path q1DocumentPak;
+static std::filesystem::path q1DocumentPak,q1DocumentBspWad;
 static const std::vector<std::filesystem::path>& q1WadPaths(){return q1ResolvedWads;}
 static void q1FindWads(bool strict=false){
-  q1MissingWads=q1MissingMapWads;
+  const auto jam = jamPreviewRuntime();
+  q1MissingWads=jam.empty() ? q1MissingMapWads : std::vector<std::filesystem::path>{};
   q1ResolvedWads.clear();q1WadLabels.clear();std::vector<std::filesystem::path> sources;
   char builtin[4096]={};if(gameWad()&&files->NativePath(gameProfile==4?"halflife-editor.wad":"quake1-editor.wad",(fs_relative)5,builtin,sizeof builtin))sources.push_back(std::filesystem::u8path(builtin));
   std::vector<std::string> roots={q1Authoring(),gameRuntime()};if(roots[0]==roots[1])roots.pop_back();
   auto base=q1BaseDirectory();if(!base.empty())roots.insert(roots.begin(),base);
-  if(gameMapModsKnown&&!gameMapResourcePaths.empty()){roots.clear();for(const auto& path:gameMapResourcePaths)roots.push_back(path.u8string());}
+  if(gameMapModsKnown)for(const auto& path:gameMapResourcePaths)roots.push_back(path.u8string());
+  if(!jam.empty())roots={jam.u8string()};
+  std::set<std::filesystem::path> scannedRoots;
   for(const auto& root:roots){if(root.empty())continue;std::vector<std::filesystem::path> archives,loose;
-    for(std::filesystem::recursive_directory_iterator it(std::filesystem::u8path(root),std::filesystem::directory_options::skip_permission_denied),end;it!=end;++it){
+    const auto directory=std::filesystem::u8path(root).lexically_normal();
+    std::error_code error;
+    if(!std::filesystem::is_directory(directory,error)||!scannedRoots.insert(directory).second)continue;
+    for(std::filesystem::recursive_directory_iterator it(directory,std::filesystem::directory_options::skip_permission_denied),end;it!=end;++it){
       const auto& e=*it;auto leaf=e.path().filename().u8string();
       if(e.is_directory()&&(leaf=="_ftebroom-build"||leaf=="_ftebroom-wads"||leaf=="cache")){it.disable_recursion_pending();continue;}
       if(!e.is_regular_file())continue;auto ext=e.path().extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);
@@ -38,10 +44,11 @@ static void q1FindWads(bool strict=false){
     for(const auto& archive:archives)for(const auto& entry:ftebroom::pak::directory(archive)){auto ext=std::filesystem::u8path(entry.name).extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);if(ext==".wad")sources.push_back(archive/std::filesystem::u8path(entry.name));}
     sources.insert(sources.end(),loose.begin(),loose.end());
   }
-  if(!q1DocumentPak.empty())for(const auto& e:ftebroom::pak::directory(q1DocumentPak)){auto ext=std::filesystem::u8path(e.name).extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);if(ext==".wad")sources.push_back(q1DocumentPak/std::filesystem::u8path(e.name));}
-  std::istringstream input(gameProfile==4?hlWads:q1Wads);std::string line;
+  if(jam.empty()&&!q1DocumentPak.empty())for(const auto& e:ftebroom::pak::directory(q1DocumentPak)){auto ext=std::filesystem::u8path(e.name).extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);if(ext==".wad")sources.push_back(q1DocumentPak/std::filesystem::u8path(e.name));}
+  std::istringstream input(jam.empty()?(gameProfile==4?hlWads:q1Wads):"");std::string line;
   while(std::getline(input,line)){if(!line.empty()&&line.back()=='\r')line.pop_back();if(line.empty())continue;auto path=std::filesystem::u8path(line);if(path.is_relative())path=std::filesystem::u8path(q1Authoring())/path;sources.push_back(path);}
-  ftebroom::quake1::prioritizeMapWads(sources,q1MapWads);
+  if(jam.empty())ftebroom::quake1::prioritizeMapWads(sources,q1MapWads);
+  if(jam.empty()&&gameProfile==2&&!q1DocumentBspWad.empty())sources.insert(sources.begin(),q1DocumentBspWad);
   char writable[4096]={};if(!files->NativePath("ftebroom.cfg",(fs_relative)5,writable,sizeof writable))throw std::runtime_error("No writable editor cache.");auto cache=std::filesystem::u8path(writable).parent_path()/"cache/wads";std::filesystem::create_directories(cache);
   std::set<std::filesystem::path> seen, availableNames;
   for(const auto& source:sources){if(!seen.insert(source.lexically_normal()).second)continue;
@@ -66,7 +73,10 @@ static void q1FindWads(bool strict=false){
       bool unchanged=false;try{unchanged=std::filesystem::exists(target)&&q1Read(target)==bytes;}catch(...){}
       if(!unchanged){std::ofstream out(target,std::ios::binary);out.write(bytes.data(),bytes.size());out.close();if(!out)throw std::runtime_error("Cannot cache packed WAD.");}
       q1ResolvedWads.push_back(target);q1WadLabels[target.u8string()]=archive.filename().u8string()+"/"+member;
-    }else q1ResolvedWads.push_back(source);
+    }else {
+      q1ResolvedWads.push_back(source);
+      if(source==q1DocumentBspWad)q1WadLabels[source.u8string()]="BSP: "+source.filename().u8string();
+    }
     availableNames.insert(source.filename());
   }
   // A user can reconnect a relocated archive without editing the original MAP.
@@ -78,6 +88,7 @@ static void q1FindWads(bool strict=false){
 }
 static std::string q1WadList() {
   std::string list;for(auto& path:q1WadPaths()){auto name=path.generic_u8string();
+    if(path==q1DocumentBspWad)continue;
     if(name.find_first_of(";\"\r\n")!=std::string::npos)throw std::runtime_error("WAD path contains a separator or quote.");
     if(!list.empty())list+=';';list+=name;}
   return list;
@@ -104,10 +115,60 @@ static std::string q1CompilerWads(const std::filesystem::path& folder,const std:
   std::ofstream output(target,std::ios::binary);output.write(bytes.data(),bytes.size());output.close();
   if(!output)throw std::runtime_error("Cannot stage WAD for the compiler.");return "textures.wad";
 }
+static std::filesystem::path q1FindBspTextures(const std::string& source,const std::filesystem::path& map) {
+  using namespace std::filesystem;
+  if(gameProfile!=2)return {};
+  const auto names=ftebroom::quake1::mapTextures(source);
+  std::set<std::string> wanted(names.begin(),names.end());
+  if(wanted.empty())return {};
+  auto sibling=map;sibling.replace_extension(".bsp");
+  const auto member=path("maps")/sibling.filename();
+  std::vector<path> candidates{sibling};
+  const auto addRoot=[&](const path& root){
+    if(root.empty())return;
+    candidates.push_back(root/member);
+    for(const auto* pak:{"pak1.pak","pak0.pak"})candidates.push_back(root/pak/member);
+  };
+  for(auto it=gameMapResourcePaths.rbegin();it!=gameMapResourcePaths.rend();++it)addRoot(*it);
+  addRoot(u8path(q1Authoring()));
+  addRoot(u8path(q1BaseDirectory()));
+  std::set<path> checked;
+  for(const auto& bsp:candidates){
+    if(!checked.insert(bsp.lexically_normal()).second||!ftebroom::pak::exists(bsp))continue;
+    try{
+      auto wad=ftebroom::quake1::embeddedTextureWad(q1Read(bsp),wanted);
+      if(wad.empty())continue;
+      char writable[4096]={};
+      if(!files->NativePath("ftebroom.cfg",(fs_relative)5,writable,sizeof writable))return {};
+      auto key=std::to_string(std::hash<std::string>{}(bsp.generic_u8string()))+"-"+
+               std::to_string(std::hash<std::string>{}(wad));
+      auto target=u8path(writable).parent_path()/"cache/wads"/u8path(key+"-"+bsp.filename().u8string()+".wad");
+      if(!ftebroom::pak::exists(target)||q1Read(target)!=wad){
+        create_directories(target.parent_path());
+        auto temporary=target;temporary+=".tmp";
+        std::ofstream output(temporary,std::ios::binary|std::ios::trunc);
+        output.write(wad.data(),wad.size());output.close();
+        if(!output)throw std::runtime_error("Cannot cache textures embedded in the BSP.");
+#ifdef _WIN32
+        if(!MoveFileExW(temporary.c_str(),target.c_str(),MOVEFILE_REPLACE_EXISTING))
+          throw std::runtime_error("Cannot install textures embedded in the BSP.");
+#else
+        rename(temporary,target);
+#endif
+      }
+      return target;
+    }catch(const std::exception& error){
+      core->Print(("ReyondBroom: "+bsp.u8string()+": "+error.what()+"\n").c_str());
+    }
+  }
+  return {};
+}
 static bool q1DiscoverWads(const std::string& source,const std::filesystem::path& map) {
+  auto previousBsp=std::exchange(q1DocumentBspWad,{});
   q1FindWads();
   auto resolved=ftebroom::quake1::mapWads(source,map,std::filesystem::u8path(q1Authoring()),ftebroom::pak::exists,q1WadPaths());
-  bool changed=resolved.missing!=q1MissingMapWads || resolved.found!=q1MapWads;
+  q1DocumentBspWad=q1FindBspTextures(source,map);
+  bool changed=resolved.missing!=q1MissingMapWads || resolved.found!=q1MapWads || previousBsp!=q1DocumentBspWad;
   q1MissingMapWads=std::move(resolved.missing);q1MapWads=std::move(resolved.found);
   return changed;
 

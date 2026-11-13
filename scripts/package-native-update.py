@@ -1,7 +1,7 @@
 """Rebuild a native editor distribution from a verified compatible base runtime.
 
 Plugins/game compilers stay pinned to the base distribution. A rebuilt engine
-and its sources can be supplied for each platform; SDL2 requires them. Current CSQC is rebuilt. Windows
+and its sources can be supplied for each platform. Current CSQC is rebuilt. Windows
 must supply the rebuilt audio helper used by the current multitrack editor.
 """
 from pathlib import Path
@@ -28,8 +28,8 @@ p.add_argument('--version', required=True)
 p.add_argument('--output', type=Path, required=True)
 a = p.parse_args()
 windows = a.platform == 'Windows-x64'
-if bool(a.engine) != bool(a.engine_source) or (a.platform == 'Linux-SDL2-x64' and not a.engine):
-    p.error('SDL2 requires --engine and --engine-source for its window-close guard; supply both together')
+if bool(a.engine) != bool(a.engine_source):
+    p.error('Supply --engine and --engine-source together')
 if windows and (not a.audio_dir or not (a.audio_dir / 'ffmpeg.exe').is_file()):
     p.error('Windows requires the rebuilt audio helper and corresponding sources')
 src = Path(__file__).resolve().parents[1]
@@ -42,6 +42,8 @@ else:
     with tarfile.open(a.base_runtime) as archive:
         archive.extractall(out, filter='data')
 root = out / ('ReyondBroom-Windows-x64' if windows else 'ReyondBroom-Linux-x64')
+if a.platform == 'Linux-SDL2-x64' and not a.engine and not (root/'linux-sdl2-build').is_file():
+    p.error('Reusing an SDL2 engine requires an SDL2 base archive')
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -71,6 +73,10 @@ shutil.copy2(a.csprogs, root/'ftebroom/csaddon.dat')
 # Application defaults belong to this source revision, just like the updater.
 for name in ('ftebroom.cfg', 'quake1.ent', 'update-ftebroom.py', 'update-ftebroom.ps1'):
     shutil.copy2(src/'runtime'/name, root/'ftebroom'/name)
+for name in ('mapping-jam-start.map', 'mapping-jam-hub.map'):
+    if (src/'runtime/maps'/name).is_file():
+        (root/'ftebroom/maps').mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src/'runtime/maps'/name, root/'ftebroom/maps'/name)
 if a.engine:
     shutil.copy2(a.engine, root/('bin/fteqw64.exe' if windows else 'fteqw-gl64'))
     if not windows:

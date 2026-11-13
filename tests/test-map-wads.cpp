@@ -17,6 +17,9 @@ int main(){
   assert(result.found.size()==1&&result.missing.empty());
   result=ftebroom::quake1::mapWads("// no archives",P("map.map"),P("/external/mod"),exists);
   assert(result.found.empty()&&result.missing.empty());
+  files.insert(P("/external/mod/texture-wads/quake.wad"));
+  result=ftebroom::quake1::mapWads("\"wad\" \"   old/quake.wad ; \"",P("/external/a.map"),P("/external/mod"),exists);
+  assert(result.missing.empty()&&result.found==std::vector<P>{P("/external/mod/texture-wads/quake.wad")});
   std::vector<P> available={P("/external/My Game/wads/first.wad"),P("/external/mod/second.wad")};
   result=ftebroom::quake1::mapWads("\"wad\" \"old/SECOND.wad;old/first.wad\"",P("/external/a.map"),P("/other/mod"),exists,available);
   assert(result.missing.empty() && result.found==std::vector<P>({available[1],available[0]}));

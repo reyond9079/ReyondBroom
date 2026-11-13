@@ -14,6 +14,25 @@ if(std::string_view(mode).rfind("welcome132",0)==0){
   if(std::string_view(mode)=="welcome132updates"){
     ImGui::ClosePopupsOverWindow(nullptr,false);cvars->SetFloat("ftebroom_dirty",0);updateCommitted=false;welcomeStartup();updateStart();frame();frame();
   }
+  if(std::string_view(mode)=="welcome132splash"){
+    welcomeStartup();updateStarted=true;updateCommitted=false;updateAutomaticCheck=true;updateStage="checking";frame();frame();
+    const auto item=welcomeQaItems.find("update/splash");
+    expect(item!=welcomeQaItems.end()&&item->second["frame"]==ImGui::GetFrameCount(),"welcome132_startup_splash_visible");
+    if(item!=welcomeQaItems.end()){
+      const auto& r=item->second;const auto center=ImGui::GetMainViewport()->GetCenter();
+      expect(std::abs(r["x"].get<float>()+r["width"].get<float>()*.5f-center.x)<2&&std::abs(r["y"].get<float>()+r["height"].get<float>()*.5f-center.y)<2,
+             "welcome132_startup_splash_centered");
+    }
+    for(auto id:{"update/start","update/check"})
+      expect(!welcomeQaItems.count(id)||welcomeQaItems[id]["frame"]!=ImGui::GetFrameCount(),"welcome132_checking_hides_action");
+    for(auto id:{"update/check-progress","update/skip"})
+      expect(welcomeQaItems.count(id)&&welcomeQaItems[id]["frame"]==ImGui::GetFrameCount(),"welcome132_checking_has_progress_and_skip");
+  }
+  if(std::string_view(mode)=="welcome132check-error"){
+    welcomeStartup();updateStarted=true;updateCommitted=false;updateAutomaticCheck=false;updateStage="error";frame();frame();
+    expect(welcomeQaItems["update/check"]["frame"]==ImGui::GetFrameCount()&&welcomeQaItems["update/skip"]["frame"]==ImGui::GetFrameCount(),
+           "welcome132_error_can_retry_or_continue");
+  }
   if(std::string_view(mode)=="welcome132no-update"){
     updateStarted=true;updateSession="qa-no-update";updateCommitted=false;updateStage="current";
     recentStage=WelcomeStage::Updates;recentWindow=true;recoveryChecked=true;recoveryRequest=true;frame();frame();

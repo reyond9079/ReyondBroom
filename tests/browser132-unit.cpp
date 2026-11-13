@@ -6,6 +6,9 @@
 #include <iostream>
 using namespace ftebroom;
 int main(){
+  assert(browser::typedPath(" \t\"C:/Map projects/Карты тест/e1m1.map\"  ")=="C:/Map projects/Карты тест/e1m1.map");
+  assert(browser::typedPath("maps/test room.map \t")=="maps/test room.map");
+  assert(browser::typedPath(" \t ").empty());
   auto parts=browser::ancestors(std::filesystem::u8path("/games/my mod/pak0.pk3/maps"));
   assert(parts.size()==5&&parts.front().path=="/"&&parts[3].path=="/games/my mod/pak0.pk3"&&parts.back().path=="/games/my mod/pak0.pk3/maps");
   auto relative=browser::ancestors(std::filesystem::u8path("models/trees/oak"));assert(relative.size()==3&&relative[1].path=="models/trees");

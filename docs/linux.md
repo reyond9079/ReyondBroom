@@ -19,6 +19,8 @@ private `lib/` directory with its dependencies, licenses and corresponding sourc
 do not set that directory globally in `LD_LIBRARY_PATH`. Compiler paths
 default to these binaries and remain editable. Sound editing uses the installed
 `/usr/bin/ffmpeg`; the package contains a small launcher, not a copied FFmpeg binary.
+Remote Mapping Jams uses the system `libcurl.so.4` and CA certificates
+(`libcurl4t64` and `ca-certificates` on Ubuntu 24.04).
 
 ## Platform differences
 
@@ -48,7 +50,7 @@ Install these build dependencies in addition to the runtime dependencies:
 ```sh
 sudo apt install meson libwayland-dev wayland-protocols build-essential git curl ca-certificates python3 cmake pkg-config \
   unzip zip zlib1g-dev libpng-dev libjpeg-dev libfreetype-dev libgl-dev libx11-dev \
-  libxrandr-dev libxcursor-dev libxi-dev libasound2-dev libpulse-dev libssl-dev \
+  libxrandr-dev libxcursor-dev libxi-dev libasound2-dev libpulse-dev libssl-dev libcurl4-openssl-dev \
   libsdl2-dev libogg-dev libvorbis-dev libopus-dev libspeex-dev liblzma-dev \
   libassimp-dev libxml2-dev libglib2.0-dev
 bash scripts/build-linux.sh /path/to/dedicated-build-directory

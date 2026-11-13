@@ -85,6 +85,7 @@ static std::string definitionsExpand(
 #include "ftebroom_bb_io.h"
 static bool definitionsLoad(std::string selection, bool mapOverride)
 {
+  if(!jamPreviewRuntime().empty()){selection="builtin:reyond";mapOverride=false;}
   const bool bundled=selection=="builtin:reyond";
   std::string path=std::move(selection), notice;
   std::string origin="Map override";
@@ -516,9 +517,16 @@ static void entitySoundPreview()
   if(!error.empty())ImGui::TextWrapped("%s",uiTr(error.c_str()));
   ImGui::TextWrapped("Uses mounted mod resources. Custom progs.dat may choose sounds dynamically; enter that relative sound path above.");
 }
+static bool jamResourceProperty(const std::string& key)
+{
+  const auto name=entityLower(key);
+  return name=="wad" || name=="_wad" || name=="_tb_mod" || name=="_tb_def" || name=="model";
+}
 static void entityProperty(
   const char* op, const std::string& key, const std::string& value = "")
 {
+  if(jamEditing()&&(jamResourceProperty(key)||
+      (std::string_view(op)=="rename"&&jamResourceProperty(value))))return;
   command(("ftebroom_entity_property " + std::string(op) + " " + organizationQuote(key)
            + " " + organizationQuote(value) + "\n")
             .c_str());
@@ -772,11 +780,13 @@ static void entityPanel()
       const char* translated=definitions;const char* end=nullptr;FteBroomTranslate(translated,end);
       float definitionWidth=ImGui::CalcTextSize(translated,end).x+ImGui::GetStyle().FramePadding.x*2;
       bool compact=definitionWidth+height+sliderWidth+ImGui::GetStyle().ItemSpacing.x*2>footerWidth;
-      if(ImGui::Button(compact?"...##definitions":definitions))ImGui::OpenPopup("Entity definitions menu");
-      entityTestItem("definitions_footer");
-      if(compact&&ImGui::IsItemHovered())ImGui::SetTooltip("Entity definitions");
-      if(ImGui::BeginPopup("Entity definitions menu")){entityDefinitionControls();ImGui::EndPopup();}
-      ImGui::SameLine(std::max(ImGui::GetCursorPosX(),ImGui::GetWindowContentRegionMax().x-sliderWidth-height-ImGui::GetStyle().ItemSpacing.x));
+      if(!jamEditing()){
+        if(ImGui::Button(compact?"...##definitions":definitions))ImGui::OpenPopup("Entity definitions menu");
+        entityTestItem("definitions_footer");
+        if(compact&&ImGui::IsItemHovered())ImGui::SetTooltip("Entity definitions");
+        if(ImGui::BeginPopup("Entity definitions menu")){entityDefinitionControls();ImGui::EndPopup();}
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX(),ImGui::GetWindowContentRegionMax().x-sliderWidth-height-ImGui::GetStyle().ItemSpacing.x));
+      }
       entityBrowserIcon("##entityThumbnailMagnify",false);
       if(ImGui::IsItemHovered())ImGui::SetTooltip("Thumbnail size");
       ImGui::SameLine();ImGui::SetNextItemWidth(sliderWidth);ImGui::SliderInt("##entityThumbnailSize",&entityThumbnailSize,48,160,"%d");

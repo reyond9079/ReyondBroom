@@ -68,11 +68,11 @@ jobs:
         python-version: '3.12'
     - name: Install build and validation tools
       run: |
-        if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! command -v xclip || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h || ! test -f /usr/include/alsa/asoundlib.h || ! test -f /usr/include/X11/extensions/Xrandr.h || ! test -f /usr/include/X11/extensions/scrnsaver.h || ! test -f /usr/include/X11/Xcursor/Xcursor.h; then
+        if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! command -v xclip || ! pkg-config --exists libcurl || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h || ! test -f /usr/include/alsa/asoundlib.h || ! test -f /usr/include/X11/extensions/Xrandr.h || ! test -f /usr/include/X11/extensions/scrnsaver.h || ! test -f /usr/include/X11/Xcursor/Xcursor.h; then
           apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
           install_tools() {
             sudo timeout 120s apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update &&
-              sudo timeout 180s apt-get "${apt_options[@]}" install -y build-essential cmake libgl-dev libegl1 libgl1-mesa-dri libasound2-dev libx11-dev libxss-dev libxrandr-dev libxcursor-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip ffmpeg libsdl2-dev ripgrep
+              sudo timeout 180s apt-get "${apt_options[@]}" install -y build-essential cmake libcurl4-openssl-dev libgl-dev libegl1 libgl1-mesa-dri libasound2-dev libx11-dev libxss-dev libxrandr-dev libxcursor-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip ffmpeg libsdl2-dev ripgrep
           }
           if test -f /etc/apt/apt-mirrors.txt; then
             installed=false

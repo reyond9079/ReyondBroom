@@ -170,8 +170,21 @@ static bool actionMatches(uint32_t required, uint32_t current)
       return false;
   return true;
 }
+static bool jamActionAllowed(const Action& a)
+{
+  if (!jamEditing()) return true;
+  const std::string_view id=a.id;
+  if (id.rfind("Menu/File/",0)==0)
+    return id=="Menu/File/Open..." || id=="Menu/File/Save" || id=="Menu/File/Save as..." ||
+           id=="Menu/File/Close" || id=="Menu/File/Revert" || id=="Menu/File/Exit";
+  if (id.rfind("Menu/Run/",0)==0)
+    return id=="Menu/Run/Build" || id=="Menu/Run/Toggle BSP preview";
+  return id!="Menu/View/Prefab collections" && id.rfind("Menu/Model editor/",0)!=0;
+}
+
 static bool actionAvailable(const Action& a)
 {
+  if (!jamActionAllowed(a)) return false;
   if(gameClassic() && std::string(a.id)=="Menu/Tools/Control Point")return false;
   if((int)cvars->GetFloat("ftebroom_tool")==4)
   {
@@ -184,6 +197,7 @@ static bool actionAvailable(const Action& a)
 }
 static void executeAction(const Action& a, bool down = true)
 {
+  if (!jamActionAllowed(a)) return;
   if (!a.command)
   {
     if (down)
@@ -247,6 +261,7 @@ static void executeAction(const Action& a, bool down = true)
     else if (name == "build")buildWindow=true;
     else if (name == "buildnow")buildBegin();
     else if (name == "bsptoggle") {if(cvars->GetFloat("ftebroom_bsp_preview"))buildEdit();else buildShow();}
+    else if (name == "compile" && jamEditing()) buildBegin();
     else if (name == "compile" || name == "launch" || name == "launchfte" || name == "rerun")
       runAction(name);
     else if (name == "clip")
@@ -255,12 +270,15 @@ static void executeAction(const Action& a, bool down = true)
       command("ftebroom_tool_toggle clip\n");
       selectMapTab = true;
     }
+    else if (name == "close" && jamEditing()) jamLocal.open = true;
     else if (name == "new" || name == "close")
       documentRequest("__new");
     else if (name == "revert" && !documentFile.empty())
       documentRequest("@"+documentFile.u8string());
     else if (name == "exit")
       documentRequest("exit");
+    else if (name == "save" && jamSaveCommand()) {}
+    else if (name == "saveas" && jamEditing()) jamFileRequest(JamFileDialog::Save);
     else if (name == "save" && !documentUntitled)
       documentSave(documentName);
     else if (name == "save" || name == "saveas")
@@ -270,7 +288,8 @@ static void executeAction(const Action& a, bool down = true)
     }
     else if (name == "open")
     {
-      recentOpen();
+      if (jamEditing()) jamFileRequest(JamFileDialog::Open);
+      else recentOpen();
       inspector = true;
     }
     else if (name == "cameraposition")
@@ -482,7 +501,7 @@ static void actionMenuGroup(const char* group,bool visibility=false)
     if (
       std::string(a.id).rfind(prefix, 0) == 0
       && std::string(a.id).find('/', prefix.size()) == std::string::npos
-      && visibilityAction(a)==visibility)
+      && visibilityAction(a)==visibility && jamActionAllowed(a))
     {
       if(gameClassic() && std::string(a.id)=="Menu/Tools/Control Point")continue;
       bool held = a.command && std::string(a.command).rfind("ftebroom_hold ", 0) == 0;
@@ -526,9 +545,9 @@ static void actionMenus()
     if (opened)
     {
       actionMenuGroup(group);
-      if(std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
+      if(!jamEditing()&&std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
       if(std::string(group)=="Edit") {
-        if(ImGui::MenuItem("Plant Editor..."))plantShow();
+        if(!jamEditing()&&ImGui::MenuItem("Plant Editor..."))plantShow();
         if(ImGui::BeginMenu("Symmetry")){
           actionMenuGroup("Edit/Symmetry");ImGui::Separator();
           if(ImGui::MenuItem("Settings..."))symmetryWindow=true;

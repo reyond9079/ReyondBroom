@@ -365,5 +365,5 @@ static void mapInspector()
   if(ImGui::IsItemDeactivated())uiSaveAppearance();
   mapBoundsPanel();
   ImGui::Spacing();
-  mapModsPanel();
+  if (!jamEditing()) mapModsPanel();
 }

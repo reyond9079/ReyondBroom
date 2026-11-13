@@ -78,7 +78,7 @@ static void assetsReady()
   resourceDirs.clear();
   shaderFiles = 0;
   if(gameWad()) {
-    try {q1IndexAssets();cacheProjectIndexed();publishMaterialTags();command("ftebroom_definitions\n");char current[256]={};cvars->GetString("mapname",current,sizeof current);if(std::filesystem::path(current).stem()=="start"&&!cvars->GetFloat("ftebroom_dirty"))profileStartMap();assetsLoading=false;setupNeeded=false;cvars->SetFloat("ftebroom_material_count",float(materials.size()));return;}
+    try {q1IndexAssets();cacheProjectIndexed();publishMaterialTags();command("ftebroom_definitions\n");char current[256]={};cvars->GetString("mapname",current,sizeof current);if(jamPreviewRuntime().empty()&&std::filesystem::path(current).stem()=="start"&&!cvars->GetFloat("ftebroom_dirty"))profileStartMap();assetsLoading=false;setupNeeded=false;cvars->SetFloat("ftebroom_material_count",float(materials.size()));return;}
     catch(const std::exception& e){assetError=e.what();assetsLoading=false;setupNeeded=true;return;}
   }
   scanDirectory("textures/");
@@ -214,6 +214,17 @@ static bool mountAssets()
   cvars->SetFloat("ftebroom_classic_map",gameClassic());
   try
   {
+    const auto jam = jamPreviewRuntime();
+    if (!jam.empty()) {
+      if (!std::filesystem::is_regular_file(jam/"pak0.pak")) throw std::runtime_error("The Jam resource pack is missing.");
+      cvars->SetString("ftebroom_assetpath",jam.generic_u8string().c_str());
+      cvars->SetString("ftebroom_modassetpath","");
+      cvars->SetString("ftebroom_mapassetpaths","");
+      gameMapModsError.clear();
+      assetsLoading = true;
+      command("fs_restart\nftebroom_assets_ready\n");
+      return true;
+    }
     if(gameProfile==2) {
       auto selected=ftebroom::quakeResourceDirectory(q1Authoring()).generic_u8string();
       if(selected.size()>=sizeof q1Mod || selected.size()>=sizeof baseq3)throw std::runtime_error("The Quake 1 resource path is too long.");

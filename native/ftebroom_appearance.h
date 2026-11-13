@@ -8,6 +8,7 @@ static int uiScaleChoice = uiDefaultScaleChoice;
 static constexpr int uiDefaultCursorPercent=100;
 static int uiCursorPercent=uiDefaultCursorPercent;
 static int uiTheme = 0;
+static bool uiJamTheme = false;
 static const char* uiThemeNames[]={"Modern Dark","Retro Light","Retro Dark","Modern Light","Half-Life","Quake"};
 static ImFont* uiFonts[5] = {};
 static ImFont* uiItalicFonts[5] = {};
@@ -117,8 +118,8 @@ static void uiStyle()
     s.WindowRounding=s.ChildRounding=s.FrameRounding=s.GrabRounding=s.PopupRounding=s.TabRounding=s.ScrollbarRounding=0;
     s.FrameBorderSize=2;s.WindowBorderSize=2;s.ChildBorderSize=2;s.TabBorderSize=1;
   }
-  if(uiModern())ModernChrome::apply(s,uiTheme);
-  if(uiTheme==4) {
+  if(uiModern())ModernChrome::apply(s,uiEffectiveTheme());
+  if(!uiJamTheme && uiTheme==4) {
     // Original olive/orange palette inspired by classic Half-Life VGUI.
     for(auto slot:{ImGuiCol_WindowBg,ImGuiCol_PopupBg,ImGuiCol_MenuBarBg,ImGuiCol_Tab,ImGuiCol_TabDimmed})c[slot]=uiColor(63,68,52);
     c[ImGuiCol_ChildBg]=c[ImGuiCol_FrameBg]=uiColor(37,42,32);
@@ -134,7 +135,7 @@ static void uiStyle()
     s.WindowRounding=s.ChildRounding=s.FrameRounding=s.GrabRounding=s.PopupRounding=s.TabRounding=0;
     s.WindowBorderSize=s.ChildBorderSize=s.FrameBorderSize=1;
   }
-  if(uiTheme==5) {
+  if(!uiJamTheme && uiTheme==5) {
     // Original dark stone, aged brass and ember palette inspired by Quake menus.
     for(auto slot:{ImGuiCol_WindowBg,ImGuiCol_PopupBg,ImGuiCol_MenuBarBg,ImGuiCol_Tab,ImGuiCol_TabDimmed})c[slot]=uiColor(39,32,27);
     c[ImGuiCol_ChildBg]=c[ImGuiCol_FrameBg]=uiColor(22,19,17);

@@ -186,10 +186,14 @@ void fb_primitive_apply()
 }
 void fb_primitive_preview(vector low,vector high)
 {
+    int ortho=cvar("ca_brush_view");
+    if(!ortho)
+        shaderforname("ftebroom/shape-preview","{\ncull none\nsort opaque\n{\nmap $whiteimage\nrgbgen vertex\ndepthwrite\n}\n}");
     if(fb_primitive_build(autocvar_ftebroom_shape,low,high)&&fb_primitive_rotate_results()) for(int b=0;b<fb_csg_count;b++) {
         static brushface_t faces[64];fb_poly_t *poly=&fb_csg_results[b].poly;
         for(int f=0;f<poly->nf;f++) faces[f]=poly->faces[f].attr;
-        DrawQCBrushSolid(faces,poly->nf,"chop",'1 0.8 0',0.15);DrawQCBrushWireframe(faces,poly->nf,"chop",'1 0.8 0',1);
+        if(ortho)DrawQCBrushWireframe(faces,poly->nf,"chop",'1 0.8 0',1);
+        else DrawQCBrushSolid(faces,poly->nf,"ftebroom/shape-preview",'0.76 0.55 0.17',1);
     }
     fb_csg_clear();
 }

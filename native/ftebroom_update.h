@@ -4,7 +4,7 @@ static const std::string& editorVersion(){
   static const auto version=ftebroom::readEditorVersion(documentPath("ftebroom.cfg").parent_path().parent_path()/"build-info.txt");
   return version;
 }
-static bool updateStarted=false,updateCommitted=false;
+static bool updateStarted=false,updateCommitted=false,updateAutomaticCheck=false;
 #ifdef _WIN32
 static HANDLE updateProcess=nullptr;
 #else
@@ -27,7 +27,7 @@ static void welcomeQaPublish(){
   try {
     nlohmann::json widgets=nlohmann::json::object();for(const auto& item:welcomeQaItems)if(item.second["frame"]==ImGui::GetFrameCount())widgets[item.first]=item.second;
     auto value=nlohmann::json{{"widgets",widgets},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},
-      {"windowOpen",recentWindow},{"welcomeStage",recentStage==WelcomeStage::Updates?"updates":recentStage==WelcomeStage::Recovery?"recovery":"recent"},
+      {"windowOpen",recentWindow},{"welcomeStage",recentStage==WelcomeStage::Updates?"updates":recentStage==WelcomeStage::Jam?"jam":recentStage==WelcomeStage::Recovery?"recovery":"recent"},
       {"stage",updateStage},{"committed",updateCommitted},{"currentVersion",editorVersion()},{"availableVersion",updateAvailable},{"session",updateSession},
       {"received",updateReceived},{"total",updateTotal},{"message",updateMessage},{"recoveryPending",recoveryRequest},{"recoveryOpening",recoveryOpening},
       {"dirty",bool(cvars->GetFloat("ftebroom_dirty"))},{"pendingDocument",documentNext},{"saveChangesOpen",widgets.contains("save/cancel")},
@@ -52,6 +52,7 @@ static bool updateRunning(){
 }
 static bool updateStart(const std::string& mode="check"){
   if(updateRunning())return false;
+  updateAutomaticCheck=false;
   try {
     auto root=settingsPath().parent_path();
     std::filesystem::create_directories(root/"updates");
@@ -123,20 +124,21 @@ static bool updateApplyStatus(const nlohmann::json& value){
     // Validate the entire record before changing UI state; foreign or truncated
     // records can never turn a download into an apparent completed update.
     updateMessage=message;updateStage=stage;
+    if(stage!="checking")updateAutomaticCheck=false;
     if(!available.empty()||!updateCommitted)updateAvailable=available;
     updateReceived=uint64_t(received);updateTotal=uint64_t(total);return true;
   }catch(...){return false;}
 }
 static void updateTick(){
   if(!ready||(cvars->GetFloat("ftebroom_skip_setup")&&!welcomeQaEnabled())||firstSetupStep>=0)return;
-  if(!updateStarted){welcomeStartup();updateStarted=true;updateStart();}
+  if(!updateStarted){welcomeStartup();updateStarted=true;updateAutomaticCheck=updateStart();}
   static quintptr_t last=0;auto now=core->GetMilliseconds();if(now-last<100)return;last=now;
   try {
     std::ifstream input(settingsPath().parent_path()/"updates/status.json");
     if(input){std::string bytes((std::istreambuf_iterator<char>(input)),{});if(bytes.size()<16384)updateApplyStatus(nlohmann::json::parse(bytes));}
   } catch(...){} // Atomic status updates may briefly be unavailable on Windows.
   if(!updateRunning()&&(updateStage=="checking"||updateStage=="downloading"||updateStage=="verifying")){
-    updateStage="error";updateMessage="The update manager stopped. Check updates/updater.log and try again.";
+    updateAutomaticCheck=false;updateStage="error";updateMessage="The update manager stopped. Check updates/updater.log and try again.";
   }
 }
 static void updateVersionCard(){
@@ -145,7 +147,8 @@ static void updateVersionCard(){
   if(!updateAvailable.empty()){ImGui::SameLine();ImGui::TextColored(ImVec4(.42f,.78f,.58f,1.f),"  ->  %s",updateAvailable.c_str());}
   ImGui::EndChild();ImGui::Spacing();
 }
-static bool welcomeUpdateContent(){
+static bool welcomeUpdatePanel(){
+  if(updateStage=="current"&&!recentManualUpdates&&!updateCommitted)return true;
   ImGui::TextUnformatted(updateCommitted?"Update ReyondBroom":"Check for updates");updateVersionCard();
   ImGui::TextWrapped("%s",updateMessage.c_str());ImGui::Spacing();
   if(updateCommitted){
@@ -162,7 +165,6 @@ static bool welcomeUpdateContent(){
     }
     return false;
   }
-  if(updateStage=="current"&&!recentManualUpdates)return true;
   if(updateStage=="available"){
     ImGui::TextWrapped("A new release is available. Download it now to continue with the latest version.");
     ImGui::BeginDisabled(updateRunning());
@@ -175,29 +177,57 @@ static bool welcomeUpdateContent(){
   }
   if(updateStage=="error"||(recentManualUpdates&&updateStage=="current")){
     ImGui::BeginDisabled(updateRunning());
-    if(ImGui::Button("Check again",{-1,0}))updateStart();
+    const bool retry=ImGui::Button("Check for updates",{-1,0});welcomeQaItem("update/check");if(retry)updateStart();
     ImGui::EndDisabled();
   }
   return false;
 }
-static bool welcomeUpdatePanel(){
-  // Keep the artwork in the update window throughout checking, downloading,
-  // verification and the restart prompt. It never covers status or controls.
+static bool welcomeCheckingAutomatically(){
+  return updateAutomaticCheck && updateStage=="checking" && !recentManualUpdates;
+}
+static bool welcomeUpdateSplash(){
   static qhandle_t splash=0;
   if(!splash&&std::filesystem::is_regular_file(documentPath("ui/update-splash.png")))splash=draw->LoadImage("ui/update-splash.png");
   float width=0,height=0;
-  if(!splash||draw->ImageSize(splash,&width,&height)<=0||width<=0||height<=0)return welcomeUpdateContent();
-  bool done=false;
-  if(ImGui::BeginTable("update-splash-layout",2,ImGuiTableFlags_SizingStretchSame)){
-    ImGui::TableNextColumn();
-    const auto room=ImGui::GetContentRegionAvail();
-    const float factor=std::min(room.x/width,std::max(1.f,room.y)/height);
-    const ImVec2 size{width*factor,height*factor};
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX()+std::max(0.f,(room.x-size.x)*.5f));
-    ImGui::Image((ImTextureID)splash,size);welcomeQaItem("update/splash");
-    ImGui::TableNextColumn();done=welcomeUpdateContent();ImGui::EndTable();
+  const bool haveImage=splash&&draw->ImageSize(splash,&width,&height)>0&&width>0&&height>0;
+  const auto* viewport=ImGui::GetMainViewport();
+  ImGui::SetNextWindowPos(viewport->Pos,ImGuiCond_Always);
+  ImGui::SetNextWindowSize(viewport->Size,ImGuiCond_Always);
+  ImGui::SetNextWindowViewport(viewport->ID);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{0,0});
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);
+  ImGui::PushStyleColor(ImGuiCol_WindowBg,IM_COL32(55,57,61,255));
+  ImGui::PushStyleColor(ImGuiCol_Text,IM_COL32(239,242,247,255));
+  bool skip=false;
+  if(ImGui::Begin("##welcome-update-splash",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|
+                  ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoScrollbar)){
+    welcomeQaWindow("welcome/window");
+    const auto screen=viewport->Size;
+    const float u=uiScale();
+    const float spacing=std::min(14*u,screen.y*.035f);
+    const float controls=ImGui::GetFrameHeightWithSpacing()+ImGui::GetTextLineHeightWithSpacing()+30*u;
+    const float panel=std::min(screen.x*.88f,390*u);
+    float imageBottom=screen.y*.5f;
+    if(haveImage){
+      const float factor=std::min({screen.x*.83f/width, std::max(1.f,screen.y-2*(controls+spacing))/height,640*u/width});
+      const ImVec2 size{width*factor,height*factor};
+      ImGui::SetCursorPos({(screen.x-size.x)*.5f,(screen.y-size.y)*.5f});
+      ImGui::Image((ImTextureID)splash,size);welcomeQaItem("update/splash");
+      imageBottom=(screen.y+size.y)*.5f;
+    }
+    ImGui::SetCursorPos({(screen.x-panel)*.5f,imageBottom+spacing});
+    ImGui::TextUnformatted("Checking for updates…");
+    ImGui::SetCursorPosX((screen.x-panel)*.5f);
+    ImGui::ProgressBar(-float(ImGui::GetTime()),{panel,9*u},"");welcomeQaItem("update/check-progress");
+    ImGui::SetCursorPosX((screen.x-panel)*.5f);
+    skip=ImGui::Button("Continue without updating",{panel,0});welcomeQaItem("update/skip");
   }
-  return done;
+  ImGui::End();
+  ImGui::PopStyleColor(2);
+  ImGui::PopStyleVar(3);
+  if(skip)updateAutomaticCheck=false;
+  return skip;
 }
 static void updatePanel(){
   ImGui::Text("ReyondBroom %s",editorVersion().c_str());

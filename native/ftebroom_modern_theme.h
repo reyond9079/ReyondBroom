@@ -38,11 +38,22 @@ constexpr Palette dark{
   color(0xCBD7D2,.24f),color(0xCBD7D2,.43f),color(0xCBD7D2,.40f),color(0xCBD7D2),color(0x000000),color(0x080A0A),
   color(0x30564F),color(0x39685E),color(0xA1D5C9,.70f)
 };
+constexpr Palette jam{
+  color(0x0D1524),color(0x131E30),color(0x19263A),color(0x101C2E),color(0x142238),color(0x23354D),
+  color(0xEAF3FF),color(0xA7BDD5),color(0x3B5772),color(0x2C435D),color(0x294D5C),
+  color(0x71C4C2),color(0xA2EDEC),color(0xFFACA4),color(0xFFD58B),
+  color(0x132235),color(0xEAF3FF),color(0xACBFD7),color(0x2A415B),color(0x315967),color(0x233650),color(0x1E3047),
+  color(0x2F4D68),color(0x547695),
+  color(0x0F1C30),color(0x1D314A),color(0x0B1421),color(0x6382A0,.62f),
+  color(0xA5C5E2,.24f),color(0xA5C5E2,.43f),color(0x71C4C2,.55f),color(0xA2EDEC),color(0x05080F),color(0x0A101C),
+  color(0x266762),color(0x35827B),color(0xA2EDEC,.70f)
+};
+constexpr int jamTheme=6;
 constexpr auto transparent = color(0,0);
 constexpr float gutter = 15.f, margin = 17.f, panelRadius = 13.f;
 constexpr float railWidth = 94.f;
-constexpr bool usesModern(int theme) { return theme == 0 || theme == 3; }
-constexpr const Palette& palette(int theme) { return theme == 3 ? light : dark; }
+constexpr bool usesModern(int theme) { return theme == 0 || theme == 3 || theme == jamTheme; }
+constexpr const Palette& palette(int theme) { return theme==jamTheme ? jam : theme==3 ? light : dark; }
 constexpr ImVec4 alpha(ImVec4 color, float opacity) {
   return {color.x,color.y,color.z,opacity};
 }
@@ -88,8 +99,9 @@ inline void apply(ImGuiStyle& s, int theme) {
 }
 
 }
-static bool uiModern(){return ModernChrome::usesModern(uiTheme);}
-static const ModernChrome::Palette& uiModernPalette(){return ModernChrome::palette(uiTheme);}
+static int uiEffectiveTheme(){return uiJamTheme ? ModernChrome::jamTheme : uiTheme;}
+static bool uiModern(){return ModernChrome::usesModern(uiEffectiveTheme());}
+static const ModernChrome::Palette& uiModernPalette(){return ModernChrome::palette(uiEffectiveTheme());}
 // The engine draws its viewport before ImGui. Only the four strips outside
 // that rectangle may carry an opaque workspace background or frame.
 template<class Paint>

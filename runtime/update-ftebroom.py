@@ -28,6 +28,16 @@ DOWNLOADS = 'https://github.com/reyond9079/ReyondBroom/releases/download/'
 ASSETS = 'https://api.github.com/repos/reyond9079/ReyondBroom/releases/assets/'
 TRANSIENT = (408, 429, 500, 502, 503, 504)
 
+
+class UnexpectedDownloadResponse(Exception):
+    """A mirror returned a page or API metadata in place of the asset."""
+
+
+def require_asset(response):
+    content_type = response.headers.get_content_type()
+    if content_type in ('text/html', 'application/json', 'application/vnd.github+json'):
+        raise UnexpectedDownloadResponse('GitHub returned a page instead of the release file.')
+
 def version(tag):
     match = re.fullmatch(r'v?(\d+)\.(\d+)\.(\d+)(?:-alpha\.(\d+))?', tag)
     return tuple(int(x) if x is not None else 999999 for x in match.groups()) if match else None
@@ -74,6 +84,9 @@ def fetch(urls, consume, status):
                     if error.code in (403, 404) and index + 1 < len(urls):
                         break
                     raise
+            except UnexpectedDownloadResponse as error:
+                last = error
+                break
             except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
                 last = error
             if attempt < 2:
@@ -90,6 +103,7 @@ def download_release(asset, checksum, updates, tag, status, progress=None):
     if PurePosixPath(name).name != name or '/' in name or '\\' in name:
         raise ValueError('Unexpected asset name')
     def read_checksum(response):
+        require_asset(response)
         fields = response.read(4097).decode('ascii').split()
         if len(fields) != 2 or not re.fullmatch('[0-9a-fA-F]{64}', fields[0]) or fields[1] != name:
             raise ValueError('Invalid release checksum')
@@ -100,6 +114,7 @@ def download_release(asset, checksum, updates, tag, status, progress=None):
     archive = target_under(updates, name)
     partial = target_under(updates, name + '.part')
     def transfer(response):
+        require_asset(response)
         received = 0
         if progress:
             progress(0, asset['size'])

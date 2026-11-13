@@ -32,7 +32,9 @@ assets=[{'id':i,'name':n,'size':len(d),'url':api+'/assets/'+str(i),'browser_down
         for i,n,d in [(1,name,payload),(2,name+'.sha256',(digest+'  '+name+'\n').encode())]]
 release=[{'tag_name':'v0.5.0-alpha.131','draft':False,'assets':assets}]
 checks=[]
-for scenario in ['api-primary-metadata-504','api-504-browser-fallback','truncated-transfer','checksum-mismatch']:
+scenarios=['api-primary-metadata-504','api-504-browser-fallback','truncated-transfer','checksum-mismatch']
+if not windows:scenarios.append('api-metadata-instead-of-asset')
+for scenario in scenarios:
  if a.scenario and scenario!=a.scenario:continue
  counts=collections.Counter();requests=[]
  class Handler(BaseHTTPRequestHandler):
@@ -47,6 +49,10 @@ for scenario in ['api-primary-metadata-504','api-504-browser-fallback','truncate
     data=json.dumps(release).encode()
    else:
     if kind=='api' and self.headers.get('Accept')!='application/octet-stream':self.send_error(406);return
+    if scenario=='api-metadata-instead-of-asset' and kind=='api':
+     data=b'{"name":"asset metadata"}'
+     self.send_response(200);self.send_header('Content-Type','application/json')
+     self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
     if (scenario=='api-primary-metadata-504' and kind=='browser') or (scenario=='api-504-browser-fallback' and kind=='api'):
      self.send_error(504);return
     data=(digest+'  '+name+'\n').encode() if checksum else payload
@@ -94,6 +100,8 @@ for scenario in ['api-primary-metadata-504','api-504-browser-fallback','truncate
    if scenario=='api-primary-metadata-504':assert counts['metadata-payload']==2 and not counts['browser-sum'] and not counts['browser-payload']
    if scenario=='api-504-browser-fallback':assert counts['api-sum']==3 and counts['api-payload']==3 and counts['browser-sum']==1 and counts['browser-payload']==1
    if scenario=='truncated-transfer':assert counts['api-payload']==2
+   if scenario=='api-metadata-instead-of-asset':
+    assert counts['api-sum']==counts['api-payload']==counts['browser-sum']==counts['browser-payload']==1
    assert all(r['fresh_query'] for r in requests)
    checks.append({'scenario':scenario,'passed':True,'requests':dict(counts)})
    print('PASS',a.platform,scenario,dict(counts),flush=True)

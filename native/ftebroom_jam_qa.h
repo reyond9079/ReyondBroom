@@ -13,7 +13,7 @@ void jamQaClick(ImVec2 point)
 void jamQaTick()
 {
   const auto* stateDirectory = std::getenv("REYONDBROOM_JAM_QA_STATE");
-  if (!stateDirectory || !jamEnabled() || !cvars->GetFloat("ftebroom_skip_setup") || gameProfile != 2) return;
+  if (!stateDirectory || !jamEnabled() || !cvars->GetFloat("ftebroom_skip_setup")) return;
   static int stage = 0;
   static std::string plot, email, password;
   static std::string playedRevision;
@@ -21,6 +21,7 @@ void jamQaTick()
   static const std::string nonce = jam::randomHex(4);
   static const auto start = std::chrono::steady_clock::now();
   static bool finished = false;
+  static const int offlineProfile = gameProfile;
   if (finished) return;
 
   const auto record = [](int step, const std::string& message, bool passed = false) {
@@ -82,6 +83,10 @@ void jamQaTick()
           jamQaClick(jamQaAlphaButton);
           return;
         }
+        jamAssign(jamLocal.password,sizeof jamLocal.password,"too-short");
+        jamRegister();
+        if (jamBusy() || jamLocal.error!=jamPasswordRules())
+          throw std::runtime_error("Registration did not explain the password length before submission.");
         registerUser("author");
         break;
       case 1:
@@ -159,7 +164,8 @@ void jamQaTick()
         break;
       case 7:
         if (documentFile != jamDraft(plot)) return;
-        if (jamPreviewRuntime()!=jamLocal.pack/"lq1" || !gameMapModsError.empty() ||
+        if (gameProfile!=2 || jamLocal.offlineProfile!=offlineProfile ||
+            jamPreviewRuntime()!=jamLocal.pack/"lq1" || !gameMapModsError.empty() ||
             modFilesVisible || !q1MissingWads.empty())
           throw std::runtime_error("The Jam editor did not switch to its own resource pack.");
         for (const auto& wad : q1WadPaths()) {

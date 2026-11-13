@@ -257,10 +257,26 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     if (present && !staleLit) return;
   }
 
-  const auto response = request(client.endpoint, "GET", manifest.at("downloadPath").get<std::string>(),
-                                client.token, {}, {}, length + 4096);
+  const auto path = manifest.at("downloadPath").get<std::string>();
+  HttpResponse response{};
+  for (int attempt=0;;++attempt) {
+    try {
+      response = request(client.endpoint,"GET",path,client.token,{},{},length+4096);
+      if (response.status!=408 && response.status!=429 && response.status!=500 &&
+          response.status!=502 && response.status!=503 && response.status!=504) break;
+      if (attempt==2) throw Error("The Jam download service is temporarily unavailable. Try Play again.",true);
+    } catch (const DownloadInterrupted&) {
+      if (attempt==2) throw;
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(attempt+1));
+  }
   if (response.status == 404) throw Error("The Jam publication changed during download.", true, "ARTIFACT_CHANGED");
-  if (response.status != 200 || response.body.size() != length ||
+  if (response.status == 401 || response.status == 403)
+    throw Error("This session cannot download the Jam map. Sign in again and retry.",false,
+                response.status==401 ? "AUTH_REQUIRED" : "");
+  if (response.status != 200)
+    throw Error("The Jam download failed (HTTP "+std::to_string(response.status)+").",false);
+  if (response.body.size() != length ||
       sha256(response.body) != manifest.at("sha256").get<std::string>())
     throw std::runtime_error("The Jam download did not match its manifest.");
 

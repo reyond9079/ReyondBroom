@@ -12,6 +12,7 @@ float fb_surface_shade(vector normal){return autocvar_ftebroom_shade_faces?0.6+0
 var float autocvar_ftebroom_bounds_visible=1;
 var float autocvar_ftebroom_hidden_tags=0,autocvar_ftebroom_entity_links=1;
 var string autocvar_ftebroom_hidden_classes="";
+var float autocvar_ftebroom_isolate_entity_classes=0,autocvar_ftebroom_show_entity_names_2d=1;
 int *fb_filter_tags;
 int *fb_filter_node_tags;
 int *fb_filter_all_faces_hidden;
@@ -106,7 +107,7 @@ void fb_filter_prepare()
     signature=strcat(signature," water=",cvar_string("r_wateralpha")," tools=",cvar_string("ftebroom_tool_opacity"));
     signature=strcat(signature," ",cvar_string("r_lavaalpha")," ",cvar_string("r_slimealpha")," ",cvar_string("r_telealpha"));
     int selectionMatters=!autocvar_ftebroom_show_brushes || !autocvar_ftebroom_show_patches || !autocvar_ftebroom_show_points || autocvar_ftebroom_hidden_tags || autocvar_ftebroom_hidden_classes!="";
-    signature=strcat(signature," selected=",itos(selectionMatters?fb_selection_epoch:0));
+    signature=strcat(signature," selected=",itos(selectionMatters?fb_selection_epoch:0)," isolate=",ftos(autocvar_ftebroom_isolate_entity_classes));
     if(signature!=previous){strunzone(previous);previous=strzone(signature);fb_filter_epoch++;}
     int materialEpoch=cvar("ftebroom_material_tag_epoch");
     if(materialEpoch!=materials){materials=materialEpoch;fb_filter_materials_load();epoch=-1;}
@@ -140,7 +141,8 @@ int fb_filter_allowed(int node)
     if(fb_nodes[node].kind==FB_NODE_BRUSH && !autocvar_ftebroom_show_brushes)return FALSE;
     if(fb_nodes[node].kind==FB_NODE_PATCH && !autocvar_ftebroom_show_patches)return FALSE;
     if(fb_nodes[node].kind==FB_NODE_ENTITY) {
-        if(strstrofs(autocvar_ftebroom_hidden_classes,strcat("|",fb_nodes[node].fields["classname"],"|"),0)>=0)return FALSE;
+        int listed=strstrofs(autocvar_ftebroom_hidden_classes,strcat("|",strtolower(fb_nodes[node].fields["classname"]),"|"),0)>=0;
+        if(listed==(autocvar_ftebroom_isolate_entity_classes==0))return FALSE;
         if(substring(fb_nodes[node].fields["model"],0,1)!="*" && !autocvar_ftebroom_show_points)return FALSE;
     }
     if(node<fb_filter_tag_count){

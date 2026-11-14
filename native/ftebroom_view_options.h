@@ -57,6 +57,9 @@ static void viewOptionsRestoreDefaults(){
   for(auto name:{"ftebroom_show_entity_names","ftebroom_show_group_bounds","ftebroom_show_brush_entity_bounds","ftebroom_show_entity_bounds","ftebroom_show_models","ftebroom_show_points","ftebroom_show_brushes","ftebroom_show_patches","ftebroom_shade_faces","ftebroom_show_edges"})cvars->SetFloat(name,1);
   cvars->SetFloat("ftebroom_render_faces",0);cvars->SetFloat("r_fog_enabled",0);
   cvars->SetFloat("ftebroom_bounds_visible",1);cvars->SetFloat("ftebroom_entity_links",1);
+  cvars->SetFloat("ftebroom_show_entity_names_2d",1);
+  cvars->SetFloat("ftebroom_isolate_entity_classes",0);
+  cvars->SetString("ftebroom_hidden_classes","");
 }
 static void viewOptionsToolbar(){
   if(modEmbedded||!uiHasScene)return;
@@ -90,12 +93,13 @@ static void viewOptionsClasses(){
   ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##classvisibility","Filter entity classes",query,sizeof query);
   char buffer[16384]{};cvars->GetString("ftebroom_hidden_classes",buffer,sizeof buffer);
   std::string hidden=buffer;std::map<std::string,std::vector<std::string>> groups;
+  bool isolate=cvars->GetFloat("ftebroom_isolate_entity_classes")!=0;
   std::set<std::string> names;
   for(const auto& item:entityDefinitions)names.insert(item.first);
   for(const auto& item:entityUsage)names.insert(item.first);
   for(const auto& name:names)if(name!="worldspawn")groups[name.substr(0,name.find('_'))].push_back(name);
-  auto visible=[&](const std::string& name){return hidden.find("|"+name+"|")==std::string::npos;};
-  auto set=[&](const std::string& name,bool show){auto token="|"+name+"|";auto at=hidden.find(token);if(show&&at!=std::string::npos)hidden.erase(at,token.size());else if(!show&&at==std::string::npos)hidden+=token;};
+  auto visible=[&](const std::string& name){return (hidden.find("|"+name+"|")!=std::string::npos)==isolate;};
+  auto set=[&](const std::string& name,bool show){auto token="|"+name+"|";auto at=hidden.find(token);const bool listed=show==isolate;if(!listed&&at!=std::string::npos)hidden.erase(at,token.size());else if(listed&&at==std::string::npos)hidden+=token;};
   const float footer=ImGui::GetFrameHeightWithSpacing()+4*uiScale();
   ImGui::BeginChild("Class visibility",{0,-footer},ImGuiChildFlags_Borders);
   if(runUiLive){auto p=ImGui::GetWindowPos(),s=ImGui::GetWindowSize();runUiGlobalRects["view-options-classes-region"]={{"x",p.x},{"y",p.y},{"width",s.x},{"height",s.y}};}
@@ -112,13 +116,14 @@ static void viewOptionsClasses(){
     ImGui::Unindent(13*uiScale());ImGui::PopID();
   }
   ImGui::EndChild();
-  if(ImGui::Button("Show all"))hidden.clear();viewOptionsRecord("view-options-showall");ImGui::SameLine();
-  if(ImGui::Button("Hide all")){hidden.clear();for(auto& name:names)if(name!="worldspawn")set(name,false);}viewOptionsRecord("view-options-hideall");
+  if(ImGui::Button("Show all")){hidden.clear();cvars->SetFloat("ftebroom_isolate_entity_classes",0);}viewOptionsRecord("view-options-showall");ImGui::SameLine();
+  if(ImGui::Button("Hide all")){hidden.clear();cvars->SetFloat("ftebroom_isolate_entity_classes",1);command("ftebroom_deselect\n");}viewOptionsRecord("view-options-hideall");
   if(hidden!=buffer)cvars->SetString("ftebroom_hidden_classes",hidden.c_str());
 }
 static void viewOptionsRenderer(){
   uiSectionHeading("Entities");
-  viewOption("Show entity classnames","ftebroom_show_entity_names");
+  viewOption("Show entity classnames in 3D","ftebroom_show_entity_names");
+  viewOption("Show entity classnames in 2D","ftebroom_show_entity_names_2d");
   viewOption("Show group bounds and names","ftebroom_show_group_bounds");
   viewOption("Show brush entity bounds","ftebroom_show_brush_entity_bounds");
   viewOption("Show point entity bounds","ftebroom_show_entity_bounds");
@@ -146,6 +151,7 @@ static void viewOptionsRenderer(){
 }
 static std::string viewOptionsSettings(){
   std::string result;char value[16384]{};
+  for(auto name:{"ftebroom_show_entity_names_2d","ftebroom_isolate_entity_classes"}){cvars->GetString(name,value,sizeof value);result+=name;result+='=';result+=value;result+='\n';}
   for(auto name:{"ftebroom_show_brushes","ftebroom_show_patches","ftebroom_show_points","ftebroom_show_models","ftebroom_show_entity_names","ftebroom_show_group_bounds","ftebroom_show_brush_entity_bounds","ftebroom_show_entity_bounds","ftebroom_hidden_tags","ftebroom_hidden_classes","ftebroom_render_faces","ftebroom_shade_faces","ftebroom_show_edges","r_fog_enabled","ftebroom_entity_links","ftebroom_bounds_visible","ftebroom_grid_plane","ftebroom_sky_overlays","ftebroom_tool_opacity","ftebroom_label_distance","v_gamma","v_contrast","vid_multisample","ftebroom_grid_aa","ftebroom_grid_fade_start","ftebroom_grid_fade_end","gl_texture_anisotropy","gl_texturemode"}){cvars->GetString(name,value,sizeof value);result+=name;result+='=';result+=value;result+='\n';}
   return result;
 }

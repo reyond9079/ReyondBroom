@@ -115,7 +115,16 @@ float fb_viewopts_testcommand()
     fb_selection_clear();fb_filter_prepare();fb_point_render_prepare();int hiddenLabel=FALSE;
     for(int q=0;q<fb_point_render_count;q++)if(fb_point_render[q].id==light)hiddenLabel=TRUE;
     fb_viewopts_expect(!fb_render_allowed(lightNode,FB_PICK_LOCKED) && !hiddenLabel,"deselected_hidden_class_removes_point_and_label_entry");cvar_set("ftebroom_show_points",ftos(points));cvar_set("ftebroom_hidden_classes","");fb_filter_prepare();
+    cvar_set("ftebroom_isolate_entity_classes","1");fb_filter_prepare();
+    fb_viewopts_expect(!fb_render_allowed(lightNode,FB_PICK_LOCKED),"hide_all_isolates_no_classes");
+    cvar_set("ftebroom_hidden_classes","|light|");fb_filter_prepare();
+    fb_viewopts_expect(fb_render_allowed(lightNode,FB_PICK_LOCKED),"one_class_visible_after_hide_all");
+    cvar_set("ftebroom_isolate_entity_classes","0");cvar_set("ftebroom_hidden_classes","");
+    float old2d=cvar("ftebroom_show_entity_names_2d");
     float names=cvar("ftebroom_show_entity_names"),bounds=cvar("ftebroom_show_brush_entity_bounds"),groups=cvar("ftebroom_show_group_bounds");
+    cvar_set("ftebroom_show_entity_names","1");cvar_set("ftebroom_show_entity_names_2d","0");
+    fb_viewopts_expect(fb_entity_classnames_visible(FALSE)&&!fb_entity_classnames_visible(TRUE),"entity_names_in_3d_only");
+    cvar_set("ftebroom_show_entity_names_2d",ftos(old2d));
     cvar_set("ftebroom_show_entity_names","0");cvar_set("ftebroom_show_brush_entity_bounds","1");cvar_set("ftebroom_show_group_bounds","1");
     fb_viewopts_expect(!fb_container_display_allowed(FALSE,TRUE) && fb_container_display_allowed(FALSE,FALSE),"entity_classname_toggle_keeps_bounds");
     fb_viewopts_expect(fb_container_display_allowed(TRUE,TRUE) && fb_container_display_allowed(TRUE,FALSE),"group_names_and_bounds_independent_of_entity_classnames");

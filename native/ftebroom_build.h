@@ -27,6 +27,7 @@ static int traceRevisionNow(){return buildCurrentContentRevision();}
 static void traceEditingView();
 static bool buildLeakFound=false;
 static bool buildLeakOffer=false,buildOpenMap=false;
+static bool buildJamTolerant=false;
 static int buildJobProfile=-1;
 // Remove only the stop-on-leak switch; preserve all other arguments verbatim.
 static std::string buildOpenArguments(std::string args){
@@ -220,7 +221,7 @@ static void mapGpuBegin(int rays, int samples=4){
 static std::string modQuote(const std::string& text);
 static void modValidate();
 static void modPreview();
-static void buildBegin(bool allowLeaks=false)
+static void buildBegin(bool allowLeaks=false,bool retryJamGeometry=false)
 {
   if(documentTerrain){buildMessage="FTE Engine terrain uses MAP plus section files; BSP compilation is unavailable for this document.";return;}
   if(runActive || runExclusive || buildRunning)return;
@@ -229,6 +230,7 @@ static void buildBegin(bool allowLeaks=false)
   if(assetsLoading){buildMessage="Wait for game resources to finish loading before building.";return;}
   buildLeakOffer=false;buildLeakFound=false;buildMessage.clear();runLoad();buildLoadSettings();gameProfileLoad();
   const bool jamBuild=jamEditing();
+  buildJamTolerant=retryJamGeometry;
   if(jamBuild){
     buildGeometry=buildVis=buildLight=true;
     for(auto& argument:buildArguments)argument.clear();
@@ -259,6 +261,7 @@ static void buildBegin(bool allowLeaks=false)
     // This is a one-run override, never a change to the user's saved pipeline.
     const bool visibility=buildVis&&!allowLeaks;
     std::string geometryArguments=allowLeaks?buildOpenArguments(buildArguments[0]):buildArguments[0];
+    if(jamBuild&&retryJamGeometry)geometryArguments="-epsilon 0.05 "+geometryArguments;
     if(allowLeaks&&gameProfile>=2)geometryArguments="-nofill "+geometryArguments;
     buildStages={"Exporting "+documentFile.filename().u8string()};
     std::string common="-game quake3 -fs_basepath \"${GAME_DIR_PATH}/..\" -fs_game baseq3 -threads ${CPU_COUNT} ";
@@ -345,6 +348,15 @@ static void buildTick()
     else{buildResult=gpuBakeOutput;buildResultModel="maps/ftebroom-build/"+buildResult.parent_path().filename().u8string()+"/"+buildResult.filename().u8string();buildSaveHistory();buildMessage="GPU bake complete (experimental neutral-surface bounce).";buildShow();}
   }
   if(!buildRunning||runActive)return;
+  if(jamEditing()&&!buildJamTolerant&&runHadError&&runStep==1&&
+     runLog.find("CheckFace: too few points")!=std::string::npos&&
+     buildDocument==documentFile&&buildGeneration==documentGeneration&&
+     buildContentRevision==buildCurrentContentRevision()&&!cvars->GetFloat("ftebroom_dirty")){
+    {std::ofstream log(buildPending.parent_path()/"build.log");log<<runLog;}
+    buildRunning=false;gameProfileLocked=false;runExportHook=nullptr;runStageHook=nullptr;
+    buildBegin(buildOpenMap,true);
+    return;
+  }
   buildDetectLeak();
   buildRunning=false;gameProfileLocked=false;runExportHook=nullptr;runStageHook=nullptr;
   bool playAfterBuild=modCompilePending;modCompilePending=false;

@@ -117,7 +117,7 @@ void fb_view_cache_draw(int index,vector mn,vector sz)
     drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
     drawpic('0 0 0',image,vidsize,'1 1 1',1,0);
     // Grid and axes are cached behind the wireframe, never painted over it.
-    fb_pick_draw_entities(TRUE);fb_visual_labels();
+    fb_point_draw_2d();fb_pick_draw_entities(TRUE);fb_visual_labels();
     drawresetcliparea();
 }
 /*the renderscene builtin in the parent progs is redirected to here*/

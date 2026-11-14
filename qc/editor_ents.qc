@@ -439,6 +439,14 @@ float(string model) modelindexforname =
 //	print(model);
 //	print("\"\n");
     if(model=="")return 0;
+    if(model=="progs/player.mdl"){
+        float present=getmodelindex(model,TRUE);
+        if(present)return present;
+        searchhandle handle=search_begin(model,TRUE,TRUE);
+        if(handle<0)return 0;
+        int count=search_getsize(handle);search_end(handle);
+        if(!count)return 0;
+    }
     if(!tempent)tempent=spawn();
 	precache_model(model);
 	setmodel(tempent, model);

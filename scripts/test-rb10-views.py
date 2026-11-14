@@ -107,7 +107,7 @@ try:
  wait(lambda:(t:=tools_fits()) and abs(t['height']-collapsed)<3)
  check(True,'collapsing Tools reclaims its original height');shot('tools-collapsed')
  open_options();display='view-options-display-region'
- bools=['ftebroom_show_entity_names','ftebroom_show_group_bounds','ftebroom_show_brush_entity_bounds','ftebroom_show_entity_bounds','ftebroom_show_points','ftebroom_show_models','ftebroom_show_brushes','ftebroom_show_patches','ftebroom_shade_faces','r_fog_enabled','ftebroom_show_edges','ftebroom_bounds_visible']
+ bools=['ftebroom_show_entity_names','ftebroom_show_entity_names_2d','ftebroom_show_group_bounds','ftebroom_show_brush_entity_bounds','ftebroom_show_entity_bounds','ftebroom_show_points','ftebroom_show_models','ftebroom_show_brushes','ftebroom_show_patches','ftebroom_shade_faces','r_fog_enabled','ftebroom_show_edges','ftebroom_bounds_visible']
  if a.width>=1600:
   area=widgets()[display]
   base=[k for k in widgets() if k.startswith(('view-tag-','view-render-mode-','view-entity-links-'))]+['view-option-'+name for name in bools]+['view-options-restore']
@@ -129,24 +129,28 @@ try:
  click(key,'view-options-classes-region');token='|'+classname+'|'
  wait(lambda:token in settings()['ftebroom_hidden_classes'] and token in saved('ftebroom_hidden_classes'))
  check(True,'entity-definition visibility changes and persists an individual class')
- classes=[key.removeprefix('view-definition-') for key in names]
  click('view-options-hideall')
- wait(lambda:all('|'+name+'|' in settings()['ftebroom_hidden_classes'] and '|'+name+'|' in saved('ftebroom_hidden_classes') for name in classes))
- metrics['hidden_classes_bytes']=len(saved('ftebroom_hidden_classes'))
- check(metrics['hidden_classes_bytes']>256,'Hide all persists the complete entity-class list beyond 256 bytes')
+ expect_value('ftebroom_isolate_entity_classes',1)
+ wait(lambda:settings()['ftebroom_hidden_classes']=='' and saved('ftebroom_hidden_classes')=='')
+ click(key,'view-options-classes-region')
+ wait(lambda:settings()['ftebroom_hidden_classes']==token and saved('ftebroom_hidden_classes')==token)
+ check(True,'Hide all allows one class to be restored without listing every hidden class')
  click('view-options-restore',display)
  for name in bools:expect_value(name,0 if name=='r_fog_enabled' else 1)
  expect_value('ftebroom_render_faces',0);expect_value('ftebroom_entity_links',1)
  check(True,'Restore Defaults restores renderer visibility controls and link/material modes')
+ click('view-options-hideall');expect_value('ftebroom_isolate_entity_classes',1)
+ click(key,'view-options-classes-region');wait(lambda:saved('ftebroom_hidden_classes')==token)
  click('view-options-additional',display);click('view-option-ftebroom_grid_plane',display);expect_value('ftebroom_grid_plane',1)
  check(True,'horizontal grid plane enables through its own saved View Options checkbox');shot('view-options-grid-plane')
  area=widgets()[display];ui.move(area['x']+area['width']*.7,area['y']+area['height']*.5);ui.scroll(-20);shot('view-options-advanced')
  click('view-options-close');wait(lambda:'view-options-close' not in widgets());wanted=settings();stop();start('restart')
  check(numeric('ftebroom_grid_plane')==1 and settings()['ftebroom_hidden_classes']==wanted['ftebroom_hidden_classes'],'restart keeps grid-plane and entity-definition visibility choices')
- check(all('|'+name+'|' in settings()['ftebroom_hidden_classes'] for name in classes),'restart keeps every class hidden after Hide all without truncation')
+ check(numeric('ftebroom_isolate_entity_classes')==1 and settings()['ftebroom_hidden_classes']==token,'restart keeps the isolated entity class')
  for name in bools+['ftebroom_render_faces','ftebroom_entity_links','ftebroom_hidden_tags']:
   check(settings()[name]==wanted[name],'restart keeps '+name)
  open_options();click('view-options-showall');wait(lambda:settings()['ftebroom_hidden_classes']=='' and saved('ftebroom_hidden_classes')=='')
+ expect_value('ftebroom_isolate_entity_classes',0)
  check(True,'Show all restores all entity-definition visibility and saves it')
  click('view-options-additional',display);click('view-option-ftebroom_grid_plane',display);expect_value('ftebroom_grid_plane',0)
  check(True,'horizontal grid plane can be independently disabled again');shot('view-options-final');stop()

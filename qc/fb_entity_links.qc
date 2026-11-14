@@ -60,7 +60,7 @@ int fb_container_display_allowed(int group,int labels)
     if(group)return cvar("ftebroom_show_group_bounds")!=0;
     // Classnames and bounds are independent for brush entities, as they are
     // for point entities. The group option intentionally controls both.
-    return cvar(labels?"ftebroom_show_entity_names":"ftebroom_show_brush_entity_bounds")!=0;
+    return cvar(labels?(cvar("ca_brush_view")?"ftebroom_show_entity_names_2d":"ftebroom_show_entity_names"):"ftebroom_show_brush_entity_bounds")!=0;
 }
 void fb_container_draw(int labels)
 {

@@ -61,7 +61,32 @@ inline std::string fileBytes(const fs::path& file, std::size_t limit)
 
 inline void writeBytes(const fs::path& file, const std::string& bytes)
 {
+#ifdef _WIN32
+  // std::filesystem's recursive directory walk may misread the drive root
+  // of an extended-length Win32 path as a directory that needs creation.
+  std::vector<fs::path> missing;
+  for (auto parent=file.parent_path(); !parent.empty(); parent=parent.parent_path()) {
+    const auto attributes=GetFileAttributesW(parent.c_str());
+    if (attributes!=INVALID_FILE_ATTRIBUTES) {
+      if (!(attributes&FILE_ATTRIBUTE_DIRECTORY))
+        throw fs::filesystem_error("The Jam path is not a directory",parent,std::make_error_code(std::errc::not_a_directory));
+      break;
+    }
+    const auto error=GetLastError();
+    if ((error!=ERROR_FILE_NOT_FOUND && error!=ERROR_PATH_NOT_FOUND) || parent==parent.parent_path())
+      throw fs::filesystem_error("Cannot access the Jam directory",parent,std::error_code(error,std::system_category()));
+    missing.push_back(parent);
+  }
+  for (auto entry=missing.rbegin();entry!=missing.rend();++entry) {
+    if (CreateDirectoryW(entry->c_str(),nullptr)) continue;
+    const auto error=GetLastError();
+    const auto attributes=GetFileAttributesW(entry->c_str());
+    if (error!=ERROR_ALREADY_EXISTS || attributes==INVALID_FILE_ATTRIBUTES || !(attributes&FILE_ATTRIBUTE_DIRECTORY))
+      throw fs::filesystem_error("Cannot create the Jam directory",*entry,std::error_code(error,std::system_category()));
+  }
+#else
   fs::create_directories(file.parent_path());
+#endif
   std::ofstream output(file, std::ios::binary | std::ios::trunc);
   output.write(bytes.data(), bytes.size());
   output.close();

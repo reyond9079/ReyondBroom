@@ -269,6 +269,10 @@ int fb_pick(vector pixel)
         FB_HIT_BRUSH|FB_HIT_PATCH|FB_HIT_ENTITY|FB_HIT_HANDLE,cvar("ca_brush_view")!=0);
 }
 int *fb_point_draw_ids;vector *fb_point_draw_colors;int fb_point_draw_capacity;
+int fb_entity_classnames_visible(int ortho)
+{
+    return cvar(ortho?"ftebroom_show_entity_names_2d":"ftebroom_show_entity_names")!=0;
+}
 void fb_pick_draw_entities_uncached(int labelsOnly)
 {
     static vector bounds[2];
@@ -278,7 +282,9 @@ void fb_pick_draw_entities_uncached(int labelsOnly)
     if(cvar("ca_brush_view")) entityWire="ftebroom/entitybounds2d";
     shaderforname(entityWire,strcat("{\n{\nmap $whiteimage\nrgbgen vertex\nalphagen vertex\n",cvar("ca_brush_view")?"nodepthtest\n":"","}\n}"));
     shaderforname("ftebroom/entitysolid","{\ncull none\nsort opaque\n{\nmap $whiteimage\nrgbgen vertex\ndepthwrite\n}\n}");
-    int ortho=cvar("ca_brush_view"),names=cvar("ftebroom_show_entity_names"),models=cvar("ftebroom_show_models"),wire=cvar("ftebroom_show_entity_bounds");
+    int ortho=cvar("ca_brush_view"),models=cvar("ftebroom_show_models"),wire=cvar("ftebroom_show_entity_bounds");
+    int names=fb_entity_classnames_visible(ortho);
+    if(ortho&&!labelsOnly)return;
     if(labelsOnly && (!names || fb_view_render_cache))return;
     vector eye=getproperty(VF_ORIGIN),angles=getproperty(VF_ANGLES),mn=getproperty(VF_MIN),sz=getproperty(VF_SIZE),fov=getproperty(VF_FOV);
     makevectors(angles);vector forward=v_forward,right=v_right,up=v_up;
@@ -421,10 +427,31 @@ void fb_point_render_prepare()
     fb_commit_profile("fb_point_render_prepare",profile81Time);
 }
 int fb_point_preview_cache_allowed();
+void fb_point_draw_2d()
+{
+    fb_point_render_prepare();
+    vector viewportMin=getproperty(VF_MIN),viewportSize=getproperty(VF_SIZE);
+    vector viewportMax=viewportMin+viewportSize;
+    static vector bounds[2];
+    for(int i=0;i<fb_point_render_count;i++){
+        fb_point_render_t *item=&fb_point_render[i];
+        if(!fb_entity_bounds(item->id,bounds))continue;
+        vector a=project(bounds[0]),b=project(bounds[1]);
+        float left=min(a_x,b_x),right=max(a_x,b_x),top=min(a_y,b_y),bottom=max(a_y,b_y);
+        if(right<viewportMin_x || left>=viewportMax_x || bottom<viewportMin_y || top>=viewportMax_y)continue;
+        vector color=fb_entity_selected(item->id)?stov(cvar_string("ftebroom_color_selected")):item->color;
+        drawline(1,[left,top,0],[right,top,0],color,1,0);
+        drawline(1,[right,top,0],[right,bottom,0],color,1,0);
+        drawline(1,[right,bottom,0],[left,bottom,0],color,1,0);
+        drawline(1,[left,bottom,0],[left,top,0],color,1,0);
+    }
+}
 void fb_pick_draw_entities(int labelsOnly)
 {
     if(!autocvar_ftebroom_point_cache || ((fb_active || fb_transform_preview) && !(fb_point_preview_cache_allowed()))){fb_pick_draw_entities_uncached(labelsOnly);return;}
-    int names=cvar("ftebroom_show_entity_names"),ortho=cvar("ca_brush_view"),models=cvar("ftebroom_show_models"),wire=cvar("ftebroom_show_entity_bounds");
+    int ortho=cvar("ca_brush_view"),models=cvar("ftebroom_show_models"),wire=cvar("ftebroom_show_entity_bounds");
+    int names=fb_entity_classnames_visible(ortho);
+    if(ortho&&!labelsOnly)return;
     if(labelsOnly && (!names || fb_view_render_cache))return;
     fb_point_render_prepare();
     cvar_set("ftebroom_selected_entity",fb_entity_classname(fb_selected_entity()));

@@ -18,4 +18,15 @@ inline fs::path filesystemPath(const fs::path& path)
   return path;
 #endif
 }
+
+inline fs::path filesystemAccessPath(const fs::path& path)
+{
+#ifdef _WIN32
+  // Ordinary paths keep Win32 normalization and drive/provider semantics.
+  // Reserve extended paths for names that might exceed the directory limit.
+  if (!path.empty() && fs::absolute(path).native().size() >= 248)
+    return filesystemPath(path);
+#endif
+  return path;
+}
 } // namespace ftebroom

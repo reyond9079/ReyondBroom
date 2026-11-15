@@ -6,7 +6,8 @@ inline void putHalf(std::ostream& out,uint16_t v){out.put(char(v));out.put(char(
 inline bool zipFile(const fs::path& path){auto ext=path.extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);return ext==".pk3";}
 inline bool zipName(std::string name){if(!name.empty()&&name.back()=='/')name.pop_back();if(name.empty()||name.size()>65534||name.front()=='/'||name.find_first_of("\\:\r\n")!=name.npos||name.find('\0')!=name.npos)return false;for(const auto& p:fs::u8path(name))if(p==".."||p==".")return false;return true;}
 inline std::vector<ZipEntry> zipDirectory(const fs::path& path){
-  std::ifstream in(path,std::ios::binary);auto size=fs::file_size(path);if(size<22)throw std::runtime_error("Truncated PK3.");
+  const auto physical=filesystemAccessPath(path);
+  std::ifstream in(physical,std::ios::binary);auto size=fs::file_size(physical);if(size<22)throw std::runtime_error("Truncated PK3.");
   size_t tail=std::min<uintmax_t>(size,65557);std::string bytes(tail,0);in.seekg(size-tail);if(!in.read(bytes.data(),tail))throw std::runtime_error("Cannot read PK3 directory.");
   size_t end=bytes.npos;for(size_t i=tail-22;;--i){if(word(bytes.data()+i)==0x06054b50&&i+22+half(bytes.data()+i+20)==tail){end=i;break;}if(!i)break;}
   if(end==bytes.npos)throw std::runtime_error("PK3 end-of-directory was not found.");auto h=bytes.data()+end;
@@ -31,7 +32,8 @@ inline uint64_t zipData(std::ifstream& in,const ZipEntry& e,uint64_t archiveSize
 inline std::string zipRead(const fs::path& archive,const std::string& member){
   for(const auto& e:zipDirectory(archive))if(e.name==member){
     if(e.size>512*1024*1024||e.compressed>512*1024*1024)throw std::runtime_error("PK3 member exceeds 512 MiB.");
-    std::ifstream in(archive,std::ios::binary);auto offset=zipData(in,e,fs::file_size(archive));in.seekg(offset);std::string packed(e.compressed,0),result(e.size,0);if(e.compressed&&!in.read(packed.data(),e.compressed))throw std::runtime_error("Truncated PK3 payload.");
+    const auto physical=filesystemAccessPath(archive);
+    std::ifstream in(physical,std::ios::binary);auto offset=zipData(in,e,fs::file_size(physical));in.seekg(offset);std::string packed(e.compressed,0),result(e.size,0);if(e.compressed&&!in.read(packed.data(),e.compressed))throw std::runtime_error("Truncated PK3 payload.");
     if(e.method==0){if(e.size!=e.compressed)throw std::runtime_error("Invalid stored PK3 size.");result=std::move(packed);}
     else {z_stream z{};z.next_in=(Bytef*)packed.data();z.avail_in=packed.size();char empty;z.next_out=(Bytef*)(result.empty()?&empty:result.data());z.avail_out=std::max<size_t>(1,result.size());if(inflateInit2(&z,-MAX_WBITS)!=Z_OK)throw std::runtime_error("Cannot initialize PK3 decoder.");int status=inflate(&z,Z_FINISH);bool valid=status==Z_STREAM_END&&z.total_out==e.size&&z.total_in==e.compressed;inflateEnd(&z);if(!valid)throw std::runtime_error("Invalid compressed PK3 data.");}
     if(crc32(0,(const Bytef*)result.data(),result.size())!=e.crc)throw std::runtime_error("PK3 CRC mismatch.");return result;

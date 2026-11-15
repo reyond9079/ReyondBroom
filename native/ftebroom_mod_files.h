@@ -53,8 +53,9 @@ static void modFileValidate(const std::filesystem::path& path) {
 static std::string modFileBytes(const std::filesystem::path& path){
   if(wadBrowseMember(path))return wadBrowseRead(path);
   if(modFileMember(path))return ftebroom::pak::read(path);
-  if(!std::filesystem::is_regular_file(path)||std::filesystem::file_size(path)>512*1024*1024)throw std::runtime_error("Choose a regular file up to 512 MiB.");
-  std::ifstream in(path,std::ios::binary);std::string bytes(std::istreambuf_iterator<char>(in),{});if(!in.eof()&&in.fail())throw std::runtime_error("Cannot read file.");return bytes;
+  if(!std::filesystem::is_regular_file(ftebroom::filesystemAccessPath(path)))
+    throw std::runtime_error("Choose a regular file up to 512 MiB.");
+  return ftebroom::pak::readFile(path);
 }
 static void modFileImportMap(const std::filesystem::path& path,float x,float y) {
   modFileValidate(path);auto bytes=modFileBytes(path);

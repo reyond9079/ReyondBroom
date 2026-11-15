@@ -201,7 +201,7 @@ static void documentProceed()
         "_ftebroom_open_"
         + std::to_string(std::chrono::system_clock::now().time_since_epoch().count())
         + "_" + std::to_string(++saveSerial);
-      {std::ofstream out(documentPath("maps/"+pendingDocumentAlias+".map"),std::ios::binary);out<<source;out.close();if(!out)throw std::runtime_error("Cannot stage map from file/archive.");}
+      {std::ofstream out(ftebroom::filesystemAccessPath(documentPath("maps/"+pendingDocumentAlias+".map")),std::ios::binary);out<<source;out.close();if(!out)throw std::runtime_error("Cannot stage map from file/archive.");}
       if(documentTerrain)terrainCopySections(pendingDocumentFile.parent_path()/pendingDocumentFile.stem(),documentPath("maps/"+pendingDocumentAlias));
       cvars->SetFloat("ftebroom_terrain_dirty",0);cvars->SetFloat("ftebroom_terrain_document",documentTerrain);cvars->SetFloat("ftebroom_terrain_edit",documentTerrain);
       profileLoad("map_resources_and_staging",prepareStarted);
@@ -300,20 +300,22 @@ static void documentSaveFinished()
   }
   try
   {
+    const auto nativeSource = ftebroom::filesystemAccessPath(source);
     if (
       (savingExport && cvars->GetFloat("ftebroom_export_status") != 1) || source.empty()
-      || target.empty() || !std::filesystem::exists(source)
-      || std::filesystem::file_size(source) == 0)
+      || target.empty() || !std::filesystem::exists(nativeSource)
+      || std::filesystem::file_size(nativeSource) == 0)
       throw std::runtime_error("The engine did not write the map.");
     std::filesystem::path archive;std::string member;
     bool packed=ftebroom::pak::split(target,archive,member);
     if(packed){if(savingExport)throw std::runtime_error("Export compiler input to a folder, not a PAK.");auto bytes=gameWad()?ftebroom::quake1::map(q1Read(source),gameProfile==2&&q1MapFormat==0,q1WadList(),true,gameProfile==4):q1Read(source);ftebroom::pak::replace(target,documentMetadata(bytes));}
     else {
-    std::filesystem::create_directories(target.parent_path());
+    std::filesystem::create_directories(ftebroom::filesystemAccessPath(target.parent_path()));
     // Stage beside the destination so replacement remains atomic across drives.
-    const auto nativeTarget = ftebroom::filesystemPath(target);
-    auto adjacent = nativeTarget;
+    const auto nativeTarget = ftebroom::filesystemAccessPath(target);
+    auto adjacent = target;
     adjacent += ".ftebroom-" + std::to_string(saveSerial) + ".tmp";
+    adjacent = ftebroom::filesystemAccessPath(adjacent);
     if(gameWad()){auto converted=ftebroom::quake1::map(q1Read(source),savingExport?false:gameProfile==2&&q1MapFormat==0,savingExport?q1CompilerWads(target.parent_path(),q1Read(source)):q1WadList(),true,gameProfile==4);
       std::ofstream output(adjacent,std::ios::binary);output<<(savingExport?converted:documentMetadata(converted));output.close();if(!output)throw std::runtime_error("Cannot write Quake map.");}
     else {std::ofstream output(adjacent,std::ios::binary);auto bytes=q1Read(source);output<<(savingExport?bytes:documentMetadata(bytes));output.close();if(!output)throw std::runtime_error("Cannot write map.");}
@@ -333,7 +335,7 @@ static void documentSaveFinished()
     if(documentTerrain&&!savingExport) {char loaded[256]={};cvars->GetString("mapname",loaded,sizeof loaded);auto stem=std::filesystem::u8path(loaded).stem().u8string();terrainCopySections(documentPath("maps/"+stem),target.parent_path()/target.stem());}
     restorePakMounts();
     std::error_code cleanupError;
-    std::filesystem::remove(source, cleanupError);
+    std::filesystem::remove(nativeSource, cleanupError);
     core->Print(("FTEBROOM_SAVED " + saveDestination + "\n").c_str());
     if (savingBackup)
     {
@@ -348,7 +350,7 @@ static void documentSaveFinished()
     }
     if (!savingBackup && !savingExport)
     {
-      documentIndexLines(ftebroom::filesystemPath(target));
+      documentIndexLines(ftebroom::filesystemAccessPath(target));
       documentFile = target;
       if (!jamEditing()) recentRemember(target,gameProfile);
       fileBrowserFolder=target.parent_path();

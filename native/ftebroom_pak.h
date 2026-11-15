@@ -29,8 +29,9 @@ inline bool validName(const std::string& n){if(!safe(n))return false;for(const a
 inline bool split(const fs::path& path,fs::path& archive,std::string& member){archive.clear();member.clear();bool found=false;for(const auto& part:path){if(found){if(!member.empty())member+='/';member+=part.u8string();}else{archive/=part;auto ext=part.extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);found=ext==".pak"||ext==".pk3";}}if(!found)archive.clear();return found;}
 inline std::vector<Entry> directory(const fs::path& path,bool ignoreUnsafeNames=false){
   if(zipFile(path)){std::vector<Entry> entries;for(const auto& e:zipDirectory(path))entries.push_back({e.name,e.offset,e.size});return entries;}
-  std::ifstream in(path,std::ios::binary);char h[12];if(!in.read(h,12)||std::string(h,4)!="PACK")throw std::runtime_error("Invalid Quake PAK: "+path.u8string());
-  auto offset=word(h+4),length=word(h+8);auto size=fs::file_size(path);
+  const auto physical=filesystemAccessPath(path);
+  std::ifstream in(physical,std::ios::binary);char h[12];if(!in.read(h,12)||std::string(h,4)!="PACK")throw std::runtime_error("Invalid Quake PAK: "+path.u8string());
+  auto offset=word(h+4),length=word(h+8);auto size=fs::file_size(physical);
   if(offset<12||length%64||length/64>65536||offset>size||length>size-offset)throw std::runtime_error("Invalid PAK directory bounds.");
   in.seekg(offset);std::vector<Entry> result;std::map<std::string,bool> seen;
   for(uint32_t i=0;i<length/64;i++){char row[64];if(!in.read(row,64))throw std::runtime_error("Truncated PAK directory.");size_t n=0;while(n<56&&row[n])n++;Entry e{std::string(row,n),word(row+56),word(row+60)};
@@ -41,21 +42,39 @@ inline std::vector<Entry> directory(const fs::path& path,bool ignoreUnsafeNames=
     seen[e.name]=true;result.push_back(e);}
   return result;
 }
-inline std::string read(const fs::path& path){fs::path archive;std::string member;uint64_t size=0,offset=0;auto physical=path;
-  if(split(path,archive,member)){if(zipFile(archive))return zipRead(archive,member);if(!validName(member))throw std::runtime_error("Unsafe PAK member path.");physical=archive;bool found=false;for(const auto& e:directory(archive,true))if(e.name==member){size=e.size;offset=e.offset;found=true;break;}if(!found)throw std::runtime_error("PAK entry not found: "+member);}
-  else { physical=ftebroom::filesystemPath(path);size=fs::file_size(physical); }
-  if(size>512*1024*1024)throw std::runtime_error("Resource exceeds 512 MiB.");std::ifstream in(physical,std::ios::binary);in.seekg(offset);std::string result(size,'\0');if(size&&!in.read(result.data(),size))throw std::runtime_error("Cannot read "+path.u8string());return result;
+inline std::string readRange(const fs::path& physical,uint64_t offset,uint64_t size){
+  if(size>512*1024*1024)throw std::runtime_error("Resource exceeds 512 MiB.");
+  std::ifstream in(physical,std::ios::binary);
+  in.seekg(offset);
+  std::string result(size,'\0');
+  if(!in || !in.read(result.data(),size))throw std::runtime_error("Cannot read "+physical.u8string());
+  return result;
 }
-inline bool exists(const fs::path& path){try{fs::path a;std::string m;if(!split(path,a,m))return fs::is_regular_file(path);for(const auto& e:directory(a,true))if(e.name==m)return true;}catch(...){}return false;}
+inline std::string readFile(const fs::path& path){
+  const auto physical=filesystemAccessPath(path);
+  return readRange(physical,0,fs::file_size(physical));
+}
+inline std::string read(const fs::path& path){
+  fs::path archive;
+  std::string member;
+  if(!split(path,archive,member))return readFile(path);
+  if(zipFile(archive))return zipRead(archive,member);
+  if(!validName(member))throw std::runtime_error("Unsafe PAK member path.");
+  for(const auto& e:directory(archive,true))
+    if(e.name==member)return readRange(filesystemAccessPath(archive),e.offset,e.size);
+  throw std::runtime_error("PAK entry not found: "+member);
+}
+inline bool exists(const fs::path& path){try{fs::path a;std::string m;if(!split(path,a,m))return fs::is_regular_file(filesystemAccessPath(path));for(const auto& e:directory(a,true))if(e.name==m)return true;}catch(...){}return false;}
 inline fs::path diskFolder(const fs::path& path){fs::path a;std::string m;return split(path,a,m)?a.parent_path():path;}
 inline std::vector<std::pair<bool,fs::path>> list(const fs::path& folder){
   std::vector<std::pair<bool,fs::path>> result;fs::path archive;std::string prefix;
-  if(!split(folder,archive,prefix)){for(auto& e:fs::directory_iterator(folder)){auto ext=e.path().extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);result.push_back({e.is_directory()||ext==".pak"||ext==".pk3",e.path()});}return result;}
+  if(!split(folder,archive,prefix)){for(auto& e:fs::directory_iterator(filesystemAccessPath(folder))){auto ext=e.path().extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);result.push_back({e.is_directory()||ext==".pak"||ext==".pk3",folder/e.path().filename()});}return result;}
   // Browse safe resources even when a Q2 PAK contains non-canonical aliases.
   // Mutations still validate the entire archive with strict directory().
   // Only cache the directory, never the archive payload, during browser rendering.
   static fs::path cached;static fs::file_time_type stamp;static uintmax_t size;static std::vector<Entry> entries;
-  auto now=fs::last_write_time(archive);auto length=fs::file_size(archive);if(cached!=archive||stamp!=now||size!=length){entries=directory(archive,true);cached=archive;stamp=now;size=length;}
+  const auto physical=filesystemAccessPath(archive);
+  auto now=fs::last_write_time(physical);auto length=fs::file_size(physical);if(cached!=archive||stamp!=now||size!=length){entries=directory(archive,true);cached=archive;stamp=now;size=length;}
   if(!prefix.empty())prefix+='/';std::map<std::string,bool> children;
   for(const auto& e:entries)if(e.name.rfind(prefix,0)==0){auto rest=e.name.substr(prefix.size());auto slash=rest.find('/');if(!rest.empty())children[rest.substr(0,slash)]=slash!=rest.npos;}
   for(const auto& c:children)result.push_back({c.second,folder/fs::u8path(c.first)});return result;

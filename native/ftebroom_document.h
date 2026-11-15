@@ -1,5 +1,6 @@
 #include "ftebroom_map_profile.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "ftebroom_filesystem_path.h"
 #include <chrono>
 #include "ftebroom_recent.h"
 #ifdef _WIN32
@@ -310,7 +311,8 @@ static void documentSaveFinished()
     else {
     std::filesystem::create_directories(target.parent_path());
     // Stage beside the destination so replacement remains atomic across drives.
-    auto adjacent = target;
+    const auto nativeTarget = ftebroom::filesystemPath(target);
+    auto adjacent = nativeTarget;
     adjacent += ".ftebroom-" + std::to_string(saveSerial) + ".tmp";
     if(gameWad()){auto converted=ftebroom::quake1::map(q1Read(source),savingExport?false:gameProfile==2&&q1MapFormat==0,savingExport?q1CompilerWads(target.parent_path(),q1Read(source)):q1WadList(),true,gameProfile==4);
       std::ofstream output(adjacent,std::ios::binary);output<<(savingExport?converted:documentMetadata(converted));output.close();if(!output)throw std::runtime_error("Cannot write Quake map.");}
@@ -318,7 +320,7 @@ static void documentSaveFinished()
 #ifdef _WIN32
     if (!MoveFileExW(
           adjacent.c_str(),
-          target.c_str(),
+          nativeTarget.c_str(),
           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     {
       std::filesystem::remove(adjacent);
@@ -346,7 +348,7 @@ static void documentSaveFinished()
     }
     if (!savingBackup && !savingExport)
     {
-      documentIndexLines(target);
+      documentIndexLines(ftebroom::filesystemPath(target));
       documentFile = target;
       if (!jamEditing()) recentRemember(target,gameProfile);
       fileBrowserFolder=target.parent_path();

@@ -161,7 +161,7 @@ int fb_polygon_apply()
     fb_tx_begin(fb_polygon_spawn?"Polygon Spawn":"Polygon Cut");brush_deselectall();int valid=TRUE;brushface_t *faces=memalloc(64*sizeof(brushface_t));
     for(int i=0;i<fb_csg_count&&valid;i++){fb_csg_item_t *item=&fb_csg_results[i];for(int f=0;f<item->poly.nf;f++)faces[f]=item->poly.faces[f].attr;valid=brush_history_create(item->model,faces,item->poly.nf,item->contents,TRUE)!=0;}
     if(valid)for(int i=0;i<fb_polygon_source_count;i++)brush_history_delete(fb_polygon_sources[i].model,fb_polygon_sources[i].id);
-    memfree(faces);if(valid)fb_tx_commit();else fb_tx_cancel();fb_csg_clear();fb_generator_clear();fb_polygon_clear();fb_document_tick();cvar_set("ftebroom_tool","0");return valid;
+    memfree(faces);if(valid)valid=fb_tx_commit();else fb_tx_cancel();fb_csg_clear();fb_generator_clear();fb_polygon_clear();fb_document_tick();cvar_set("ftebroom_tool","0");return valid;
 }
 
 int fb_polygon_drag,fb_polygon_saved_count;vector fb_polygon_before,fb_polygon_lastpixel;float fb_polygon_lasttime;

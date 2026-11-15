@@ -10,8 +10,159 @@ void jamQaClick(ImVec2 point)
   io.AddMouseButtonEvent(0,false);
 }
 
+bool jamQaWorldTransitions()
+{
+  const auto* directory=std::getenv("REYONDBROOM_JAM_QA_WORLD");
+  const auto* ownPlot=std::getenv("REYONDBROOM_JAM_QA_PLOT");
+  if (!directory || !ownPlot || !jamEnabled() || !cvars->GetFloat("ftebroom_skip_setup")) return false;
+  const auto* authorPlot=std::getenv("REYONDBROOM_JAM_QA_AUTHOR");
+  if (!authorPlot) authorPlot="A1";
+  using namespace std::chrono;
+  static const auto deadline=steady_clock::now()+seconds(110);
+  static int step=0;
+  static std::size_t initialFaces=0;
+  static std::string initialRevision, initialHubModel, initialHubVersion;
+  static auto captureAt=steady_clock::time_point{};
+  const bool testHub=std::getenv("REYONDBROOM_JAM_QA_HUB")!=nullptr;
+  if (step<0) return true;
+  const auto signals=JamFs::u8path(directory);
+  const auto received=[&](const char* signal) { return JamFs::is_regular_file(signals/signal); };
+  const auto send=[&](const char* signal) { jam::writeBytes(signals/signal,"ready\n"); };
+  try {
+    if (steady_clock::now()>=deadline) throw std::runtime_error("Timed out at transition step "+std::to_string(step));
+    if (step==0) {
+      jamLocal.open=true;
+      step=1;
+    } else if (step==1 && !jamBusy()) {
+      if (jamLocal.screen==JamScreen::Resources) jamResources();
+      else if (jamLocal.screen==JamScreen::Board && jamOwnedPlot(ownPlot)) {
+        jamLocal.selection=ownPlot;
+        jamOpenDraft();
+        step=2;
+      }
+    } else if (step>=2 && jamWorld.active) {
+      if (testHub && initialHubModel.empty()) {
+        if (jamWorld.hub.model.empty() || jamWorld.lastScene.find("model "+jamWorld.hub.model)==std::string::npos) return true;
+        const auto tested=cvars->GetFloat("ftebroom_jam_qa_hub");
+        if (tested<0) throw std::runtime_error("The Hub entered the editable scene.");
+        if (!tested) {
+          command("ftebroom_test_jam_hub\n");
+          return true;
+        }
+        initialHubModel=jamWorld.hub.model;
+        initialHubVersion=jamWorld.hub.version;
+      }
+      const auto hubUpdated=[&] {
+        if (!testHub) return true;
+        if (jamWorld.hub.version==initialHubVersion || jamWorld.hub.model==initialHubModel ||
+            jamWorld.lastScene.find("model "+jamWorld.hub.model)==std::string::npos) return false;
+        if (captureAt==steady_clock::time_point{}) {
+          command("ftebroom_test_jam_hub 1\nin 0.5 screenshot jam-hub-preview.png\n");
+          captureAt=steady_clock::now()+seconds(2);
+        }
+        return steady_clock::now()>=captureAt;
+      };
+      if (std::string_view(ownPlot)==authorPlot) {
+        if (step==2 && received("initial-map") && !jamBusy() && !assetsLoading &&
+            pendingDocumentFile.empty() && !savingDocument) {
+          jamRequestUpload();
+          if (jamLocal.fileDialog==JamFileDialog::Upload) {
+            jamAssign(jamLocal.mapName,sizeof jamLocal.mapName,"World transition QA");
+            if (!jamSaveNamed()) throw std::runtime_error(jamLocal.fileError);
+            jamLocal.fileDialog=JamFileDialog::None;
+          }
+          if (!jamBusy() && !jamPublishing() && !savingDocument && !jamLocal.uploadReady)
+            throw std::runtime_error("The author did not start publishing.");
+          step=3;
+        } else if (step==3 && received("published-bsp") && cvars->GetFloat("ftebroom_bsp_preview")) {
+          buildEdit();
+          step=4;
+        } else if (step==4 && !cvars->GetFloat("ftebroom_bsp_preview") && !assetsLoading) {
+          command("ftebroom_box 384 128 112 32 32 32\n");
+          step=5;
+        } else if (step==5 && received("edited-map") && hubUpdated()) {
+          if (jamWorld.syncErrors) throw std::runtime_error("The author recorded world_sync.");
+          core->Print("FTEBROOM_JAM_WORLD_PASS author_published_and_edited\n");
+          command("quit force\n");
+          step=-1;
+        }
+      } else {
+        const auto preview=jamWorld.previews.find(authorPlot);
+        if (preview==jamWorld.previews.end()) return true;
+        const auto& view=preview->second;
+        const bool inScene=!view.model.empty() && jamWorld.lastScene.find("model "+view.model)!=std::string::npos;
+        if (step==2 && view.model.empty() && !view.faces.empty() && jamWorld.lastScene.find("face ")!=std::string::npos) {
+          initialFaces=view.faces.size();
+          initialRevision=view.revision;
+          send("initial-map");
+          step=3;
+        } else if (step==3 && inScene) {
+          if (!JamFs::is_regular_file(ftebroom::filesystemPath(documentPath(view.model))))
+            throw std::runtime_error("The remote BSP did not reach the local scene.");
+          send("published-bsp");
+          step=4;
+        } else if (step==4 && view.model.empty() && view.revision!=initialRevision && view.faces.size()>initialFaces &&
+                   jamWorld.lastScene.find("face ")!=std::string::npos && hubUpdated()) {
+          if (jamWorld.syncErrors) throw std::runtime_error("The observer recorded world_sync.");
+          core->Print(("FTEBROOM_JAM_WORLD_PASS observer_map_bsp_map obsolete="+
+            std::to_string(jamWorld.obsoletePreviews)+"\n").c_str());
+          send("edited-map");
+          command("quit force\n");
+          step=-1;
+        }
+      }
+    }
+  } catch (const std::exception& error) {
+    core->Print(("FTEBROOM_JAM_WORLD_FAIL "+std::string(error.what())+"\n").c_str());
+    send("failed");
+    command("quit force\n");
+    step=-1;
+  }
+  return true;
+}
+
+bool jamQaForeignTools()
+{
+  const auto* plot=std::getenv("REYONDBROOM_JAM_QA_TOOLS");
+  if (!plot || !jamEnabled() || !cvars->GetFloat("ftebroom_skip_setup")) return false;
+  using namespace std::chrono;
+  static const auto deadline=steady_clock::now()+seconds(80);
+  static auto next=steady_clock::time_point{};
+  static auto done=steady_clock::time_point{};
+  static int stage=0;
+  if (steady_clock::now()>deadline) {
+    core->Print("FTEBROOM_JAM_FOREIGN_FAIL timed_out\n");
+    command("quit force\n");
+    return true;
+  }
+  if (stage==0) {
+    if (!jamSafePlot(plot)) return true;
+    jamLocal.open=true;
+    stage=1;
+  } else if (stage==1 && jamLocal.screen==JamScreen::Resources && !jamBusy()) {
+    jamResources();
+  } else if (stage==1 && jamLocal.screen==JamScreen::Board && !jamBusy() && jamOwnedPlot(plot)) {
+    jamLocal.selection=plot;
+    jamOpenDraft();
+    stage=2;
+  } else if (stage==2 && jamWorld.active && steady_clock::now()>=next) {
+    next=steady_clock::now()+milliseconds(350);
+    command("ftebroom_test_jam_foreign 1\n");
+    if (cvars->GetFloat("ftebroom_jam_qa_foreign_done")) {
+        done=steady_clock::now()+seconds(25);
+      stage=3;
+    }
+  } else if (stage==3 && steady_clock::now()>=done) {
+    core->Print("FTEBROOM_JAM_FOREIGN_PASS two_client_scene_exercised\n");
+    command("quit force\n");
+    stage=4;
+  }
+  return true;
+}
+
 void jamQaTick()
 {
+  if (jamQaWorldTransitions() || jamQaForeignTools()) return;
   const auto* stateDirectory = std::getenv("REYONDBROOM_JAM_QA_STATE");
   if (!stateDirectory || !jamEnabled() || !cvars->GetFloat("ftebroom_skip_setup")) return;
   static int stage = 0;

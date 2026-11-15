@@ -3,6 +3,7 @@
 int fb_tx_start,fb_tx_redocount,fb_tx_serial,fb_tx_lastmarker;
 int fb_tx_empty_cursor,fb_tx_empty_serial;
 int fb_linked_before_commit();
+int fb_jam_validate_transaction(int first,int last);
 void fb_autosnap_before_commit();
 void fb_repeat_selection(history_t *marker);
 history_t *fb_tx_redo;
@@ -89,12 +90,17 @@ void fb_tx_cancel()
     fb_tx_lasttime=-100;
     fb_history_labels();
 }
-void fb_tx_commit()
+int fb_tx_commit()
 {
-    if(!fb_tx_depth) return;
+    if(!fb_tx_depth) return FALSE;
     if(fb_tx_depth==1)fb_autosnap_before_commit();
-    if(fb_tx_depth==1)if(!fb_linked_before_commit()){fb_tx_cancel();return;}
-    if(--fb_tx_depth) return;
+    if(fb_tx_depth==1)if(!fb_linked_before_commit()){fb_tx_cancel();return FALSE;}
+    if(fb_tx_depth==1)if(!fb_jam_validate_transaction(fb_tx_start+1,history)){
+        fb_tx_cancel();
+        cvar_set("ftebroom_jam_bounds_rejected",itos(stoi(cvar_string("ftebroom_jam_bounds_rejected"))+1));
+        return FALSE;
+    }
+    if(--fb_tx_depth) return TRUE;
     history_t *marker=&historyring[fb_tx_start&(historyring_length-1)];
     marker->aftercount=selectedbrushcount;
     marker->afterselection=memalloc(sizeof(selbrush_t)*selectedbrushcount);
@@ -106,7 +112,7 @@ void fb_tx_commit()
             if(fb_selection_equal(marker->selection,marker->selectioncount,marker->afterselection,marker->aftercount)) {
                 history_release(marker);history=history_max=fb_tx_start;
                 fb_tx_restore_redo();history_transaction=0;strunzone(fb_tx_name);fb_tx_name="";
-                fb_history_labels();return;
+                fb_history_labels();return TRUE;
             }
     int repeat=fb_tx_name=="Nudge" || fb_tx_name=="Nudge texture" || fb_tx_name=="Rotate";
     if(repeat && !fb_tx_redocount && fb_tx_start>history_min && fb_tx_lastmarker>=history_min)
@@ -122,7 +128,7 @@ void fb_tx_commit()
     memfree(fb_tx_redo);fb_tx_redo=__NULL__;fb_tx_redocount=0;
     fb_tx_lastmarker=fb_tx_start;fb_tx_lasttime=gettime(0);
     history_transaction=0;strunzone(fb_tx_name);fb_tx_name="";
-    fb_tx_prune();fb_history_labels();
+    fb_tx_prune();fb_history_labels();return TRUE;
 }
 void fb_tx_entity_set(int index,string data,int kind)
 {

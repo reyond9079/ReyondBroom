@@ -179,7 +179,9 @@ static bool jamActionAllowed(const Action& a)
            id=="Menu/File/Close" || id=="Menu/File/Revert" || id=="Menu/File/Exit";
   if (id.rfind("Menu/Run/",0)==0)
     return id=="Menu/Run/Build" || id=="Menu/Run/Toggle BSP preview";
-  return id!="Menu/View/Prefab collections" && id.rfind("Menu/Model editor/",0)!=0;
+  return id!="Menu/View/Prefab collections" && id!="Menu/Tools/Unity Sync" &&
+    id!="Menu/Tools/Control Point" && id!="Menu/Edit/Convert Selection to Patches" &&
+    id.rfind("Menu/Model editor/",0)!=0;
 }
 
 static bool actionAvailable(const Action& a)

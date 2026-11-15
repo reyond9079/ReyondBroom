@@ -181,7 +181,7 @@ void fb_entity_create(string classname,int brush,vector position)
         for(int b=0;b<count && valid;b++)valid=fb_organize_move_brush(selection[b].model,selection[b].id,destination,FALSE);
         memfree(selection);fb_organize_cleanup();
     }else {fb_selection_clear();fb_entity_select(id,TRUE);}
-    if(valid)fb_tx_commit();else fb_tx_cancel();strunzone(name);
+    if(valid)valid=fb_tx_commit();else fb_tx_cancel();strunzone(name);
 }
 void fb_entity_apply_defaults(string mode)
 {

@@ -60,6 +60,7 @@ int fb_batch_move(vector delta)
     fb_container_cache_prepare();
     fb_tx_begin("Move");fb_linked_translate(delta);history_t *h=history_allocate();h->kind=HIST_MOVE_BATCH;h->batch=batch;
     if(!fb_batch_apply(batch,TRUE)){history_deallocate(h);fb_tx_cancel();return FALSE;}
+    // The operation was handled even if the plot rejected it. Do not retry through the slow path.
     fb_tx_commit();fb_commit_profile("batch91_apply",started91);return TRUE;
 }
 void fb_batch_grid_face(fb_grid_face_t *face)

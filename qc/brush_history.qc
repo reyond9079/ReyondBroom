@@ -10,7 +10,7 @@ void fb_rotate_restore_center(vector center);
 void editor_ents_reload();
 void editor_ents_refresh(int index);
 void fb_tx_begin(string name);
-void fb_tx_commit();
+int fb_tx_commit();
 void fb_history_labels();
 int fb_tx_depth;
 float fb_tx_lasttime;

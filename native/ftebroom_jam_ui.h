@@ -61,7 +61,7 @@ void jamViewportToolbar()
       runActive || runExclusive || buildRunning || assetsLoading || jamLocal.client.token.empty();
     const auto playButton = [&] {
       ImGui::BeginDisabled(locked || !jamLocal.canPublish);
-      if(jamButton(play,{playWidth,0}))jamRequestUpload(true);
+      if(jamTrackedButton("play_my_map",play,{playWidth,0}))jamRequestUpload(true);
       rememberButton(jamQaPlayButton);
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -75,7 +75,7 @@ void jamViewportToolbar()
       ImGui::SameLine();
     }else ImGui::SetCursorPosX((panelWidth-width)*.5f);
     ImGui::BeginDisabled(locked);
-    const bool compileAction = jamButton(label,{width,0},JamTone::Action);
+    const bool compileAction = jamTrackedButton(compileButton==JamCompileButton::Edit ? "back_to_editing" : compileButton==JamCompileButton::View ? "view_compiled_map" : "compile_and_upload",label,{width,0},JamTone::Action);
     rememberButton(jamQaUploadButton);
     if (compileAction) {
       if (compileButton==JamCompileButton::Edit) buildEdit();
@@ -90,7 +90,7 @@ void jamViewportToolbar()
       playButton();
       ImGui::SameLine();
     }
-    if(jamButton(browse,{browseWidth,0}))jamLocal.open=true;
+    if(jamTrackedButton("browse_jam",browse,{browseWidth,0}))jamLocal.open=true;
     rememberButton(jamQaBrowseButton);
     if (showStatus) {
       const bool error = !jamLocal.error.empty();
@@ -106,7 +106,7 @@ void jamViewportToolbar()
       ImGui::Dummy({panelWidth,size.y+12*u});
       if (error && jamLocal.inspectLocalBuild) {
         ImGui::BeginDisabled(locked);
-        if (jamButton(jamText("Inspect compile locally","Проверить сборку локально"))) {
+        if (jamTrackedButton("inspect_compile_locally",jamText("Inspect compile locally","Проверить сборку локально"))) {
           jamLocal.inspectLocalBuild = false;
           buildBegin();
         }
@@ -121,10 +121,13 @@ void jamViewportToolbar()
 void jamEditorMenu()
 {
   if (!ImGui::BeginMenu("Mapping Jams")) return;
-  if (ImGui::MenuItem(jamText("Jam map","Карта Jam"))) jamLocal.open = true;
-  if (ImGui::MenuItem(jamText("Open my maps…","Открыть мои карты…"))) jamFileRequest(JamFileDialog::Open);
+  if (ImGui::MenuItem(jamText("Jam map","Карта Jam"))) {jamRecordTelemetry("button","jam_map");jamLocal.open = true;}
+  if (ImGui::MenuItem(jamText("Open my maps…","Открыть мои карты…"))) {jamRecordTelemetry("button","my_maps");jamFileRequest(JamFileDialog::Open);}
   if (ImGui::MenuItem(jamText("Quit Jam","Выйти из Jam"),nullptr,false,
-                     !jamLocal.child&&!jamBusy()&&!jamPublishing()&&!savingDocument)) jamQuit();
+                     !jamLocal.child&&!jamBusy()&&!jamPublishing()&&!savingDocument)) {
+    jamRecordTelemetry("button","quit_jam");
+    jamQuit();
+  }
   ImGui::EndMenu();
 }
 
@@ -161,7 +164,7 @@ void jamEditorDialog()
         for (const auto& map : maps) {
           ImGui::PushID(map.u8string().c_str());
           const auto label = map.stem().u8string()+"  ·  "+map.parent_path().filename().u8string()+"##open";
-          const bool picked = jamButton(label.c_str(),{-1,0});
+          const bool picked = jamTrackedButton("open_draft",label.c_str(),{-1,0});
           ImGui::PopID();
           if (picked) {chosen=map;break;}
         }
@@ -171,12 +174,12 @@ void jamEditorDialog()
     } catch (const std::exception& error) {jamLocal.fileError=error.what();}
   } else if (dialog==JamFileDialog::Confirm) {
     ImGui::TextUnformatted(jamText("The current Jam map has unsaved changes.","В текущей карте Jam есть несохранённые изменения."));
-    if (jamButton(jamText("Save","Сохранить"),{},JamTone::Action)) {
+    if (jamTrackedButton("save",jamText("Save","Сохранить"),{},JamTone::Action)) {
       if (documentUntitled) jamFileRequest(JamFileDialog::Save);
       else close = documentSave(documentName,false,documentFile);
     }
     ImGui::SameLine();
-    if (jamButton(jamText("Don't save","Не сохранять"))) {documentProceed();close=true;}
+    if (jamTrackedButton("don_t_save",jamText("Don't save","Не сохранять"))) {documentProceed();close=true;}
     ImGui::SameLine();
   } else {
     ImGui::TextUnformatted(jamText("Map name","Название карты"));
@@ -184,7 +187,7 @@ void jamEditorDialog()
     ImGui::SetNextItemWidth(-1);
     const bool enter = ImGui::InputText("##jam-map-name",jamLocal.mapName,sizeof jamLocal.mapName,
                                       ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll);
-    const bool save = jamButton(heading,{},JamTone::Action);
+    const bool save = jamTrackedButton("save_named_map",heading,{},JamTone::Action);
     if (enter || save) {
       try {close=jamSaveNamed();}
       catch (const std::exception& error) {jamLocal.fileError=error.what();}
@@ -192,7 +195,7 @@ void jamEditorDialog()
     ImGui::SameLine();
   }
   if (jamLocal.fileDialog==dialog) jamLocal.dialogFocus = false;
-  const bool cancel = jamButton(jamText("Cancel","Отмена")) || ImGui::IsKeyPressed(ImGuiKey_Escape,false);
+  const bool cancel = jamTrackedButton("cancel",jamText("Cancel","Отмена")) || ImGui::IsKeyPressed(ImGuiKey_Escape,false);
   if (!jamLocal.fileError.empty()) ImGui::TextWrapped("%s",jamDisplayMessage(jamLocal.fileError).c_str());
   if (cancel) {
     documentNext.clear();
@@ -213,7 +216,7 @@ bool jamOffer()
   ImGui::TextWrapped("%s", jamText("Build and play maps with the Jam community.", "Создавай и проходи карты участников Jam."));
   if (!ImGui::BeginTable("##jam-welcome", 2, ImGuiTableFlags_SizingStretchSame)) return false;
   ImGui::TableNextColumn();
-  const bool join = jamButton(jamText("Join Mapping Jam (unstable alpha)","Участвовать в Mapping Jam (unstable alpha)"),
+  const bool join = jamTrackedButton("join_mapping_jam_unstable_alpha",jamText("Join Mapping Jam (unstable alpha)","Участвовать в Mapping Jam (unstable alpha)"),
                               {-1,0},JamTone::Hub);
   if (join) jamLocal.open = true;
   ImGui::TableNextColumn();
@@ -303,7 +306,7 @@ void jamAvatarEditor()
   jamAvatar(jamLocal.avatarEdited ? jamLocal.pendingAvatarUrl : jamField(jamLocal.account,"avatarUrl"));
   ImGui::TextWrapped("%s",jamText("PNG, JPEG or WebP · up to 4 MiB","PNG, JPEG или WebP · до 4 МиБ"));
 #ifdef _WIN32
-  if (jamButton(jamText("Choose avatar…","Выбрать аватар…"))) {
+  if (jamTrackedButton("choose_avatar",jamText("Choose avatar…","Выбрать аватар…"))) {
     wchar_t buffer[4096]{};
     OPENFILENAMEW dialog{};
     dialog.lStructSize = sizeof dialog;
@@ -317,11 +320,11 @@ void jamAvatarEditor()
   ImGui::InputTextWithHint("##jam-avatar-path",jamText("Image file path","Путь к файлу изображения"),
                            jamLocal.avatarPath,sizeof jamLocal.avatarPath);
   ImGui::BeginDisabled(!*jamLocal.avatarPath);
-  if (jamButton(jamText("Load avatar","Загрузить аватар"))) jamUploadAvatar(JamFs::u8path(jamLocal.avatarPath));
+  if (jamTrackedButton("load_avatar",jamText("Load avatar","Загрузить аватар"))) jamUploadAvatar(JamFs::u8path(jamLocal.avatarPath));
   ImGui::EndDisabled();
 #endif
   ImGui::SameLine();
-  if (jamButton(jamText("Remove avatar","Убрать аватар"))) {
+  if (jamTrackedButton("remove_avatar",jamText("Remove avatar","Убрать аватар"))) {
     jamLocal.pendingAvatar.clear();
     jamLocal.pendingAvatarUrl.clear();
     jamLocal.avatarEdited = true;
@@ -371,6 +374,7 @@ void jamTile(const std::string& id, const char* title, const char* subtitle, ImV
 {
   const bool hub = tone == JamTone::Hub;
   if (ImGui::InvisibleButton(id.c_str(),size,ImGuiButtonFlags_EnableNav)) {
+    jamRecordTelemetry("button",hub ? "select_hub" : "select_plot");
     jamLocal.selection = id;
     jamLocal.confirm.clear();
   }
@@ -478,13 +482,13 @@ void jamPlot()
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(jamColors(JamTone::Hub).accent),"Hub B2-D4");
     ImGui::TextWrapped("%s",jamText("Reserved for the Jam. Purchase is unavailable.","Зарезервирован для Jam. Покупка недоступна."));
     ImGui::BeginDisabled(jamLocal.child!=0);
-    if (jamButton(jamText("Play Hub","Играть в HUB"),{},JamTone::Action)) jamPlay(true);
+    if (jamTrackedButton("play_hub",jamText("Play Hub","Играть в HUB"),{},JamTone::Action)) jamPlay(true);
     ImGui::EndDisabled();
     if (jamEditing()) {
       if (!jamLocal.gameDraft.empty() && jamLocal.child)
         ImGui::TextWrapped("%s",jamText("Press F10 in the Hub to return to editing.","Нажми F10 в HUB, чтобы вернуться к редактированию."));
       ImGui::BeginDisabled(jamLocal.child!=0);
-      if (jamButton(jamText("Return to editing","Вернуться к редактированию"))) jamResumeDraft();
+      if (jamTrackedButton("return_to_editing",jamText("Return to editing","Вернуться к редактированию"))) jamResumeDraft();
       ImGui::EndDisabled();
     }
     return;
@@ -497,7 +501,7 @@ void jamPlot()
     const bool own=jamField(owner,"accountId")==jamField(jamLocal.account,"accountId");
     const std::string label="RB Like  "+std::to_string(count)+"##rb-like";
     ImGui::BeginDisabled(own||owner.value("restricted",false)||jamLocal.wallet.value("giftableRb",0)==0);
-    if(jamButton(label.c_str(),{ImGui::CalcTextSize(label.c_str(),nullptr,true).x+48*uiScale(),0},JamTone::Occupied))
+    if(jamTrackedButton("rb_like",label.c_str(),{ImGui::CalcTextSize(label.c_str(),nullptr,true).x+48*uiScale(),0},JamTone::Occupied))
       jamLike(jamField(cell,"plotId"));
     const auto corner = ImGui::GetItemRectMin();
     const float u = uiScale(), x = corner.x+13*u, y = corner.y+ImGui::GetItemRectSize().y*.37f;
@@ -514,7 +518,7 @@ void jamPlot()
     jamLimits();
     ImGui::TextUnformatted(jamText("Price: 20 ordinary RB","Цена: 20 обычных RB"));
     ImGui::BeginDisabled(jamLocal.wallet.value("spendableRb",0)<20);
-    if (jamButton(jamText("Buy for 20 RB","Купить за 20 RB"))) jamLocal.confirm = "purchase";
+    if (jamTrackedButton("buy_for_20_rb",jamText("Buy for 20 RB","Купить за 20 RB"))) jamLocal.confirm = "purchase";
     ImGui::EndDisabled();
   } else {
     const bool playable = publication.is_object() && publication.value("playable",false);
@@ -523,30 +527,32 @@ void jamPlot()
     else ImGui::TextUnformatted(jamText("No published map","Карта не опубликована"));
     if(playable){
       ImGui::BeginDisabled(jamLocal.child!=0);
-      if(jamButton(jamText("Play","Играть"),{},JamTone::Action))jamPlay();
+      if(jamTrackedButton("play",jamText("Play","Играть"),{},JamTone::Action))jamPlay();
       ImGui::EndDisabled();
     }
     if (jamField(owner,"accountId") == jamField(jamLocal.account,"accountId")) {
       jamLimits();
-      if (jamButton(publication.is_null() ? jamText("Create or continue map","Создать или продолжить карту")
+      if (jamTrackedButton("edit_plot",publication.is_null() ? jamText("Create or continue map","Создать или продолжить карту")
                                              : jamText("Edit map","Редактировать карту"))) jamOpenDraft();
       const bool active = jamLocal.selection == jamLocal.draftPlot && !documentUntitled && !documentFile.empty();
       if (active) ImGui::TextWrapped("%s",documentName.c_str());
       ImGui::BeginDisabled(!active || !jamLocal.operation.empty());
-      if (jamButton(publication.is_null() ? jamText("Save to plot","Сохранить в участок")
+      if (jamTrackedButton("save_to_plot",publication.is_null() ? jamText("Save to plot","Сохранить в участок")
                                             : jamText("Replace published map","Заменить опубликованную карту")))
         jamLocal.confirm = "publish";
       ImGui::EndDisabled();
     } else {
       ImGui::TextWrapped("%s",jamField(owner,"nickname").c_str());
-      if (ImGui::CollapsingHeader(jamText("Owner profile","Профиль владельца"))) {
+      const bool ownerOpen = ImGui::CollapsingHeader(jamText("Owner profile","Профиль владельца"));
+      if (ImGui::IsItemToggledOpen()) jamRecordTelemetry("button","owner_profile");
+      if (ownerOpen) {
         jamAvatar(jamField(owner,"avatarUrl"));
         ImGui::TextWrapped("%s",jamField(owner,"bio").c_str());
       }
       ImGui::BeginDisabled(owner.value("restricted",false));
-      if (jamButton(jamText("Gift RB","Подарить RB"))) jamLocal.confirm = "gift";
+      if (jamTrackedButton("gift_rb",jamText("Gift RB","Подарить RB"))) jamLocal.confirm = "gift";
       ImGui::EndDisabled();
-      if (jamButton(jamText("Report…","Пожаловаться…"))) {
+      if (jamTrackedButton("report",jamText("Report…","Пожаловаться…"))) {
         jamLocal.confirm = "report";
         jamLocal.reportTarget = playable ? 1 : 0;
         jamLocal.reportReason = 0;
@@ -564,7 +570,7 @@ void jamConfirmation()
   ImGui::Separator();
   if (jamLocal.confirm == "purchase") {
     ImGui::TextWrapped(jamText("Buy %s for 20 ordinary RB?","Купить %s за 20 обычных RB?"),jamLocal.selection.c_str());
-    if (jamButton(jamText("Confirm purchase","Подтвердить покупку"),{},JamTone::Action)) {
+    if (jamTrackedButton("confirm_purchase",jamText("Confirm purchase","Подтвердить покупку"),{},JamTone::Action)) {
       jamLocal.confirm.clear();
       jamPurchase();
       return;
@@ -575,7 +581,7 @@ void jamConfirmation()
     ImGui::InputInt(jamText("Gift amount","Сумма подарка"),&jamLocal.gift);
     ImGui::TextWrapped("%s",jamText("The recipient receives ordinary RB.","Получатель получит обычные RB."));
     ImGui::BeginDisabled(jamLocal.gift <= 0 || jamLocal.gift > available || cell["owner"].is_null());
-    const bool send = jamButton(jamText("Confirm gift","Подтвердить подарок"));
+    const bool send = jamTrackedButton("confirm_gift",jamText("Confirm gift","Подтвердить подарок"));
     ImGui::EndDisabled();
     if (send) {
       jamLocal.confirm.clear();
@@ -594,7 +600,7 @@ void jamConfirmation()
     const auto& publication = cell.at("publication");
     const bool canReport = jamLocal.reportTarget != 1 || (publication.is_object() && publication.value("playable",false));
     ImGui::BeginDisabled(!canReport);
-    const bool send = jamButton(jamText("Submit report","Отправить жалобу"));
+    const bool send = jamTrackedButton("submit_report",jamText("Submit report","Отправить жалобу"));
     ImGui::EndDisabled();
     if (send) {
       const auto kind = jamLocal.reportTarget==0 ? "plot" : jamLocal.reportTarget==1 ? "revision" : "profile";
@@ -607,13 +613,13 @@ void jamConfirmation()
   } else if (jamLocal.confirm == "publish") {
     ImGui::TextWrapped("%s",jamText("Other participants can play this version after validation.",
                                     "После проверки другие участники смогут сыграть в эту версию."));
-    if (jamButton(jamText("Publish","Опубликовать"),{},JamTone::Action)) {
+    if (jamTrackedButton("publish",jamText("Publish","Опубликовать"),{},JamTone::Action)) {
       jamLocal.confirm.clear();
       jamBeginPublish(jamLocal.selection);
       return;
     }
   }
-  if (jamButton(jamText("Cancel##jam-confirm","Отмена##jam-confirm"))) jamLocal.confirm.clear();
+  if (jamTrackedButton("cancel",jamText("Cancel##jam-confirm","Отмена##jam-confirm"))) jamLocal.confirm.clear();
 }
 
 void jamPlayers()
@@ -651,14 +657,14 @@ void jamPlayers()
 void jamBoard()
 {
   jamWallet();
-  if (jamButton(jamText("Refresh","Обновить"))) jamRefresh();
+  if (jamTrackedButton("refresh",jamText("Refresh","Обновить"))) jamRefresh();
   ImGui::SameLine();
-  if (jamButton(jamText("My profile","Мой профиль"))) jamBeginProfile(false);
+  if (jamTrackedButton("my_profile",jamText("My profile","Мой профиль"))) jamBeginProfile(false);
   ImGui::SameLine();
-  if (jamButton(jamText("My maps","Мои карты"))) jamOpenOwnMaps();
+  if (jamTrackedButton("my_maps",jamText("My maps","Мои карты"))) jamOpenOwnMaps();
   ImGui::SameLine();
   ImGui::BeginDisabled(!jamLocal.operation.empty());
-  if (jamButton(jamText("Sign out","Выйти"))) jamSignOut();
+  if (jamTrackedButton("sign_out",jamText("Sign out","Выйти"))) jamSignOut();
   ImGui::EndDisabled();
   if (ImGui::GetContentRegionAvail().x > 695*uiScale() &&
       ImGui::BeginTable("##jam-board-layout",2,ImGuiTableFlags_Resizable)) {
@@ -741,18 +747,18 @@ void jamAuthForm()
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(16*u,14*u));
   if(ImGui::BeginChild("##jam-auth",{width,0},ImGuiChildFlags_Borders|ImGuiChildFlags_AutoResizeY|
                        ImGuiChildFlags_AlwaysAutoResize,ImGuiWindowFlags_NoScrollbar)) {
-    const auto action = [](const char* label, JamTone tone = JamTone::Neutral) {
-      return jamButton(label,{-FLT_MIN,0},tone);
+    const auto action = [](const char* id, const char* label, JamTone tone = JamTone::Neutral) {
+      return jamTrackedButton(id,label,{-FLT_MIN,0},tone);
     };
-    const auto secondary = [](const char* label, const char* other, bool& first, bool& second) {
+    const auto secondary = [](const char* id, const char* label, const char* otherId, const char* other, bool& first, bool& second) {
       const float spacing = ImGui::GetStyle().ItemSpacing.x;
       const float available = ImGui::GetContentRegionAvail().x;
       const float half = (available-spacing)*.5f;
       const bool sideBySide = half >= std::max(ImGui::CalcTextSize(label).x,ImGui::CalcTextSize(other).x)+20*uiScale();
       const ImVec2 size{sideBySide ? half : available,0};
-      first = jamButton(label,size);
+      first = jamTrackedButton(id,label,size);
       if (sideBySide) ImGui::SameLine();
-      second = jamButton(other,size);
+      second = jamTrackedButton(otherId,other,size);
     };
     const auto back = jamText("Back to sign in","Назад ко входу");
     const bool registration = screen == JamScreen::Register;
@@ -761,23 +767,24 @@ void jamAuthForm()
       if (registration) jamAuthField(jamText("Nickname","Ник"),jamLocal.nickname,sizeof jamLocal.nickname);
       jamAuthField(jamText("Password","Пароль"),jamLocal.password,sizeof jamLocal.password,
                    jamLocal.showPassword ? 0 : ImGuiInputTextFlags_Password);
-      ImGui::Checkbox(jamText("Show password","Показать пароль"),&jamLocal.showPassword);
+      if (ImGui::Checkbox(jamText("Show password","Показать пароль"),&jamLocal.showPassword))
+        jamRecordTelemetry("button","show_password");
       if (registration) {
         ImGui::TextWrapped("%s",jamPasswordRules());
-        if (action(jamText("Register","Зарегистрироваться"),JamTone::Action)) jamRegister();
+        if (action("register",jamText("Register","Зарегистрироваться"),JamTone::Action)) jamRegister();
         bool generate, signIn;
-        secondary(jamText("Generate password","Сгенерировать пароль"),back,generate,signIn);
+        secondary("generate_password",jamText("Generate password","Сгенерировать пароль"),"back_to_sign_in",back,generate,signIn);
         if (generate) jamAssign(jamLocal.password,sizeof jamLocal.password,jam::randomHex(16));
         if (signIn) jamLocal.screen = JamScreen::SignIn;
       } else {
         const auto remember = jamText("Remember me","Запомнить вход");
         if (ImGui::GetContentRegionAvail().x > ImGui::GetFrameHeight()+ImGui::CalcTextSize(remember).x+12*u)
           ImGui::SameLine(0,14*u);
-        ImGui::Checkbox(remember,&jamLocal.rememberSession);
-        if (action(jamText("Sign in","Войти"),JamTone::Action)) jamLogin();
-        if (action(jamText("Create account","Создать аккаунт"))) jamLocal.screen = JamScreen::Register;
+        if (ImGui::Checkbox(remember,&jamLocal.rememberSession)) jamRecordTelemetry("button","remember_me");
+        if (action("sign_in",jamText("Sign in","Войти"),JamTone::Action)) jamLogin();
+        if (action("create_account",jamText("Create account","Создать аккаунт"))) jamLocal.screen = JamScreen::Register;
         bool forgot, verify;
-        secondary(jamText("Forgot password?","Забыли пароль?"),jamText("Enter confirmation code","Ввести код подтверждения"),forgot,verify);
+        secondary("forgot_password",jamText("Forgot password?","Забыли пароль?"),"enter_confirmation_code",jamText("Enter confirmation code","Ввести код подтверждения"),forgot,verify);
         if (verify) jamLocal.screen = JamScreen::Verify;
         if (forgot) {
           jamLocal.password[0] = jamLocal.code[0] = '\0';
@@ -790,20 +797,20 @@ void jamAuthForm()
         ? jamText("Enter the confirmation code from your email.","Введите код подтверждения из письма.")
         : jamText("Enter the code from the local server mail folder.","Введи код из почтовой папки локального сервера."));
       jamAuthField(jamText("Code","Код"),jamLocal.code,sizeof jamLocal.code);
-      if (action(jamText("Confirm email","Подтвердить почту"),JamTone::Action)) jamVerify();
+      if (action("confirm_email",jamText("Confirm email","Подтвердить почту"),JamTone::Action)) jamVerify();
       if (remote) {
         jamAuthField(jamText("Email","Почта"),jamLocal.email,sizeof jamLocal.email);
         ImGui::BeginDisabled(!jamLocal.email[0]);
-        const bool resend = action(jamText("Resend code","Отправить код повторно"));
+        const bool resend = action("resend_code",jamText("Resend code","Отправить код повторно"));
         ImGui::EndDisabled();
         if (resend) jamResendConfirmation();
       }
-      if (action(back)) jamLocal.screen = JamScreen::SignIn;
+      if (action("back_to_sign_in",back)) jamLocal.screen = JamScreen::SignIn;
     } else if (screen == JamScreen::Recover) {
       jamAuthField(jamText("Email","Почта"),jamLocal.email,sizeof jamLocal.email);
-      if (action(jamText("Request recovery code","Запросить код восстановления"),JamTone::Action)) jamForgotPassword();
+      if (action("request_recovery_code",jamText("Request recovery code","Запросить код восстановления"),JamTone::Action)) jamForgotPassword();
       bool code, signIn;
-      secondary(jamText("I already have a code","У меня уже есть код"),back,code,signIn);
+      secondary("already_have_code",jamText("I already have a code","У меня уже есть код"),"back_to_sign_in",back,code,signIn);
       if (code) jamLocal.screen = JamScreen::Reset;
       if (signIn) jamLocal.screen = JamScreen::SignIn;
     } else if (screen == JamScreen::Reset) {
@@ -814,8 +821,8 @@ void jamAuthForm()
       ImGui::TextWrapped("%s",jamPasswordRules());
       jamAuthField(jamText("Confirm new password","Повтори новый пароль"),jamLocal.passwordConfirmation,
                    sizeof jamLocal.passwordConfirmation,ImGuiInputTextFlags_Password);
-      if (action(jamText("Reset password","Сменить пароль"),JamTone::Action)) jamResetPassword();
-      if (action(jamText("Back","Назад"))) {
+      if (action("reset_password",jamText("Reset password","Сменить пароль"),JamTone::Action)) jamResetPassword();
+      if (action("back",jamText("Back","Назад"))) {
         jamLocal.password[0] = jamLocal.passwordConfirmation[0] = jamLocal.code[0] = '\0';
         jamLocal.screen = JamScreen::Recover;
       }
@@ -845,7 +852,10 @@ void jamAlphaWarning(float left, float lane)
       "Mapping Jam is in early development. All of your online progress may be lost in future updates.",
       "Mapping Jam находится на ранней стадии разработки. В будущих обновлениях весь твой онлайн-прогресс может быть потерян."));
     ImGui::Spacing();
-    if (jamButton(jamText("Agree and continue","Согласен, продолжить"),{-FLT_MIN,0},JamTone::Action))
+    ImGui::TextWrapped("%s",jamText("We collect anonymous button and error statistics to fix bugs.",
+      "Мы собираем анонимную статистику нажатий и ошибок, чтобы исправлять баги."));
+    ImGui::Spacing();
+    if (jamTrackedButton("agree_and_continue",jamText("Agree and continue","Согласен, продолжить"),{-FLT_MIN,0},JamTone::Action))
       jamAcceptAlphaWarning();
     if (std::getenv("REYONDBROOM_JAM_QA_STATE"))
       jamQaAlphaButton = ImRect(ImGui::GetItemRectMin(),ImGui::GetItemRectMax()).GetCenter();
@@ -883,7 +893,7 @@ void jamPanel()
     else
       ImGui::SetCursorPosX(left);
     ImGui::BeginDisabled(board && (jamLocal.child || jamBusy() || jamPublishing() || savingDocument));
-    const bool leave = jamButton(exit,{exitWidth,0});
+    const bool leave = jamTrackedButton(board ? "quit_jam" : "back_to_editor",exit,{exitWidth,0});
     ImGui::EndDisabled();
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape,false) && !ImGui::GetIO().WantTextInput &&
       !ImGui::IsPopupOpen(nullptr,ImGuiPopupFlags_AnyPopupId|ImGuiPopupFlags_AnyPopupLevel);
@@ -930,8 +940,30 @@ void jamPanel()
     };
     feedback(jamLocal.status,ImGui::GetStyleColorVec4(ImGuiCol_Text));
     feedback(jamLocal.error,{1,.43f,.4f,1});
+    if (const auto transfer=jamLocal.resourceTransfer) {
+      const auto phase=transfer->phase.load();
+      const auto total=transfer->total.load();
+      const auto bytes=std::min(transfer->bytes.load(),total);
+      const char* phaseText="";
+      switch (phase) {
+        case jam::ResourcePhase::Checking: phaseText=jamText("Checking the resource pack…","Проверка набора ресурсов…"); break;
+        case jam::ResourcePhase::Downloading: phaseText=jamText("Downloading the resource pack…","Загрузка набора ресурсов…"); break;
+        case jam::ResourcePhase::Retrying: phaseText=jamText("Connection interrupted. Retrying…","Связь прервалась. Повтор загрузки…"); break;
+        case jam::ResourcePhase::Verifying: phaseText=jamText("Verifying the resource files…","Проверка файлов ресурсов…"); break;
+        case jam::ResourcePhase::Opening: phaseText=jamText("Opening the Jam board…","Открытие карты Jam…"); break;
+      }
+      ImGui::TextUnformatted(transfer->canceled ? jamText("Canceling…","Отмена…") : phaseText);
+      if (total && phase!=jam::ResourcePhase::Checking) {
+        char label[96];
+        std::snprintf(label,sizeof label,jamText("%.1f / %.1f MiB","%.1f / %.1f МиБ"),bytes/1048576.,total/1048576.);
+        ImGui::ProgressBar(float(bytes)/float(total),{-1,0},label);
+      }
+      ImGui::BeginDisabled(transfer->canceled);
+      if (jamTrackedButton("cancel",jamText("Cancel download","Отменить загрузку"))) transfer->canceled=true;
+      ImGui::EndDisabled();
+    }
     if (jamBusy() && jamLocal.status == jamText("Downloading the published map…","Загрузка опубликованной карты…") &&
-        jamButton(jamText("Cancel game launch","Отменить запуск игры")))
+        jamTrackedButton("cancel_game_launch",jamText("Cancel game launch","Отменить запуск игры")))
       jamLocal.playCanceled = true;
     ImGui::BeginDisabled(jamBusy() || jamLocal.snapshot.has_value());
     switch (jamLocal.screen) {
@@ -944,18 +976,18 @@ void jamPanel()
         jamAvatarEditor();
         ImGui::InputText(jamText("Nickname","Ник"),jamLocal.nickname,sizeof jamLocal.nickname);
         ImGui::InputTextMultiline(jamText("About me","О себе"),jamLocal.bio,sizeof jamLocal.bio,{-1,80*uiScale()});
-        if (jamButton(jamText("Save profile","Сохранить профиль"))) jamSaveProfile(false);
+        if (jamTrackedButton("save_profile",jamText("Save profile","Сохранить профиль"))) jamSaveProfile(false);
         ImGui::SameLine();
-        if (jamButton(jamLocal.profileFirst ? jamText("Skip","Пропустить") : jamText("Back","Назад"))) {
+        if (jamTrackedButton(jamLocal.profileFirst ? "skip_profile" : "back_from_profile",jamLocal.profileFirst ? jamText("Skip","Пропустить") : jamText("Back","Назад"))) {
           if (jamLocal.profileFirst) jamSaveProfile(true);
           else jamLocal.screen = JamScreen::Board;
         }
         break;
       case JamScreen::Resources:
         ImGui::TextWrapped("LibreQuake 0.09 + Plant Generator");
-        if (jamButton(jamText("Prepare Jam resources","Подготовить ресурсы Jam"),{},JamTone::Action)) jamResources();
+        if (jamTrackedButton("prepare_jam_resources",jamText("Prepare Jam resources","Подготовить ресурсы Jam"),{},JamTone::Action)) jamResources();
         ImGui::SameLine();
-        if (jamButton(jamText("Sign out","Выйти"))) jamSignOut();
+        if (jamTrackedButton("sign_out",jamText("Sign out","Выйти"))) jamSignOut();
         break;
       case JamScreen::Board: jamBoard(); break;
     }

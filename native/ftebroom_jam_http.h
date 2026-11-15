@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <exception>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -32,6 +34,51 @@ struct HttpResponse {
 
 struct DownloadInterrupted : std::runtime_error {
   using std::runtime_error::runtime_error;
+};
+
+struct DownloadCanceled : std::runtime_error {
+  DownloadCanceled() : std::runtime_error("The Mapping Jam download was canceled.") {}
+};
+
+enum class ResourcePhase { Checking, Downloading, Retrying, Verifying, Opening };
+
+struct ResourceTransfer {
+  using Clock = std::chrono::steady_clock;
+  const Clock::time_point deadline = Clock::now() + std::chrono::minutes(4);
+  std::atomic<ResourcePhase> phase{ResourcePhase::Checking};
+  std::atomic<std::size_t> bytes{0}, total{0};
+  std::atomic<bool> canceled{false};
+
+  void check() const
+  {
+    if (canceled) throw DownloadCanceled();
+    if (Clock::now() >= deadline)
+      throw DownloadInterrupted("The Mapping Jam resource download reached its time limit.");
+  }
+};
+
+// Keep a slow trickle of bytes from extending the socket's idle timeout indefinitely.
+class ResourceReadProgress {
+  ResourceTransfer* transfer;
+  ResourceTransfer::Clock::time_point since = ResourceTransfer::Clock::now();
+  std::size_t checkpoint = 0;
+  bool report;
+public:
+  explicit ResourceReadProgress(ResourceTransfer* control)
+    : transfer(control), report(control && control->phase == ResourcePhase::Downloading) {}
+
+  void update(std::size_t bytes) {
+    if (!transfer) return;
+    transfer->check();
+    const auto now = ResourceTransfer::Clock::now();
+    if (report) transfer->bytes = bytes;
+    if (bytes - checkpoint >= 1024) {
+      checkpoint = bytes;
+      since = now;
+    } else if (now - since >= std::chrono::seconds(10)) {
+      throw DownloadInterrupted("The Mapping Jam server stopped sending resources.");
+    }
+  }
 };
 
 struct Endpoint {
@@ -138,7 +185,7 @@ template<class T> inline T curlSymbol(void* library, const char* name)
 
 inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& method,
                                  const std::string& path, const std::string& headers,
-                                 const std::string& body, std::size_t limit)
+                                 const std::string& body, std::size_t limit, ResourceTransfer* transfer)
 {
   static auto* const library = dlopen("libcurl.so.4", RTLD_NOW | RTLD_LOCAL);
   static const auto globalInit = curlSymbol<decltype(&curl_global_init)>(library,"curl_global_init");
@@ -167,6 +214,14 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
       throw std::runtime_error("Cannot configure the Mapping Jam HTTPS connection.");
   };
   struct Download { HttpResponse result{}; std::size_t limit; bool oversized = false; } download{{},limit};
+  ResourceReadProgress progress(transfer);
+  struct TransferContext { ResourceReadProgress* progress; std::exception_ptr error; } context{&progress,{}};
+  const auto progressCallback = +[](void* data, curl_off_t, curl_off_t received, curl_off_t, curl_off_t) -> int {
+    auto& state = *static_cast<TransferContext*>(data);
+    try { state.progress->update(static_cast<std::size_t>(std::max<curl_off_t>(0,received))); }
+    catch (...) { state.error = std::current_exception(); return 1; }
+    return 0;
+  };
   const auto write = +[](char* bytes, std::size_t size, std::size_t count, void* context) -> std::size_t {
     auto& target = *static_cast<Download*>(context);
     const auto length = size*count;
@@ -192,12 +247,18 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
   configure(CURLOPT_USERAGENT,"ReyondBroom Mapping Jams");
   configure(CURLOPT_WRITEFUNCTION,write);
   configure(CURLOPT_WRITEDATA,&download);
+  if (transfer) {
+    configure(CURLOPT_NOPROGRESS,0L);
+    configure(CURLOPT_XFERINFOFUNCTION,progressCallback);
+    configure(CURLOPT_XFERINFODATA,&context);
+  }
   if (method != "GET") {
     configure(CURLOPT_POSTFIELDS,body.c_str());
     configure(CURLOPT_POSTFIELDSIZE_LARGE,static_cast<curl_off_t>(body.size()));
     configure(CURLOPT_CUSTOMREQUEST,method.c_str());
   }
   const auto code = perform(handle.value);
+  if (context.error) std::rethrow_exception(context.error);
   if (download.oversized) throw std::runtime_error("The Jam response exceeds its size limit.");
   if (code == CURLE_PEER_FAILED_VERIFICATION)
     throw std::runtime_error("Could not verify the Mapping Jam server's TLS certificate. Check the system clock and CA certificates.");
@@ -216,7 +277,7 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
 
 inline HttpResponse request(const Endpoint& endpoint, const std::string& method, const std::string& path,
                             const std::string& token, const std::string& key, const std::string& body,
-                            std::size_t limit)
+                            std::size_t limit, ResourceTransfer* transfer = nullptr)
 {
   const unsigned port = endpoint.port;
   const bool secure = !endpoint.hostname.empty();
@@ -229,6 +290,8 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
     (method == "PUT" || path == "/v1/me/avatar" ? "application/octet-stream\r\n" : "application/json\r\n");
   HttpResponse result{};
   std::array<char, 65536> buffer{};
+  if (transfer) transfer->check();
+  ResourceReadProgress progress(transfer);
 #ifdef _WIN32
   static const auto library = LoadLibraryExW(L"winhttp.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
   const auto open = loadProc<decltype(&WinHttpOpen)>(library, "WinHttpOpen");
@@ -247,7 +310,8 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
     ~Handle() { if (value) release(value); }
   };
   Handle session{open(L"ReyondBroom Mapping Jams", WINHTTP_ACCESS_TYPE_NO_PROXY, nullptr, nullptr, 0), close};
-  if (!session.value || !timeout(session.value, 3000, 3000, 12000, 12000))
+  const int ioTimeout = transfer ? 5000 : 12000;
+  if (!session.value || !timeout(session.value, 3000, 3000, ioTimeout, ioTimeout))
     throw std::runtime_error("Cannot start the local HTTP client.");
   const std::wstring hostname = secure ? std::wstring(endpoint.hostname.begin(),endpoint.hostname.end()) : L"127.0.0.1";
   Handle host{connect(session.value, hostname.c_str(), static_cast<INTERNET_PORT>(port), 0), close};
@@ -257,26 +321,45 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
                          secure ? WINHTTP_FLAG_SECURE : 0), close};
   DWORD disabled = WINHTTP_DISABLE_REDIRECTS | WINHTTP_DISABLE_COOKIES | WINHTTP_DISABLE_AUTHENTICATION;
   const std::wstring wideHeaders(headers.begin(), headers.end());
-  if (!req.value || !setOption(req.value, WINHTTP_OPTION_DISABLE_FEATURE, &disabled, sizeof disabled) ||
-      !send(req.value, wideHeaders.c_str(), static_cast<DWORD>(wideHeaders.size()),
+  if (!req.value || !setOption(req.value, WINHTTP_OPTION_DISABLE_FEATURE, &disabled, sizeof disabled))
+    throw std::runtime_error("Cannot configure the Mapping Jam connection.");
+  if (!send(req.value, wideHeaders.c_str(), static_cast<DWORD>(wideHeaders.size()),
         body.empty() ? nullptr : const_cast<char*>(body.data()), static_cast<DWORD>(body.size()),
-        static_cast<DWORD>(body.size()), 0) || !receive(req.value, nullptr))
+        static_cast<DWORD>(body.size()), 0) || !receive(req.value, nullptr)) {
+    const auto error = GetLastError();
+    if (transfer) transfer->check();
+    if (error == ERROR_WINHTTP_TIMEOUT)
+      throw DownloadInterrupted("The Mapping Jam server did not respond in time.");
+    if (transfer && (error == ERROR_WINHTTP_CONNECTION_ERROR || error == ERROR_WINHTTP_CANNOT_CONNECT))
+      throw DownloadInterrupted("The Mapping Jam connection was interrupted.");
     throw std::runtime_error("Cannot reach the Mapping Jam server.");
+  }
   DWORD status = 0, size = sizeof status;
   if (!query(req.value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
              WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX))
     throw std::runtime_error("The local server returned an invalid HTTP response.");
   result.status = static_cast<int>(status);
+  DWORD expected = 0;
+  size = sizeof expected;
+  const bool hasLength = method!="HEAD" && status!=204 && status!=304 &&
+    query(req.value,WINHTTP_QUERY_CONTENT_LENGTH | WINHTTP_QUERY_FLAG_NUMBER,
+          WINHTTP_HEADER_NAME_BY_INDEX,&expected,&size,WINHTTP_NO_HEADER_INDEX);
+  if (hasLength && expected > limit) throw std::runtime_error("The Jam response exceeds its size limit.");
   for (;;) {
     DWORD n = 0;
-    if (!read(req.value, buffer.data(), static_cast<DWORD>(buffer.size()), &n))
-      throw std::runtime_error("The local download was interrupted.");
+    if (!read(req.value, buffer.data(), static_cast<DWORD>(buffer.size()), &n)) {
+      if (transfer) transfer->check();
+      throw DownloadInterrupted("The Mapping Jam download was interrupted or timed out.");
+    }
     if (!n) break;
     if (n > limit - result.body.size()) throw std::runtime_error("The local response exceeds its size limit.");
     result.body.append(buffer.data(), n);
+    progress.update(result.body.size());
   }
+  if (hasLength && result.body.size() != expected)
+    throw DownloadInterrupted("The Mapping Jam download was incomplete.");
 #else
-  if (secure) return requestHttps(endpoint,method,path,headers,body,limit);
+  if (secure) return requestHttps(endpoint,method,path,headers,body,limit,transfer);
   struct Socket { int value; ~Socket() { if (value >= 0) close(value); } };
   Socket client{socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)};
   sockaddr_in host{};
@@ -285,7 +368,7 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
   host.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   if (client.value < 0 || connect(client.value, reinterpret_cast<sockaddr*>(&host), sizeof host) != 0)
     throw std::runtime_error("Cannot reach the local Mapping Jam server.");
-  timeval timeout{12, 0};
+  timeval timeout{transfer ? 5 : 12, 0};
   if (setsockopt(client.value, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) ||
       setsockopt(client.value, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof timeout))
     throw std::runtime_error("Cannot configure the local HTTP connection.");
@@ -300,7 +383,10 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
   std::size_t offset = std::string::npos, expected = 0;
   for (;;) {
     const auto n = recv(client.value, buffer.data(), buffer.size(), 0);
-    if (n < 0) throw std::runtime_error("The local download was interrupted.");
+    if (n < 0) {
+      if (transfer) transfer->check();
+      throw DownloadInterrupted("The Mapping Jam download was interrupted or timed out.");
+    }
     if (!n) break;
     received.append(buffer.data(), static_cast<std::size_t>(n));
     if (offset == received.npos) {
@@ -319,10 +405,11 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
       offset = end + 4;
       if (expected > limit) throw std::runtime_error("The local response exceeds its size limit.");
     }
+    progress.update(received.size() - offset);
     if (received.size() - offset >= expected) break;
   }
   if (offset == received.npos || received.size() - offset != expected)
-    throw std::runtime_error("Incomplete local HTTP response.");
+    throw DownloadInterrupted("The Mapping Jam download was incomplete.");
   result.body.assign(received, offset, expected);
 #endif
   return result;

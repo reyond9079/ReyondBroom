@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <stdexcept>
+#include "ftebroom_filesystem_path.h"
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -42,7 +43,7 @@ inline std::vector<Entry> directory(const fs::path& path,bool ignoreUnsafeNames=
 }
 inline std::string read(const fs::path& path){fs::path archive;std::string member;uint64_t size=0,offset=0;auto physical=path;
   if(split(path,archive,member)){if(zipFile(archive))return zipRead(archive,member);if(!validName(member))throw std::runtime_error("Unsafe PAK member path.");physical=archive;bool found=false;for(const auto& e:directory(archive,true))if(e.name==member){size=e.size;offset=e.offset;found=true;break;}if(!found)throw std::runtime_error("PAK entry not found: "+member);}
-  else size=fs::file_size(path);
+  else { physical=ftebroom::filesystemPath(path);size=fs::file_size(physical); }
   if(size>512*1024*1024)throw std::runtime_error("Resource exceeds 512 MiB.");std::ifstream in(physical,std::ios::binary);in.seekg(offset);std::string result(size,'\0');if(size&&!in.read(result.data(),size))throw std::runtime_error("Cannot read "+path.u8string());return result;
 }
 inline bool exists(const fs::path& path){try{fs::path a;std::string m;if(!split(path,a,m))return fs::is_regular_file(path);for(const auto& e:directory(a,true))if(e.name==m)return true;}catch(...){}return false;}

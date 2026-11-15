@@ -101,7 +101,12 @@ void fb_tool_panel_state()
     cvar_set("ftebroom_shape_points",itos(fb_shape_count));
     cvar_set("ftebroom_gesture_owner",itos(fb_owner));
 }
-float fb_tool_can_activate(int tool) { return tool>=FB_TOOL_NONE && tool<=FB_TOOL_PLANTBRUSH && !(tool==FB_TOOL_CONTROLPOINT && cvar("ftebroom_classic_map")); }
+float fb_tool_can_activate(int tool)
+{
+    if(tool<FB_TOOL_NONE || tool>FB_TOOL_PLANTBRUSH)return FALSE;
+    if(cvar("ftebroom_jam_world") && (tool==FB_TOOL_CONTROLPOINT || tool==FB_TOOL_PLANTBRUSH))return FALSE;
+    return tool!=FB_TOOL_CONTROLPOINT || !cvar("ftebroom_classic_map");
+}
 void fb_tool_refresh()
 {
     fb_cancel(); fb_owner=FB_OWNER_NONE;

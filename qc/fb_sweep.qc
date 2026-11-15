@@ -115,7 +115,8 @@ void fb_sweep_perform()
         fb_poly_t *poly=&fb_sweep_solids[i];brushface_t faces[64];for(int f=0;f<poly->nf;f++)faces[f]=poly->faces[f].attr;
         if(!brush_history_create(fb_sweep_faces[i%fb_sweep_count].model,faces,poly->nf,CONTENTBIT_SOLID,TRUE)){valid=FALSE;break;}
     }
-    if(valid){fb_tx_commit();fb_tool_deactivate();fb_sweep_clear();}else fb_tx_cancel();
+    if(!valid){fb_tx_cancel();return;}
+    if(fb_tx_commit()){fb_tool_deactivate();fb_sweep_clear();}
 }
 int fb_sweep_drag,fb_sweep_view,fb_sweep_alt;
 vector fb_sweep_pixel,fb_sweep_before_offset,fb_sweep_before_quaternion,fb_sweep_drag_start;

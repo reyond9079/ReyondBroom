@@ -157,5 +157,7 @@ fb_generators_tests.qc
 fb_shader_pack.qc
 fb_tutorial.qc
 fb_tutorial_tests.qc
+fb_jam_world.qc
+fb_jam_world_tests.qc
 csaddon.qc
 #endlist

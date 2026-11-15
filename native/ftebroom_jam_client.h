@@ -8,6 +8,7 @@
 #include <chrono>
 #include <thread>
 
+#include "ftebroom_filesystem_path.h"
 #include "ftebroom_jam_http.h"
 
 namespace ftebroom::jam {
@@ -27,10 +28,10 @@ struct Client {
   std::string prefix;
 
   Json json(const std::string& method, const std::string& path, const Json& body = nullptr,
-            const std::string& key = {}, const std::string& bytes = {}) const
+            const std::string& key = {}, const std::string& bytes = {}, ResourceTransfer* transfer = nullptr) const
   {
     const auto response = request(endpoint, method, path, token, key,
-      method == "PUT" || path == "/v1/me/avatar" ? bytes : body.is_null() ? std::string{} : body.dump(), 512 * 1024);
+      method == "PUT" || path == "/v1/me/avatar" ? bytes : body.is_null() ? std::string{} : body.dump(), 512 * 1024, transfer);
     auto value = response.body.empty() ? Json::object() : Json::parse(response.body, nullptr, false);
     if (value.is_discarded() || !value.is_object()) throw Error("Invalid Mapping Jam API response.", true);
     if (response.status < 200 || response.status >= 300) {
@@ -43,24 +44,27 @@ struct Client {
     return value;
   }
 
-  Json board() const
+  Json board(ResourceTransfer* transfer = nullptr) const
   {
-    return {{"board", json("GET", prefix + "board")}, {"wallet", json("GET", prefix + "me/wallet")}};
+    return {{"board", json("GET", prefix + "board", nullptr, {}, {}, transfer)},
+            {"wallet", json("GET", prefix + "me/wallet", nullptr, {}, {}, transfer)}};
   }
 };
 
 inline std::string fileBytes(const fs::path& file, std::size_t limit)
 {
-  const auto size = fs::file_size(file);
+  const auto nativeFile = ftebroom::filesystemPath(file);
+  const auto size = fs::file_size(nativeFile);
   if (size > limit) throw std::runtime_error("The local file exceeds its size limit.");
   std::string result(static_cast<std::size_t>(size), '\0');
-  std::ifstream in(file, std::ios::binary);
+  std::ifstream in(nativeFile, std::ios::binary);
   if (!in.read(result.data(), result.size())) throw std::runtime_error("Cannot read the local file.");
   return result;
 }
 
-inline void writeBytes(const fs::path& file, const std::string& bytes)
+inline void writeBytes(const fs::path& path, const std::string& bytes)
 {
+  const auto file=ftebroom::filesystemPath(path);
 #ifdef _WIN32
   // std::filesystem's recursive directory walk may misread the drive root
   // of an extended-length Win32 path as a directory that needs creation.
@@ -164,19 +168,6 @@ inline bool packEntry(const std::string& path)
   return path.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_", prefix.size()) == path.size()-4;
 }
 
-inline fs::path artifactFilesystemPath(const fs::path& path)
-{
-#ifdef _WIN32
-  if (path.native().rfind(L"\\\\?\\",0)==0)
-    return fs::path(path).make_preferred();
-  const auto native = fs::absolute(path).lexically_normal().make_preferred().native();
-  if (native.rfind(L"\\\\",0)==0) return L"\\\\?\\UNC\\" + native.substr(2);
-  return L"\\\\?\\" + native;
-#else
-  return path;
-#endif
-}
-
 inline void renameArtifactDirectory(const fs::path& source, const fs::path& target)
 {
 #ifdef _WIN32
@@ -196,7 +187,7 @@ inline void renameArtifactDirectory(const fs::path& source, const fs::path& targ
 
 inline bool validPack(const fs::path& destination, const Json& files)
 {
-  const auto root = artifactFilesystemPath(destination);
+  const auto root = ftebroom::filesystemPath(destination);
   for (const auto& item : files) {
     const auto name = item.at("path").get<std::string>();
     const auto length = item.at("sizeBytes").get<std::size_t>();
@@ -211,7 +202,7 @@ inline bool validPack(const fs::path& destination, const Json& files)
 inline bool installedPack(const fs::path& destination, const Json& manifest)
 {
   try {
-    const auto root = artifactFilesystemPath(destination);
+    const auto root = ftebroom::filesystemPath(destination);
     const auto& files = manifest.at("files");
     if (!files.is_array() || files.empty() || files.size()>64) return false;
     Json inventory = Json::object();
@@ -245,7 +236,7 @@ inline bool installedPack(const fs::path& destination, const Json& manifest)
 }
 
 inline void download(const Client& client, const Json& manifest, const fs::path& destination, bool base,
-                     const std::string& mapStem = "jam_map", bool reuse = false)
+                     const std::string& mapStem = "jam_map", bool reuse = false, ResourceTransfer* transfer = nullptr)
 {
   if (!base && (mapStem != "jam_map" && mapStem != "jam_hub"))
     throw std::runtime_error("Unknown Jam map name.");
@@ -269,7 +260,11 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
   }
   if (!members.count(base ? "lq1/pak0.pak" : mapPath+".bsp"))
     throw std::runtime_error("The Jam manifest is incomplete.");
-  const auto target = artifactFilesystemPath(destination);
+  const auto target = ftebroom::filesystemPath(destination);
+  if (transfer) {
+    transfer->check();
+    transfer->phase = ResourcePhase::Verifying;
+  }
   if (base && validPack(destination, files)) return;
   if (!base && reuse) {
     const bool present = std::all_of(members.begin(),members.end(),[&](const auto& item) {
@@ -285,14 +280,25 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
   const auto path = manifest.at("downloadPath").get<std::string>();
   HttpResponse response{};
   for (int attempt=0;;++attempt) {
+    if (transfer) {
+      transfer->check();
+      transfer->total = length;
+      transfer->bytes = 0;
+      transfer->phase = ResourcePhase::Downloading;
+    }
     try {
-      response = request(client.endpoint,"GET",path,client.token,{},{},length+4096);
+      response = request(client.endpoint,"GET",path,client.token,{},{},length+4096,transfer);
+      if (response.status==200 && response.body.size()<length)
+        throw DownloadInterrupted("The Mapping Jam download was incomplete.");
       if (response.status!=408 && response.status!=429 && response.status!=500 &&
           response.status!=502 && response.status!=503 && response.status!=504) break;
-      if (attempt==2) throw Error("The Jam download service is temporarily unavailable. Try Play again.",true);
+      if (response.status==429 && transfer)
+        throw Error("The Mapping Jam server asked the client to wait.",true,"RATE_LIMITED");
+      if (attempt==2) throw Error("The Jam download service is temporarily unavailable. Try again.",true);
     } catch (const DownloadInterrupted&) {
       if (attempt==2) throw;
     }
+    if (transfer) transfer->phase = ResourcePhase::Retrying;
     std::this_thread::sleep_for(std::chrono::seconds(attempt+1));
   }
   if (response.status == 404) throw Error("The Jam publication changed during download.", true, "ARTIFACT_CHANGED");
@@ -301,6 +307,10 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
                 response.status==401 ? "AUTH_REQUIRED" : "");
   if (response.status != 200)
     throw Error("The Jam download failed (HTTP "+std::to_string(response.status)+").",false);
+  if (transfer) {
+    transfer->check();
+    transfer->phase = ResourcePhase::Verifying;
+  }
   if (response.body.size() != length ||
       sha256(response.body) != manifest.at("sha256").get<std::string>())
     throw std::runtime_error("The Jam download did not match its manifest.");
@@ -313,6 +323,7 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     const auto entries = ftebroom::pak::zipDirectory(archive);
     if (entries.size() != members.size()) throw std::runtime_error("Unexpected files in Jam download.");
     for (const auto& entry : entries) {
+      if (transfer) transfer->check();
       const auto i = members.find(entry.name);
       if (i == members.end() || entry.size != i->second.at("sizeBytes").get<std::size_t>())
         throw std::runtime_error("Unexpected file or size in Jam download.");
@@ -321,6 +332,7 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
         throw std::runtime_error("An extracted Jam file did not match its manifest.");
       writeBytes(staging / fs::u8path(entry.name).make_preferred(), bytes);
     }
+    if (transfer) transfer->check();
     fs::remove(archive);
     if (fs::exists(target)) {
       auto previous = target;
@@ -350,7 +362,7 @@ inline Json sendMap(const Client& client, const std::string& plot, const Json& r
 {
   const auto bytes = fileBytes(snapshot, 2 * 1024 * 1024);
   if (bytes.empty()) throw std::runtime_error("The exported map is empty.");
-  const auto archive = snapshot.parent_path() / "source.zip";
+  const auto archive = ftebroom::filesystemPath(snapshot.parent_path() / "source.zip");
   std::string empty(22, '\0');
   empty.replace(0, 4, "PK\x05\x06", 4);
   writeBytes(archive, empty);

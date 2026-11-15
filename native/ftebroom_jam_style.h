@@ -147,4 +147,10 @@ bool jamButton(const char* label, ImVec2 size = {}, JamTone tone = JamTone::Neut
                   visible.c_str(),ImGui::GetFontSize(),ImGui::GetColorU32(ImGuiCol_Text));
   return clicked;
 }
+bool jamTrackedButton(const char* action, const char* label, ImVec2 size = {}, JamTone tone = JamTone::Neutral)
+{
+  const bool clicked = jamButton(label,size,tone);
+  if (clicked) jamRecordTelemetry("button",action);
+  return clicked;
+}
 } // namespace

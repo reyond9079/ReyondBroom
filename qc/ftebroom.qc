@@ -103,7 +103,7 @@ int fb_createbox(vector center, vector size)
     int model=fb_creation_model();
     if(!model) {fb_tx_cancel();return 0;}
     int id=brush_history_create(model,fb_preview,6,CONTENTBIT_SOLID,TRUE);
-    fb_tx_commit();return id;
+    return fb_tx_commit()?id:0;
 }
 void fb_cancel()
 {

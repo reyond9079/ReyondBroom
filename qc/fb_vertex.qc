@@ -221,9 +221,9 @@ int fb_vertex_build(vector delta,int remove,float snap)
     }
     return valid;
 }
-void fb_vertex_commit(string label)
+int fb_vertex_commit(string label)
 {
-    if(!fb_vertex_preview_valid) return;
+    if(!fb_vertex_preview_valid) return FALSE;
     vector *selected=memalloc((fb_vertex_count+1)*sizeof(vector));int selectedCount=0;
     for(int h=0;h<fb_vertex_count;h++) if(fb_vertex_handles[h].selected) {
         vector point=fb_vertex_handles[h].point+fb_vertex_delta;
@@ -242,9 +242,11 @@ void fb_vertex_commit(string label)
         for(int f=0;f<item->preview.nf;f++) faces[f]=item->preview.faces[f].attr;
         if(!brush_history_edit(item->model,item->id,faces,item->preview.nf,item->contents)) {ok=FALSE;break;}
     }
-    if(ok) fb_tx_commit();else fb_tx_cancel();fb_vertex_rebuild();
-    for(int h=0;h<fb_vertex_count;h++) for(int s=0;s<selectedCount;s++) if(vlen(fb_vertex_handles[h].point-selected[s])<FB_GEOM_MERGE) fb_vertex_handles[h].selected=TRUE;
+    if(ok) ok=fb_tx_commit();else fb_tx_cancel();
+    fb_vertex_rebuild();
+    if(ok) for(int h=0;h<fb_vertex_count;h++) for(int s=0;s<selectedCount;s++) if(vlen(fb_vertex_handles[h].point-selected[s])<FB_GEOM_MERGE) fb_vertex_handles[h].selected=TRUE;
     memfree(selected);fb_vertex_selection_count();
+    return ok;
 }
 void fb_vertex_cancel()
 {

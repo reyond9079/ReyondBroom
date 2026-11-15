@@ -169,7 +169,8 @@ void fb_transform_commit(vector delta)
             if(!fb_transform_duplicate || delta!='0 0 0')fb_tx_set_key(id,"origin",sprintf("%.9g %.9g %.9g",movedOrigin_x,movedOrigin_y,movedOrigin_z),HIST_ENTITY);
         }
     }
-    fb_tx_commit();fb_repeat_move(delta,fb_transform_duplicate);fb_clone_clear();
+    if(fb_tx_commit())fb_repeat_move(delta,fb_transform_duplicate);
+    fb_clone_clear();
 }
 int fb_transform_replaces(int model,int id)
 {

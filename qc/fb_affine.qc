@@ -8,7 +8,7 @@ int fb_repeat_fixed_pivot;
 int fb_vertex_affine_command();
 int fb_vertex_bounds(vector *bounds);
 int fb_vertex_affine_preview(fb_affine_t *m);
-void fb_vertex_commit(string label);
+int fb_vertex_commit(string label);
 vector fb_affine_point(fb_affine_t *m,vector p) {return m->x*p_x+m->y*p_y+m->z*p_z+m->translation;}
 vector fb_affine_direction(fb_affine_t *m,vector p) {return m->x*p_x+m->y*p_y+m->z*p_z;}
 vector fb_affine_covector(fb_affine_t *m,vector p) {return m->ix*p_x+m->iy*p_y+m->iz*p_z;}
@@ -103,7 +103,10 @@ int fb_affine_valid(fb_affine_t *m)
 }
 int fb_affine_apply(fb_affine_t *m,string label)
 {
-    if(fb_vertex_scope) {if(!fb_vertex_affine_preview(m)) return FALSE;fb_vertex_commit(label);return TRUE;}
+    if(fb_vertex_scope) {
+        if(!fb_vertex_affine_preview(m)) return FALSE;
+        return fb_vertex_commit(label);
+    }
     if(!fb_affine_valid(m)) return FALSE;
     int textureLock=cvar("ftebroom_texture_lock");
     vector repeatCenter=fb_affine_center();
@@ -129,7 +132,8 @@ int fb_affine_apply(fb_affine_t *m,string label)
             if(cvar("ftebroom_rotate_entity_properties")) fb_affine_angles(item->id,m);
         }
     }
-    fb_tx_commit();fb_repeat_affine(m,repeatCenter);return TRUE;
+    if(!fb_tx_commit())return FALSE;
+    fb_repeat_affine(m,repeatCenter);return TRUE;
 }
 vector fb_affine_axis(vector direction)
 {

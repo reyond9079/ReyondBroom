@@ -52,6 +52,7 @@ struct JamUpload {
   JamPublishedMap map;
 };
 struct JamLocal {
+  bool liveWorld = false;
   jam::Client client;
   JamScreen screen = JamScreen::SignIn;
   bool open = false;
@@ -73,6 +74,7 @@ struct JamLocal {
   JamPublishedMap publishingMap, publishedMap;
   std::string retryKey, retryIntent;
   JamFs::path pack;
+  std::shared_ptr<jam::ResourceTransfer> resourceTransfer;
   std::optional<JamUpload> snapshot;
   JamJson account, rules, board, wallet;
   JamJson players = JamJson::array();
@@ -149,7 +151,7 @@ JamFs::path jamRoot()
 
 JamFs::path jamAlphaWarningPath()
 {
-  return settingsPath().parent_path() / "mapping-jams-local" / "alpha-warning-accepted";
+  return settingsPath().parent_path() / "mapping-jams-local" / "alpha-warning-telemetry-accepted";
 }
 
 bool jamAlphaWarningAccepted()
@@ -178,6 +180,65 @@ std::string jamField(const JamJson& value, const char* key)
   if (!value.is_object()) return {};
   const auto field = value.find(key);
   return field != value.end() && field->is_string() ? field->get<std::string>() : std::string{};
+}
+
+struct JamTelemetry {
+  JamJson pending = JamJson::array(), inFlight;
+  std::future<int> request;
+  std::chrono::steady_clock::time_point next;
+  std::string lastError, lastDocumentError, lastDialogError, lastBuildError;
+  const char* action = "session";
+  bool unsupported = false;
+} jamTelemetry;
+
+void jamRecordTelemetry(const char* kind, const char* name)
+{
+  if (jamTelemetry.unsupported) return;
+  if (std::string_view(kind)=="button") jamTelemetry.action=name;
+  if (jamTelemetry.pending.size()>=256) jamTelemetry.pending.erase(jamTelemetry.pending.begin());
+  jamTelemetry.pending.push_back({{"kind",kind},{"name",name},{"action",jamTelemetry.action}});
+}
+
+bool jamEditing();
+
+void jamTelemetryTick()
+{
+  const auto report = [](const std::string& error, std::string& previous, const char* category) {
+    if (!error.empty() && error!=previous) jamRecordTelemetry("error",category);
+    previous=error;
+  };
+  report(jamLocal.error,jamTelemetry.lastError,"client_operation");
+  report(jamLocal.fileError,jamTelemetry.lastDialogError,"map_dialog");
+  if (jamEditing()) {
+    report(documentError,jamTelemetry.lastDocumentError,"map_document");
+    report(runHadError ? buildMessage : std::string{},jamTelemetry.lastBuildError,"local_compile");
+  }
+  using namespace std::chrono;
+  const auto now=steady_clock::now();
+  if (jamTelemetry.request.valid()) {
+    if (jamTelemetry.request.wait_for(milliseconds(0))!=std::future_status::ready) return;
+    const auto status=jamTelemetry.request.get();
+    if (status==404) {jamTelemetry.unsupported=true;jamTelemetry.pending.clear();return;}
+    if (!status || status==429 || status>=500) {
+      auto& pending=jamTelemetry.pending;
+      for (auto it=jamTelemetry.inFlight.rbegin();it!=jamTelemetry.inFlight.rend() && pending.size()<256;++it)
+        pending.insert(pending.begin(),std::move(*it));
+      jamTelemetry.next=now+seconds(10);
+    }
+    jamTelemetry.inFlight.clear();
+  }
+  if (jamTelemetry.unsupported || now<jamTelemetry.next || jamTelemetry.pending.empty() || !jamAlphaWarningAccepted()) return;
+  JamJson batch=JamJson::array();
+  const auto count=std::min<std::size_t>(32,jamTelemetry.pending.size());
+  for (std::size_t index=0;index<count;index++) batch.push_back(std::move(jamTelemetry.pending[index]));
+  jamTelemetry.pending.erase(jamTelemetry.pending.begin(),jamTelemetry.pending.begin()+count);
+  const auto endpoint=jamEndpoint();
+  jamTelemetry.next=now+milliseconds(800);
+  jamTelemetry.inFlight=batch;
+  jamTelemetry.request=std::async(std::launch::async,[endpoint,batch=std::move(batch)]() {
+    try {return jam::request(endpoint,"POST","/v1/telemetry",{},{},JamJson{{"events",batch}}.dump(),4096).status;}
+    catch (const std::exception&) {return 0;}
+  });
 }
 
 void jamAssign(char* target, std::size_t size, const std::string& value)
@@ -269,6 +330,7 @@ void jamJoin()
     data["prefix"] = client.prefix;
     data["rules"] = rules;
     data["canPublish"] = info.value("canPublish",false);
+    data["liveWorld"] = info.value("liveWorld",false);
     const auto version=rules.at("packVersion").template get<std::string>();
     if(version=="librequake-0.09-plants-local1"){
       const auto manifest=client.json("GET",client.prefix+"packs/"+version+"/manifest");
@@ -280,6 +342,7 @@ void jamJoin()
     jamLocal.client.prefix = data.at("prefix");
     jamLocal.rules = data.at("rules");
     jamLocal.canPublish = data.value("canPublish",false);
+    jamLocal.liveWorld = data.value("liveWorld",false);
     const auto pack=jamField(data,"pack");
     jamApplyBoard(std::move(data));
     jamLocal.pack=JamFs::u8path(pack);
@@ -465,19 +528,24 @@ void jamSaveProfile(bool skip)
 
 void jamResources()
 {
+  if (jamBusy()) return;
   const auto version = jamField(jamLocal.rules, "packVersion");
   if (version != "librequake-0.09-plants-local1") {
     jamLocal.error = jamText("Unsupported local pack version.","Эта версия локального пакета не поддерживается.");
     return;
   }
   const auto destination = jamRoot() / "packs" / version;
-  jamStart(jamText("Downloading and verifying resources…","Загрузка и проверка ресурсов…"), [version,destination](auto client) {
-    const auto manifest = client.json("GET", client.prefix + "packs/" + version + "/manifest");
+  auto transfer = std::make_shared<jam::ResourceTransfer>();
+  jamLocal.resourceTransfer = transfer;
+  jamStart({}, [version,destination,transfer](auto client) {
+    const auto manifest = client.json("GET", client.prefix + "packs/" + version + "/manifest",nullptr,{},{},transfer.get());
     if (jamField(manifest,"packVersion") != version)
       throw std::runtime_error("The base pack version changed.");
-    jam::download(client, manifest, destination, true);
+    jam::download(client, manifest, destination, true,"jam_map",false,transfer.get());
+    transfer->check();
     if(!jam::installedPack(destination,manifest))throw std::runtime_error("The installed Jam resources failed verification.");
-    return client.board();
+    transfer->phase = jam::ResourcePhase::Opening;
+    return client.board(transfer.get());
   }, [destination](auto data) {
     jamLocal.pack = destination;
     jamApplyBoard(std::move(data));
@@ -593,11 +661,26 @@ bool jamStoredPath(const JamFs::path& path)
 bool jamMapPath(const JamFs::path& path)
 {
   if (!path.is_absolute() || path.extension()!=".map") return false;
-  std::error_code error;
   const auto clean = path.lexically_normal();
   const auto plot = clean.parent_path();
-  return clean==path && jamSafePlot(plot.filename().u8string()) && plot.parent_path()==jamDrafts() &&
-    JamFs::weakly_canonical(path,error)==path && !error;
+  if (clean!=path || !jamSafePlot(plot.filename().u8string()) || plot.parent_path()!=jamDrafts()) return false;
+#ifdef _WIN32
+  // MinGW's weakly_canonical mishandles the Win32 extended-length prefix.
+  // Reject links and junctions on every component, including on existing parents.
+  for (auto component=path;component!=component.root_path();component=component.parent_path()) {
+    const auto attributes=GetFileAttributesW(ftebroom::filesystemPath(component).c_str());
+    if (attributes!=INVALID_FILE_ATTRIBUTES) {
+      if (attributes&FILE_ATTRIBUTE_REPARSE_POINT) return false;
+    } else {
+      const auto error=GetLastError();
+      if (error!=ERROR_FILE_NOT_FOUND && error!=ERROR_PATH_NOT_FOUND) return false;
+    }
+  }
+  return true;
+#else
+  std::error_code error;
+  return JamFs::weakly_canonical(path,error)==path && !error;
+#endif
 }
 
 bool jamOwnedPlot(const std::string& plot)
@@ -635,7 +718,7 @@ std::vector<JamFs::path> jamMaps()
   for (const auto& plot : JamFs::directory_iterator(root)) {
     if (!jamOwnedPlot(plot.path().filename().u8string()) || plot.is_symlink() || !plot.is_directory()) continue;
     for (const auto& entry : JamFs::directory_iterator(plot.path())) {
-      if (entry.path().filename()!="jam-draft.map" && jamMapPath(entry.path()) && entry.is_regular_file())
+      if (entry.path().filename()!="jam-draft.map" && jamMapPath(entry.path()) && JamFs::is_regular_file(ftebroom::filesystemPath(entry.path())))
         maps.push_back(entry.path());
     }
   }
@@ -647,7 +730,7 @@ std::vector<JamFs::path> jamMaps()
 
 void jamOpenMap(const JamFs::path& path)
 {
-  if (!jamMapPath(path) || !jamOwnedPlot(path.parent_path().filename().u8string()) || !JamFs::is_regular_file(path))
+  if (!jamMapPath(path) || !jamOwnedPlot(path.parent_path().filename().u8string()) || !JamFs::is_regular_file(ftebroom::filesystemPath(path)))
     throw std::runtime_error(jamText("Choose one of your Jam maps.","Выбери одну из своих карт Jam."));
   if (!jamEditing() && documentFile!=path) jamLocal.offlineMap = documentFile;
   jamLocal.open = false;
@@ -705,7 +788,7 @@ void jamDocumentLoaded()
   if (!jamEditing() || documentUntitled) return;
   try {
     const auto receipt = jamPublicationReceipt(documentFile);
-    if (!JamFs::is_regular_file(receipt)) return;
+    if (!JamFs::is_regular_file(ftebroom::filesystemPath(receipt))) return;
     const auto data = JamJson::parse(jam::fileBytes(receipt,4096));
     const auto revision = jamField(data,"revisionId"), hash = jamField(data,"savedHash");
     if (jam::hexId(revision,32) && jam::hexId(hash,64) &&
@@ -956,7 +1039,8 @@ bool jamSaveNamed()
     return false;
   }
   std::error_code compareError;
-  if (JamFs::exists(target) && !JamFs::equivalent(target,documentFile,compareError)) {
+  const auto physical=ftebroom::filesystemPath(target);
+  if (JamFs::exists(physical) && !JamFs::equivalent(physical,ftebroom::filesystemPath(documentFile),compareError)) {
     jamLocal.fileError = jamText("A map with that name already exists on this plot.",
                                  "На этом участке уже есть карта с таким названием.");
     return false;
@@ -976,10 +1060,10 @@ void jamOpenDraft()
     auto modified = JamFs::file_time_type::min();
     for (const auto& map : jamMaps()) {
       if (map.parent_path()!=draft.parent_path()) continue;
-      const auto stamp = JamFs::last_write_time(map);
+      const auto stamp = JamFs::last_write_time(ftebroom::filesystemPath(map));
       if (stamp>modified) {modified=stamp;draft=map;}
     }
-    if (!JamFs::exists(draft)) {
+    if (!JamFs::exists(ftebroom::filesystemPath(draft))) {
       auto bytes = jam::fileBytes(documentPath("maps/mapping-jam-start.map"), 64*1024);
       const auto wad = (jamLocal.pack / "lq1/texture-wads/lq_dev.wad").generic_u8string();
       const auto marker = bytes.find("@jam-wad@");
@@ -1233,6 +1317,7 @@ void jamTick()
   if (!jamEnabled()) return;
   jamResumeSession();
   jamPresenceTick();
+  jamTelemetryTick();
   if (jamLocal.compileReady) {
     if (!jamEditing() || (int)cvars->GetFloat("ftebroom_revision")!=saveRevision) {
       jamLocal.compileReady = false;
@@ -1259,7 +1344,18 @@ void jamTick()
   }
   if (jamLocal.work.valid() && jamLocal.work.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     auto done = std::move(jamLocal.ready);
+    auto resourceTransfer = std::move(jamLocal.resourceTransfer);
     try { auto result = jamLocal.work.get(); jamLocal.status.clear(); done(std::move(result)); }
+    catch (const jam::DownloadCanceled&) {
+      jamLocal.status = jamText("Download canceled. You can retry here.","Загрузка отменена. Её можно запустить снова.");
+    }
+    catch (const jam::DownloadInterrupted& error) {
+      jamLocal.status.clear();
+      jamLocal.error = resourceTransfer
+        ? jamText("The resource transfer stopped responding. Check your connection and retry.",
+                  "Передача ресурсов прервалась. Проверьте подключение и повторите загрузку.")
+        : error.what();
+    }
     catch (const jam::Error& error) {
       if (!error.retryable) jamLocal.retryKey.clear();
       jamLocal.error = error.code == "RATE_LIMITED"
@@ -1312,6 +1408,7 @@ void jamTick()
   const bool returnToDraft = !jamLocal.gameDraft.empty() && jamEditing() && documentFile==jamLocal.gameDraft;
   jamLocal.gameDraft.clear();
   if (returnToDraft) jamLocal.open = false;
+  if (exitCode) jamRecordTelemetry("error","game_exit");
   jamLocal.status = exitCode ? jamText("The game ended with an error.","Игра завершилась с ошибкой.")
                              : returnToDraft ? jamText("Returned to editing.","Возврат к редактированию.")
                                              : jamText("Returned to the Jam board.","Возврат на поле Jam.");

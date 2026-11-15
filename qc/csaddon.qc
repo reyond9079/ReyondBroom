@@ -300,7 +300,7 @@ void() wrap_renderscene =
         vector mn=getproperty(VF_MIN),sz=getproperty(VF_SIZE);
         if(fb_build_preview_active) {
             drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
-            fb_build_preview_draw();perf_renderscene();drawresetcliparea();continue;
+            fb_build_preview_draw();fb_jam_world_draw();perf_renderscene();drawresetcliparea();continue;
         }
         // Keep orthographic rasterization identical while dragging and idle.
         // A multisampled window backbuffer and the single-sample cache produce
@@ -326,7 +326,7 @@ void() wrap_renderscene =
         fb_view_render_cache=offscreen;
         profileTime=gettime(1);
         if(!type) addentities(MASK_ENGINE);
-        if(autocvar_ca_editormode==MODE_BRUSHEDIT) editor_brushes_addentities(curmousepos);
+        if(cvar("ftebroom_jam_world") || autocvar_ca_editormode==MODE_BRUSHEDIT) editor_brushes_addentities(curmousepos);
         else if(autocvar_ca_editormode==MODE_ENTSEDIT) editor_ents_addentities();
         else if(autocvar_ca_editormode==MODE_LIGHTEDIT) editor_lights_addentities();
         else if(autocvar_ca_editormode==MODE_TERRAINEDIT) editor_terrain_addentities(curmousepos);
@@ -335,6 +335,8 @@ void() wrap_renderscene =
         fb_terrain_frame(curmousepos);
         ftebroom_frame();
         fb_profile_sum[2]+=gettime(1)-profileTime;profileTime=gettime(1);
+        fb_jam_capture();
+        fb_jam_world_draw();
         fb_visual_draw();
         fb_profile_sum[3]+=gettime(1)-profileTime;profileTime=gettime(1);
         fb_editor_clear_sky();fb_shader_pack_frame();perf_renderscene();fb_shader_pack_finish();
@@ -384,7 +386,8 @@ float (float event, float parama, float paramb, float devid) CSQC_InputEvent =
 		if (parama == K_RALT || parama == K_LALT)
 			altdown = (event == IE_KEYDOWN);
 	}
-	if (autocvar_ca_show)
+	// Jam input goes through the native editor and its checked transactions.
+	if (autocvar_ca_show && !cvar("ftebroom_jam_world"))
 	{
 		if (event == IE_KEYDOWN)
 		{
@@ -715,6 +718,9 @@ float(string txt, string info) CSQC_ConsoleLink =
 float(string cmd) CSQC_ConsoleCommand =
 {
     fb_entity_tokenize(cmd);
+    if(argv(0)=="ftebroom_test_jam_foreign"){fb_jam_foreign_pick_test(stoi(argv(1)));return TRUE;}
+    if(argv(0)=="ftebroom_test_jam_hub"){fb_jam_hub_test(stoi(argv(1)));return TRUE;}
+    if(argv(0)=="ftebroom_test_jam_bounds"){fb_jam_tool_test();return TRUE;}
     if(argv(0)=="reyond_shader_status"){RSPStatus();return TRUE;}
     if(argv(0)=="ftebroom_pointer" && argv(5)!="" && cvar("ftebroom_view_count")>1) {
         int pane=bound(0,stoi(argv(5)),cvar("ftebroom_view_count")-1);
@@ -841,6 +847,9 @@ void(float prevprogs) init =
 	
 	//brush editor needs some commands for easier binds.
 	editor_brushes_registercommands();
+    registercommand("ftebroom_test_jam_foreign");
+    registercommand("ftebroom_test_jam_hub");
+    registercommand("ftebroom_test_jam_bounds");
     registercommand("reyond_shader_status");
 	registercommand("ftebroom_test_drag");
 	registercommand("ftebroom_box");

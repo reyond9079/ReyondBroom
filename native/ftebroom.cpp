@@ -282,6 +282,7 @@ static bool terrainCreateWindow;
 #include "ftebroom_shader_pack.h"
 #include "ftebroom_update.h"
 #include "ftebroom_jam.h"
+#include "ftebroom_jam_world.h"
 #include "ftebroom_jam_ui.h"
 #include "ftebroom_jam_qa.h"
 #include "ftebroom_cache_maintenance.h"
@@ -294,6 +295,39 @@ static bool terrainCreateWindow;
 #include "ftebroom_unity.h"
 static void worldOpen();
 #include "ftebroom_plugins.h"
+namespace {
+void jamWorldLabels()
+{
+  if (!jamWorld.active || jamWorld.lastScene.empty() || !jamWorld.state.contains("plots")) return;
+  const auto own=jamWorldCenter(jamWorld.activePlot);
+  for (int view=0;view<viewLayout;view++) {
+    rbviewport::Projection projection;
+    if (viewRects[view].type || !pluginProjection(view,projection)) continue;
+    const auto rect=viewRects[view];
+    auto* draw=ImGui::GetBackgroundDrawList();
+    draw->PushClipRect({rect.x,rect.y},{rect.x+rect.w,rect.y+rect.h},true);
+    for (const auto& other:jamWorld.state.at("plots")) {
+      const auto plot=jamField(other,"plot");
+      if (plot==jamWorld.activePlot || !jamWorldPlot(plot) || !other.contains("player")) continue;
+      const auto center=jamWorldCenter(plot);
+      const auto& player=other.at("player");
+      const auto name=jamField(player,"nickname");
+      const auto& pose=player.at("pose");
+      if (name.empty() || !pose.is_array() || pose.size()!=4) continue;
+      rbviewport::V point{pose[0].get<float>()+center[0]-own[0],pose[1].get<float>()+center[1]-own[1],
+                          pose[2].get<float>()+22};
+      ImVec2 where;
+      if (!projection.project(point,where.x,where.y)) continue;
+      const auto size=ImGui::CalcTextSize(name.c_str());
+      where.x-=size.x*.5f;
+      draw->AddRectFilled({where.x-4,where.y-2},{where.x+size.x+4,where.y+size.y+2},IM_COL32(13,24,40,232),4);
+      draw->AddText(where,IM_COL32(219,249,245,255),name.c_str());
+    }
+    draw->PopClipRect();
+  }
+}
+} // namespace
+
 #include "ftebroom_plant_editor.h"
 #include "ftebroom_placement.h"
 #include "ftebroom_plant_brush.h"
@@ -380,6 +414,8 @@ static void panel(float w, float h)
   if(runUiNavigation()||plantFocused()||worldArchitectFocused()||jamModeActive()||startupCheck)io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::NewFrame();
   jamTick();
+  jamWorldTick();
+  jamWorldNotifications();
   if(startupCheck && !jamModeActive()){
     uiHasScene=false;
     recentPanel();
@@ -426,6 +462,7 @@ static void panel(float w, float h)
   viewCompute(w, h);
   viewOverlay();
   jamViewportToolbar();
+  jamWorldLabels();
   if ((int)cvars->GetFloat("ftebroom_tool") == 1)
   {
     auto overlay = ImGui::GetForegroundDrawList();
@@ -531,7 +568,7 @@ static void panel(float w, float h)
     actionMenus();
     if (!jamEditing()) {pluginsMenu();shaderPackMenu();}
     if (jamEditing()) jamEditorMenu();
-    else if(jamEnabled() && ImGui::MenuItem("Mapping Jams")) jamLocal.open=true;
+    else if(jamEnabled() && ImGui::MenuItem("Mapping Jams")) {jamRecordTelemetry("button","open_mapping_jams");jamLocal.open=true;}
     if (ImGui::BeginMenu("Workspace"))
     {
       if (!jamEditing()) ImGui::MenuItem("Mod file manager",nullptr,&modFilesOpen);
@@ -2119,6 +2156,7 @@ static void shutdownEditor()
   desktopDetach();
   cameraSave();
   cacheMaintenanceStop();
+  jamBackgroundShutdown();
   if (ready)
   {
     ImGui::GetIO().WantSaveIniSettings = true;

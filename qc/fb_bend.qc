@@ -123,7 +123,7 @@ int fb_bend_apply()
     fb_tx_begin("Bezier Bend");brush_deselectall();
     for(int i=0;i<fb_generator_count&&valid;i++){fb_poly_t *piece=&fb_generator_items[i].poly;fb_bend_source_t *source=&fb_bend_sources[i/slices];for(int f=0;f<piece->nf;f++)faces[f]=piece->faces[f].attr;valid=brush_history_create(source->model,faces,piece->nf,source->contents,TRUE)!=0;}
     if(valid)for(int b=0;b<fb_bend_count;b++)brush_history_delete(fb_bend_sources[b].model,fb_bend_sources[b].id);
-    memfree(faces);if(valid)fb_tx_commit();else fb_tx_cancel();fb_bend_clear();fb_document_tick();cvar_set("ftebroom_tool","0");return valid;
+    memfree(faces);if(valid)valid=fb_tx_commit();else fb_tx_cancel();fb_bend_clear();fb_document_tick();cvar_set("ftebroom_tool","0");return valid;
 }
 
 void fb_bend_cancel_drag()

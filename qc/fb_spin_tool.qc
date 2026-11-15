@@ -48,7 +48,7 @@ int fb_spin_capture()
 int fb_spin_tool_apply()
 {
     if(!fb_spin_build())return FALSE;
-    fb_tx_begin("Spin");int valid=fb_spin_apply();if(valid)fb_tx_commit();else fb_tx_cancel();
+    fb_tx_begin("Spin");int valid=fb_spin_apply();if(valid)valid=fb_tx_commit();else fb_tx_cancel();
     fb_spin_clear();fb_document_tick();cvar_set("ftebroom_tool","0");return valid;
 }
 void fb_spin_cancel_drag()

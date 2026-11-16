@@ -199,6 +199,8 @@ should become independent. See [linked-group workflow and limits](alpha21.md).
 
 ## Mod file manager, models and sounds
 
+![Mod file manager showing model thumbnails inside a LibreQuake PAK archive, with Plant Brush open beside the viewport](images/reyondbroom-mod-file-manager.webp)
+
 Open the file manager from **Workspace**. It supports folder trees, tiles or lists,
 thumbnail size, Up, Refresh and opening a directory in the operating-system file
 manager. FTE Custom game exposes **Mod files** and **Map sources / authoring assets**

@@ -21,6 +21,7 @@ The release page has source archives and SHA-256 checksums. See the [installatio
 - **Edit maps.** Work with brushes, entities, materials, and UVs in 2D and 3D. Organize levels with groups and layers, use clipping and CSG, and load custom entity definitions. [Editor manual](docs/manual.md)
 - **Compile and test.** Run compiler stages, inspect lightmaps, and follow a leak trail through the map. Import TrenchBroom compilation profiles or configure a Run task for your engine. [Build and launch](docs/compilation-profiles-build.md) · [Leak inspection](docs/leak111.md)
 - **Create assets.** Edit meshes and UVs, paint textures, animate models, and generate vegetation with the built-in editors. Export and placement options depend on the game profile. [Model Editor](docs/model-authoring.md) · [Plant Editor](docs/plant-editor.md)
+- **Browse mod assets.** Open mod folders and PAK archives and preview models and sounds from the workspace. [Mod file manager](docs/manual.md#mod-file-manager-models-and-sounds)
 - **Generate editable geometry.** Use World Architect to generate and refine level layouts and architecture. AutoLevel is available under **Legacy generators**. [World Architect](docs/world-architect.md) · [AutoLevel](docs/autolevel.md)
 - **Author FTE materials.** The optional Reyond's GLSL Shader Pack adds water, skies, fog, and weather controls to the **FTE Custom game** profile. [Shader Pack](docs/shader-pack.md)
 

@@ -124,14 +124,24 @@ def exercise(engine, game, output):
                 if process.poll() is not None or time.monotonic() >= deadline:
                     raise RuntimeError(f"Standalone rigs did not load. See {log_path}")
                 time.sleep(.1)
-            # The ready message is emitted before the first render presents.
-            time.sleep(.45)
+            # The ready message is emitted before the software renderer
+            # presents the room. Sample the rendered floor before starting.
+            deadline = time.monotonic()+8
+            while True:
+                image = ImageGrab.grab(bbox=(0,0,1280,800)).convert("RGB")
+                floor = image.crop((0,655,1280,800)).convert("L")
+                if sum(count!=0 for count in floor.histogram())>=32:
+                    break
+                if process.poll() is not None or time.monotonic() >= deadline:
+                    raise RuntimeError("FTE prepared the rigs but never presented the textured test room.")
+                time.sleep(.12)
             frames = []
             for index in range(5):
-                image = ImageGrab.grab(bbox=(0,0,1280,800)).convert("RGB")
                 image.save(output/f"standalone-{index}.png")
                 frames.append(image)
-                time.sleep(.22)
+                if index<4:
+                    time.sleep(.22)
+                    image = ImageGrab.grab(bbox=(0,0,1280,800)).convert("RGB")
             if process.wait(timeout=19) != 0:
                 raise RuntimeError(f"Standalone FTE exited with code {process.returncode}. See {log_path}")
         finally:

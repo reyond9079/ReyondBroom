@@ -9,9 +9,11 @@ is still open. The core export fixture includes ten editable example
 characters under `exports/legacy/characters`.
 Pass `--sanitize` on Linux to run the parser, fitting, and export checks
 with AddressSanitizer and UndefinedBehaviorSanitizer.
+Pass `--legacy-fixture` with an existing Field Technician `.rbchar` to test
+opening and saving the retired preset. The original file is only read.
 
-The suite writes `fit-matrix.csv` and `fit-contacts.csv` after sampling 400
-dressed poses across outfits, body shapes and motions. It checks actual
+The suite writes `fit-matrix.csv` and `fit-contacts.csv` after sampling all 13
+outfits with five body shapes and eight poses each. It checks actual
 skinned triangles by region. A reported contact requires visual follow-up,
 especially near cutout hair cards and garment seams. The geometric check
 remains red while it detects intersections.
@@ -67,6 +69,11 @@ positional difference in Quake units. This check measures format agreement.
 To validate the GLB with Khronos glTF Validator, install the `gltf-validator`
 package into the disposable test directory and call `validateBytes` on
 `character.glb`. The npm package is a development tool.
+
+Use `--catalog-only` with `test-character-placement.py` to select ten presets,
+inspect each tab and check pixel changes while scrubbing a walking sequence.
+The script captures the actual preview and verifies that the retired preset
+is absent from the menu.
 
 Native smoke runs use a copy of the editor with `runtime/characters` installed
 as `ftebroom/characters`. Start the editor, use **Plugins > Character Creator**

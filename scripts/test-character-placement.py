@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 
-from PIL import ImageGrab
+from PIL import ImageChops, ImageGrab
 
 from editor_os_input import NativeInput, read_ui_json
 
@@ -41,7 +41,7 @@ def editor_process(arguments, root, stream, hardware=False):
 
 def exercise(root, out, compile_assets, document_only=False, startup_placement=False, motion_fixture=None,
              legacy_fixture=None, fit_fixture=None, pose_phase=.25, benchmark=False, export_goldsrc=False,
-             export_iqm=None):
+             export_iqm=None, catalog_only=False):
     data = root / "ftebroom"
     telemetry = data / "placement-ui-live.json"
     telemetry.unlink(missing_ok=True)
@@ -62,7 +62,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             texture = folder/name
             texture.parent.mkdir(parents=True,exist_ok=True)
             texture.write_bytes(bytes(header) + bytes([116,108,92]) * (64*64))
-    profile = 4 if export_goldsrc else 1 if startup_placement or fit_fixture else 0
+    profile = 4 if export_goldsrc else 1 if startup_placement or fit_fixture or catalog_only else 0
     (root / "ftebroom-game-profile.txt").write_text(f'{profile} 0 "" "" "" "" 1 0 "" 1 1\n')
     fit_command = ""
     if fit_fixture:
@@ -72,7 +72,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
     performance_setup = ("vid_vsync 0\ncl_maxfps 0\ncl_yieldcpu 0\n"
                          "set ftebroom_character_benchmark_frames 240\n") if benchmark else ""
     (data / "rb21-placement.cfg").write_text(
-        ("exec ftebroom.cfg\n" if startup_placement or fit_fixture else "exec qa-clip.cfg\n")+
+        ("exec ftebroom.cfg\n" if startup_placement or fit_fixture or catalog_only else "exec qa-clip.cfg\n")+
         "set ftebroom_placement_qa 1\n"
         +fit_command+performance_setup+
         "in 11 echo RB_CHARACTER_FIXTURE_READY\n"
@@ -158,8 +158,10 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                     self.settle()
 
                 def key(self,key,mods=()):
+                    key = {"backspace":"BackSpace", "enter":"Return", "escape":"Escape"}.get(key,key)
                     prefix="+".join((*mods,key))
-                    self.run("key",prefix)
+                    self.run("keydown",prefix,"sleep",".16","keyup",prefix)
+                    self.settle()
 
                 def text(self,value):
                     self.run("type","--clearmodifiers",value)
@@ -173,17 +175,20 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
 
             ui = XvfbInput()
 
-        def screenshot(name):
+        def capture():
             if os.name == "nt":
                 if ui.hwnd is None:
                     return
                 window = ui.types.RECT()
                 if not ui.user.GetWindowRect(ui.hwnd,ctypes.byref(window)):
                     return
-                ImageGrab.grab(bbox=(window.left,window.top,window.right,window.bottom),
-                               all_screens=True).save(out/name)
-            else:
-                ImageGrab.grab().save(out/name)
+                return ImageGrab.grab(bbox=(window.left,window.top,window.right,window.bottom),
+                                      all_screens=True)
+            return ImageGrab.grab()
+
+        def screenshot(name):
+            if frame := capture():
+                frame.save(out/name)
 
         def item(key):
             r = wait(lambda:live()["widgets"].get(key))
@@ -251,6 +256,51 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
 
         def state():
             return live()["character"]
+
+        def exercise_catalog():
+            click("menu/plugins")
+            click("menu/plugins/character")
+            wait(lambda:state()["open"] and state()["applied"])
+            names = ("Casey", "Morgan", "Riley", "Sam", "Devin", "Jordan", "Jamie", "Drew", "Taylor", "Robin")
+
+            def preview():
+                rect = live()["widgets"]["character/viewport"]
+                x, y, w, h = (int(rect[key]) for key in ("x", "y", "width", "height"))
+                frame = capture().convert("RGB")
+                return frame.crop((x+3,y+3,x+w-3,y+h-3))
+
+            images = set()
+            for name in names:
+                click("character/preset")
+                wait(lambda:live()["widgets"].get("character/preset/"+name))
+                assert "character/preset/Field Technician" not in live()["widgets"]
+                click("character/preset/"+name)
+                wait(lambda:state()["name"]==name and state()["revision"]==state()["applied"])
+                ui.settle()
+                view = preview()
+                assert any(lo<hi for lo,hi in view.getextrema()), f"Blank preview for {name}"
+                images.add(hashlib.sha256(view.tobytes()).digest())
+                screenshot("preset-"+name.lower()+".png")
+            check(len(images)==len(names),"Ten preset selections render distinct previews and Field Technician is absent")
+            for tab_id,tab_name in enumerate(("body","face","appearance","wardrobe","rig")):
+                click("character/tab-"+tab_name)
+                wait(lambda:state()["tab"]==tab_id)
+                screenshot("tab-"+tab_name+".png")
+            check(True,"Body, Face, Appearance, Wardrobe and Rig render after native tab changes")
+            click("character/tab-body")
+            click("character/clip")
+            click("character/clip/walk_forward")
+            wait(lambda:state()["clip"]=="walk_forward")
+            ui.settle()
+            first=preview()
+            slider=live()["widgets"]["character/scrub"]
+            ui.click(slider["x"]+slider["width"]*.32,slider["y"]+slider["height"]*.5)
+            wait(lambda:state()["time"]>.1 and not state()["playing"])
+            ui.settle()
+            second=preview()
+            changed=ImageChops.difference(first,second).convert("L").histogram()
+            check(sum(changed[16:])>250,"Native timeline scrubbing changes the actual preview pixels")
+            screenshot("walk-scrubbed.png")
 
         def exercise_document():
             click("menu/plugins")
@@ -375,11 +425,14 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                 screenshot("legacy-field-technician.png")
 
         try:
-            if not startup_placement and not fit_fixture:
+            if not startup_placement and not fit_fixture and not catalog_only:
                 wait(lambda:live()["mapPath"].replace("\\","/").endswith("/maps/qa_clip.map"))
             wait(lambda:"RB_CHARACTER_FIXTURE_READY" in
                  "\n".join(p.read_text(errors="replace") for p in (log,data/"qconsole.log") if p.is_file()))
             ui.position()
+            if catalog_only:
+                exercise_catalog()
+                return
             if fit_fixture:
                 wait(lambda:state()["open"] and state()["applied"] and state()["revision"]==state()["applied"])
                 assert not state()["error"] and live()["profile"]==profile
@@ -393,7 +446,10 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                         model_file=out/"bundle/models"/(export_iqm+extension)
                         model_file.parent.mkdir(parents=True,exist_ok=True)
                         click("file-path")
+                        wait(lambda:live()["widgets"].get("file-path",{}).get("active"))
                         ui.key("a",("ctrl",))
+                        ui.key("backspace")
+                        wait(lambda:live()["browsePath"]=="")
                         ui.text(model_file.as_posix())
                         wait(lambda:Path(live()["browsePath"])==model_file)
                     click("file-choose")
@@ -540,6 +596,7 @@ def main():
     parser.add_argument("output",type=Path)
     parser.add_argument("--compile-assets",action="store_true",help="Compile a sealed room with the placed model")
     parser.add_argument("--document-only",action="store_true",help="Exercise document guards and animation controls")
+    parser.add_argument("--catalog-only",action="store_true",help="Inspect native previews, tabs and one rendered animation")
     parser.add_argument("--motion-fixture",type=Path,help="Canonical animation GLB for the document import test")
     parser.add_argument("--legacy-fixture",type=Path,help="Previously saved Field Technician document")
     parser.add_argument("--startup-placement",action="store_true",help="Place an IQM character on the untitled FTE-specific startup map")
@@ -566,7 +623,7 @@ def main():
                  args.motion_fixture.resolve() if args.motion_fixture else None,
                  args.legacy_fixture.resolve() if args.legacy_fixture else None,
                  args.fit_fixture.resolve() if args.fit_fixture else None,args.pose_phase,args.benchmark,
-                 args.export_goldsrc,args.export_iqm)
+                 args.export_goldsrc,args.export_iqm,args.catalog_only)
 
 
 if __name__ == "__main__":

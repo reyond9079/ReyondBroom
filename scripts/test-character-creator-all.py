@@ -18,6 +18,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--runtime", type=Path, help="Prepared runtime for the current host")
+    parser.add_argument("--legacy-fixture", type=Path,
+                        help="A Field Technician .rbchar saved before the preset was retired")
     parser.add_argument("--benchmark-fixture", type=Path,
                         help="Looping .rbchar to benchmark on a real GPU and active desktop")
     parser.add_argument("--fte-game-qcc", type=Path,
@@ -73,7 +75,7 @@ def main():
     if fit_build==0:
         run_command("FIT-MATRIX", [fit_exe, ROOT/"runtime/characters", output/"fit-matrix.csv",
                                    output/"fit-contacts.csv"],
-                    "400 skinned wardrobe/body/animation fits with five-view depth diagnostics")
+                    "All bundled outfits across five body variants and eight poses, with five-view depth diagnostics")
     else:
         block("FIT-MATRIX","A working native fit test is required")
     if args.sanitize:
@@ -83,8 +85,13 @@ def main():
         block("CORE-ASAN-UBSAN", "Run with --sanitize on a compiler with ASan and UBSan")
     if args.runtime and args.runtime.is_dir():
         runtime = args.runtime.resolve()
+        legacy_args = ["--legacy-fixture", args.legacy_fixture.resolve()] if args.legacy_fixture else []
+        if not legacy_args:
+            block("NATIVE-LEGACY-DOCUMENT", "Supply the previously saved Field Technician .rbchar")
         run("NATIVE-DOCUMENT-TIMELINE", "test-character-placement.py", runtime,
-            output/"document", "--document-only", "--motion-fixture", output/"exports/character.glb")
+            output/"document", "--document-only", "--motion-fixture", output/"exports/character.glb", *legacy_args)
+        run("NATIVE-CATALOG", "test-character-placement.py", runtime,
+            output/"catalog", "--catalog-only")
         run("NATIVE-MAP-Q3-BUNDLE", "test-character-placement.py", runtime,
             output/"placement", "--compile-assets")
         run("NATIVE-MAP-FTE-STARTUP", "test-character-placement.py", runtime,
@@ -114,6 +121,7 @@ def main():
             block("VIEWPORT-HARDWARE-FRAMES", "Supply a looping --benchmark-fixture on a hardware desktop")
     else:
         block("NATIVE-DOCUMENT-TIMELINE", "Supply a prepared runtime and a usable desktop")
+        block("NATIVE-CATALOG", "Supply a prepared runtime and a usable desktop")
         block("NATIVE-MAP-Q3-BUNDLE", "Supply a prepared runtime and a usable desktop")
         block("NATIVE-MAP-FTE-STARTUP", "Supply a prepared runtime and a usable desktop")
         block("STANDALONE-FTE-IQM", "Supply a Linux runtime, FTEQCC and Xvfb")

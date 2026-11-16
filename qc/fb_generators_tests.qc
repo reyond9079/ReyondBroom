@@ -88,8 +88,10 @@ int fb_generators_testcommand()
     if(argv(1)=="sprites118"){
         fb_selection_clear();fb_entity_create("test118_sprite",FALSE,'-48 0 48');int sprite118=fb_selected_entity();editor_ents_reload();
         fb_transform_expect(fb_entity_model_ready(sprite118)&&fb_entity_model_name(sprite118)=="progs/s_bubble_blue1.spr","sprites118_pak_sprite_in_viewport");
+        fb_transform_expect(fb_entity_icon_shader(sprite118)!=""&&!fb_entity_pick_mesh(sprite118),"sprites118_ortho_icon_keeps_box_picking");
         fb_entity_create("test118_rgba",FALSE,'48 0 48');int rgba118=fb_selected_entity();editor_ents_reload();
         fb_transform_expect(fb_entity_model_ready(rgba118)&&fb_entity_model_name(rgba118)=="progs/qa118.spr","sprites118_rgba_sprite_in_viewport");
+        fb_transform_expect(fb_entity_icon_shader(rgba118)!="","sprites118_rgba_icon_in_orthographic_view");
         fb_entity_create("light",FALSE,'0 -24 82');fb_transform_expect(fb_entity_has_model(fb_selected_entity()),"sprites118_light_icon_visible");return TRUE;
     }
     if(argv(1)=="sprites118colors"){

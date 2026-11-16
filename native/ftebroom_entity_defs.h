@@ -30,6 +30,8 @@ struct EntityDefinition
   std::string name, description, model, modelKey;
   std::string modelSkin, modelFrame, modelScale;
   std::vector<FgdModelRule> modelRules;
+  std::vector<std::string> iconSprites;
+  std::string iconSprite;
   bool brush = false, base = false, hasBounds = false, hasColor = false;
   std::array<float, 3> color{.65f, .8f, .4f}, mins{-8, -8, -8}, maxs{8, 8, 8};
   std::vector<std::string> bases;
@@ -253,8 +255,15 @@ public:
             d.hasColor = true;
           }
         }
-        if (key == "model" || key == "studio" || ((key=="iconsprite"||key=="sprite")&&!explicitModel)){
-          if(!value.empty())try{d.modelRules=FgdModels(value).read();}catch(const std::exception& e){throw std::runtime_error(std::string(e.what())+" near FGD line "+std::to_string(tokens[pos-1].line)+": "+value.substr(0,120));}
+        if (key == "model" || key == "studio" || key == "iconsprite" || (key=="sprite"&&!explicitModel)){
+          if(!value.empty())try{
+            auto rules=FgdModels(value).read();
+            if(key=="iconsprite") {
+              for(const auto& rule:rules)
+                if(rule.path.size()>1 && rule.path.front()=='=')
+                  d.iconSprites.push_back(entityModelPath(rule.path.substr(1)));
+            } else d.modelRules=std::move(rules);
+          }catch(const std::exception& e){throw std::runtime_error(std::string(e.what())+" near FGD line "+std::to_string(tokens[pos-1].line)+": "+value.substr(0,120));}
           else if(key=="sprite")d.modelKey="model";
           if(key=="model"||key=="studio")explicitModel=true;
         }
@@ -656,6 +665,9 @@ inline EntityDefinitions entityResolve(EntityDefinitions definitions)
       if (d.model.empty())
         d.model = b.model;
       if(d.modelRules.empty())d.modelRules=b.modelRules;
+      for(const auto& icon:b.iconSprites)
+        if(std::find(d.iconSprites.begin(),d.iconSprites.end(),icon)==d.iconSprites.end())
+          d.iconSprites.push_back(icon);
       if (d.modelSkin.empty())
         d.modelSkin = b.modelSkin;
       if (d.modelFrame.empty())

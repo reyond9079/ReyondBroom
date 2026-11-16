@@ -105,6 +105,16 @@ def check(exe, root, source, peak_limit):
             assert digest(target/"lq1/pak0.pak")==digest(source/"lq1/pak0.pak")
             assert not list(root.glob("installed.incoming-*"))
             print("PASS rejects a wrong member hash and preserves the installed pack")
+            replacement = root/"replacement"
+            replacement.mkdir()
+            (replacement/"old-pack-marker").write_text("stale installation")
+            run(destination="replacement",mode="replace")
+            assert (replacement/".verified-pack.json").is_file()
+            assert digest(replacement/"lq1/pak0.pak")==digest(source/"lq1/pak0.pak")
+            assert not (replacement/"old-pack-marker").exists()
+            print("PASS replacement finishes before old pack cleanup")
+            assert "time limit" in run(mode="watchdog",expected=1).stderr
+            print("PASS catches stalled filesystem work and renews the deadline on writes")
             assert "Canceled" in run(mode="cancel",expected=3).stderr
             run("map","published")
             assert (root/"published/maps/jam_map.bsp").read_bytes()==payload

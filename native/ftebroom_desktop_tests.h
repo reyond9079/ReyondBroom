@@ -308,11 +308,15 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     return;
   }
   if(std::string(mode)=="sprites118setup"){
-    std::ofstream(documentPath("data/sprites118.fgd"))<<"@PointClass iconsprite(\"progs/s_bubble_blue1.spr\") = test118_sprite []\n@PointClass iconsprite(\"progs/qa118.spr\") = test118_rgba []\n";
+    std::ofstream(documentPath("data/sprites118.fgd"))
+      <<"@BaseClass iconsprite(\"progs/s_bubble_blue1.spr\") = Base118Icon []\n"
+        "@PointClass base(Base118Icon) iconsprite(\"progs/missing118.spr\") = test118_sprite []\n"
+        "@PointClass iconsprite(\"progs/qa118.spr\") = test118_rgba []\n";
     command(("ftebroom_definitions \""+documentPath("data/sprites118.fgd").generic_u8string()+"\"\n").c_str());
   }
   if(std::string(mode)=="sprites118check"){
-    expect(entityDefinitions.at("test118_sprite").model=="progs/s_bubble_blue1.spr","sprites118_fgd_icon_resolved");
+    const auto& icon=entityDefinitions.at("test118_sprite");
+    expect(icon.model.empty()&&icon.iconSprite=="progs/s_bubble_blue1.spr","sprites118_fgd_icon_resolved");
     recentWindow=false;setupNeeded=false;firstSetupStep=-1;selectEntityTab=true;cvars->SetString("ftebroom_test_entity_filter","test118_");frame();frame();
     bool palette=false,rgba=false;for(auto& pair:entityPreviews){if(pair.first.rfind("progs/s_bubble_blue1.spr:",0)==0)palette=pair.second.image&&pair.second.spriteWidth>0;if(pair.first.rfind("progs/qa118.spr:",0)==0)rgba=pair.second.image&&pair.second.spriteWidth==64;}
     expect(palette,"sprites118_paletted_browser_thumbnail");expect(rgba,"sprites118_rgba_browser_thumbnail");

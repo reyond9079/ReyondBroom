@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Native definition parsing publishes a compact cache consumed by the scene renderer.
-typedef struct {string classname,model,modelkey,modelskin,modelframe,modelscale;vector mins,maxs,color;int firstRule,ruleCount;} fb_entity_definition_t;
+typedef struct {string classname,model,modelkey,modelskin,modelframe,modelscale,iconSprite;vector mins,maxs,color;int firstRule,ruleCount;} fb_entity_definition_t;
 typedef struct {string condition,path,skin,frame,scale;} fb_definition_rule_t;
 fb_definition_rule_t *fb_definition_rules;int fb_definition_rule_count,fb_definition_rule_capacity;
 hashtable fb_entity_defaults;
@@ -11,7 +11,7 @@ void fb_entity_definitions_load()
 {
     filestream stream=fopen("ftebroom-entity-definitions.txt",FILE_READ);if((float)stream<0) return;
     for(int r=0;r<fb_definition_rule_count;r++){strunzone(fb_definition_rules[r].condition);strunzone(fb_definition_rules[r].path);strunzone(fb_definition_rules[r].skin);strunzone(fb_definition_rules[r].frame);strunzone(fb_definition_rules[r].scale);}memfree(fb_definition_rules);fb_definition_rules=__NULL__;fb_definition_rule_count=fb_definition_rule_capacity=0;
-    for(int i=0;i<fb_entity_definition_count;i++) {strunzone(fb_entity_definitions[i].classname);strunzone(fb_entity_definitions[i].model);strunzone(fb_entity_definitions[i].modelkey);strunzone(fb_entity_definitions[i].modelskin);strunzone(fb_entity_definitions[i].modelframe);strunzone(fb_entity_definitions[i].modelscale);}
+    for(int i=0;i<fb_entity_definition_count;i++) {strunzone(fb_entity_definitions[i].classname);strunzone(fb_entity_definitions[i].model);strunzone(fb_entity_definitions[i].modelkey);strunzone(fb_entity_definitions[i].modelskin);strunzone(fb_entity_definitions[i].modelframe);strunzone(fb_entity_definitions[i].modelscale);strunzone(fb_entity_definitions[i].iconSprite);}
     memfree(fb_entity_definitions);fb_entity_definitions=__NULL__;fb_entity_definition_count=0;
     if(fb_entity_defaults)hash_destroytab(fb_entity_defaults);fb_entity_defaults=hash_createtab(256,EV_STRING);
     if(fb_entity_kinds)hash_destroytab(fb_entity_kinds);fb_entity_kinds=hash_createtab(256,EV_INTEGER);
@@ -30,10 +30,11 @@ void fb_entity_definitions_load()
             if(fb_definition_rule_count==fb_definition_rule_capacity){fb_definition_rule_capacity=max(32,fb_definition_rule_capacity*2);fb_definition_rule_t *grown=memalloc(fb_definition_rule_capacity*sizeof(fb_definition_rule_t));memcpy(grown,fb_definition_rules,fb_definition_rule_count*sizeof(fb_definition_rule_t));memfree(fb_definition_rules);fb_definition_rules=grown;}
             if(!owner->ruleCount)owner->firstRule=fb_definition_rule_count;owner->ruleCount++;fb_definition_rule_t *rule=&fb_definition_rules[fb_definition_rule_count++];rule->condition=strzone(argv(2));rule->path=strzone(argv(3));rule->skin=strzone(argv(4));rule->frame=strzone(argv(5));rule->scale=strzone(argv(6));continue;
         }
-        if(count!=6 && count!=9)continue;
+        if(count!=6 && count!=9 && count!=10)continue;
         fb_entity_definition_t *items=memalloc((fb_entity_definition_count+1)*sizeof(fb_entity_definition_t));
         memcpy(items,fb_entity_definitions,fb_entity_definition_count*sizeof(fb_entity_definition_t));memfree(fb_entity_definitions);fb_entity_definitions=items;
         fb_entity_definition_t *def=&items[fb_entity_definition_count++];def->classname=strzone(argv(0));def->mins=stov(argv(1));def->maxs=stov(argv(2));def->color=stov(argv(3));def->model=strzone(argv(4));def->modelkey=strzone(argv(5));def->modelskin=strzone(argv(6));def->modelframe=strzone(argv(7));def->modelscale=strzone(argv(8));
+        def->iconSprite=strzone(argv(9));
     }
     for(int i=0;i<fb_entity_definition_count;i++)if(!(int)fb_entity_definition_index[fb_entity_definitions[i].classname])fb_entity_definition_index[fb_entity_definitions[i].classname]=i+1i;
     fclose(stream);

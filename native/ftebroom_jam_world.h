@@ -465,5 +465,6 @@ void jamBackgroundShutdown()
   drain(jamTelemetry.request);
   drain(jamLocal.work);
   drain(jamLocal.presenceWork);
+  drain(jamLocal.packCleanup);
 }
 } // namespace

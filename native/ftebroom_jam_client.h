@@ -94,6 +94,7 @@ inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTra
   fs::create_directories(file.parent_path());
 #endif
   std::ofstream output(file, std::ios::binary | std::ios::trunc);
+  std::size_t finalChunk = 0;
   if (!transfer) {
     output.write(bytes.data(),bytes.size());
   } else {
@@ -102,12 +103,17 @@ inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTra
       const auto count = std::min<std::size_t>(bytes.size(),256*1024);
       if (!output.write(bytes.data(),count))
         throw std::runtime_error("Cannot write the Mapping Jam working file.");
-      transfer->bytes += count;
       bytes.remove_prefix(count);
+      if (bytes.empty()) finalChunk = count;
+      else transfer->wrote(count);
     }
   }
   output.close();
   if (!output) throw std::runtime_error("Cannot write the Mapping Jam working file.");
+  if (transfer) {
+    transfer->check();
+    transfer->wrote(finalChunk);
+  }
 }
 
 inline void forgetSession(const fs::path& path)
@@ -292,7 +298,8 @@ public:
 };
 
 inline void download(const Client& client, const Json& manifest, const fs::path& destination, bool base,
-                     const std::string& mapStem = "jam_map", bool reuse = false, ResourceTransfer* transfer = nullptr)
+                     const std::string& mapStem = "jam_map", bool reuse = false,
+                     ResourceTransfer* transfer = nullptr, fs::path* retired = nullptr)
 {
   if (!base && (mapStem != "jam_map" && mapStem != "jam_hub"))
     throw std::runtime_error("Unknown Jam map name.");
@@ -365,7 +372,7 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     transfer->check();
     transfer->total = 0;
     transfer->bytes = 0;
-    transfer->phase = ResourcePhase::Verifying;
+    transfer->localPhase(ResourcePhase::Verifying);
   }
   if (response.body.size() != length ||
       sha256(response.body) != manifest.at("sha256").get<std::string>())
@@ -380,8 +387,9 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     const auto entries = ftebroom::pak::zipDirectory(input,archive.size());
     if (entries.size() != members.size()) throw std::runtime_error("Unexpected files in Jam download.");
     if (transfer) {
+      transfer->check();
       transfer->total = total;
-      transfer->phase = ResourcePhase::Installing;
+      transfer->localPhase(ResourcePhase::Installing);
     }
     for (const auto& entry : entries) {
       if (transfer) transfer->check();
@@ -404,6 +412,10 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
         throw std::runtime_error("An extracted Jam file did not match its manifest.");
       writeBytes(staging / fs::u8path(entry.name).make_preferred(),bytes,transfer);
     }
+    if (transfer) {
+      transfer->check();
+      transfer->localPhase(ResourcePhase::Finalizing);
+    }
     if (base) {
       const auto receipt = packReceipt(staging,manifest);
       if (receipt.is_null()) throw std::runtime_error("The installed Jam resources failed verification.");
@@ -416,8 +428,11 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
       renameArtifactDirectory(target,previous);
       try { renameArtifactDirectory(staging,target); }
       catch (...) { renameArtifactDirectory(previous,target); throw; }
-      std::error_code ignored;
-      fs::remove_all(previous, ignored);
+      if (retired) *retired = std::move(previous);
+      else {
+        std::error_code ignored;
+        fs::remove_all(previous, ignored);
+      }
     } else {
       renameArtifactDirectory(staging,target);
     }

@@ -10,7 +10,12 @@ float fb_pick_testcommand()
     if(!cvar("ftebroom_skip_setup")) return TRUE;
     string mode=argv(1);
     if(mode=="setup") {
-        for(int i=0;i<3;i++) fb_pick_test_ids[i]=fb_createbox([i*100,0,200],'32 32 32');
+        for(int i=0;i<3;i++) {
+            int created=fb_createbox([i*100,0,200],'32 32 32');
+            fb_pick_test_ids[i]=created;
+            fb_pick_expect(selectedbrushcount==1 && created==selectedbrushes[0].id,
+                sprintf("createbox_keeps_exact_id_%i",i));
+        }
         static patchvert_t cp[9];
         for(int y=0;y<3;y++) for(int x=0;x<3;x++) {
             cp[y*3+x].xyz=[x*32-32,y*32-32,320];
@@ -26,7 +31,9 @@ float fb_pick_testcommand()
         int count=fb_pick_query(start,end,pixel,0,FB_HIT_BRUSH,FALSE);
         fb_pick_expect(count==3,"three_brushes");
         if(count==3) {
-            fb_pick_expect(fb_hits[0].id==fb_pick_test_ids[0] && fb_hits[1].id==fb_pick_test_ids[1] && fb_hits[2].id==fb_pick_test_ids[2],"distance_order");
+            fb_pick_expect(fb_hits[0].id==fb_pick_test_ids[0] && fb_hits[1].id==fb_pick_test_ids[1] &&
+                fb_hits[2].id==fb_pick_test_ids[2] && fb_hits[0].distance<fb_hits[1].distance &&
+                fb_hits[1].distance<fb_hits[2].distance,"distance_order");
             fb_pick_expect(fabs(fb_hits[0].distance-84)<0.001 && fb_hits[0].normal=='-1 0 0',"entry_plane");
             int node=fb_hits[1].node;
             fb_nodes[node].flags|=FB_NODE_HIDDEN;
@@ -115,6 +122,11 @@ float fb_pick_testcommand()
         vector patchPixel=project('8 8 324');patchPixel_z=0;
         fb_begin(patchPixel,0,cvar("ca_brush_view"));fb_finish(patchPixel,0,cvar("ca_brush_view"));
         fb_pick_expect(selectedbrushcount==1 && selectedbrushes[0].id==fb_pick_test_patch,"patch_click");
+        // A patch activates Control Point mode; Esc first exits that tool.
+        fb_pick_expect(cvar("ftebroom_tool")==FB_TOOL_CONTROLPOINT,"patch_activates_control_point_tool");
+        fb_tool_escape();
+        fb_pick_expect(cvar("ftebroom_tool")==FB_TOOL_NONE && selectedbrushcount==1 &&
+            selectedbrushes[0].id==fb_pick_test_patch,"escape_exits_tool_before_deselecting");
         brush_undo();
     } else if(mode=="entityview") {
         vector viewPixel=project('0 -200 128');viewPixel_z=0;
@@ -122,6 +134,7 @@ float fb_pick_testcommand()
         fb_pick_expect(fb_selected_entity()==1,"entity_view_selection");
         fb_tool_escape();fb_pick_expect(fb_selected_entity()<0,"entity_escape");
         brush_undo();fb_pick_expect(fb_selected_entity()==1,"entity_deselect_undo");
+        brush_redo();fb_pick_expect(fb_selected_entity()<0,"entity_deselect_redo");
     } else if(mode=="overlap") {
         fb_createbox('0 0 200','96 96 96');
         int small=fb_createbox('0 0 300','16 16 16');

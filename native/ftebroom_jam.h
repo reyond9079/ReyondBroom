@@ -75,6 +75,7 @@ struct JamLocal {
   std::string retryKey, retryIntent;
   JamFs::path pack;
   std::shared_ptr<jam::ResourceTransfer> resourceTransfer;
+  std::future<void> packCleanup;
   std::optional<JamUpload> snapshot;
   JamJson account, rules, board, wallet;
   JamJson players = JamJson::array();
@@ -541,15 +542,31 @@ void jamResources()
     const auto manifest = client.json("GET", client.prefix + "packs/" + version + "/manifest",nullptr,{},{},transfer.get());
     if (jamField(manifest,"packVersion") != version)
       throw std::runtime_error("The base pack version changed.");
-    jam::download(client, manifest, destination, true,"jam_map",false,transfer.get());
-    transfer->check();
-    transfer->phase = jam::ResourcePhase::Opening;
-    return client.board(transfer.get());
+    JamFs::path retired;
+    jam::download(client, manifest, destination, true,"jam_map",false,transfer.get(),&retired);
+    return JamJson{{"retired",retired.u8string()}};
   }, [destination](auto data) {
     jamLocal.pack = destination;
-    jamApplyBoard(std::move(data));
+    // Join already fetched the board. A slow request or removal of an old
+    // cache must not keep the completed installation on the resource screen.
     jamLocal.screen = JamScreen::Board;
+    const auto retired = jamField(data,"retired");
+    if (!retired.empty() && !jamLocal.packCleanup.valid()) {
+      try {
+        jamLocal.packCleanup = std::async(std::launch::async,[retired] {
+          std::error_code ignored;
+          JamFs::remove_all(JamFs::u8path(retired),ignored);
+        });
+      } catch (const std::system_error&) {}
+    }
+    jamRefresh();
   });
+}
+
+const char* jamResourceInstallTimeout()
+{
+  return jamText("The local drive stopped responding while installing Jam resources. If it stays unresponsive, return to the editor.",
+                 "Локальный диск не отвечает при установке ресурсов Jam. Если это продолжается, вернитесь в редактор.");
 }
 
 JamJson jamCell(const std::string& selection)
@@ -1341,19 +1358,28 @@ void jamTick()
       jamBeginPublish(jamLocal.draftPlot,std::exchange(jamLocal.publishPlayAfterSave,false));
     }
   }
+  if (jamLocal.packCleanup.valid() &&
+      jamLocal.packCleanup.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    try { jamLocal.packCleanup.get(); } catch (const std::exception&) {}
+  }
   if (jamLocal.work.valid() && jamLocal.work.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     auto done = std::move(jamLocal.ready);
     auto resourceTransfer = std::move(jamLocal.resourceTransfer);
-    try { auto result = jamLocal.work.get(); jamLocal.status.clear(); done(std::move(result)); }
+    try {
+      auto result = jamLocal.work.get();
+      if (resourceTransfer && resourceTransfer->canceled) throw jam::DownloadCanceled();
+      if (resourceTransfer && resourceTransfer->timedOut)
+        throw jam::DownloadInterrupted("The local resource installation stopped responding.");
+      jamLocal.status.clear();
+      done(std::move(result));
+    }
     catch (const jam::DownloadCanceled&) {
       jamLocal.status = jamText("Download canceled. You can retry here.","Загрузка отменена. Её можно запустить снова.");
     }
     catch (const jam::DownloadInterrupted& error) {
       jamLocal.status.clear();
-      const auto phase = resourceTransfer ? resourceTransfer->phase.load() : jam::ResourcePhase::Downloading;
-      if (phase == jam::ResourcePhase::Installing || phase == jam::ResourcePhase::Verifying) {
-        jamLocal.error = jamText("Resource verification or installation timed out. Check available disk space and retry.",
-                                 "Проверка или установка ресурсов заняла слишком много времени. Проверьте свободное место и повторите попытку.");
+      if (resourceTransfer && resourceTransfer->local()) {
+        jamLocal.error = jamResourceInstallTimeout();
       } else {
         jamLocal.error = resourceTransfer
           ? jamText("The resource transfer stopped responding. Check your connection and retry.",
@@ -1381,6 +1407,11 @@ void jamTick()
         jamLocal.avatarTextures.clear();
       }
     } catch (const std::exception& error) { jamLocal.error = error.what(); jamLocal.status.clear(); }
+  } else if (const auto& transfer = jamLocal.resourceTransfer) {
+    if (!transfer->canceled && !transfer->timedOut && transfer->localStalled()) {
+      transfer->timedOut = true;
+      jamLocal.error = jamResourceInstallTimeout();
+    }
   }
   if (!jamBusy() && !savingDocument && jamLocal.snapshot) {
     auto upload = std::move(*jamLocal.snapshot);

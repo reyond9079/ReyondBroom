@@ -53,6 +53,19 @@ float fb_affine_testcommand()
         fb_transform_capture();fb_affine_rotate('0 0 1',90,'0 0 0');fb_transform_clear();
         fb_transform_expect(fb_clip_field(terrain_edit(TEREDIT_ENT_GET,entityId),"angle")=="-1","vertical_angle_preserved_about_z");
         brush_undo();brush_undo();
+        fb_selection_clear();
+        fb_entity_create("item_artifact_lava_nails",FALSE,'-224 992 24');int lava=fb_selected_entity();
+        fb_entity_create("item_artifact_sharp_shooter",FALSE,'224 976 24');int sharp=fb_selected_entity();
+        fb_entity_select(lava,TRUE);fb_document_tick();
+        fb_transform_capture();fb_affine_rotate('0 0 1',90,'-224 992 24');fb_transform_clear();
+        fb_transform_expect(fb_entity_origin(lava)=='-224 992 24' && fb_entity_origin(sharp)=='-208 1440 24',"artifact_positions_follow_rotation");
+        fb_transform_expect(fb_clip_field(terrain_edit(TEREDIT_ENT_GET,lava),"angle")=="" && fb_clip_field(terrain_edit(TEREDIT_ENT_GET,sharp),"angle")=="","artifacts_keep_implicit_orientation");
+        brush_undo();
+        fb_entity_select(sharp,FALSE);fb_entity_select(lava,TRUE);
+        fb_tx_begin("Explicit artifact angle");fb_tx_set_key(lava,"angle","26",HIST_ENTITY);fb_tx_commit();
+        fb_transform_capture();fb_affine_rotate('0 0 1',90,'-224 992 24');fb_transform_clear();
+        fb_transform_expect(fabs(stof(fb_clip_field(terrain_edit(TEREDIT_ENT_GET,lava),"angle"))-116)<0.001,"explicit_artifact_angle_rotates");
+        brush_undo();brush_undo();brush_undo();brush_undo();
     }
     return TRUE;
 }

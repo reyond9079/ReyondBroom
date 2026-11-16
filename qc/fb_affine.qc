@@ -72,7 +72,10 @@ void fb_affine_angles(int id,fb_affine_t *m)
         yawForward=normalize(fb_affine_direction(m,yawForward));
         if(yawForward_z>0.99999) yaw=-1;else if(yawForward_z< -0.99999) yaw=-2;else yaw=atan2(yawForward_y,yawForward_x)*180/M_PI;
         fb_tx_set_key(id,"angle",sprintf("%.9g",yaw),HIST_ENTITY);
-    } else if(vlen(m->z-'0 0 1')<0.0001 && m->determinant>0) {
+    // Arcane Dimensions artifacts can leave orientation to the game. Only
+    // transform an orientation that the mapper has actually set for them.
+    } else if(substring(fields["classname"],0,14)!="item_artifact_" &&
+              vlen(m->z-'0 0 1')<0.0001 && m->determinant>0) {
         float newYaw=atan2(m->x[1],m->x[0])*180/M_PI;
         if(fabs(newYaw)>0.0001) fb_tx_set_key(id,"angle",sprintf("%.9g",newYaw),HIST_ENTITY);
     }

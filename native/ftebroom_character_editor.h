@@ -1126,13 +1126,18 @@ static void characterProperties() {
     }
   }
   if (s.tab==Tab::Wardrobe) {
-    if (characterPropertyCombo("Outfit",cc::outfits[s.doc.outfit].label)) {
-      for (unsigned i = 0; i < std::size(cc::outfits); ++i)
-        if (ImGui::Selectable(cc::outfits[i].label,i == s.doc.outfit)) {
-          characterCheckpoint(s.doc);
-          s.doc.outfit = i;
-          ++s.revision;
-        }
+    const bool chooseOutfit=characterPropertyCombo("Outfit",cc::outfits[s.doc.outfit].label,
+                                                    ImGuiComboFlags_HeightLargest);
+    placementRect("character/outfit");
+    if (chooseOutfit) {
+      for (unsigned i = 0; i < std::size(cc::outfits); ++i) {
+        const bool selected=ImGui::Selectable(cc::outfits[i].label,i == s.doc.outfit);
+        placementRect((std::string("character/outfit/")+std::to_string(i)).c_str());
+        if (!selected || i==s.doc.outfit) continue;
+        characterCheckpoint(s.doc);
+        s.doc.outfit = i;
+        ++s.revision;
+      }
       ImGui::EndCombo();
     }
     const bool chooseHairTexture = characterPropertyCombo("Hair texture",cc::hairTextureNames[s.hairFilter]);
@@ -1169,13 +1174,17 @@ static void characterProperties() {
       characterAdjustShape("Hair length",s.doc.hairLength);
       characterAdjustShape("Hairline",s.doc.hairline);
     }
-    if (characterPropertyCombo("Facial hair",cc::beards[s.doc.beard])) {
-      for (unsigned i = 0; i < std::size(cc::beards); ++i)
-        if (ImGui::Selectable(cc::beards[i],i == s.doc.beard)) {
-          characterCheckpoint(s.doc);
-          s.doc.beard = i;
-          ++s.revision;
-        }
+    const bool chooseBeard=characterPropertyCombo("Facial hair",cc::beards[s.doc.beard]);
+    placementRect("character/beard");
+    if (chooseBeard) {
+      for (unsigned i = 0; i < std::size(cc::beards); ++i) {
+        const bool selected=ImGui::Selectable(cc::beards[i],i == s.doc.beard);
+        placementRect((std::string("character/beard/")+std::to_string(i)).c_str());
+        if (!selected || i==s.doc.beard) continue;
+        characterCheckpoint(s.doc);
+        s.doc.beard = i;
+        ++s.revision;
+      }
       ImGui::EndCombo();
     }
     auto chooseLayer = [&](const char* label, const auto& choices, unsigned& selection) {

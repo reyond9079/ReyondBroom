@@ -287,6 +287,19 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                 wait(lambda:state()["tab"]==tab_id)
                 screenshot("tab-"+tab_name+".png")
             check(True,"Body, Face, Appearance, Wardrobe and Rig render after native tab changes")
+
+            click("character/tab-wardrobe")
+            wait(lambda:state()["tab"]==3)
+            for field,total in (("outfit",13),("hairstyle",8),("beard",4)):
+                images.clear()
+                for index in range(total):
+                    click("character/"+field)
+                    click(f"character/{field}/{index}")
+                    wait(lambda:state()[field]==index and state()["revision"]==state()["applied"])
+                    ui.settle()
+                    images.add(hashlib.sha256(preview().tobytes()).digest())
+                    screenshot(f"{field}-{index:02d}.png")
+                check(len(images)==total,f"{total} native {field} choices render distinct previews")
             click("character/tab-body")
             click("character/clip")
             click("character/clip/walk_forward")

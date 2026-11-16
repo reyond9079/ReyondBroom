@@ -206,6 +206,8 @@ static void placementWriteQa(){
                  {"error",characterEditor.error},{"status",characterEditor.status},
                  {"tab",int(characterEditor.tab)},{"framing",int(characterEditor.framing)},
                  {"region",characterEditor.faceRegion},{"name",characterEditor.doc.name},
+                 {"outfit",characterEditor.doc.outfit},{"hairstyle",characterEditor.doc.hairstyle},
+                 {"beard",characterEditor.doc.beard},
                  {"dirty",characterEditor.rig && characterDirty()},
                  {"clip",characterEditor.doc.clip},{"time",characterEditor.time},
                  {"detail",characterEditor.detailLevel},{"gearSockets",characterEditor.showSockets},

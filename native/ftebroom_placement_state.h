@@ -22,6 +22,7 @@ static void placementShutdown();
 static bool placementSnapshotPath(const std::filesystem::path& path);
 static void placementPlantSaved();
 static void placementTick();
+static void placementValid(AssetPlacement&);
 static void placementAfterPlantSave(std::function<void()> next);
 static void placementCancel(AssetPlacement& p){p={};}
 static void placementCapture() {

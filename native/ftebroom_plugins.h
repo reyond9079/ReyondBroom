@@ -201,9 +201,13 @@ static void pluginsTick(){
 }
 static void pluginsMenu(){
   const bool opened=ImGui::BeginMenu("Plugins");runUiRecordGlobal("menu/Plugins");
+  placementRect("menu/plugins");
   if(opened){
     if(ImGui::MenuItem("World Architect..."))worldOpen();
     runUiRecordGlobal("Menu/Plugins/World Architect...");
+    if(ImGui::MenuItem("Character Creator..."))characterCommand();
+    runUiRecordGlobal("Menu/Plugins/Character Creator...");
+    placementRect("menu/plugins/character");
     if(ImGui::MenuItem("Manage plugins..."))pluginManagerOpen=true;
     for(auto& p:editorPlugins)if(p.api&&p.id!="org.reyondbroom.autolevel"&&p.id!="org.reyondbroom.levelgen")if(ImGui::MenuItem(p.name.c_str()))p.open=true;
     if(ImGui::BeginMenu("Legacy generators")){

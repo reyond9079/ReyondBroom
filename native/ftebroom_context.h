@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 static void bspModelShow();
 static void plantBrushShow();
+namespace { static void characterCreateHere(); }
 static bool sceneContextPending = false, sceneContextCandidate = false;
 static int sceneContextSerial = 0,sceneContextEpoch=0;
 static quintptr_t sceneContextTime, sceneContextDuration;
@@ -49,6 +50,7 @@ static void sceneContextPanel()
       if(ImGui::MenuItem("3d model"))placementCreate(false);placementRect("context/new-model");
       if(ImGui::MenuItem("Plant",nullptr,false,viewTypes[viewFocus]==0))plantBrushShow();placementRect("context/plant-brush");
       if(ImGui::MenuItem("New plant model..."))placementCreate(true);placementRect("context/new-plant");
+      if(ImGui::MenuItem("Character..."))characterCreateHere();placementRect("context/new-character");
       ImGui::EndMenu();}ImGui::EndMenu();}
     bool selected = cvars->GetFloat("ftebroom_selection_count")
                     || cvars->GetFloat("ftebroom_entity_selection_count");

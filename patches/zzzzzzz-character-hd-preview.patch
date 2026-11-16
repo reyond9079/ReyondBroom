@@ -1,0 +1,15 @@
+--- a/engine/client/pr_csqc.c
++++ b/engine/client/pr_csqc.c
+@@ -8561,8 +8561,10 @@
+    int style=cull+2*(soft||hair);
+    t->shader=R_ShaderFind(va("bbmat/%d/%s",style,name));
+    if(!t->shader && pbr)t->shader=R_RegisterShader(va("bbmat/%d/%s",style,name),SUF_NONE,va(
+-    "{\n cull %s\n program reyond_character_surface_v3#PREVIEW#%s\n diffusemap %s\n normalmap textures/reyond_character_detail_v3.png\n %s\n map %s\n rgbgen vertex\n alphagen vertex\n }\n }\n",
+-    cull?"back":"none",pbr,name,hair ? "sort seethrough\n {\n depthwrite\n blendfunc blend" : "sort opaque\n {\n depthwrite",name));
++    "{\n cull %s\n program reyond_character_surface_v4#PREVIEW#%s\n diffusemap %s\n normalmap %s\n %s\n map %s\n rgbgen vertex\n alphagen vertex\n }\n }\n",
++    cull?"back":"none",pbr,name,
++    !strcmp(pbr,"CLOTH") ? "textures/reyond_character_fabric_v4.png" : "textures/reyond_character_detail_v3.png",
++    hair ? "sort seethrough\n {\n depthwrite\n blendfunc blend" : "sort opaque\n {\n depthwrite",name));
+    if(!t->shader && skin)t->shader=R_RegisterShader(va("bbmat/%d/%s",style,name),SUF_NONE,va(
+     "{\n cull %s\n program reyond_character_skin_v2#PREVIEW\n diffusemap %s\n sort opaque\n {\n map %s\n depthwrite\n rgbgen vertex\n alphagen vertex\n }\n }\n",
+     cull?"back":"none",name,name));

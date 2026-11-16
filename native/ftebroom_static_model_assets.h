@@ -3,7 +3,11 @@
 static void stageGeneratedModels(const std::string& map,const std::filesystem::path& destination,const std::filesystem::path& snapshot={}){
  if(jamEditing())return;
  std::set<std::string> copied,shaders;
- auto safe=[](const std::string& name){return ftebroom::pak::zipName(name)&&name.find_first_of("\\:\r\n")==name.npos&&(name.rfind("models/",0)==0||name.rfind("textures/",0)==0||name.rfind("progs/",0)==0||name=="glsl/reyond_plant_wind_v1.glsl"||((name.rfind("scripts/plant-",0)==0||name.rfind("scripts/model-",0)==0)&&std::filesystem::u8path(name).extension()==".shader"));};
+ auto script=[](const std::string& name){
+  return (name.rfind("scripts/plant-",0)==0||name.rfind("scripts/model-",0)==0||
+          name.rfind("scripts/character-",0)==0)&&std::filesystem::u8path(name).extension()==".shader";
+ };
+ auto safe=[&](const std::string& name){return ftebroom::pak::zipName(name)&&name.find_first_of("\\:\r\n")==name.npos&&(name.rfind("models/",0)==0||name.rfind("textures/",0)==0||name.rfind("progs/",0)==0||name=="glsl/reyond_plant_wind_v1.glsl"||name=="glsl/reyond_character_skin_v1.glsl"||name=="glsl/reyond_character_skin_v2.glsl"||name=="glsl/reyond_character_surface_v3.glsl"||name=="glsl/reyond_character_surface_v4.glsl"||script(name));};
  auto read=[&](const std::string& name){
   if(!safe(name))throw std::runtime_error("Invalid generated model dependency path.");
   for(auto folder:{snapshot,documentPath("ftebroom.cfg").parent_path()})if(!folder.empty()){
@@ -14,16 +18,17 @@ static void stageGeneratedModels(const std::string& map,const std::filesystem::p
  auto copy=[&](const std::string& name,const std::string& bytes){
   if(bytes.empty()||bytes.size()>64*1024*1024)throw std::runtime_error("Generated model asset is missing or too large: "+name);
   if(!copied.insert(name).second)return;
-  if((name.rfind("scripts/plant-",0)==0||name.rfind("scripts/model-",0)==0)&&std::filesystem::u8path(name).extension()==".shader")shaders.insert(std::filesystem::u8path(name).stem().u8string());
+  if(script(name))shaders.insert(std::filesystem::u8path(name).stem().u8string());
   auto target=destination/std::filesystem::u8path(name);if(std::filesystem::exists(target)&&q1Read(target)==bytes)return;
   buildWriteTexture(target,bytes);
  };
  for(const auto& path:ftebroom::generatedIvyModels(map)){
   auto bytes=read(path);copy(path,bytes);
-  if(path.rfind("models/reyond-plugins/plant-",0)==0||path.rfind("models/reyond-plugins/model-",0)==0){
+  if(path.rfind("models/reyond-plugins/plant-",0)==0||path.rfind("models/reyond-plugins/model-",0)==0||
+     path.rfind("models/reyond-plugins/character-",0)==0){
    auto metadata=path+".reyond.json";auto text=read(metadata);auto json=nlohmann::json::parse(text);
-   if(json.value("kind","")!="reyondbroom-authoring-model"||!json.contains("dependencies")||!json["dependencies"].is_array()||json["dependencies"].size()>512)throw std::runtime_error("Invalid generated plant manifest.");
-   copy(metadata,text);for(auto& entry:json["dependencies"]){auto dependency=entry.get<std::string>();if(!safe(dependency))throw std::runtime_error("Invalid generated plant dependency.");copy(dependency,read(dependency));}
+   if(json.value("kind","")!="reyondbroom-authoring-model"||!json.contains("dependencies")||!json["dependencies"].is_array()||json["dependencies"].size()>512)throw std::runtime_error("Invalid generated model manifest.");
+   copy(metadata,text);for(auto& entry:json["dependencies"]){auto dependency=entry.get<std::string>();if(!safe(dependency))throw std::runtime_error("Invalid generated model dependency.");copy(dependency,read(dependency));}
   }
   for(auto dependency:ftebroom::generatedModelDependencies(bytes)){
    if(!safe(dependency))throw std::runtime_error("Invalid generated model material path.");

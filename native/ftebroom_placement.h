@@ -48,6 +48,7 @@ static void placementSend(AssetPlacement& p,const std::string& model,const std::
 static bool placementSnapshotPath(const std::filesystem::path& file){
   auto name=file.filename().u8string();std::string stem;
   if(name.size()>8&&name.substr(name.size()-8)==".bbmodel")stem=name.substr(0,name.size()-8);
+  else if(name.size()>7&&name.substr(name.size()-7)==".rbchar")stem=name.substr(0,name.size()-7);
   else if(name.size()>11&&name.substr(name.size()-11)==".plant.json")stem=name.substr(0,name.size()-11);
   else return false;
   for(auto extension:{".md3",".mdl",".md2",".iqm"}){
@@ -164,14 +165,58 @@ static void placementTick(){
 }
 
 static nlohmann::json plantBrushQa();
+static void placementCharacterBenchmark() {
+ const float request=cvars->GetFloat("ftebroom_character_benchmark_frames");
+ if (!(request>=60 && request<=1200)) return;
+ const auto count=std::size_t(request);
+ const auto& state=characterEditor;
+ const auto& io=ImGui::GetIO();
+ if (!state.open || !state.playing || !state.reduced || state.applied!=state.revision) return;
+ using Clock=std::chrono::steady_clock;
+ static auto previous=Clock::time_point{};
+ static unsigned warmup=0;
+ static std::vector<double> milliseconds;
+ const auto now=Clock::now();
+ const auto elapsed=std::chrono::duration<double,std::milli>(now-previous).count();
+ previous=now;
+ if (warmup<60) { ++warmup; return; }
+ if (milliseconds.size()>=count) return;
+ milliseconds.push_back(elapsed);
+ if (milliseconds.size()!=count) return;
+ const nlohmann::json result{{"frameMilliseconds",milliseconds},{"clip",state.doc.clip},
+                            {"triangles",state.reduced->triangles.size()},
+                            {"width",io.DisplaySize.x},{"height",io.DisplaySize.y},
+                            {"vsync",cvars->GetFloat("vid_vsync")},{"fpsCap",cvars->GetFloat("cl_maxfps")}};
+ try { bb::atomicWrite(documentPath("character-benchmark.json"),result.dump(2)+"\n"); }
+ catch (const std::exception& error) { core->Print((std::string("Character benchmark: ")+error.what()+"\n").c_str()); }
+}
+
 static void placementWriteQa(){
- if(!placementQa())return;static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
+ if(!placementQa())return;
+ placementCharacterBenchmark();
+ static double last=0;if(ImGui::GetTime()-last<.08)return;last=ImGui::GetTime();
  nlohmann::json views=nlohmann::json::array();for(auto& v:viewRects)views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});
  auto binding=[](auto& p){return nlohmann::json{{"active",p.active},{"created",p.created},{"awaiting",p.awaiting},{"id",p.id},{"epoch",p.epoch},{"point",p.point},{"normal",p.normal},{"layer",p.layer}};};
  auto widgets=placementWidgets;if(plantState.qa)for(auto it=plantState.widgets.begin();it!=plantState.widgets.end();++it)widgets["plant/"+it.key()]=it.value();
  auto j=nlohmann::json{{"widgets",widgets},{"views",views},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"profile",gameProfile},{"epoch",organizationMapEpoch},{"context",binding(contextPlacement)},{"plant",binding(plantPlacement)},{"plantBrush",plantBrushQa()},{"model",binding(modelPlacement)},{"contextGesture",{{"candidate",sceneContextCandidate},{"duration_ms",sceneContextDuration},{"dx",sceneContextDX},{"dy",sceneContextDY},{"pending",sceneContextPending},{"looking",sceneLook}}},{"browseError",runUiBrowseError},{"browsePath",runUiBrowsePath},{"modelBusy",bool(placementModelPending)||placementModelJob.valid()||modelPlacement.awaiting},{"modelOpen",bbActive},{"modelPath",bbProject.path},{"modelMessage",bbMessage},{"modelElements",bbProject.root["elements"].size()},{"newModel",bbNewOpen},{"guardModel",bbGuardOpen},{"plantOpen",plantState.open},{"plantReady",plantReady()},{"plantMessage",plantState.message},{"plantError",plantState.error},{"plantPath",plantState.file.u8string()},{"mapPath",documentFile.u8string()},{"generation_ms",plantState.result?plantState.result->milliseconds:0.}};
  j["bspPreview"]=cvars->GetFloat("ftebroom_bsp_preview")!=0;
  j["buildRunning"]=buildRunning;
+ j["character"]={{"open",characterEditor.open},{"available",characterAvailable()},
+                 {"path",characterEditor.file.u8string()},{"placement",binding(characterEditor.placement)},
+                 {"error",characterEditor.error},{"status",characterEditor.status},
+                 {"tab",int(characterEditor.tab)},{"framing",int(characterEditor.framing)},
+                 {"region",characterEditor.faceRegion},{"name",characterEditor.doc.name},
+                 {"dirty",characterEditor.rig && characterDirty()},
+                 {"clip",characterEditor.doc.clip},{"time",characterEditor.time},
+                 {"detail",characterEditor.detailLevel},{"gearSockets",characterEditor.showSockets},
+                 {"previewTriangles",characterEditor.reduced ? characterEditor.reduced->triangles.size() :
+                    characterEditor.fitted.triangles.size()},
+                 {"playing",characterEditor.playing},{"playback",int(characterEditor.playback)},
+                 {"noseWidth",characterEditor.doc.values[cc::NoseWidth]},
+                 {"noseDepth",characterEditor.doc.values[cc::NoseTip]},
+                 {"revision",characterEditor.revision},{"applied",characterEditor.applied}};
+ if(runUiBrowseOpen)
+   for(auto it=runUiBrowseRects.begin();it!=runUiBrowseRects.end();++it)j["widgets"][it.key()]=it.value();
  j["unlitPreview"]=buildUnlitPreview;
  try{bb::atomicWrite(documentPath("placement-ui-live.json"),j.dump());}catch(const std::exception& e){core->Print((std::string("Placement QA: ")+e.what()+"\n").c_str());}
 }

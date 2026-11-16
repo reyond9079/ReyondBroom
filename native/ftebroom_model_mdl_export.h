@@ -22,7 +22,12 @@ inline std::string mdl(const Mesh& mesh,const std::vector<Skin>& skins,const std
   for(const auto& s:mesh.surfaces){nv+=s.frames.at(0).size();nt+=s.triangles.size();if(s.frames.size()!=mesh.frames)throw std::runtime_error("Missing animation frames.");
     for(const auto& f:s.frames){if(f.size()!=s.frames[0].size())throw std::runtime_error("Animated topology changes.");for(const auto& v:f)for(int a=0;a<3;a++){if(!std::isfinite(v.position[a]))throw std::runtime_error("Invalid position.");low[a]=std::min(low[a],v.position[a]);high[a]=std::max(high[a],v.position[a]);}}}
   if(nv>2048||nt>4096||mesh.surfaces.size()>16)throw std::runtime_error("Quake MDL export limit: 2048 vertices, 4096 triangles and 16 materials. Simplify the source explicitly; automatic resizing/decimation is disabled.");
-  const unsigned tile=masked?512:256,columns=unsigned(std::ceil(std::sqrt(double(skins.size())))),rows=(skins.size()+columns-1)/columns,w=columns*tile,h=rows*tile;
+  const unsigned columns = unsigned(std::ceil(std::sqrt(double(skins.size()))));
+  const unsigned rows = (skins.size()+columns-1)/columns;
+  // WinQuake and Quake II reject alias skins taller than 480. Masked
+  // foliage uses the extended FTE MDL format and has a separate atlas budget.
+  const unsigned tile = masked ? 512 : (std::min(256u,480u/rows) & ~3u);
+  const unsigned w = columns*tile, h = rows*tile;
   if(replacement)*replacement={w,h,std::vector<unsigned char>(size_t(w)*h*4)};
   if(regions)regions->clear();
   std::vector<unsigned char> pixels(w*h,0);std::vector<std::array<int,2>> uv;

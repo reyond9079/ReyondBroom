@@ -132,7 +132,10 @@ static void runUiBrowsePanel(){
   std::vector<std::filesystem::path> entries;std::error_code error;for(std::filesystem::directory_iterator i(runUiBrowseFolder,error),end;!error&&i!=end;i.increment(error))entries.push_back(i->path());std::sort(entries.begin(),entries.end());
   if(error)ImGui::TextWrapped("%s",error.message().c_str());
   for(const auto& p:entries){bool folder=std::filesystem::is_directory(p,error);auto label=(folder?"[Folder] ":"")+p.filename().u8string();
-   if(ImGui::Selectable(label.c_str(),runUiBrowsePath==p.u8string(),ImGuiSelectableFlags_AllowDoubleClick)){if(folder){runUiBrowseFolder=p;break;}runUiBrowsePath=p.u8string();}
+   const bool selected=ImGui::Selectable(label.c_str(),runUiBrowsePath==p.u8string(),ImGuiSelectableFlags_AllowDoubleClick);
+   if(!folder&&cvars->GetFloat("ftebroom_skip_setup")&&cvars->GetFloat("ftebroom_placement_qa"))
+    record(("file-entry/"+p.filename().u8string()).c_str());
+   if(selected){if(folder){runUiBrowseFolder=p;break;}runUiBrowsePath=p.u8string();}
   }
   ImGui::EndChild();ImGui::SetNextItemWidth(-1);runUiEdit("##Selected file",runUiBrowsePath);record("file-path");
   if(ImGui::Button(runUiBrowseAllowNew?"Save":"Choose",{80*uiScale(),0})){

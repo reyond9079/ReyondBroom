@@ -101,8 +101,13 @@ if not windows:
 shutil.copy2(src / 'runtime/fonts/FTEBroom-CJK.otf', root / 'ftebroom/fonts/FTEBroom-CJK.otf')
 shutil.copytree(src / 'docs', root / 'docs', dirs_exist_ok=True)
 shutil.copytree(src / 'runtime/plants', root / 'ftebroom/plants', dirs_exist_ok=True)
+shutil.copytree(src / 'runtime/characters', root / 'ftebroom/characters', dirs_exist_ok=True)
 shutil.copytree(src / 'runtime/world-architect', root / 'ftebroom/world-architect', dirs_exist_ok=True)
 shutil.copytree(src / 'runtime/glsl', root / 'ftebroom/glsl', dirs_exist_ok=True)
+character_textures = root / 'ftebroom/textures'
+character_textures.mkdir(parents=True, exist_ok=True)
+shutil.copy2(src / 'runtime/textures/reyond_character_detail_v3.png', character_textures)
+shutil.copy2(src / 'runtime/textures/reyond_character_fabric_v4.png', character_textures)
 (root/'ftebroom/ui').mkdir(parents=True,exist_ok=True)
 shutil.copy2(src/'runtime/ui/update-splash.png',root/'ftebroom/ui/update-splash.png')
 shutil.copy2(src / 'runtime/scripts/ftebroom.shader', root / 'ftebroom/scripts/ftebroom.shader')

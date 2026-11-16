@@ -16,6 +16,12 @@ root,out=a.runtime.resolve(),a.output.resolve();out.mkdir(parents=True,exist_ok=
 profile=root/'ftebroom-game-profile.txt'
 previous_profile=profile.read_bytes() if profile.is_file() else None
 profile.write_text('0 0 "" "" "" "" 1 0 "" 1 1\n')
+# Model Editor validates its document path against the active mod root. Use
+# the fixture's own resource directory as that root for both authoring tools.
+project_settings = {folder/'ftebroom-project.txt': None for folder in (root,data)}
+for settings in project_settings:
+ project_settings[settings] = settings.read_bytes() if settings.is_file() else None
+ settings.write_text(data.as_posix(), encoding='utf-8')
 (data/'placement-interaction.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\nin 12 ftebroom_plant qa '+a.theme+'\n')
 for f in (data/'maps').glob('creation-qa-*.map'):f.unlink()
 (data/'maps/creation-qa-switch.map').write_bytes((data/'maps/qa_clip.map').read_bytes())
@@ -34,7 +40,6 @@ def wait(fn,timeout=90):
   except (FileNotFoundError,json.JSONDecodeError,KeyError,PermissionError):pass
   time.sleep(.08)
  raise AssertionError('Timed out; latest state='+path.read_text()[:1200])
-ui=NativeInput(process,path,live,wait,out,focus_required=True)
 def check(ok,name):
  assert ok,name
  checks.append(name);(out/'results.json').write_text(json.dumps(checks,indent=2));print('PASS',name,flush=True)
@@ -59,8 +64,9 @@ def edit(key,value,scalar=False):
  if key=='plant/file-path':wait(lambda:live()['browsePath']==str(value),10)
  ui.key('enter')
 def close_plant():
- w=live()['widgets']['plant/window'];ui.click(w['x']+w['width']-16,w['y']+14)
- if 'plant/confirm-discard' in live()['widgets']:click('plant/confirm-discard')
+ w=live()['widgets']['plant/window'];ui.click(w['x']+w['width']-16,w['y']+14,hold=.26)
+ wait(lambda:not live()['plantOpen'] or live()['widgets'].get('plant/confirm-discard',{}).get('visible'))
+ if live()['plantOpen']:click('plant/confirm-discard')
  wait(lambda:not live()['plantOpen'])
 def context(kind,view=0,hold=None):
  v=live()['views'][view];x=v['x']+v['width']*.46;y=v['y']+v['height']*.52
@@ -73,6 +79,7 @@ def snapshot(name):
 
 def entities(text):return [dict(re.findall(r'"([^"\n]+)"\s+"([^"\n]*)"',x)) for x in re.findall(r'\{([^{}]*)\}',text) if '"_reyondbroom_placement"' in x]
 try:
+ ui=NativeInput(process,path,live,wait,out,focus_required=True)
  wait(lambda:live()['plantReady']);ui.position()
  check(live()['profile']==0,'placement fixture starts in Quake III profile')
  if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
@@ -137,6 +144,9 @@ finally:
  stream.close()
  if previous_profile is None:profile.unlink(missing_ok=True)
  else:profile.write_bytes(previous_profile)
+ for settings, previous in project_settings.items():
+  if previous is None: settings.unlink(missing_ok=True)
+  else: settings.write_bytes(previous)
  for log in root.rglob('qconsole.log'):
   try:
    import shutil

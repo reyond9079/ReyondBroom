@@ -99,6 +99,7 @@ static void initialize()
   IMGUI_CHECKVERSION();
   cvars->SetFloat("ftebroom_mod_preview",0);
   cvars->GetNVFDG("ftebroom_text_input","0",0,"Native GUI UTF-8 composition request","ReyondBroom");
+  cvars->GetNVFDG("ftebroom_world_bound","65536",0,"Coordinate limit for editor geometry","ReyondBroom");
   ImGui::CreateContext();
   auto& io = ImGui::GetIO();
   io.IniFilename = nullptr;
@@ -294,6 +295,8 @@ static bool terrainCreateWindow;
 #include "ftebroom_spawn_master.h"
 #include "ftebroom_unity.h"
 static void worldOpen();
+#include "ftebroom_plant_editor.h"
+#include "ftebroom_character_editor.h"
 #include "ftebroom_plugins.h"
 namespace {
 void jamWorldLabels()
@@ -334,8 +337,8 @@ void jamWorldLabels()
 }
 } // namespace
 
-#include "ftebroom_plant_editor.h"
 #include "ftebroom_placement.h"
+#include "ftebroom_character_placement.h"
 #include "ftebroom_plant_brush.h"
 #include "ftebroom_world_architect.h"
 #include "ftebroom_texture_folders.h"
@@ -422,6 +425,8 @@ static void panel(float w, float h)
   jamTick();
   jamWorldTick();
   jamWorldNotifications();
+  characterModeTick();
+  characterDocumentActionsTick();
   if(startupCheck && !jamModeActive()){
     uiHasScene=false;
     recentPanel();
@@ -1286,7 +1291,7 @@ static void panel(float w, float h)
   if (!jamEditing()) {
     shaderPackPanel();
     modFilesPanel(statusText,selectionStatus[0]!=0);
-    modelViewerPanel();bbBenchTick();plantPanel();worldPanel();
+    modelViewerPanel();bbBenchTick();plantPanel();characterPanel();worldPanel();
     plantBrushHover();
     pluginsPanel();pluginPreviewDraw();
     textureFolderPanel();prefabPanel();
@@ -2152,6 +2157,7 @@ static void shutdownEditor()
   // Release the child window and tool process before waiting on editor jobs.
   modEmbedEnd();
   if(runActive)runStop();
+  characterShutdown();
   plantShutdown();
   if(worldArchitect.work)worldArchitect.work->cancel=true;worldRelease();
   pluginsShutdown();
@@ -2184,6 +2190,7 @@ static void QDECL videoChanged(int width,int height,qboolean restarted)
   thumbnailCache.clear();entityPreviews.clear();++entityPreviewGeneration;fileImages.clear();++fileImageGeneration;
   bbImages.clear();bbImageRevisions.clear();bbImageTimes.clear();bbCheckerReady=false;bbRenderRevision=0;
   modelViewerImage=0;modelViewerSkinTexture=0;modelViewerSkinTextureIndex=-1;
+  characterEditor.uploaded=false;
   plantVideoChanged();
   uploadFontAtlas();
   ImGui::GetIO().DisplaySize={float(width),float(height)};
@@ -2275,6 +2282,7 @@ extern "C" qboolean NATIVEEXPORT FTEPlug_Init(plugcorefuncs_t* api)
   commands->AddCommand("ftebroom_test_run", testRunProfiles, "Test run profiles in disposable runs.");
   commands->AddCommand("ftebroom_world_architect",worldCommand,"Open World Architect.");
   commands->AddCommand("ftebroom_plant",plantCommand,"Open the native Plant Editor or select a plant preset.");
+  commands->AddCommand("ftebroom_character",characterCommand,"Open Character Creator in an offline project.");
   commands->AddCommand("ftebroom_test_desktop",testDesktop,"Test desktop integration in disposable installations.");
 #ifndef _WIN32
   commands->AddCommand("ftebroom_drop_hex",linuxDropCommand,"Import a local desktop WAD drop.");

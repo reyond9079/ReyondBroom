@@ -18,6 +18,9 @@ static ftebroom::bb::DynamicMeshAPI *bbAPI() {
   return static_cast<ftebroom::bb::DynamicMeshAPI *>(
       core->GetEngineInterface("ReyondBroomDynamicMeshV1", sizeof(ftebroom::bb::DynamicMeshAPI)));
 }
+static bool bbSmoothNormals() {
+  return core->GetEngineInterface("ReyondBroomDynamicMeshV2",sizeof(ftebroom::bb::DynamicMeshAPI))!=nullptr;
+}
 static ftebroom::bb::DynamicImageAPI *bbImageAPI() {
   return static_cast<ftebroom::bb::DynamicImageAPI *>(
       core->GetEngineInterface("ReyondBroomDynamicImageV1", sizeof(ftebroom::bb::DynamicImageAPI)));

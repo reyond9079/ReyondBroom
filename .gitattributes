@@ -8,3 +8,5 @@ assets/reyond-shader-pack/**/*.tga binary
 assets/reyond-shader-pack/**/*.ktx binary
 runtime/download-shader-pack.* text eol=lf
 runtime/reyond-shader-pack.json text eol=lf
+runtime/characters/LICENSE-CC0.md text eol=lf
+runtime/characters/examples/*.rbchar text eol=lf

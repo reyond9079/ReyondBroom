@@ -38,10 +38,19 @@ run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
         type: string
         required: false
         default: ''
+      rb21_evidence_run_id:
+        description: Successful Actions run for this commit containing the rb21-release-evidence artifact
+        type: string
+        default: ''
+      rb21_candidate_run_id:
+        description: Successful build run for the exact candidate checked by the acceptance run
+        type: string
+        default: ''
 permissions:
-  contents: write
+  contents: read
 jobs:
   plan:
+    if: inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == ''
     uses: ./.github/workflows/ci-plan.yml
     with:
       base: ${{ inputs.validation_base }}
@@ -206,10 +215,6 @@ jobs:
       shell: bash
       run: xvfb-run -a -s '-screen 0 1280x800x24' python scripts/ci-release-smoke.py out/release --platform "$PLATFORM" --version "$VERSION"
         --output qa/smoke --require-jam
-    - name: Upload validated packages to the draft release
-      run: |
-        test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
-        gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 --clobber
     - name: Install selected plant import probes
       if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
@@ -242,6 +247,15 @@ jobs:
           qa/viewport-create-dark-1920/model-editor.png
           qa/viewport-create-dark-1920/placed-models-scene.png
           qa/viewport-create-dark-1920/create-model-menu.png
+        retention-days: 7
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-packages-${{ matrix.platform }}
+        path: |
+          out/release/*.tar.gz
+          out/release/*.zip
+          out/release/*.sha256
+        if-no-files-found: error
         retention-days: 7
     - name: Collect compact release evidence
       if: always()
@@ -426,12 +440,6 @@ jobs:
       run: |-
         python scripts/ci-release-smoke.py out/release --platform Windows-x64 --version $env:VERSION --output qa/smoke --require-jam
         if ($LASTEXITCODE) { throw 'Packaged smoke failed' }
-    - name: Upload validated packages to the draft release
-      shell: pwsh
-      run: |
-        if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
-        gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
-        if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
     - name: Install selected plant import probes
       if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
@@ -453,4 +461,62 @@ jobs:
         path: qa-artifact/
         if-no-files-found: error
         retention-days: 7
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-packages-Windows-x64
+        path: |
+          out/release/*.zip
+          out/release/*.sha256
+        if-no-files-found: error
+        retention-days: 7
     needs: plan
+
+  upload-draft:
+    if: inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != ''
+    runs-on: ubuntu-24.04
+    environment: rb21-release
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      RB21_EVIDENCE_RUN: ${{ inputs.rb21_evidence_run_id }}
+      RB21_CANDIDATE_RUN: ${{ inputs.rb21_candidate_run_id }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Verify both successful runs belong to this source revision
+      shell: bash
+      run: |
+        for run in "$RB21_CANDIDATE_RUN" "$RB21_EVIDENCE_RUN"; do
+          [[ "$run" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" | \
+            jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
+              '.head_sha == $sha and .conclusion == "success" and .head_repository.full_name == $repo'
+        done
+    - uses: actions/download-artifact@v4
+      with:
+        name: rb21-release-evidence
+        github-token: ${{ github.token }}
+        run-id: ${{ inputs.rb21_evidence_run_id }}
+        path: acceptance
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: release-packages-*
+        github-token: ${{ github.token }}
+        run-id: ${{ inputs.rb21_candidate_run_id }}
+        path: release-packages
+    - name: Verify the complete acceptance evidence and all three package sets
+      shell: bash
+      run: |
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" > approvals.json
+        for platform in Windows-x64 Linux-x64 Linux-SDL2-x64; do
+          python3 scripts/check-character-release.py --evidence acceptance \
+            --release "release-packages/release-packages-$platform" --commit "$GITHUB_SHA" --platform "$platform" \
+            --approvals approvals.json --owner "$GITHUB_REPOSITORY_OWNER"
+        done
+    - name: Upload the validated packages to the existing draft
+      shell: bash
+      run: |
+        test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
+        gh release upload "v$VERSION" release-packages/release-packages-*/* --clobber

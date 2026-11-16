@@ -36,6 +36,11 @@ Polygon Cut/Spawn and symmetry behavior were studied against UltimateTrenchBroom
 
 - AutoLevel algorithm/model design: Al-Asl, MIT, revision f27c97ecab604168f7e4dad1d6a4669481edee36. Independent C++17 plugin implementation in `plugins/autolevel`; original MIT notice in `plugins/autolevel/LICENSE.AutoLevel.txt`. No Unity application or proprietary art is distributed.
 
+- Character Creator's humanoid mesh, skeletal landmarks and skin weights come
+  from MakeHuman's CC0 graphics assets. The pinned revision, source hashes and
+  license are in `runtime/characters`. The converter and Character Creator
+  implementation are part of ReyondBroom.
+
 
 - Model authoring geometry, box UV, animation and codec behavior was studied
   against Blockbench 5.2.2, commit ec0b2827104d0799c153bfb5f867579c0c44652f,

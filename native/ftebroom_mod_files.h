@@ -69,6 +69,7 @@ static void modFileImportMap(const std::filesystem::path& path,float x,float y) 
   command(("ftebroom_import_file 0 "+std::to_string(x)+" "+std::to_string(y)+"\n").c_str());
 }
 static void lmpShow(const std::filesystem::path& path);
+namespace { static void characterOpenFile(const std::filesystem::path& path); }
 #include "ftebroom_asset_tools.h"
 #include "ftebroom_sound_editor.h"
 #include "ftebroom_image_viewer.h"
@@ -250,7 +251,7 @@ static void modFilesTree(const std::filesystem::path& folder,std::filesystem::pa
       if(soft&&ImGui::IsItemVisible())modFileIcon({start.x+labelOffset,start.y+2*uiScale()},13*uiScale(),entry.first);
       if(ImGui::IsItemClicked()&&!ImGui::IsItemToggledOpen()&&entry.first)navigate=path;
       if(ImGui::IsItemHovered()&&ImGui::IsMouseDoubleClicked(0)&&!entry.first) {
-        if(entityLower(path.extension().u8string())==".lmp")lmpShow(path);else if(modelViewableFile(path))modelEditorShow(modFileModelPath(path));else if(soundFile(path))soundOpen(path);else if(imageFile(path))imageViewerShow(path);else if(entityLower(path.extension().u8string())==".map")modFileOpenMap(path);else if(modFileText(path))modFilesEdit(path);
+        if(entityLower(path.extension().u8string())==".rbchar"&&!modFileMember(path))characterOpenFile(path);else if(entityLower(path.extension().u8string())==".lmp")lmpShow(path);else if(modelViewableFile(path))modelEditorShow(modFileModelPath(path));else if(soundFile(path))soundOpen(path);else if(imageFile(path))imageViewerShow(path);else if(entityLower(path.extension().u8string())==".map")modFileOpenMap(path);else if(modFileText(path))modFilesEdit(path);
       }
       if(entry.first&&expanded){modFilesTree(path,navigate,depth+1,budget);ImGui::TreePop();}ImGui::PopID();
     }
@@ -414,7 +415,7 @@ static void modFilesPanel(const char* status,bool warning) {
           if(visible.GetWidth()>0&&visible.GetHeight()>0)modFilesTestItems[path.generic_u8string()]=visible.GetCenter();
         }
         if(ImGui::IsItemHovered()&&ImGui::IsMouseDoubleClicked(0)&&!directory) {
-          if(entityLower(path.extension().u8string())==".lmp")lmpShow(path);else if(modelViewableFile(path))modelEditorShow(modFileModelPath(path));else if(soundFile(path))soundOpen(path);else if(imageFile(path))imageViewerShow(path);else if(entityLower(path.extension().u8string())==".map")modFileOpenMap(path);else if(modFileText(path))modFilesEdit(path);
+          if(entityLower(path.extension().u8string())==".rbchar"&&!modFileMember(path))characterOpenFile(path);else if(entityLower(path.extension().u8string())==".lmp")lmpShow(path);else if(modelViewableFile(path))modelEditorShow(modFileModelPath(path));else if(soundFile(path))soundOpen(path);else if(imageFile(path))imageViewerShow(path);else if(entityLower(path.extension().u8string())==".map")modFileOpenMap(path);else if(modFileText(path))modFilesEdit(path);
         }
         if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",label.c_str());
         if(ImGui::BeginDragDropSource()){auto value=path.u8string();ImGui::SetDragDropPayload("FTEBROOM_MOD_FILE",value.c_str(),value.size()+1);ImGui::TextUnformatted(label.c_str());ImGui::EndDragDropSource();}

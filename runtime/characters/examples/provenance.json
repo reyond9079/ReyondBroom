@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "Canonical ReyondBroom Character Creator preset library",
+  "files": {
+    "Casey.rbchar": "0d2ef8e5c2d3c4bc7938f738d0232360a8e82f2dcbe80220d7d889752c4001d0",
+    "Devin.rbchar": "d71ddc5c3df9c3656398c5e37c5670ef5596e034946acb59c70fff18c146ef85",
+    "Drew.rbchar": "e430713f52553ad032ded5f13616fe197170305d7d650ee832f5b94bb1698813",
+    "Jamie.rbchar": "9af722e7ae6551781c867424327241894fd7b6791e9c40b870e778c2bef78151",
+    "Jordan.rbchar": "d2725de30b832b2e209cdb36c2f5cbf04c8b5914adab66eca7a761d0cb17b63c",
+    "Morgan.rbchar": "d894e0fb9faea79fe11d4a5b065617d2174131754e4967ddbc74aed9bda7ce8e",
+    "Riley.rbchar": "af1e66cb39c1229c9fe0eafb92308a929729c09b21baec69113866bb99d0f84b",
+    "Robin.rbchar": "df4da94fc0556bbc2b67222300d2ef9d4e4b934098b730e0cb97bfee3a5e6395",
+    "Sam.rbchar": "317acac89f5aaae95726360000fe0a5d33b5aead1bc803c1741ab42e6987fb8b",
+    "Taylor.rbchar": "115e485c697cae5085d8d2d4c874859075cbcb13a973029d3473a39506927c5a"
+  }
+}

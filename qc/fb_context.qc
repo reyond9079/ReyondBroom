@@ -69,10 +69,9 @@ void fb_authoring_save()
         if(matches>1 || (create && matches))status="ambiguous";
         else if(id<0 && !create)status="missing";
         else {
-            int parent=fb_organize_node(layer),valid=TRUE;
-            if(parent<1 && layer)valid=FALSE;
-            for(int a=0;a<3;a++)if(!fb_geom_finite(origin[a])||fabs(origin[a])>autocvar_ftebroom_world_bound)valid=FALSE;
-            if(!valid)status="invalid";
+            int parent=fb_organize_node(layer);
+            if(parent<1 && layer)status="invalid-layer";
+            else if(!fb_geom_point(origin))status="invalid-position";
             else {
                 fb_tx_begin(id<0?"Create authoring model":"Update authoring model");
                 if(id<0){

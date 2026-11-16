@@ -95,11 +95,15 @@ class ScopeTests(unittest.TestCase):
         begin = source.index('    if(ImGui::MenuItem("World Architect..."))')
         end = source.index('    ImGui::EndMenu();\n  }\n}', begin)
         promoted = source[begin:end]
+        character_entry = promoted[promoted.index('    if(ImGui::MenuItem("Character Creator..."))'):
+                                   promoted.index('    if(ImGui::MenuItem("Manage plugins..."))')]
         previous = ('    if(ImGui::MenuItem("World Architect (development preview)..."))worldOpen();\n'
+                    + character_entry +
                     '    if(ImGui::MenuItem("Manage plugins..."))pluginManagerOpen=true;\n'
                     '    for(auto& p:editorPlugins)if(p.api)if(ImGui::MenuItem(p.name.c_str()))p.open=true;\n')
         self.assertEqual(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted), {'world_ui'})
         self.assertIsNone(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted.replace('pluginManagerOpen=true;', 'pluginManagerOpen=false;')))
+        self.assertIsNone(planner.world_host_scope('native/ftebroom_plugins.h', previous, promoted.replace('characterCommand();', 'worldOpen();')))
 
     def test_onboarding_clip_overlay_move_requires_identical_shared_rendering(self):
         path = 'native/ftebroom.cpp'
@@ -402,6 +406,24 @@ class PreparedReuseTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_character_draft_rechecks_owner_and_frozen_packages(self):
+        import yaml
+        source = (REPO/'.github/workflows/release-linux-ui-update.yml').read_text()
+        workflow = yaml.safe_load(source)
+        jobs = workflow['jobs']
+        self.assertEqual(workflow['permissions']['contents'], 'read')
+        self.assertEqual(source.count('gh release upload'), 1)
+        upload = jobs['upload-draft']
+        self.assertEqual(upload['environment'], 'rb21-release')
+        self.assertEqual(upload['permissions']['contents'], 'write')
+        downloads = [step['with'] for step in upload['steps'] if step.get('uses') == 'actions/download-artifact@v4']
+        self.assertEqual({step['run-id'] for step in downloads},
+                         {'${{ inputs.rb21_candidate_run_id }}', '${{ inputs.rb21_evidence_run_id }}'})
+        commands = [step['run'] for step in upload['steps'] if 'run' in step]
+        self.assertIn('/approvals', commands[-2])
+        self.assertIn('check-character-release.py', commands[-2])
+        self.assertIn('gh release upload', commands[-1])
+
     def test_gates_and_caches_are_wired_without_fuzzy_restores(self):
         import yaml
         def read(name): return yaml.safe_load((REPO/'.github'/name).read_text())

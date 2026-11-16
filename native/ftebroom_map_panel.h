@@ -152,7 +152,8 @@ static void mapLayerPanel(float height)
 static void mapBoundsPanel()
 {
   if(!uiInspectorFold("Map Properties",ImGuiTreeNodeFlags_DefaultOpen))return;
-  const float world=std::max(1.f,cvars->GetFloat("ftebroom_world_bound"));
+  const float configured=cvars->GetFloat("ftebroom_world_bound");
+  const float world=std::isfinite(configured)&&configured>0 ? configured : 65536.f;
   std::array<float,6> limits={-world,-world,-world,world,world,world},values{};
   static std::array<float,6> custom{};
   static std::string lastBounds="\n";

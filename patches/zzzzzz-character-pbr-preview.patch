@@ -1,0 +1,179 @@
+--- a/engine/client/client.h
++++ b/engine/client/client.h
+@@ -1203,7 +1203,7 @@
+ extern vecV_t			*fte_restrict cl_strisvertv;
+ extern vec4_t			*fte_restrict cl_strisvertc;
+ extern vec2_t			*fte_restrict cl_strisvertt;
+-//extern vec3_t			*fte_restrict cl_strisvertn[3];
++extern vec3_t *fte_restrict cl_strisvertn;
+ extern index_t			*fte_restrict cl_strisidx;
+ extern unsigned int cl_numstrisidx;
+ extern unsigned int cl_maxstrisidx;
+@@ -1220,10 +1220,8 @@
+ 		cl_strisvertv = BZ_Realloc(cl_strisvertv, sizeof(*cl_strisvertv)*cl_maxstrisvert);	\
+ 		cl_strisvertt = BZ_Realloc(cl_strisvertt, sizeof(*cl_strisvertt)*cl_maxstrisvert);	\
+ 		cl_strisvertc = BZ_Realloc(cl_strisvertc, sizeof(*cl_strisvertc)*cl_maxstrisvert);	\
+-/*		cl_strisvertn[0] = BZ_Realloc(cl_strisvertn[0], sizeof(*cl_strisvertn[0])*cl_maxstrisvert);	\
+-		cl_strisvertn[1] = BZ_Realloc(cl_strisvertn[1], sizeof(*cl_strisvertn[1])*cl_maxstrisvert);	\
+-		cl_strisvertn[2] = BZ_Realloc(cl_strisvertn[2], sizeof(*cl_strisvertn[2])*cl_maxstrisvert);	\
+-*/	} while(0)
++		cl_strisvertn = BZ_Realloc(cl_strisvertn, sizeof(*cl_strisvertn)*cl_maxstrisvert);	\
++	} while(0)
+ 
+ extern char emodel_name[], pmodel_name[], prespawn_name[], modellist_name[], soundlist_name[];
+ 
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -277,6 +277,7 @@
+ vecV_t			*fte_restrict cl_strisvertv;
+ vec4_t			*fte_restrict cl_strisvertc;
+ vec2_t			*fte_restrict cl_strisvertt;
++vec3_t *fte_restrict cl_strisvertn;
+ index_t			*fte_restrict cl_strisidx;
+ unsigned int cl_numstrisidx;
+ unsigned int cl_maxstrisidx;
+--- a/engine/client/r_2d.c
++++ b/engine/client/r_2d.c
+@@ -193,6 +193,8 @@
+ 	cl_strisvertc = NULL;
+ 	BZ_Free(cl_strisvertt);
+ 	cl_strisvertt = NULL;
++	BZ_Free(cl_strisvertn);
++	cl_strisvertn = NULL;
+ 	BZ_Free(cl_strisidx);
+ 	cl_strisidx = NULL;
+ 	cl_numstrisidx = 0;
+--- a/engine/gl/shader.h
++++ b/engine/gl/shader.h
+@@ -804,6 +804,7 @@
+ #define BEF_NOSHADOWS			(1u<<7) //don't appear in shadows
+ #define BEF_FORCECOLOURMOD		(1u<<8) //q3 shaders default to 'rgbgen identity', and ignore ent colours. this forces ent colours to be considered
+ #define BEF_LINES				(1u<<9)	//draw line pairs instead of triangles.
++#define BEF_RB_NORMALS (1u<<11) // smooth authoring-preview normals
+ #define BEF_FORCETWOSIDED		(1u<<10) //more evilness.s
+ //#define	BEFF_POLYHASNORMALS		(1u<<31) //false flag - for cl_scenetries and not actually used by the backend.
+ 
+--- a/engine/gl/gl_alias.c
++++ b/engine/gl/gl_alias.c
+@@ -2840,7 +2840,7 @@
+ 
+ 	mesh.xyz_array = cl_strisvertv + cl_stris[i].firstvert;
+ 	mesh.st_array = cl_strisvertt + cl_stris[i].firstvert;
+-//	mesh.normals_array = cl_strisvertn[0];// + cl_stris[i].firstvert;
++	mesh.normals_array = (cl_stris[i].flags & BEF_RB_NORMALS) ? cl_strisvertn + cl_stris[i].firstvert : NULL;
+ //	mesh.snormals_array = cl_strisvertn[1];// + cl_stris[i].firstvert;
+ //	mesh.tnormals_array = cl_strisvertn[2];// + cl_stris[i].firstvert;
+ 	mesh.colors4f_array[0] = cl_strisvertc + cl_stris[i].firstvert;
+--- a/engine/common/plugin.c
++++ b/engine/common/plugin.c
+@@ -2451,7 +2451,7 @@
+ #if defined(CSQC_DAT) && defined(HAVE_CLIENT)
+ 	if (!strcmp(interfacename, "ReyondBroomIndexedUIV1")) { extern void *RB_IndexedUIInterface(size_t); return RB_IndexedUIInterface(structsize); }
+ 	if (!strcmp(interfacename, "ReyondBroomDynamicImageV1")) { extern void *RB_DynamicImageInterface(size_t); return RB_DynamicImageInterface(structsize); }
+-	if (!strcmp(interfacename, "ReyondBroomDynamicMeshV1")) { extern void *RB_DynamicMeshInterface(size_t); return RB_DynamicMeshInterface(structsize); }
++	if (!strcmp(interfacename, "ReyondBroomDynamicMeshV1") || !strcmp(interfacename, "ReyondBroomDynamicMeshV2")) { extern void *RB_DynamicMeshInterface(size_t); return RB_DynamicMeshInterface(structsize); }
+ 	if (!strcmp(interfacename, "CSQCVM"))
+ 	{
+ 		extern world_t csqc_world;
+--- a/engine/client/pr_csqc.c
++++ b/engine/client/pr_csqc.c
+@@ -8484,24 +8484,26 @@
+ static int rb_dyn_upload(const void *bytes,size_t size)
+ {
+  const unsigned char *p=bytes,*end;unsigned surfaces,i,j;double start=Sys_DoubleTime();
+- if(!bytes||size<8||size>32*1024*1024||memcmp(p,"RBB1",4))return 0;
++ unsigned stride;
++ if(!bytes || size<8 || size>32*1024*1024 || (memcmp(p,"RBB1",4) && memcmp(p,"RBB2",4)))return 0;
++ stride = p[3]=='2' ? 12 : 9;
+  end=p+size;surfaces=rb_read32(p+4);p+=8;if(surfaces>256)return 0;
+  for(i=0;i<surfaces;i++){
+   unsigned nv,ni;if(end-p<136)return 0;nv=rb_read32(p);ni=rb_read32(p+4);
+   if(nv>65536||ni>393216||ni%3||!memchr(p+8,0,128))return 0;p+=136;
+-  if((size_t)(end-p)<(size_t)nv*36+(size_t)ni*4)return 0;
+-  for(j=0;j<nv*9;j++){float v;memcpy(&v,p+j*4,4);if(!isfinite(v)||fabs(v)>1e8)return 0;}
+-  p+=nv*36;for(j=0;j<ni;j++)if(rb_read32(p+j*4)>=nv)return 0;p+=ni*4;
++  if((size_t)(end-p)<(size_t)nv*stride*4+(size_t)ni*4)return 0;
++  for(j=0;j<nv*stride;j++){float v;memcpy(&v,p+j*4,4);if(!isfinite(v)||fabs(v)>1e8)return 0;}
++  p+=nv*stride*4;for(j=0;j<ni;j++)if(rb_read32(p+j*4)>=nv)return 0;p+=ni*4;
+  }
+  if(p!=end)return 0;
+  rb_dynmesh=BZ_Realloc(rb_dynmesh,size);memcpy(rb_dynmesh,bytes,size);rb_dynsize=size;
+  rb_dynstats[0]=(Sys_DoubleTime()-start)*1000;return 1;
+ }
+ static void rb_dyn_clear(void){
+- if(rb_dynmesh&&qrenderer!=QR_NONE){const unsigned char *p=rb_dynmesh+8;unsigned n;
++ if(rb_dynmesh&&qrenderer!=QR_NONE){const unsigned char *p=rb_dynmesh+8;unsigned n, stride=rb_dynmesh[3]=='2'?48:36;
+   for(n=0;n<rb_read32(rb_dynmesh+4);n++){unsigned nv=rb_read32(p),ni=rb_read32(p+4);char name[256];int cull;
+-   for(cull=0;cull<(!strncmp((const char*)p+8,"bbtex/rbchar-fine-",18)||!strncmp((const char*)p+8,"bbtex/rbchar-hair-",18)?4:2);cull++){shader_t *shader;snprintf(name,sizeof(name),"bbmat/%i/%s",cull,(const char*)p+8);shader=R_ShaderFind(name);if(shader)R_UnloadShader(shader);}
+-   p+=136+(size_t)nv*36+(size_t)ni*4;
++   for(cull=0;cull<(!strncmp((const char*)p+8,"bbtex/rbchar-fine-",18)||!strncmp((const char*)p+8,"bbtex/rbchar-hair-",18)||!strncmp((const char*)p+8,"bbtex/rbchar-pbr-hair-",22)?4:2);cull++){shader_t *shader;snprintf(name,sizeof(name),"bbmat/%i/%s",cull,(const char*)p+8);shader=R_ShaderFind(name);if(shader)R_UnloadShader(shader);}
++   p+=136+(size_t)nv*stride+(size_t)ni*4;
+   }
+  }
+  if(rb_dynmesh)BZ_Free(rb_dynmesh);rb_dynmesh=NULL;rb_dynsize=0;
+@@ -8534,15 +8536,23 @@
+ }
+ static void QCBUILTIN PF_editor_dynmesh_draw(pubprogfuncs_t *prinst,struct globalvars_s *pr_globals)
+ {
+- const unsigned char *p;unsigned count,s;double start=Sys_DoubleTime();unsigned tris=0;int mode=Cvar_Get("ftebroom_bb_display","0",0,"")->ival;
+- if(!rb_dynmesh)return;if(R2D_Flush)R2D_Flush();p=rb_dynmesh+8;count=rb_read32(rb_dynmesh+4);
++ const unsigned char *p;unsigned count,s,stride;double start=Sys_DoubleTime();unsigned tris=0;int mode=Cvar_Get("ftebroom_bb_display","0",0,"")->ival;
++ if(!rb_dynmesh)return;if(R2D_Flush)R2D_Flush();p=rb_dynmesh+8;count=rb_read32(rb_dynmesh+4);stride=rb_dynmesh[3]=='2'?48:36;
+  for(s=0;s<count;s++){
+   unsigned nv=rb_read32(p),ni=rb_read32(p+4),i;scenetris_t *t;const char *name=(const char*)p+8;p+=136;
+   if(cl_numstris==cl_maxstris){cl_maxstris+=8;cl_stris=BZ_Realloc(cl_stris,sizeof(*cl_stris)*cl_maxstris);}
+   t=&cl_stris[cl_numstris++];memset(t,0,sizeof(*t));
+   {
+    qboolean soft=!strncmp(name,"bbtex/rbchar-fine-",18) && mode!=2;
+-   qboolean hair=!strncmp(name,"bbtex/rbchar-hair-",18) && mode!=2;
++   const char *pbr = NULL;
++   qboolean hair;
++   if (stride==48 && mode!=2) {
++    if(!strncmp(name,"bbtex/rbchar-pbr-skin-",22))pbr="SKIN";
++    else if(!strncmp(name,"bbtex/rbchar-pbr-eye-",21))pbr="EYE";
++    else if(!strncmp(name,"bbtex/rbchar-pbr-hair-",22))pbr="HAIR";
++    else if(!strncmp(name,"bbtex/rbchar-pbr-cloth-",23))pbr="CLOTH";
++   }
++   hair=(!strncmp(name,"bbtex/rbchar-hair-",18) || (pbr && !strcmp(pbr,"HAIR"))) && mode!=2;
+    qboolean skin=!strncmp(name,"bbtex/rbchar-skin-",18) && mode!=2;
+    int cull=Cvar_Get("ftebroom_bb_cull","0",0,"")->ival;
+    const char *pass=soft ? "sort blend\n {\n blendfunc blend\n alphafunc GT0" :
+@@ -8550,6 +8560,9 @@
+                           "sort opaque\n {\n depthwrite\n alphafunc GE128";
+    int style=cull+2*(soft||hair);
+    t->shader=R_ShaderFind(va("bbmat/%d/%s",style,name));
++   if(!t->shader && pbr)t->shader=R_RegisterShader(va("bbmat/%d/%s",style,name),SUF_NONE,va(
++    "{\n cull %s\n program reyond_character_surface_v3#PREVIEW#%s\n diffusemap %s\n normalmap textures/reyond_character_detail_v3.png\n %s\n map %s\n rgbgen vertex\n alphagen vertex\n }\n }\n",
++    cull?"back":"none",pbr,name,hair ? "sort seethrough\n {\n depthwrite\n blendfunc blend" : "sort opaque\n {\n depthwrite",name));
+    if(!t->shader && skin)t->shader=R_RegisterShader(va("bbmat/%d/%s",style,name),SUF_NONE,va(
+     "{\n cull %s\n program reyond_character_skin_v2#PREVIEW\n diffusemap %s\n sort opaque\n {\n map %s\n depthwrite\n rgbgen vertex\n alphagen vertex\n }\n }\n",
+     cull?"back":"none",name,name));
+@@ -8564,7 +8577,14 @@
+   t->flags=BEF_NOSHADOWS|(Cvar_Get("ftebroom_bb_cull","0",0,"")->ival?0:BEF_FORCETWOSIDED)|(mode==2?BEF_LINES:0);t->firstidx=cl_numstrisidx;t->firstvert=cl_numstrisvert;t->numvert=nv;t->numidx=ni*(mode==2?2:1);
+   if(cl_numstrisidx+t->numidx>cl_maxstrisidx){cl_maxstrisidx=cl_numstrisidx+t->numidx;cl_strisidx=BZ_Realloc(cl_strisidx,sizeof(*cl_strisidx)*cl_maxstrisidx);}
+   if(cl_numstrisvert+nv>cl_maxstrisvert)cl_stris_ExpandVerts(cl_numstrisvert+nv);
+-  for(i=0;i<nv;i++){float v[9];memcpy(v,p,36);p+=36;VectorCopy(v,cl_strisvertv[t->firstvert+i]);Vector2Copy(v+3,cl_strisvertt[t->firstvert+i]);Vector4Copy(v+5,cl_strisvertc[t->firstvert+i]);}
++  if(stride==48)t->flags|=BEF_RB_NORMALS;
++  for(i=0;i<nv;i++){
++   float v[12];memcpy(v,p,stride);p+=stride;
++   VectorCopy(v,cl_strisvertv[t->firstvert+i]);
++   Vector2Copy(v+3,cl_strisvertt[t->firstvert+i]);
++   Vector4Copy(v+5,cl_strisvertc[t->firstvert+i]);
++   if(stride==48)VectorCopy(v+9,cl_strisvertn[t->firstvert+i]);
++  }
+   if(mode==2){for(i=0;i<ni;i+=3){unsigned a=rb_read32(p+i*4),b=rb_read32(p+(i+1)*4),c=rb_read32(p+(i+2)*4);cl_strisidx[cl_numstrisidx++]=a;cl_strisidx[cl_numstrisidx++]=b;cl_strisidx[cl_numstrisidx++]=b;cl_strisidx[cl_numstrisidx++]=c;cl_strisidx[cl_numstrisidx++]=c;cl_strisidx[cl_numstrisidx++]=a;}p+=ni*4;}else for(i=0;i<ni;i++){cl_strisidx[cl_numstrisidx++]=rb_read32(p);p+=4;}
+   cl_numstrisvert+=nv;tris+=ni/3;
+  }
+@@ -8572,9 +8592,9 @@
+ }
+ static void QCBUILTIN PF_editor_dynmesh_vertex(pubprogfuncs_t *prinst,struct globalvars_s *pr_globals)
+ {
+- unsigned idx=G_FLOAT(OFS_PARM0),mode=G_FLOAT(OFS_PARM1);const unsigned char *p;unsigned s;
+- VectorClear(G_VECTOR(OFS_RETURN));if(!rb_dynmesh)return;p=rb_dynmesh+8;
+- for(s=0;s<rb_read32(rb_dynmesh+4);s++){unsigned nv=rb_read32(p),ni=rb_read32(p+4);p+=136;if(idx<ni){unsigned v=rb_read32(p+nv*36+idx*4);float value[9];memcpy(value,p+v*36,36);VectorCopy(value+(mode==2?5:mode==1?3:0),G_VECTOR(OFS_RETURN));return;}idx-=ni;p+=nv*36+ni*4;}
++ unsigned idx=G_FLOAT(OFS_PARM0),mode=G_FLOAT(OFS_PARM1);const unsigned char *p;unsigned s,stride;
++ VectorClear(G_VECTOR(OFS_RETURN));if(!rb_dynmesh)return;p=rb_dynmesh+8;stride=rb_dynmesh[3]=='2'?48:36;
++ for(s=0;s<rb_read32(rb_dynmesh+4);s++){unsigned nv=rb_read32(p),ni=rb_read32(p+4);p+=136;if(idx<ni){unsigned v=rb_read32(p+nv*stride+idx*4);float value[9];memcpy(value,p+v*stride,36);VectorCopy(value+(mode==2?5:mode==1?3:0),G_VECTOR(OFS_RETURN));return;}idx-=ni;p+=nv*stride+ni*4;}
+ }
+ 
+ static void QCBUILTIN PF_editor_model_info(pubprogfuncs_t *prinst, struct globalvars_s *pr_globals)

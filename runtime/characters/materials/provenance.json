@@ -1,0 +1,774 @@
+{
+  "version": 2,
+  "detailSource": {
+    "file": "assets/characters/reyond-surface-source-v5.png",
+    "tool": "OpenAI ImageGen built-in",
+    "prompt": "Create a seamless-ready orthographic PBR ALBEDO texture source contact sheet for an adult character creator in a 3D game. A precise 3 x 2 layout with six equal square photographic texture samples, landscape with aspect ratio 3:2, no dividers, no words, no full objects, no perspective. Upper left: flat peach-neutral adult cheek skin showing natural tiny pores, some faint redness; upper middle: blackish-gray fine cotton poplin from a plain overshirt; upper right: indigo denim with fine diagonal twill. Bottom left: dark gray wool suiting with subtle micro-weave, bottom middle: very dark brown pebbled boot leather with fine irregular grain, bottom right: dense dark brown strands of hair arranged mostly vertically with natural subtle tonal variation. Neutral exposure and cross polarized flat diffuse light in all six samples. Entire tiles filled evenly, no harsh highlights, cast shadows, vignettes, fake mesh patterns, extreme local gradients, borders, labels, branding or watermark. High detail fine microstructure. Real material photography.",
+    "sha256": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+  },
+  "textures": {
+    "skin-deep": {
+      "file": "skin-deep.jpg",
+      "sha256": "042a6dfcc674bb1819ef42c5466191de9356024691b50ed7f47209d9492a6e84",
+      "size": 2048,
+      "source": "Original skin grain and painted UV pigment",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+      }
+    },
+    "skin-medium": {
+      "file": "skin-medium.jpg",
+      "sha256": "0da8431608aeb14e86efa966c087011980e702361410d3ff9c48b4cc9e987c9a",
+      "size": 2048,
+      "source": "Original skin grain and painted UV pigment",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+      }
+    },
+    "skin-warm": {
+      "file": "skin-warm.jpg",
+      "sha256": "db5e5b8ad3ef012219064475e9a0aadc3a6cbe12a28dd9993ca5548de0e0cf1f",
+      "size": 2048,
+      "source": "Original skin grain and painted UV pigment",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+      }
+    },
+    "skin-soft": {
+      "file": "skin-soft.jpg",
+      "sha256": "45e67cce64cc35006700fe00f0782baf079c110bb9b87ade2fb5c5a3bead40f3",
+      "size": 2048,
+      "source": "Original skin grain and painted UV pigment",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+      }
+    },
+    "skin-mature": {
+      "file": "skin-mature.jpg",
+      "sha256": "93b664cfe92dd9ab6a84f6f84ddea1d1073d46bf8a2de701d365ebcdddad3772",
+      "size": 2048,
+      "source": "Original skin grain and painted UV pigment",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+      }
+    },
+    "skin-fair": {
+      "file": "skin-fair.jpg",
+      "sha256": "d02de8b1958e2c138324f6b2dc72456bfb5430ea5a352a3a4e4b158ac12f3375",
+      "size": 2048,
+      "source": "Original skin grain and painted UV pigment",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+      }
+    },
+    "skin-freckled": {
+      "file": "skin-freckled.jpg",
+      "sha256": "051b4b7964d62fa008426b8b7e44897203e150f8c7c424b64c9aa361ad9f5947",
+      "size": 2048,
+      "source": "Original skin grain and painted UV pigment",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859"
+      }
+    },
+    "eyes-pbr-brown": {
+      "file": "eyes-pbr-brown.jpg",
+      "sha256": "6534d2872fdea21e6a033e2a90397302f6d566a379fd0e105cce305c88e8a679",
+      "size": 2048,
+      "source": "Original generated iris and color variants",
+      "authoringInputs": {
+        "assets/characters/iris-albedo-source-v3.png": "e4e6e6b5210c133502e2538fd6942c84fb24ab8b8a4c375f74689344bf92c291"
+      }
+    },
+    "eyes-brown": {
+      "file": "eyes-brown.jpg",
+      "sha256": "921d7cbe2245365c2b416c8770fd2bc2daa50a08551239f3510a7e94d012c757",
+      "size": 512,
+      "source": "Original generated iris and color variants",
+      "authoringInputs": {
+        "assets/characters/iris-albedo-source-v3.png": "e4e6e6b5210c133502e2538fd6942c84fb24ab8b8a4c375f74689344bf92c291"
+      }
+    },
+    "eyes-pbr-blue": {
+      "file": "eyes-pbr-blue.jpg",
+      "sha256": "7c8115386f633d3692a5c2ee269526f3adb75edd0c8d1e420c33d8e750a88479",
+      "size": 2048,
+      "source": "Original generated iris and color variants",
+      "authoringInputs": {
+        "assets/characters/iris-albedo-source-v3.png": "e4e6e6b5210c133502e2538fd6942c84fb24ab8b8a4c375f74689344bf92c291"
+      }
+    },
+    "eyes-blue": {
+      "file": "eyes-blue.jpg",
+      "sha256": "9fb44ee26f5e3fb01dbb35c418782d3671da1bd8284f65ed53d531f8f76740f2",
+      "size": 512,
+      "source": "Original generated iris and color variants",
+      "authoringInputs": {
+        "assets/characters/iris-albedo-source-v3.png": "e4e6e6b5210c133502e2538fd6942c84fb24ab8b8a4c375f74689344bf92c291"
+      }
+    },
+    "eyes-pbr-green": {
+      "file": "eyes-pbr-green.jpg",
+      "sha256": "d53d802b2953cb9301c1d6dad04955650a86415101aaa2ab30b5d66ba4a2cd4d",
+      "size": 2048,
+      "source": "Original generated iris and color variants",
+      "authoringInputs": {
+        "assets/characters/iris-albedo-source-v3.png": "e4e6e6b5210c133502e2538fd6942c84fb24ab8b8a4c375f74689344bf92c291"
+      }
+    },
+    "eyes-green": {
+      "file": "eyes-green.jpg",
+      "sha256": "e1b7973307b3d40f35483eecc12cd820b16cc6f3f8747379c09e50b1d07136ca",
+      "size": 512,
+      "source": "Original generated iris and color variants",
+      "authoringInputs": {
+        "assets/characters/iris-albedo-source-v3.png": "e4e6e6b5210c133502e2538fd6942c84fb24ab8b8a4c375f74689344bf92c291"
+      }
+    },
+    "hd-afro01": {
+      "file": "hd-afro01.png",
+      "sha256": "466d5b95a45acc65f9f95f01d888d4b35feb1532910b233b2cbaf65ddb49c0b3",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/afro01.rbw": "444cac44bdfd4e9d3bfe759b805e651eaafe523b0e32b2fadcfbe99a70da6ecf"
+      }
+    },
+    "afro01": {
+      "file": "afro01.png",
+      "sha256": "b44bd9ebc3acaf69f734eafc212b13e015b4e50da65d0a1288135fbc222716ed",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/afro01.rbw": "444cac44bdfd4e9d3bfe759b805e651eaafe523b0e32b2fadcfbe99a70da6ecf"
+      }
+    },
+    "hd-bob01": {
+      "file": "hd-bob01.png",
+      "sha256": "bd0ace25ac27a7b8499b375c6804642abf6fb24c04c8c01ba51a1cb87a3f7591",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/bob01.rbw": "01b939dd7c188820ad11db3410005dcdbe356333bada7f6d08db56c6d747743e"
+      }
+    },
+    "bob01": {
+      "file": "bob01.png",
+      "sha256": "968acc6b8a08001123818a70bb1dcbc60edaf6aa5b117adcbdf73e891d38c004",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/bob01.rbw": "01b939dd7c188820ad11db3410005dcdbe356333bada7f6d08db56c6d747743e"
+      }
+    },
+    "hd-bob02": {
+      "file": "hd-bob02.png",
+      "sha256": "3e496bd29210ba9a0c5503331746ca5a176dd27fbf19b5684057d6de58776adb",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/bob02.rbw": "8331a8f0086f3439912583cd08c9470f44845d3d2b0863a3e741c115d92f68cc"
+      }
+    },
+    "bob02": {
+      "file": "bob02.png",
+      "sha256": "59f36a3fa7549d6fc55002644d1e891da207339859172e7f3c5652280423f15a",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/bob02.rbw": "8331a8f0086f3439912583cd08c9470f44845d3d2b0863a3e741c115d92f68cc"
+      }
+    },
+    "hd-braid01": {
+      "file": "hd-braid01.png",
+      "sha256": "7aae0cc2f7b95e4741f9b94f0a78a1ffc0645b51c8950b4694f2f2db22391392",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/braid01.rbw": "9820297f249f7a23c3e32ebb8a97f4cb29411a2cffa83971cd129268c303e7e6"
+      }
+    },
+    "braid01": {
+      "file": "braid01.png",
+      "sha256": "1dd38e033d3aeb09f9e3c4271139dcff8883c6509311821c9c6cd40ece4c39f4",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/braid01.rbw": "9820297f249f7a23c3e32ebb8a97f4cb29411a2cffa83971cd129268c303e7e6"
+      }
+    },
+    "hd-eyebrow001": {
+      "file": "hd-eyebrow001.png",
+      "sha256": "4790bb0de06f383049563e349932b525e32bedeab706c858bd672c3f2230a082",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyebrow001.rbw": "df8952471ab809c14bc2c06550928a9dfeab72f67b4ea1f14c1582d400335ccb"
+      }
+    },
+    "eyebrow001": {
+      "file": "eyebrow001.png",
+      "sha256": "c1566019d7a9696efa8c4ee1bd9e1a93eec29d7bd7e6f5d78a373945cc750ee4",
+      "size": 512,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyebrow001.rbw": "df8952471ab809c14bc2c06550928a9dfeab72f67b4ea1f14c1582d400335ccb"
+      }
+    },
+    "hd-eyebrow010": {
+      "file": "hd-eyebrow010.png",
+      "sha256": "dbc4ae68c8810422319f8bd377c20aa9917e664e1908822964cb569ec324083e",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyebrow010.rbw": "23b9973ede9f2e074f3450ba83243bc647f2b1ddad136075f08617e7a10b2c2e"
+      }
+    },
+    "eyebrow010": {
+      "file": "eyebrow010.png",
+      "sha256": "7c976a554e3ce1ee1a95a2fa8b625a03a41537f2d226ef5c96831fcbda7a04c7",
+      "size": 512,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyebrow010.rbw": "23b9973ede9f2e074f3450ba83243bc647f2b1ddad136075f08617e7a10b2c2e"
+      }
+    },
+    "hd-eyebrow012": {
+      "file": "hd-eyebrow012.png",
+      "sha256": "28dc37a3404d29c44249b959cca3f721a006fac6e064a4b667def34496c8690e",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyebrow012.rbw": "15fd1753053bfb4e25b9f5e8c27137556f13ef8b0140aba0ffccf0c8fb0c2fdb"
+      }
+    },
+    "eyebrow012": {
+      "file": "eyebrow012.png",
+      "sha256": "ded58c1ec808f1e1eedb94cc54a2e242bb522e3d7f80a5d69bcd0d9ff987a6dc",
+      "size": 512,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyebrow012.rbw": "15fd1753053bfb4e25b9f5e8c27137556f13ef8b0140aba0ffccf0c8fb0c2fdb"
+      }
+    },
+    "hd-eyelashes01": {
+      "file": "hd-eyelashes01.png",
+      "sha256": "400900259f4feedb5897e42fa5035ed516d3e8c3c39381e573d489889f2228b9",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyelashes01.rbw": "13723d67f530c9c8d65fbe86c3886e4369b4f803bc0bb4cb97d3782f4f0a92b3"
+      }
+    },
+    "eyelashes01": {
+      "file": "eyelashes01.png",
+      "sha256": "f914528a7c0a4350208320b999acb5019ac3976965f95d4c0c2d4dc0a0d26f34",
+      "size": 512,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/eyelashes01.rbw": "13723d67f530c9c8d65fbe86c3886e4369b4f803bc0bb4cb97d3782f4f0a92b3"
+      }
+    },
+    "hd-fedora01": {
+      "file": "hd-fedora01.jpg",
+      "sha256": "41240bdce9f21d4d5f6dc9a08b09b9a6a095f07ba86dbf70f81089f780ab17d7",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/fedora01.rbw": "7e8bb467c0667312ad52d8a8d2b67ac989d9148cd784660fe7b7c5fb424ef726"
+      }
+    },
+    "fedora01": {
+      "file": "fedora01.jpg",
+      "sha256": "66a52a75ba9cfe6706ba5776c2f7478ce5d51229bd5546b52a2241b5984d3b6b",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/fedora01.rbw": "7e8bb467c0667312ad52d8a8d2b67ac989d9148cd784660fe7b7c5fb424ef726"
+      }
+    },
+    "hd-female_casualsuit01": {
+      "file": "hd-female_casualsuit01.jpg",
+      "sha256": "e2283fddd7329aad0c0f983018f0c4a98d4eb82a2b9e02f837dc4d9afcc2c1ee",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_casualsuit01.rbw": "fb594481451030f4145236e1c6dbafbf96069e138a8dac15f8bb9ebe45a8d2b7"
+      }
+    },
+    "female_casualsuit01": {
+      "file": "female_casualsuit01.jpg",
+      "sha256": "33697d99551be90ce1972bf2a468c6e915fd60b25c550ffdfb23e3b43eb01c80",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_casualsuit01.rbw": "fb594481451030f4145236e1c6dbafbf96069e138a8dac15f8bb9ebe45a8d2b7"
+      }
+    },
+    "hd-female_casualsuit02": {
+      "file": "hd-female_casualsuit02.jpg",
+      "sha256": "6a1289a896aeee2680c84d0ad30fe194df7996489bd9a34dc615ee292e9e8360",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_casualsuit02.rbw": "be626a804b78e6b1b8a05d5f4bc00a9f5d83f60a1bc1298b38e5f30b4688f030"
+      }
+    },
+    "female_casualsuit02": {
+      "file": "female_casualsuit02.jpg",
+      "sha256": "3c6d67f0a9c3a6302ad0f6991c0c094bf3faa003447d76f965225feca7cc872a",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_casualsuit02.rbw": "be626a804b78e6b1b8a05d5f4bc00a9f5d83f60a1bc1298b38e5f30b4688f030"
+      }
+    },
+    "hd-female_elegantsuit01": {
+      "file": "hd-female_elegantsuit01.jpg",
+      "sha256": "c0ef238c77183a1e7d46844211c9924d0302fd0cff2823a97ba2728f51e178aa",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_elegantsuit01.rbw": "4155b7e83910e25da098a540bc93818b68706d3dc63c210d78c287cc8bb9eaf7"
+      }
+    },
+    "female_elegantsuit01": {
+      "file": "female_elegantsuit01.jpg",
+      "sha256": "5b4e65c809d5b443a84ac89b9ba5fd5bddb33c0f83a85d11c749fb438ae61fd7",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_elegantsuit01.rbw": "4155b7e83910e25da098a540bc93818b68706d3dc63c210d78c287cc8bb9eaf7"
+      }
+    },
+    "hd-female_sportsuit01": {
+      "file": "hd-female_sportsuit01.jpg",
+      "sha256": "29f3520f25f9cfb299c99a5134f661f5608c7960cfb305b771ef2b3e22b7be41",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_sportsuit01.rbw": "9e81c116bf2aa87881dd9d0eef7ad50f4ec2eb6d64bc41f4fb48afb270aa06c0"
+      }
+    },
+    "female_sportsuit01": {
+      "file": "female_sportsuit01.jpg",
+      "sha256": "cdbc06e42784b6b6440183c74808e8d95d6a47fb6a99c1338393f2644d7bf8e5",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/female_sportsuit01.rbw": "9e81c116bf2aa87881dd9d0eef7ad50f4ec2eb6d64bc41f4fb48afb270aa06c0"
+      }
+    },
+    "hd-long01": {
+      "file": "hd-long01.png",
+      "sha256": "d79b351f90b8f82f4c8f629372a93288c53e4bc85896eff94caecbf038619f5c",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/long01.rbw": "6e9beb1fc0cd33c409fafa0fab5edbaed2bd039b6c7080154c835fc8112d3fb6"
+      }
+    },
+    "long01": {
+      "file": "long01.png",
+      "sha256": "c238407d7cd148c3cb643990c383f731fd9d87600081210b12eb5a8cea40fa35",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/long01.rbw": "6e9beb1fc0cd33c409fafa0fab5edbaed2bd039b6c7080154c835fc8112d3fb6"
+      }
+    },
+    "hd-male_casualsuit01": {
+      "file": "hd-male_casualsuit01.jpg",
+      "sha256": "6ac36d8451537f31b3be59f58a10595066f70020b3c46a479581c37ad80f58dc",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit01.rbw": "0353e90a9d6b8ea5a723c3cac454bcfa677386a20cf14f6a79970437ce95215d"
+      }
+    },
+    "male_casualsuit01": {
+      "file": "male_casualsuit01.jpg",
+      "sha256": "9707403dd6bcd475b5137194d94577a008949df9643a65651cae068efa502662",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit01.rbw": "0353e90a9d6b8ea5a723c3cac454bcfa677386a20cf14f6a79970437ce95215d"
+      }
+    },
+    "hd-male_casualsuit02": {
+      "file": "hd-male_casualsuit02.jpg",
+      "sha256": "bcfd4d980e40f977abc5a7d6e0d04dfa2a9fee37e4fc29517e4c15197794eb39",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit02.rbw": "be1feff74a66531e9424017a0540d464fe69fd9cfed14af9466f92e3688afb63"
+      }
+    },
+    "male_casualsuit02": {
+      "file": "male_casualsuit02.jpg",
+      "sha256": "0a3a0768be8d7b7534bfb37e7f8c7db4a31c73636e4b8532b4825c0ea1ceb8e9",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit02.rbw": "be1feff74a66531e9424017a0540d464fe69fd9cfed14af9466f92e3688afb63"
+      }
+    },
+    "hd-male_casualsuit03": {
+      "file": "hd-male_casualsuit03.jpg",
+      "sha256": "ddbe192e9d9847e0fbd06bc1b981287072beb5c6d5ba00a17738530a88678b72",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit03.rbw": "80c0e08f8528ae75284a8323016050e37c84d2305c2b8671b1165d925a5a6140"
+      }
+    },
+    "male_casualsuit03": {
+      "file": "male_casualsuit03.jpg",
+      "sha256": "df81e00ced3475aa179f7f59c342ef996a1feb16b13bf3333da0da6af7117366",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit03.rbw": "80c0e08f8528ae75284a8323016050e37c84d2305c2b8671b1165d925a5a6140"
+      }
+    },
+    "hd-male_casualsuit04": {
+      "file": "hd-male_casualsuit04.jpg",
+      "sha256": "c86a60cf5c55e29f46c198a20afc12253516ac4b8df6d9359f1c4665e3be0865",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit04.rbw": "f0eb28baf7f99d6d927124c7b6de32386f59cc42044351760064c35fdf01ed82"
+      }
+    },
+    "male_casualsuit04": {
+      "file": "male_casualsuit04.jpg",
+      "sha256": "ddac10e9ed4664b2cfa6f539eb839a91728182093f9d5f95250d41a8c311a6d8",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit04.rbw": "f0eb28baf7f99d6d927124c7b6de32386f59cc42044351760064c35fdf01ed82"
+      }
+    },
+    "hd-male_casualsuit05": {
+      "file": "hd-male_casualsuit05.jpg",
+      "sha256": "fcf4e492d53d71976dae94c280a78096522699647496a8d361053bfa5a06b5e6",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit05.rbw": "b6b908fbb30ad5dbdf38e03b01d1b420f4499d5d41abbed3c779ab6903a4ec67"
+      }
+    },
+    "male_casualsuit05": {
+      "file": "male_casualsuit05.jpg",
+      "sha256": "8aeadd165c8b093561dbd4a7889bef1126ee1e318ebfbbf17bab1a0bac08316f",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit05.rbw": "b6b908fbb30ad5dbdf38e03b01d1b420f4499d5d41abbed3c779ab6903a4ec67"
+      }
+    },
+    "hd-male_casualsuit06": {
+      "file": "hd-male_casualsuit06.jpg",
+      "sha256": "17e6012b9ca52fdd00fdb28c0ca4ee75af399e5fa08dec334d54be15ca22deb3",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit06.rbw": "ddc7d3d49a33c3cff5c591ddc5430e420c45178ca00d076d83002bc9204d8bae"
+      }
+    },
+    "male_casualsuit06": {
+      "file": "male_casualsuit06.jpg",
+      "sha256": "f9490e0e8a7bbc8b10ccea609b7deccd674e8d016e38fbf23797e844c988667b",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_casualsuit06.rbw": "ddc7d3d49a33c3cff5c591ddc5430e420c45178ca00d076d83002bc9204d8bae"
+      }
+    },
+    "hd-male_elegantsuit01": {
+      "file": "hd-male_elegantsuit01.jpg",
+      "sha256": "905296a300610c5d26c275d53c425936294e94c56118feaab9b2abaa5217e75c",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_elegantsuit01.rbw": "84901c11c7d0c2b1e40d0dd56a2ad825563fd6632e289dccb90ee6b7de15ceeb"
+      }
+    },
+    "male_elegantsuit01": {
+      "file": "male_elegantsuit01.jpg",
+      "sha256": "623ea745e50b1ed06347a577ac069a66a40ffe80b403823d683be61ca9c63704",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_elegantsuit01.rbw": "84901c11c7d0c2b1e40d0dd56a2ad825563fd6632e289dccb90ee6b7de15ceeb"
+      }
+    },
+    "hd-male_worksuit01": {
+      "file": "hd-male_worksuit01.jpg",
+      "sha256": "6ee95c596bb627dd574fbd1bef81f74307d56e4f74a33eafbf96fd333f9a187d",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_worksuit01.rbw": "f088ff310194c8e3dd25438cddacd9c029406dcfd11ef5a555cf1ae87bd3220c"
+      }
+    },
+    "male_worksuit01": {
+      "file": "male_worksuit01.jpg",
+      "sha256": "2e252cb60da1d06b0dc540e3e8a6f7d8749ed3c2e4d2ca6bd5f6850046b2b883",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/male_worksuit01.rbw": "f088ff310194c8e3dd25438cddacd9c029406dcfd11ef5a555cf1ae87bd3220c"
+      }
+    },
+    "hd-ponytail01": {
+      "file": "hd-ponytail01.png",
+      "sha256": "2aaaf1384dc86e4718418c0cadf369056aed29af3fe3af72cb2903fba669267c",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/ponytail01.rbw": "24b5116064515f9d1a97c4c99a850abede60cd2cdd4bd6c6b743939a9a7cbcb0"
+      }
+    },
+    "ponytail01": {
+      "file": "ponytail01.png",
+      "sha256": "b9e90855c30d17434343055e1dba88fccbcc95a2d14581c6013639f5e497ee7f",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/ponytail01.rbw": "24b5116064515f9d1a97c4c99a850abede60cd2cdd4bd6c6b743939a9a7cbcb0"
+      }
+    },
+    "hd-shoes02": {
+      "file": "hd-shoes02.jpg",
+      "sha256": "84eead917ecd46ae0ace17711578f76b46985b974cf57f25b95d1c18c2d90a22",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/shoes02.rbw": "8e5e20607bc80d0f16edc86ace592480a8f409e7bac8b9e2dcf0edbeb261f2df"
+      }
+    },
+    "shoes02": {
+      "file": "shoes02.jpg",
+      "sha256": "8550c7f0157675295d3f8ecd7c4d7a23a99a773b61cc5be05f12cba1ffc418b9",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/shoes02.rbw": "8e5e20607bc80d0f16edc86ace592480a8f409e7bac8b9e2dcf0edbeb261f2df"
+      }
+    },
+    "hd-shoes03": {
+      "file": "hd-shoes03.jpg",
+      "sha256": "a3153c4283840b8c8497d1b72c7ec996b8fc01aa4252348fefc28cc3c75f4151",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/shoes03.rbw": "b2d1bea155a37af36b9a5fe64c532a5a8eed9e9e959298231a09c480c7bb45f2"
+      }
+    },
+    "shoes03": {
+      "file": "shoes03.jpg",
+      "sha256": "9214fc7f66c2e897a4d89cd412459c8312a868605664b735f1c3358580b874de",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/shoes03.rbw": "b2d1bea155a37af36b9a5fe64c532a5a8eed9e9e959298231a09c480c7bb45f2"
+      }
+    },
+    "hd-shoes04": {
+      "file": "hd-shoes04.jpg",
+      "sha256": "5f40e5115dfc02c5c6e54f95d6127887f698fd42ce694a84851140f65985768d",
+      "size": 2048,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/shoes04.rbw": "eb5d7fe2965ede6d414a3df5a6fd85b98e978818de6ccb43ac56907e607e4e3f"
+      }
+    },
+    "shoes04": {
+      "file": "shoes04.jpg",
+      "sha256": "031a3d41db3b384d481ca277b47895cd67a54702bcac7a92f4ba7d70c8e16845",
+      "size": 1024,
+      "source": "Original fabric and UV dyes",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/shoes04.rbw": "eb5d7fe2965ede6d414a3df5a6fd85b98e978818de6ccb43ac56907e607e4e3f"
+      }
+    },
+    "hd-short01": {
+      "file": "hd-short01.png",
+      "sha256": "276d0fad1ce4f7ddb15e4c18b94bda6574fda55b1b6638f35288373426a02b6b",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short01.rbw": "14772bcebd1862825c7c620ae0d9fb96878c15f10a9faf7b9aef899b9d4e2e8a"
+      }
+    },
+    "short01": {
+      "file": "short01.png",
+      "sha256": "e487a44b878a136f1f7bdd586e63eefde080be7e766c28491ed129f3b01945c7",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short01.rbw": "14772bcebd1862825c7c620ae0d9fb96878c15f10a9faf7b9aef899b9d4e2e8a"
+      }
+    },
+    "hd-short02": {
+      "file": "hd-short02.png",
+      "sha256": "b2cd99c9c68fa2c5dc85fe626e629819b307f7ad0f7fce2c600961c6f16a6340",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short02.rbw": "445159b545a7f82caf19f67f82c7425633ef2496ffb0057939b544ea2aa3f8b7"
+      }
+    },
+    "short02": {
+      "file": "short02.png",
+      "sha256": "c928bb04b1e62f4d6e6ce9675e994b006b29c95faa8ccf7d8e34bf7163128d91",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short02.rbw": "445159b545a7f82caf19f67f82c7425633ef2496ffb0057939b544ea2aa3f8b7"
+      }
+    },
+    "hd-short03": {
+      "file": "hd-short03.png",
+      "sha256": "d8813254ae707812e21f3c8e1127c33621f52f758e035c27e65040cada956762",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short03.rbw": "caac2c4775a09eb79d0a3898aaa0c67b5e184b45c0dd560dc0beebb7040d82f6"
+      }
+    },
+    "short03": {
+      "file": "short03.png",
+      "sha256": "e25987988a18a488fafd48d6ed3d862ea9dd0f1ee253ea7bdcc8db65d179cc96",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short03.rbw": "caac2c4775a09eb79d0a3898aaa0c67b5e184b45c0dd560dc0beebb7040d82f6"
+      }
+    },
+    "hd-short04": {
+      "file": "hd-short04.png",
+      "sha256": "0549308aaea73eacb5baa2fdaa45c78fd5b4b5ce8cb0a4e524167df3bbc1419e",
+      "size": 2048,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short04.rbw": "cc315b007e8896581b7afd975ef7930dd36036660ca81ef442e7ae0ac6eac33a"
+      }
+    },
+    "short04": {
+      "file": "short04.png",
+      "sha256": "84399705e0532bd51567f48bf612a642d59470d248e1d65a81273bbeb2875762",
+      "size": 1024,
+      "source": "Original fibers and geometry-derived UV opacity",
+      "authoringInputs": {
+        "assets/characters/reyond-surface-source-v5.png": "2ee91e77ee0658441b60b847042344502a4f8a904b64e41489a4aa7203418859",
+        "runtime/characters/wardrobe/short04.rbw": "cc315b007e8896581b7afd975ef7930dd36036660ca81ef442e7ae0ac6eac33a"
+      }
+    },
+    "charcoal-utility": {
+      "file": "charcoal-utility.jpg",
+      "sha256": "b156225822b59e97e45626fb785f64e66bee92659e2c6b59468c3f6bc5dc12e2",
+      "size": 2048,
+      "source": "Original photographic cloth source sheet and folded workwear mesh",
+      "authoringInputs": {
+        "runtime/characters/wardrobe/male_casualsuit03.rbw": "80c0e08f8528ae75284a8323016050e37c84d2305c2b8671b1165d925a5a6140",
+        "assets/characters/charcoal-workwear-source.png": "e1f826779eeadf3a53d29491e21f4c059f58703537b90d9de7e540a6682db76c",
+        "assets/characters/workwear-folds-source.png": "eb8949d29d04d833ed8d04b8a7c30908beff380a1b7ac5cca326c8803cff5b11"
+      }
+    },
+    "field-boots": {
+      "file": "field-boots.jpg",
+      "sha256": "65a77742e1b4a5e5c9b91142e00bd56a986996b77fff3e333eb9cf309b2201e5",
+      "size": 2048,
+      "source": "Original ReyondBroom shoes04 leather atlas with charcoal ribbing and grain",
+      "authoringInputs": {
+        "runtime/characters/materials/hd-shoes04.jpg": "5f40e5115dfc02c5c6e54f95d6127887f698fd42ce694a84851140f65985768d",
+        "assets/characters/fabric-macro-source-v4.png": "8e5d9ee211bae67d4659d5865c6802aa66e4d21d91ed3b06e454de308a1e0c36"
+      }
+    },
+    "tousled-fringe": {
+      "file": "tousled-fringe.png",
+      "sha256": "58ae562e2834ba516156cd825a9110d1a334f75cebdc1077b77723a56c394539",
+      "size": 2048,
+      "source": "Original ReyondBroom short02 strands with a hand-shaped fringe opacity mask",
+      "authoringInputs": {
+        "runtime/characters/materials/hd-short02.png": "b2cd99c9c68fa2c5dc85fe626e629819b307f7ad0f7fce2c600961c6f16a6340"
+      }
+    }
+  },
+  "pbrInputs": {
+    "assets/characters/skin-pore-source-v3.png": "2589dfb91c7ccae9b07d2ab67cc8a15129d3ce038e5be6a74db15f9e12cbc846",
+    "assets/characters/iris-albedo-source-v3.png": "e4e6e6b5210c133502e2538fd6942c84fb24ab8b8a4c375f74689344bf92c291",
+    "assets/characters/fabric-macro-source-v4.png": "8e5d9ee211bae67d4659d5865c6802aa66e4d21d91ed3b06e454de308a1e0c36",
+    "assets/characters/charcoal-utility-source.png": "c683939183c2fcfdbb7f4b258946ad87d626ca8a47bcce7428da20073b3aafce",
+    "assets/characters/charcoal-workwear-source.png": "e1f826779eeadf3a53d29491e21f4c059f58703537b90d9de7e540a6682db76c",
+    "assets/characters/workwear-folds-source.png": "eb8949d29d04d833ed8d04b8a7c30908beff380a1b7ac5cca326c8803cff5b11"
+  },
+  "pbrFabric": {
+    "file": "textures/reyond_character_fabric_v4.png",
+    "sha256": "df4bdcf0b9f68ec77c7264509125eaf4883cd99bee77f74997f47a087d5f0ffa"
+  },
+  "pbrDetail": {
+    "file": "textures/reyond_character_detail_v3.png",
+    "sha256": "61b7fafe57b09dfa9ad28f4507c7ede92eb2b43e6524db3f966c5d88cbdd812a"
+  }
+}

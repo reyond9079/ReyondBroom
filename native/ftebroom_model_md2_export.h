@@ -33,6 +33,7 @@ inline std::string pcx(unsigned w,unsigned h,const std::string& pixels,const std
 // MD2 stores UVs separately and has per-frame scale/translation, without any
 // normalization of the source model's coordinate system.
 inline Md2Output md2(const Mesh& mesh,const std::vector<Skin>& skins,const std::string& palette,const std::string& skinName){
+  if(skinName.empty()||skinName.size()>=64)throw std::runtime_error("Use a Quake II skin path of 1-63 bytes relative to the mod folder.");
   if(mesh.frames>512)throw std::runtime_error("Native Quake II MD2 supports at most 512 frames.");
   auto q=mdl(mesh,skins,palette);auto u=[&](size_t p){return quake1::word(q,p);};
   unsigned w=u(52),h=u(56),nv=u(60),nt=u(64),nf=u(68),frameSize=40+4*nv;

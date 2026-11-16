@@ -1,0 +1,340 @@
+{
+  "source": "https://files2.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip",
+  "assets": [
+    {
+      "id": "female_casualsuit01",
+      "file": "female_casualsuit01.rbw",
+      "sha256": "fb594481451030f4145236e1c6dbafbf96069e138a8dac15f8bb9ebe45a8d2b7",
+      "sources": {
+        "clothes/female_casualsuit01/female_casualsuit01.mhclo": "8a17e4edceeb22ef30ce102ed05fb3463ca0eeb61addc7811f4867fde5963fa4",
+        "clothes/female_casualsuit01/female_casualsuit01.obj": "b6cfaf08b291fe10ea312d37e98d5e328eced5828bdb6f96ecac6bf4ababe652"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "female_casualsuit02",
+      "file": "female_casualsuit02.rbw",
+      "sha256": "be626a804b78e6b1b8a05d5f4bc00a9f5d83f60a1bc1298b38e5f30b4688f030",
+      "sources": {
+        "clothes/female_casualsuit02/female_casualsuit02.mhclo": "dbbce782dcb95f2dc9d9b70fe66629c9a177fe0a8d14fd546961ed01eeb556c8",
+        "clothes/female_casualsuit02/female_casualsuit02.obj": "569ce1a79f61c1a213fd813d14da656863e6832badaa41225543fcba93bbe1ce"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "female_elegantsuit01",
+      "file": "female_elegantsuit01.rbw",
+      "sha256": "4155b7e83910e25da098a540bc93818b68706d3dc63c210d78c287cc8bb9eaf7",
+      "sources": {
+        "clothes/female_elegantsuit01/female_elegantsuit01.mhclo": "8ed657dbc49466e6a485993cfdcfd7b6ac30a0f44408dfd38de7a649477d8928",
+        "clothes/female_elegantsuit01/female_elegantsuit01.obj": "3b46cef6d63968954dc00c39ede649d76c05e5d36fe9f9c677349c88fd424de9"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "female_sportsuit01",
+      "file": "female_sportsuit01.rbw",
+      "sha256": "9e81c116bf2aa87881dd9d0eef7ad50f4ec2eb6d64bc41f4fb48afb270aa06c0",
+      "sources": {
+        "clothes/female_sportsuit01/female_sportsuit01.mhclo": "6df057d3116db93afbbbb6d692f92cce84aa16db699f47dd14e825d07c6fd42f",
+        "clothes/female_sportsuit01/female_sportsuit01.obj": "fd529bb8dd6a994c1e9a3fb2fd8b236f52c0cc7cebb1f6fd9328953d9df6d6ff"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_casualsuit01",
+      "file": "male_casualsuit01.rbw",
+      "sha256": "0353e90a9d6b8ea5a723c3cac454bcfa677386a20cf14f6a79970437ce95215d",
+      "sources": {
+        "clothes/male_casualsuit01/male_casualsuit01.mhclo": "78503ed7f56c149843d85e06e1164bc6871ce7319b2ef689237046352cc90de4",
+        "clothes/male_casualsuit01/male_casualsuit01.obj": "001921d237e408c35103720d046aa37f9c5512db1a179a5ede6a065cd504ba89"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_casualsuit02",
+      "file": "male_casualsuit02.rbw",
+      "sha256": "be1feff74a66531e9424017a0540d464fe69fd9cfed14af9466f92e3688afb63",
+      "sources": {
+        "clothes/male_casualsuit02/male_casualsuit02.mhclo": "f9e6821704a1508a02d5e416b2360785b705cfe5a130c359021a4b4570dcc43a",
+        "clothes/male_casualsuit02/male_casualsuit02.obj": "e07cbd1a43d21bd700e6598f01f74341a9dd66eac4e035c8be8de2650eac380f"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_casualsuit03",
+      "file": "male_casualsuit03.rbw",
+      "sha256": "80c0e08f8528ae75284a8323016050e37c84d2305c2b8671b1165d925a5a6140",
+      "sources": {
+        "clothes/male_casualsuit03/male_casualsuit03.mhclo": "ce796e4cc6ac312e0426d793ccc874d0d94c085e1c06764fe096ec8d59ae94c5",
+        "clothes/male_casualsuit03/male_casualsuit03.obj": "c55e02caa1f04126606eee5ac704637e9d3461bd527f26ade65e01973dc7aabb"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_casualsuit04",
+      "file": "male_casualsuit04.rbw",
+      "sha256": "f0eb28baf7f99d6d927124c7b6de32386f59cc42044351760064c35fdf01ed82",
+      "sources": {
+        "clothes/male_casualsuit04/male_casualsuit04.mhclo": "8c1a2d3272cd51ba03f0840d593eddc6325d3d2c4c8529f8203d2c2cad3d0cef",
+        "clothes/male_casualsuit04/male_casualsuit04.obj": "9a56b7b1cb27589233dc048e8ccf1fd93d03f3a5c01a668f0e8a189ebdea7a34"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_casualsuit05",
+      "file": "male_casualsuit05.rbw",
+      "sha256": "b6b908fbb30ad5dbdf38e03b01d1b420f4499d5d41abbed3c779ab6903a4ec67",
+      "sources": {
+        "clothes/male_casualsuit05/male_casualsuit05.mhclo": "df41c9fba3da054e35b964706ad2f8d189e65cc00a45f4a34f65235946f647f0",
+        "clothes/male_casualsuit05/male_casualsuit05.obj": "6069dd8b828591c16f74678c235387954775b815b5b77640d24fb7c9541b85c2"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_casualsuit06",
+      "file": "male_casualsuit06.rbw",
+      "sha256": "ddc7d3d49a33c3cff5c591ddc5430e420c45178ca00d076d83002bc9204d8bae",
+      "sources": {
+        "clothes/male_casualsuit06/male_casualsuit06.mhclo": "9cebda22a0fa57fc556a1a77723f59b176724dc7e987c01214283677444ddcc5",
+        "clothes/male_casualsuit06/male_casualsuit06.obj": "9a86386435d7557a520320b8db4cd0ffe4755040044d1925c2b5730b864a603e"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_elegantsuit01",
+      "file": "male_elegantsuit01.rbw",
+      "sha256": "84901c11c7d0c2b1e40d0dd56a2ad825563fd6632e289dccb90ee6b7de15ceeb",
+      "sources": {
+        "clothes/male_elegantsuit01/male_elegantsuit01.mhclo": "6e725b0adac1a07173a14e15207d0b0125d5510455ef6dee756b5fa1c51cccef",
+        "clothes/male_elegantsuit01/male_elegantsuit01.obj": "3f6dfc8c10de6160b1e23aad6b4b201b7651914bf3ea5bc8a8aba03e0c0298ea"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_worksuit01",
+      "file": "male_worksuit01.rbw",
+      "sha256": "f088ff310194c8e3dd25438cddacd9c029406dcfd11ef5a555cf1ae87bd3220c",
+      "sources": {
+        "clothes/male_worksuit01/male_worksuit01.mhclo": "77561689f0e9eb13537f67e0582ce4e8b93fc7291ea87f57fd86b38b9114d4e1",
+        "clothes/male_worksuit01/male_worksuit01.obj": "d8ef4bf71aa6bd386958921c17e0eed263ef63abc8b50a2c8be6d482f6e1d3f7"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "shoes02",
+      "file": "shoes02.rbw",
+      "sha256": "8e5e20607bc80d0f16edc86ace592480a8f409e7bac8b9e2dcf0edbeb261f2df",
+      "sources": {
+        "clothes/shoes02/shoes02.mhclo": "0d447fd6b7415d6b2603e91697336ee51ac2f00ef85878d6667e9acfb45a20fe",
+        "clothes/shoes02/shoes02.obj": "5726aabac42ff489998d0a769545dea013961bbb71b9c6024d75170181a98818"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "shoes03",
+      "file": "shoes03.rbw",
+      "sha256": "b2d1bea155a37af36b9a5fe64c532a5a8eed9e9e959298231a09c480c7bb45f2",
+      "sources": {
+        "clothes/shoes03/shoes03.mhclo": "5a388e18e6759db99bcc8c7d062a2b3bed02eecd32705731ba90063a6e35265b",
+        "clothes/shoes03/shoes03.obj": "b03f46c0b5cdc38e4472e4747ba267f101e1e8ae88656180b1334986646108b2"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "shoes04",
+      "file": "shoes04.rbw",
+      "sha256": "eb5d7fe2965ede6d414a3df5a6fd85b98e978818de6ccb43ac56907e607e4e3f",
+      "sources": {
+        "clothes/shoes04/shoes04.mhclo": "88223bf0c6168e85fd118015e4ca61612c6b35f42a79d7ce5df1864f1a6f715e",
+        "clothes/shoes04/shoes04.obj": "eac355a842a8eb8ae2f09fac8dd18a877a24ef2521ed2d6bf38559b42ce4b49a"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "fedora01",
+      "file": "fedora01.rbw",
+      "sha256": "7e8bb467c0667312ad52d8a8d2b67ac989d9148cd784660fe7b7c5fb424ef726",
+      "sources": {
+        "clothes/fedora01/fedora01.mhclo": "c3af725d316d7003d2d00fc3d79750edc431f71af9ef539051217a3d308d3b15",
+        "clothes/fedora01/fedora.obj": "09653260c082e2039f11b41615d6b59a7609d134aae3e2bfcf95da3ed555303c"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "afro01",
+      "file": "afro01.rbw",
+      "sha256": "444cac44bdfd4e9d3bfe759b805e651eaafe523b0e32b2fadcfbe99a70da6ecf",
+      "sources": {
+        "hair/afro01/afro01.mhclo": "9977bd4507e2dd1408504b7a39a6f585ffa2d3ba3aa40ad4bdc2844884bbebb5",
+        "hair/afro01/afro01.obj": "8344fffef15120a05a89219f31184ca2958537223fa885c885137ad1e97edcb8",
+        "hair/afro01/afro_diffuse.png": "dc0db7dd8a13802f02303ca7e49844b219e09db134471b7061538a8af8f7c7fb"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "bob01",
+      "file": "bob01.rbw",
+      "sha256": "01b939dd7c188820ad11db3410005dcdbe356333bada7f6d08db56c6d747743e",
+      "sources": {
+        "hair/bob01/bob01.mhclo": "a295b11ab6c7808afa1e01d0c79fb595bbbd7885f65252766486c9fcf6d158c5",
+        "hair/bob01/bob01.obj": "d7fb73806f47ee37ba3c37bcfadff40a91ba99635d08c3e02d94b4acbf97c231",
+        "hair/bob01/bob01_diffuse.png": "2b38bc7a028e06e8e633accb7fe2dd1b2bacbb9d32463df73f39f82e63ef9009"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "braid01",
+      "file": "braid01.rbw",
+      "sha256": "9820297f249f7a23c3e32ebb8a97f4cb29411a2cffa83971cd129268c303e7e6",
+      "sources": {
+        "hair/braid01/braid01.mhclo": "e350614dab32230c47d67e7747079b89859d36e62a890ca47890f068eca4f7a9",
+        "hair/braid01/braid01.obj": "ad0b449c80244452bc8d437f5d59c25ec2ac17b2eb35e1ae2d9531fc00b73b0a",
+        "hair/braid01/braid01_diffuse.png": "24c0d2a639f04704734c3e38af97d110777c1b203e5a10c66a5c89563643a018"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "long01",
+      "file": "long01.rbw",
+      "sha256": "6e9beb1fc0cd33c409fafa0fab5edbaed2bd039b6c7080154c835fc8112d3fb6",
+      "sources": {
+        "hair/long01/long01.mhclo": "94ecbebfd834da2cbee2ce90b730972590eb22a252ecd9592038ea736e063646",
+        "hair/long01/long01.obj": "7f1d6dadbdf9e96435251955d6657e77ea5433c9bc7c85a5c5f5e4eae0cb9a8c",
+        "hair/long01/long01_diffuse.png": "e8dc25d90f8f62467e8630420e1240a400d070054fb7c3f1d3f7bf3e457d6c2c"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ponytail01",
+      "file": "ponytail01.rbw",
+      "sha256": "24b5116064515f9d1a97c4c99a850abede60cd2cdd4bd6c6b743939a9a7cbcb0",
+      "sources": {
+        "hair/ponytail01/ponytail01.mhclo": "97fc50b12bcb3b1c7b33edddd8d427a2604ffb06fe79b31132bf47f82d7afbac",
+        "hair/ponytail01/ponytail01.obj": "d9f5fe96fbedbc8006220d87aad0e4a33d15286eb6b21f5929661cdc490ebf5a",
+        "hair/ponytail01/ponytail01_diffuse.png": "dcb364300cac06ce8bef91b2f7c0970baf310898bbdd06b0c6b884ee9306eb97"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "short01",
+      "file": "short01.rbw",
+      "sha256": "14772bcebd1862825c7c620ae0d9fb96878c15f10a9faf7b9aef899b9d4e2e8a",
+      "sources": {
+        "hair/short01/short01.mhclo": "ae1ffaa98da5753b803b3a173bede4895d2215e6bb94763f3765a71f0e984f35",
+        "hair/short01/short01.obj": "d998d8416f9b5d5591f1d756f4d292288d000a6951bc0f4d2e8e72727bbc44fa",
+        "hair/short01/short01_diffuse.png": "f34a0957184e3d1e911ed59245f874f8d4843f61ee44ff49f43edb4be0196949"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "short02",
+      "file": "short02.rbw",
+      "sha256": "445159b545a7f82caf19f67f82c7425633ef2496ffb0057939b544ea2aa3f8b7",
+      "sources": {
+        "hair/short02/short02.mhclo": "625736cdb73e6d094df6e5a2df18f371781f1d2cd37b0ae15795c5d7051c3ec2",
+        "hair/short02/short02.obj": "48f979114adfa712165a69cc55c45a70831af1fb3cba8e2a89120f0c87407b64",
+        "hair/short02/short02_diffuse.png": "47fe33831a3929567c733356dd66243116e05df2ace1f884ddca0080b728229f"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "short03",
+      "file": "short03.rbw",
+      "sha256": "caac2c4775a09eb79d0a3898aaa0c67b5e184b45c0dd560dc0beebb7040d82f6",
+      "sources": {
+        "hair/short03/short03.mhclo": "d80bbb8fd9b06721c481756fb3e1d6dce04fcfc9ca8a379edd4ea3c0d81ed17f",
+        "hair/short03/short03.obj": "4a9fc385718f2c46fb328ab99d33e3a946cecdb717987c8b324cf2466b59bd9c",
+        "hair/short03/short03_diffuse.png": "fe6ed0bb14498a48a2e8fc07e80e2a6f62c8b67686fcd0a7a570d345faec97da"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "short04",
+      "file": "short04.rbw",
+      "sha256": "cc315b007e8896581b7afd975ef7930dd36036660ca81ef442e7ae0ac6eac33a",
+      "sources": {
+        "hair/short04/short04.mhclo": "d60640aa4c4ffce1aa269647ba436b6ee0bb21bb948f927b84e27a48d2107157",
+        "hair/short04/short04.obj": "676964a133ee35ffcea1195382bf75542da7a298931e4001bc7b0d7b707225de",
+        "hair/short04/short04_diffuse.png": "0bef7fc0e403db5a40fabb2111ebfa6f7e8158e204c6e56b8da98e9ef527846e"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "bob02",
+      "file": "bob02.rbw",
+      "sha256": "8331a8f0086f3439912583cd08c9470f44845d3d2b0863a3e741c115d92f68cc",
+      "sources": {
+        "hair/bob02/bob02.mhclo": "a48dcf87c6a618f9c6e90fcb00eed07cd59ab024d8d994606fa1b070da515b96",
+        "hair/bob02/bob02.obj": "30d44038836d786364eb4134a9259cf93ca0c707f883861b0135ebfb149caa08",
+        "hair/bob02/bob02_diffuse.png": "38c88e6f71631356591f09b1f17a1bb5a99c3bb095b1a29003f1dc3d3e839b0d"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "eyebrow001",
+      "file": "eyebrow001.rbw",
+      "sha256": "df8952471ab809c14bc2c06550928a9dfeab72f67b4ea1f14c1582d400335ccb",
+      "sources": {
+        "eyebrows/eyebrow001/eyebrow001.mhclo": "54c8892c2ba577f4152d779ce1f20f7cd323beb8cbd9cb701796165c221b4f5b",
+        "eyebrows/eyebrow001/eyebrow001.obj": "88b13146395133f3901715e11706cdfd293e5d6087ad7c5e01efe1485a26b513"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "eyebrow010",
+      "file": "eyebrow010.rbw",
+      "sha256": "23b9973ede9f2e074f3450ba83243bc647f2b1ddad136075f08617e7a10b2c2e",
+      "sources": {
+        "eyebrows/eyebrow010/eyebrow010.mhclo": "f007d2739463323d1398f20e6c77afd683da997956527ce5bc7cf9e56160e81e",
+        "eyebrows/eyebrow010/eyebrow010.obj": "db7a9747ffdc534b10de584f2d140f2006cc528ffffb6eff5071fef2ed94dce9"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "eyebrow012",
+      "file": "eyebrow012.rbw",
+      "sha256": "15fd1753053bfb4e25b9f5e8c27137556f13ef8b0140aba0ffccf0c8fb0c2fdb",
+      "sources": {
+        "eyebrows/eyebrow012/eyebrow012.mhclo": "780fa7314eb3775f09b0f804dbc9fa5be7ee5bc8960f5e27d0211b7827c3d8fa",
+        "eyebrows/eyebrow012/eyebrow012.obj": "0a8d119c47f2d037e0ace7d2121f756084d9c614a5aec24459b4aa3385c0811a"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "eyelashes01",
+      "file": "eyelashes01.rbw",
+      "sha256": "13723d67f530c9c8d65fbe86c3886e4369b4f803bc0bb4cb97d3782f4f0a92b3",
+      "sources": {
+        "eyelashes/eyelashes01/eyelashes01.mhclo": "5a86b29c15649273d723084954b7fa7bf199112571d4f58539b46734d397ee6b",
+        "eyelashes/eyelashes01/eyelashes01.obj": "f78f5b93fea1946fcae103d32c4f082dd9612a1ec2e7e2f90b03ebe59b0baf20"
+      },
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "male_utility_field",
+      "file": "male_utility_field.rbw",
+      "sha256": "7ec4c5e48aafbd3f579f4bb7b15df52c9e360e4a51f791b5bb62efec23909d41",
+      "sources": {
+        "clothes/male_casualsuit03/male_casualsuit03.mhclo": "ce796e4cc6ac312e0426d793ccc874d0d94c085e1c06764fe096ec8d59ae94c5",
+        "clothes/male_casualsuit03/male_casualsuit03.obj": "c55e02caa1f04126606eee5ac704637e9d3461bd527f26ade65e01973dc7aabb"
+      },
+      "license": "CC0-1.0",
+      "material": "charcoal-utility",
+      "derivedFrom": "male_casualsuit03.rbw"
+    },
+    {
+      "id": "short02-tousled",
+      "file": "short02-tousled.rbw",
+      "sha256": "77b14fb6870d6b05cd0eaddd47cb642de6e71ac343e46a699969e9463603f5d5",
+      "sources": {
+        "hair/short02/short02.mhclo": "625736cdb73e6d094df6e5a2df18f371781f1d2cd37b0ae15795c5d7051c3ec2",
+        "hair/short02/short02.obj": "48f979114adfa712165a69cc55c45a70831af1fb3cba8e2a89120f0c87407b64",
+        "hair/short02/short02_diffuse.png": "47fe33831a3929567c733356dd66243116e05df2ace1f884ddca0080b728229f"
+      },
+      "license": "CC0-1.0",
+      "material": "tousled-fringe",
+      "derivedFrom": "short02.rbw"
+    }
+  ]
+}

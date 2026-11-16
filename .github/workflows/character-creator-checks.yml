@@ -1,0 +1,34 @@
+name: Character Creator core checks
+
+on:
+  pull_request:
+    paths:
+      - 'native/character/**'
+      - 'runtime/characters/**'
+      - 'scripts/*character*.py'
+      - 'tests/test-character-*.cpp'
+      - 'tests/test-character-release-lock.py'
+      - 'qa/rb-21/required-gates.txt'
+      - '.github/workflows/character-creator-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/test-character-core.py --stress
+      - run: python3 tests/test-character-release-lock.py
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python
+      - shell: msys2 {0}
+        run: python scripts/test-character-core.py --stress

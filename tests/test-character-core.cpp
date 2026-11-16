@@ -48,6 +48,24 @@ static std::string motionFixture(const Humanoid& rig,bool wrongOrder=false) {
                          {"skins",Json::array({{{"joints",joints}}})},{"animations",Json::array({animation})}});
 }
 
+template<class Parse>
+static void exerciseParserMutations(std::string_view original,std::mt19937& random,Parse parse) {
+  for (unsigned trial=0;trial<192;++trial) {
+    std::string input(original);
+    const auto offset=random()%input.size();
+    switch (trial%3) {
+      case 0: input.erase(offset,1+random()%31); break;
+      case 1: input.insert(offset,size_t(1+random()%8),char(random()%256)); break;
+      case 2: input[offset]=char(random()%256); break;
+    }
+    // Most changed inputs should fail. Some remain legal, for example a
+    // changed ASCII digit in a JSON property or an unused GLB chunk byte.
+    try { parse(input); }
+    catch (const std::runtime_error&) {}
+    catch (const Json::exception&) {}
+  }
+}
+
 int main(int argc, char** argv) try {
   check(argc >= 2 && argc <= 5, "Expected humanoid asset and optional GLB, IQM and legacy fixture outputs");
   std::ifstream file(argv[1], std::ios::binary);
@@ -636,6 +654,18 @@ int main(int argc, char** argv) try {
   for (std::size_t length=0; length<originalDocument.size(); ++length)
     rejects([&] { readDocument(std::string_view(originalDocument).substr(0,length),rig); },
             "Accepted a truncated canonical document");
+  {
+    std::mt19937 random(0x52423231);
+    exerciseParserMutations(originalDocument,random,[&](const auto& input) { readDocument(input,rig); });
+    exerciseParserMutations(bytes,random,[](const auto& input) { readHumanoid(input); });
+    const auto sample=motionFixture(rig);
+    exerciseParserMutations(sample,random,[&](const auto& input) { MotionGlb(input).retarget(rig); });
+    std::ifstream garmentAsset(clothingDir/"male_worksuit01.rbw",std::ios::binary);
+    check(garmentAsset.good(),"Unable to open the wardrobe fuzz seed");
+    const std::string garment((std::istreambuf_iterator<char>(garmentAsset)),{});
+    exerciseParserMutations(garment,random,[&](const auto& input) { readWardrobe(input,rig); });
+    std::cout << "PASS 768 deterministic mutations across character, rig, wardrobe and GLB parsers\n";
+  }
   const Animator animator(rig);
   {
     const auto doc = applyPreset({},presets[0]);

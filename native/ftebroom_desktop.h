@@ -29,6 +29,7 @@ static void importAddWads(const std::vector<std::filesystem::path>& paths){
    if(!present){if(!list.empty())list+='\n';list+=value;}
  }
  if(list.size()>=sizeof q1Wads)throw std::runtime_error("Too many WAD paths.");std::snprintf(destination,sizeof q1Wads,"%s",list.c_str());if(!gameProfileSave())throw std::runtime_error("Cannot save WAD settings.");mountAssets();
+ for(const auto& path:paths)documentAttachWad(std::filesystem::absolute(path).lexically_normal());
 }
 static std::vector<std::filesystem::path> desktopDrops;
 struct DesktopFileDrop {std::filesystem::path path,folder;ImVec2 point;bool scene;};

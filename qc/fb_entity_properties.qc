@@ -262,3 +262,22 @@ void fb_compile_mods(string replacement)
     if(mods!="")data=strcat(data,"\"_tb_mod\" ",fb_map_quote(mods),"\n");
     data=strzone(data);fb_tx_begin("Enabled mods");fb_tx_entity_set(0,data,HIST_ENTITY);fb_tx_commit();strunzone(data);strunzone(mods);
 }
+void fb_attach_wad(string value)
+{
+    string path=strzone(value);fb_document_tick();
+    if(fb_node_count<2){strunzone(path);return;}
+    string key="wad";
+    if(isnull(fb_nodes[0].fields[key])&&!isnull(fb_nodes[0].fields["_wad"]))key="_wad";
+    string list=fb_nodes[0].fields[key];
+    string normalized=sprintf(";%s;",strreplace("\\","/",list));
+    string entry=sprintf(";%s;",path);
+    if(path!=""&&strstrofs(normalized,entry,0)<0) {
+        string updated=path;
+        if(list!="") {
+            if(substring(list,strlen(list)-1,1)==";")updated=sprintf("%s%s",list,path);
+            else updated=sprintf("%s;%s",list,path);
+        }
+        fb_tx_begin("Attach WAD");fb_tx_set_key(0,key,updated,HIST_ENTITY);fb_tx_commit();
+    }
+    strunzone(path);
+}

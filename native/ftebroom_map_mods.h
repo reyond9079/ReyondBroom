@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -58,6 +59,27 @@ inline bool mapModToken(const std::string& source,size_t& at,MapModToken& token)
   }else if(source[at]=='{'||source[at]=='}')token.value=source[at++];
   else while(at<source.size()&&!std::isspace(static_cast<unsigned char>(source[at]))&&source[at]!='{'&&source[at]!='}')token.value+=source[at++];
   token.end=at;return true;
+}
+struct MapWorldProperty { std::string value; size_t begin,end; };
+inline std::optional<MapWorldProperty> mapWorldProperty(const std::string& source,const std::string& name) {
+  size_t at=0;MapModToken key,value;
+  while(mapModToken(source,at,key)&& (key.quoted||key.value!="{")) {}
+  while(mapModToken(source,at,key)&&key.quoted&&mapModToken(source,at,value)&&value.quoted)
+    if(key.value==name)return MapWorldProperty{std::move(value.value),key.begin,value.end};
+  return {};
+}
+inline std::string mapSourceWithWorldProperty(std::string source,const std::string& name,const std::string& value) {
+  if(auto existing=mapWorldProperty(source,name)) {
+    if(existing->value!=value)
+      source.replace(existing->begin,existing->end-existing->begin,value.empty()?"":mapModQuote(name)+" "+mapModQuote(value));
+    return source;
+  }
+  if(value.empty())return source;
+  size_t at=0;MapModToken token;
+  while(mapModToken(source,at,token))if(!token.quoted&&token.value=="{") {
+    source.insert(token.end,"\n"+mapModQuote(name)+" "+mapModQuote(value)+"\n");return source;
+  }
+  throw std::runtime_error("Map has no worldspawn.");
 }
 inline std::vector<std::string> mapModsFromSource(const std::string& source) {
   size_t at=0;MapModToken token,key;int depth=0;bool expectValue=false;std::vector<std::string> result;

@@ -36,4 +36,15 @@ int main(){using ftebroom::mapProfile;
  assert(!trenchBroomMapCompatible("\tpatchDef2WS\n",0));
  assert(!trenchBroomMapCompatible("\tpatchDef3\n",1));
  assert(!trenchBroomMapCompatible("\tpatchDef2\n",3));
+ const std::string trenchSave="// Game: Quake 3\n// Format: Quake3 (Valve)\n// Generator: TrenchBroom\n";
+ const std::string original=trenchSave+"{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \"light\"\n}\n";
+ using ftebroom::mapSourceWithWorldProperty;
+ using ftebroom::mapProfileProperty;
+ using ftebroom::fteMapProfileValue;
+ const auto fteRoundTrip=mapSourceWithWorldProperty(original,mapProfileProperty,fteMapProfileValue);
+ assert(mapProfile(fteRoundTrip).profile==1);
+ assert(mapSourceWithWorldProperty(fteRoundTrip,mapProfileProperty,fteMapProfileValue)==fteRoundTrip);
+ assert(mapProfile(mapSourceWithWorldProperty(fteRoundTrip,mapProfileProperty,"")).profile==0);
+ assert(mapProfile(original+"{\"_ftebroom_game_profile\" \"fte-custom\"}").profile==0);
+ assert(mapProfile(terrain+"{\"_ftebroom_game_profile\" \"fte-custom\"}").terrain);
 }

@@ -140,6 +140,7 @@ static void worldApply(bool replace=false,std::optional<uint64_t> region={}){
   if(gameWad()){
     auto wad=documentPath(wa::wadFilename(*selected,palette)).u8string();std::string list=gameProfile==4?hlWads:q1Wads;
     if(list.find(wad)==list.npos){if(!list.empty())list+='\n';list+=wad;if(list.size()>=sizeof q1Wads)throw std::runtime_error("Configured WAD list is full");std::snprintf(gameProfile==4?hlWads:q1Wads,sizeof q1Wads,"%s",list.c_str());q1FindWads(true);}
+    documentAttachWad(std::filesystem::u8path(wad));
   }
   do{s.request=worldIdentity();}while(std::filesystem::exists(documentPath("data/wa-import-"+s.request+".map")));
 s.requestMode=replace?"replace":"add";s.requestRegion=region?std::to_string(*region):"all";

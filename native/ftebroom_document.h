@@ -75,9 +75,23 @@ static std::filesystem::path documentDefaultFolder()
 static std::string documentMetadata(std::string bytes,bool trenchMap=false)
 {
   if(bytes.rfind("// ReyondBroom profile=",0)==0 || bytes.rfind("// FTEBroom profile=",0)==0)bytes.erase(0,bytes.find('\n')+1);
+  if(gameProfile==1||bytes.find(ftebroom::mapProfileProperty)!=bytes.npos)
+    bytes=ftebroom::mapSourceWithWorldProperty(std::move(bytes),ftebroom::mapProfileProperty,gameProfile==1?ftebroom::fteMapProfileValue:"");
   const bool compatible=!documentTerrain&&ftebroom::trenchBroomMapCompatible(bytes,gameProfile,trenchMap);
   if(trenchMap&&!compatible)throw std::runtime_error("TrenchBroom MAP export requires odd patch grid sizes of at least 3 and cannot include FTE terrain.");
   return ftebroom::mapDocumentHeader(gameProfile,q1MapFormat!=0,documentTerrain,compatible)+bytes;
+}
+static std::string documentWadsForSave(const std::string& bytes)
+{
+  // Existing MAPs own their WAD list. Mounted libraries can contain competing
+  // textures and temporary files that are useful only on this installation.
+  if(ftebroom::mapWorldProperty(bytes,"wad")||ftebroom::mapWorldProperty(bytes,"_wad"))return {};
+  return q1WadList();
+}
+static void documentAttachWad(const std::filesystem::path& path)
+{
+  if(!jamEditing()&&!documentName.empty())
+    command(("ftebroom_attach_wad "+ftebroom::mapModQuote(path.generic_u8string())+"\n").c_str());
 }
 static void mapModsOpenSource(const std::string& source);
 static std::string mapModsPrepareScene(const std::string& source);
@@ -333,7 +347,7 @@ static void documentSaveFinished()
       throw std::runtime_error("The engine did not write the map.");
     std::filesystem::path archive;std::string member;
     bool packed=ftebroom::pak::split(target,archive,member);
-    if(packed){if(savingExport)throw std::runtime_error("Export compiler input to a folder, not a PAK.");auto bytes=gameWad()?ftebroom::quake1::map(q1Read(source),gameProfile==2&&q1MapFormat==0,q1WadList(),true,gameProfile==4):q1Read(source);ftebroom::pak::replace(target,documentMetadata(bytes));}
+    if(packed){if(savingExport)throw std::runtime_error("Export compiler input to a folder, not a PAK.");auto bytes=q1Read(source);if(gameWad())bytes=ftebroom::quake1::map(bytes,gameProfile==2&&q1MapFormat==0,documentWadsForSave(bytes),true,gameProfile==4);ftebroom::pak::replace(target,documentMetadata(std::move(bytes)));}
     else {
     if (jamEditing()) ftebroom::jam::createArtifactDirectories(ftebroom::filesystemPath(target.parent_path()));
     else std::filesystem::create_directories(ftebroom::filesystemAccessPath(target.parent_path()));
@@ -342,7 +356,7 @@ static void documentSaveFinished()
     auto adjacent = target;
     adjacent += ".ftebroom-" + std::to_string(saveSerial) + ".tmp";
     adjacent = ftebroom::filesystemAccessPath(adjacent);
-    if(gameWad()){auto converted=ftebroom::quake1::map(q1Read(source),savingExport?false:gameProfile==2&&q1MapFormat==0,savingExport?q1CompilerWads(target.parent_path(),q1Read(source)):q1WadList(),true,gameProfile==4);
+    if(gameWad()){const auto bytes=q1Read(source);auto converted=ftebroom::quake1::map(bytes,!savingExport&&gameProfile==2&&q1MapFormat==0,savingExport?q1CompilerWads(target.parent_path(),bytes):documentWadsForSave(bytes),true,gameProfile==4);
       std::ofstream output(adjacent,std::ios::binary);output<<(savingExport?converted:documentMetadata(converted));output.close();if(!output)throw std::runtime_error("Cannot write Quake map.");}
     else {auto bytes=q1Read(source);if(!savingExport)bytes=documentMetadata(std::move(bytes),savingTrenchMap);std::ofstream output(adjacent,std::ios::binary);output<<bytes;output.close();if(!output)throw std::runtime_error("Cannot write map.");}
 #ifdef _WIN32
@@ -808,7 +822,9 @@ static void documentFileBrowser()
           std::filesystem::create_directories(target.parent_path());
           std::ofstream out(target,std::ios::binary);
           std::ostringstream scene;scene<<ftebroom::mapDocumentHeader(newMapProfile,q1MapFormat!=0,false,true)<<"{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \""<<(newMapProfile!=0?"info_player_start":"info_player_deathmatch")<<"\"\n\"origin\" \"0 0 64\"\n}\n";
-          out<<mapModsPrepareScene(scene.str());
+          auto bytes=mapModsPrepareScene(scene.str());
+          if(newMapProfile==1)bytes=ftebroom::mapSourceWithWorldProperty(std::move(bytes),ftebroom::mapProfileProperty,ftebroom::fteMapProfileValue);
+          out<<bytes;
           out.close();if(!out)throw std::runtime_error("Cannot create map.");
           documentNext="@"+target.u8string();documentProceed();fileBrowserNew=false;ImGui::CloseCurrentPopup();
         }catch(const std::exception& e){documentError=e.what();}

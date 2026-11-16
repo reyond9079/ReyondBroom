@@ -5,8 +5,11 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include "ftebroom_map_mods.h"
 namespace ftebroom {
 struct MapProfile { int profile=-1, format=-1; bool terrain=false; };
+inline constexpr const char* mapProfileProperty="_ftebroom_game_profile";
+inline constexpr const char* fteMapProfileValue="fte-custom";
 inline std::string mapDocumentHeader(int profile,bool valve,bool terrain,bool compatible) {
   profile=std::clamp(profile,0,4);
   const char* names[]={"Quake 3","Quake 3","Quake","Quake 2","Half-Life"};
@@ -57,6 +60,10 @@ inline MapProfile mapProfile(const std::string& bytes) {
     if(line.rfind("// Format:",0)==0)format=line.substr(10);
   }
   auto clean=[](std::string& s){auto start=s.find_first_not_of(" \t");s=start==s.npos?"":s.substr(start);std::transform(s.begin(),s.end(),s.begin(),[](unsigned char c){return char(std::tolower(c));});};clean(game);clean(format);
+  if(bytes.find(mapProfileProperty)!=bytes.npos) {
+    auto property=mapWorldProperty(bytes,mapProfileProperty);
+    if(property&&property->value==fteMapProfileValue)return {1,-1,false};
+  }
   if(game=="quake"||game=="quake 1"||game=="librequake") {if(format=="standard"||format=="valve")return {2,format=="valve"?1:0,false};}
   if(game=="quake2"||game=="quake 2"||game=="quake ii"||game=="quake2re"||game=="quake ii remastered"||format=="quake2"||format=="quake2 (valve)")return {3,1,false};
   if(game=="half-life"||game=="halflife"||game=="goldsrc"||game=="counter-strike")return {4,1,false};

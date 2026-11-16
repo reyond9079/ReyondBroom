@@ -27,9 +27,9 @@ float fb_extrude_pick_testcommand()
     fb_extrude_draw();
     fb_transform_expect(fb_extrude_outline==cachedOutline && fb_extrude_outline[0]==firstOutline && fb_extrude_outline_count==8,"hover_outline_reuses_storage");
     cvar_set("ftebroom_shift","0");
-    float quake1=cvar("ftebroom_quake1");cvar_set("ftebroom_quake1","1");
+    float classic=cvar("ftebroom_classic_map");cvar_set("ftebroom_classic_map","1");
     fb_transform_expect(!fb_tool_can_activate(FB_TOOL_CONTROLPOINT) && fb_tool_can_activate(FB_TOOL_VERTEX),"quake1_no_patch_control_tool");
-    cvar_set("ftebroom_quake1",ftos(quake1));
+    cvar_set("ftebroom_classic_map",ftos(classic));
     pixel=project('0 -32 96');pixel_y+=40;pixel_z=0;found=fb_extrude_pick(pixel,0);
     fb_transform_expect(found && fb_extrude_plane_support && fb_hits[0].normal[2]< -0.99,"pick_lower_silhouette_bottom");
     pixel_x+=300;found=fb_extrude_pick(pixel,0);fb_transform_expect(found && fb_extrude_plane_support,"pick_far_cursor_has_no_pixel_cutoff");
@@ -42,6 +42,17 @@ float fb_extrude_pick_testcommand()
         fb_transform_expect(distance-fb_extrude_start_distance>0,"pick_xy_drag_outward");fb_cancel();
     }
     pixel=project('0 0 128');pixel_z=0;fb_transform_expect(!fb_extrude_pick(pixel,3),"pick_xy_inside_has_no_face");
+    int insideEdge=TRUE;
+    for(int view=1;view<=3;view++) {
+        for(int zoom=128;zoom<=4096;zoom*=4) {
+            cvar_set("ca_brush_view",itos(view));cvar_set("ca_brush_viewsize",itos(zoom));
+            fb_view_centers[view]='0 0 128';fb_view_prepare();
+            pixel=project('0 0 128'+fb_view_right*32);pixel_z=0;pixel_x-=1;
+            if(!fb_extrude_pick(pixel,view) || !fb_extrude_plane_support || fb_hits[0].normal*fb_view_right<0.99)
+                insideEdge=FALSE;
+        }
+    }
+    fb_transform_expect(insideEdge,"pick_ortho_near_edge_from_inside_at_all_zooms");
     cvar_set("ca_brush_view","0");
     fb_selection_clear();int a=fb_createbox('-32 0 128','64 64 64');fb_createbox('32 0 128','64 64 64');brush_select(1,a);fb_document_tick();
     fb_extrude_cache();int seamCount=0;for(int e=0;e<fb_extrude_edge_count;e++)if(fb_extrude_seam(e))seamCount++;

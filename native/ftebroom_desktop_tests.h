@@ -9,6 +9,38 @@ static void testDesktop(){
  char mode[64]={},root[4096]={};commands->Argv(1,mode,sizeof mode);cvars->GetString("ftebroom_test_import_root",root,sizeof root);initialize();float testW=std::max(1280.f,ImGui::GetIO().DisplaySize.x),testH=std::max(800.f,ImGui::GetIO().DisplaySize.y);auto frame=[&](){event(0,0,0,testW*.74f,testH*.69f,testW,testH);};
 
  try {
+  if(std::string_view(mode)=="releasejam"){
+    expect(jamEnabled() && !jamEndpoint().hostname.empty(),"release_mapping_jams_enabled");
+    return;
+  }
+  if(std::string_view(mode)=="adproperties" || std::string_view(mode)=="adpropertieschanged"){
+    recentWindow=false;setupNeeded=false;firstSetupStep=-1;selectEntityTab=true;
+    entityTestItems.clear();
+    frame();frame();
+    expect(entityTestItems.count("key/frame_box") && entityTestItems.count("key/skin_override") &&
+           entityTestItems.count("key/targetname"),"ad_inherited_entity_properties");
+    if(std::string_view(mode)=="adproperties"){
+      expect(entityTestItems.count("flag/spawnflags/1") && entityTestItems.count("flag/spawnflags/2") &&
+             entityTestItems.count("flag/spawnflags/256") && entityTestItems.count("flag/spawnflags/2048"),
+             "ad_inherited_spawnflag_checkboxes");
+      if(auto flag=entityTestItems.find("flag/spawnflags/2");flag!=entityTestItems.end()) {
+        auto p=flag->second;
+        event(0,0,0,p.x,p.y,testW,testH);
+        event(1,mouseKeys[0],0,p.x,p.y,testW,testH);
+        event(0,0,0,p.x,p.y,testW,testH);
+        event(2,mouseKeys[0],0,p.x,p.y,testW,testH);
+        frame();frame();
+      }
+    }else{
+      bool changed=false;
+      for(const auto& item:entityProperties) {
+        const auto value=item.second.find("spawnflags");
+        if(value!=item.second.end())changed|=ftebroom::entityFlagMask(value->second)==4099;
+      }
+      expect(changed,"ad_spawnflag_edit_preserves_other_bits");
+    }
+    return;
+  }
   #include "ftebroom_tutorial_tests.h"
   #include "ftebroom_welcome132_tests.h"
   if(std::string_view(mode)=="rb10q1optin"){
@@ -212,7 +244,7 @@ static void testDesktop(){
              "rb123_entity_selection_opens_properties");
       bool fitted=false;
       for(auto* window:ImGui::GetCurrentContext()->Windows)
-        if(window->Active&&std::strstr(window->Name,"/Property list_"))
+        if(window->Active&&std::strstr(window->Name,"/Entity properties_"))
           fitted=(window->ChildFlags&ImGuiChildFlags_AutoResizeY)&&window->ScrollMax.y<=1 &&
                  window->Size.y>=ImGui::GetTextLineHeight()*2;
       expect(fitted,"rb123_property_table_fits_rows");

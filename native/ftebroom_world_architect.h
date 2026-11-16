@@ -384,9 +384,28 @@ static void QDECL worldCommand(){
   char operation[64]={};commands->Argv(1,operation,sizeof operation);
   if(std::string(operation)=="materials"){
     char request[64]={};commands->Argv(2,request,sizeof request);auto& s=worldArchitect;if(s.request!=request||s.request.empty())return;
-    worldAction([&]{for(const auto& [name,body]:s.pendingShaders)if(!s.materialHandles.count(name)){
-      auto handle=draw->LoadImageShader(name.c_str(),body.c_str());if(!handle){std::error_code ec;std::filesystem::remove(s.requestPath,ec);throw std::runtime_error("Material registration failed; generated map was not applied");}s.materialHandles[name]=handle;
-    }s.pendingShaders.clear();});return;
+    worldAction([&]{
+      try {
+        if(gameWad()) {
+          // Loose previews and compiler WADs can already exist while the MAP
+          // renderer still uses the previous indexed material generation.
+          q1IndexAssets();
+          resetMaterialBrowser();
+          publishMaterialTags();
+          cvars->SetFloat("ftebroom_material_count",float(materials.size()));
+        }
+        for(const auto& [name,body]:s.pendingShaders)if(!s.materialHandles.count(name)){
+          auto handle=draw->LoadImageShader(name.c_str(),body.c_str());
+          if(!handle)throw std::runtime_error("Material registration failed; generated map was not applied");
+          s.materialHandles[name]=handle;
+        }
+        s.pendingShaders.clear();
+      }catch(...){
+        std::error_code error;
+        std::filesystem::remove(s.requestPath,error);
+        throw;
+      }
+    });return;
   }
   worldOpen();
   auto& s=worldArchitect;

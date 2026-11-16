@@ -584,7 +584,8 @@ void fb_visual_face_hover()
             else if(db<4)b=b+(a-b)*((4-db)/(da-db));
         }
         a=project(a);b=project(b);a_z=b_z=0;
-        drawline(2,a,b,'1 1 0',1,0);
+        if(ortho)fb_view_stroke(a,b,2,'1 1 0',1);
+        else drawline(2,a,b,'1 1 0',1,0);
     }
     drawresetcliparea();
 }

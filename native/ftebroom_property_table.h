@@ -8,6 +8,7 @@ static bool entityPublicProperty(std::string_view key)
 {
   return key.rfind("_tb_",0)!=0 && key.rfind("_ftebroom_",0)!=0;
 }
+static void entityPropertyDescription(const ftebroom::EntityProperty& property);
 static void entityClassDefaults(const ftebroom::EntityDefinition& definition)
 {
   uiSectionHeading(definition.name.c_str());
@@ -23,8 +24,13 @@ static void entityClassDefaults(const ftebroom::EntityDefinition& definition)
     ImGui::TableNextRow();
     ImGui::TableSetColumnIndex(0);
     ImGui::TextUnformatted(key.c_str());
-    if(!property.description.empty()&&ImGui::IsItemHovered())
-      ImGui::SetTooltip("%s",property.description.c_str());
+    if(ImGui::IsItemHovered() && (property.label!=key || !property.description.empty())) {
+      ImGui::BeginTooltip();
+      ImGui::PushTextWrapPos(ImGui::GetFontSize()*32.f);
+      entityPropertyDescription(property);
+      ImGui::PopTextWrapPos();
+      ImGui::EndTooltip();
+    }
     ImGui::TableSetColumnIndex(1);
     ImGui::TextUnformatted(property.value.c_str());
     if(testing)entityTestItem("class-default/"+key+"="+property.value);
@@ -58,15 +64,9 @@ static void entityPropertyFlags(const std::string& key, const ftebroom::EntityPr
 {
   for (const auto& choice : definition.choices)
   {
-    unsigned bit;
-    try
-    {
-      bit = std::stoul(choice.value);
-    }
-    catch (...)
-    {
+    const auto bit = ftebroom::entityFlagMask(choice.value);
+    if (!bit)
       continue;
-    }
     bool enabled = false, first = true, mixed = false;
     for (const auto& e : entityProperties)
     {
@@ -81,14 +81,7 @@ static void entityPropertyFlags(const std::string& key, const ftebroom::EntityPr
             auto p = def->second.properties.find(key);
             p != def->second.properties.end())
             value = p->second.value;
-      unsigned flags = 0;
-      try
-      {
-        flags = std::stoul(value);
-      }
-      catch (...)
-      {
-      }
+      const auto flags = ftebroom::entityFlagMask(value);
       bool current = (flags & bit) != 0;
       if (first)
       {
@@ -102,6 +95,7 @@ static void entityPropertyFlags(const std::string& key, const ftebroom::EntityPr
     if (mixed)
       ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
     bool changed = ImGui::Checkbox(choice.label.c_str(), &enabled);
+    entityTestItem("flag/"+key+"/"+choice.value);
     if (mixed)
       ImGui::PopItemFlag();
     if (ImGui::IsItemHovered() && !choice.description.empty())
@@ -120,13 +114,13 @@ static void entityPropertyTable()
   static std::vector<PropertyRow> rows;
   static std::vector<int> now;
   static std::map<std::string, unsigned> protectedCounts;
-  static bool singleClass;
+  static ftebroom::EntityProperty spawnflags;
   static int selectionEpoch=-2, definitionsEpoch=-2, mapEpoch=-2;
   // Aggregation depends on the published data, not the frame rate or camera.
   if(selectionEpoch!=entitySelectionEpoch || definitionsEpoch!=entityDefinitionEpoch || mapEpoch!=organizationMapEpoch)
   {
     selectionEpoch=entitySelectionEpoch;definitionsEpoch=entityDefinitionEpoch;mapEpoch=organizationMapEpoch;
-    definitions.clear();keys.clear();rows.clear();now.clear();protectedCounts.clear();
+    definitions.clear();keys.clear();rows.clear();now.clear();protectedCounts.clear();spawnflags={};
     std::set<std::string> classes;
   for (const auto& entity : entityProperties)
   {
@@ -143,7 +137,25 @@ static void entityPropertyTable()
       keys.insert(p.first);
     for(const auto& key:protectedPropertyKeys(entity.second)){keys.insert(key);protectedCounts[key]++;}
   }
-  singleClass = classes.size()==1;
+  if (auto flags = definitions.find("spawnflags"); flags != definitions.end() && flags->second.type=="flags") {
+    spawnflags = flags->second;
+    for (const auto& classname : classes) {
+      const auto type = entityDefinitions.find(classname);
+      if (type==entityDefinitions.end()) { spawnflags.choices.clear(); break; }
+      const auto field = type->second.properties.find("spawnflags");
+      if (field==type->second.properties.end() || field->second.type!="flags") {
+        spawnflags.choices.clear();
+        break;
+      }
+      auto& choices=spawnflags.choices;
+      choices.erase(std::remove_if(choices.begin(),choices.end(),[&](const auto& choice) {
+        const auto& other = field->second.choices;
+        return std::none_of(other.begin(),other.end(),[&](const auto& candidate) {
+          return candidate.value==choice.value && candidate.label==choice.label;
+        });
+      }), choices.end());
+    }
+  }
   for (const auto& key : keys)
   {
     if (!entityPublicProperty(key))
@@ -237,16 +249,10 @@ static void entityPropertyTable()
     if (!list.empty())
       command(("ftebroom_entity_remove " + list + "\n").c_str());
   };
-  const auto spawnflags=definitions.find("spawnflags");
-  if (singleClass && spawnflags!=definitions.end() && spawnflags->second.type=="flags" &&
-      !spawnflags->second.choices.empty() && uiInspectorFold("Spawn flags",ImGuiTreeNodeFlags_DefaultOpen)) {
-    entityPropertyDescription(spawnflags->second);
-    entityPropertyFlags("spawnflags",spawnflags->second);
+  if (!spawnflags.choices.empty() && uiInspectorFold("Spawn flags",ImGuiTreeNodeFlags_DefaultOpen)) {
+    entityPropertyDescription(spawnflags);
+    entityPropertyFlags("spawnflags",spawnflags);
   }
-  ImGui::BeginChild(
-    "Property list",
-    {0, 0},
-    ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize);
   if (
     editing.empty() && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)
     && !ImGui::IsAnyItemActive())
@@ -305,15 +311,14 @@ static void entityPropertyTable()
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_Header));
       else if (ImGui::TableGetHoveredRow() == ImGui::TableGetRowIndex())
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_HeaderHovered, .55f));
-      if (!row.complete)
-        ImGui::PushStyleColor(
-          ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
       if (!row.explicitValue && uiItalicFonts[uiScaleChoice])
         ImGui::PushFont(uiItalicFonts[uiScaleChoice]);
       for (int col = 0; col < 2; ++col)
       {
         ImGui::TableSetColumnIndex(col);
         ImGui::PushID(col);
+        if (col==1 && !row.complete)
+          ImGui::PushStyleColor(ImGuiCol_Text,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         if (editing == row.key && editColumn == col)
         {
           const bool startingEdit = focusEdit;
@@ -407,11 +412,11 @@ static void entityPropertyTable()
             }
           }
         ImGui::PopID();
+        if (col==1 && !row.complete)
+          ImGui::PopStyleColor();
       }
       if (!row.explicitValue && uiItalicFonts[uiScaleChoice])
         ImGui::PopFont();
-      if (!row.complete)
-        ImGui::PopStyleColor();
       if(linked)
       {
         ImGui::TableSetColumnIndex(2);
@@ -428,7 +433,6 @@ static void entityPropertyTable()
     }
     ImGui::EndTable();
   }
-  ImGui::EndChild();
   cvars->SetString(
     "ftebroom_property_cell", (selected + "/" + std::to_string(column)).c_str());
   cvars->SetString("ftebroom_property_editing", editing.c_str());

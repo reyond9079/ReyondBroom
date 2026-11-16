@@ -27,6 +27,20 @@ spawnflags(flags) = [ 1 : "Fast" : 1 : "Moves at double speed" 4 : "Silent" : 0 
   assert(fgd.at("player").properties.at("spawnflags").choices.front().description=="Moves at double speed");
   assert(fgd.at("player").properties.at("mode").choices.size()==2);
   assert(fgd.at("player").mins[2]==-24 && fgd.at("player").model=="models/player.md3");
+  auto inherited=entityRead(R"(
+@BaseClass = Skill [ spawnflags(flags) = [ 256 : "Not in Easy" : 1 : "Difficulty" ]
+  speed(integer) : "Speed" : 100 ]
+@BaseClass base(Skill) = Ammo [ SPAWNFLAGS(flags) = [ 1 : "Large box" : 1 ] skin(integer) ]
+@BaseClass = Lid [ spawnflags(flags) = [ 2 : "Lid" : 1 ] speed(integer) : "Speed" : 200 ]
+@PointClass base(Ammo, Lid) = item_ammo [
+  open(integer) closed(integer) : "Closed" : "]" : "Bracket default"
+  spawnflags(flags) = [ 1 : "Custom box" : 0 ]
+])", ".fgd");
+  const auto& props=inherited.at("item_ammo").properties;
+  const auto& flags=props.at("spawnflags");
+  assert(flags.value=="258" && flags.choices.size()==3 && flags.choices[0].label=="Custom box");
+  assert(props.at("speed").value=="100" && props.count("skin") && props.count("open"));
+  assert(props.at("closed").value=="]" && props.at("closed").description=="Bracket default");
   auto prefixed=entityRead(R"(@PointClass model({{ skin -> ":models/alternate.md2", ":models/default.md2" }}) = q2_item [skin(integer) : "Skin" : 0])",".fgd");
   assert(prefixed.at("q2_item").model=="models/default.md2");
   assert(prefixed.at("q2_item").modelRules.front().path=="=models/alternate.md2");

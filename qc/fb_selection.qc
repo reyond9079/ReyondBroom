@@ -189,19 +189,17 @@ void fb_selection_double(vector pixel,int ctrl)
 
 // Cache exactly the existing face loops, without simplifying or dropping edges.
 typedef struct {
-    vector *points;
-    int *counts,*lines;
+    int *lines;
     trisoup_simple_vert_t *vertices;
     vector color;
-    int faces,total,ready;
-    vector low,high;
+    int total,ready;
 } fb_wire_cache_t;
 fb_wire_cache_t *fb_wire_cache;
 int fb_wire_cache_count;var int fb_wire_cache_epoch=-1;
 void fb_wire_cache_prepare()
 {
     if(fb_wire_cache_epoch==fb_grid_geometry_epoch && fb_wire_cache_count==fb_node_count)return;
-    for(int i=0;i<fb_wire_cache_count;i++){memfree(fb_wire_cache[i].points);memfree(fb_wire_cache[i].counts);memfree(fb_wire_cache[i].lines);memfree(fb_wire_cache[i].vertices);}
+    for(int i=0;i<fb_wire_cache_count;i++){memfree(fb_wire_cache[i].lines);memfree(fb_wire_cache[i].vertices);}
     memfree(fb_wire_cache);fb_wire_cache_count=fb_node_count;
     fb_wire_cache=memalloc(max(1,fb_node_capacity)*sizeof(fb_wire_cache_t));
     fb_wire_cache_epoch=fb_grid_geometry_epoch;
@@ -209,36 +207,46 @@ void fb_wire_cache_prepare()
 void fb_wire_cache_forget(int node)
 {
     if(!fb_wire_cache || fb_wire_cache_epoch!=fb_grid_geometry_epoch || node<0 || node>=fb_node_capacity)return;
-    fb_wire_cache_t *cache=&fb_wire_cache[node];memfree(cache->points);memfree(cache->counts);memfree(cache->lines);memfree(cache->vertices);memfill8((__variant*)cache,0,sizeof(fb_wire_cache_t));
+    fb_wire_cache_t *cache=&fb_wire_cache[node];memfree(cache->lines);memfree(cache->vertices);memfill8((__variant*)cache,0,sizeof(fb_wire_cache_t));
 }
 void fb_wire_cache_draw(int node)
 {
     fb_wire_cache_t *cache=&fb_wire_cache[node];
     if(!cache.ready) {
         cache.ready=TRUE;
-        cache.counts=memalloc(MAX_BRUSHFACES*sizeof(int));
-        for(int f=0;f<MAX_BRUSHFACES;f++) {
-            int n=brush_getfacepoints(fb_nodes[node].model,fb_nodes[node].id,f+1,facepoints,MAX_FACEPOINTS);
-            if(n<=0)break;
-            cache.counts[cache.faces]=n;cache.faces=cache.faces+1;cache.total=cache.total+n;
+        fb_node_t item=fb_nodes[node];
+        int faces=brush_get(item.model,item.id,__NULL__,0,__NULL__);
+        if(item.kind==FB_NODE_PATCH) {
+            patchinfo_t info;
+            if(patch_getmesh(item.model,item.id,__NULL__,0,&info)<1)return;
+            faces=(info.cpwidth-1)*(info.cpheight-1);
         }
-        cache.points=memalloc(max(1,cache.total)*sizeof(vector));
+        if(faces<1)return;
+        int capacity=item.kind==FB_NODE_PATCH?4:max(4,faces);
+        vector *points=memalloc(capacity*sizeof(vector));
+        int *counts=memalloc(faces*sizeof(int));
+        for(int f=0;f<faces;f++) {
+            counts[f]=brush_getfacepoints(item.model,item.id,f+1,points,capacity);
+            if(counts[f]<3)counts[f]=0;
+            cache.total+=counts[f];
+        }
         cache.lines=memalloc(max(1,cache.total)*2*sizeof(int));
         cache.vertices=memalloc(max(1,cache.total)*sizeof(trisoup_simple_vert_t));
         cache.color='-1 -1 -1';
         int storeOffset=0;
-        for(int f=0;f<cache.faces;f++) {
-            brush_getfacepoints(fb_nodes[node].model,fb_nodes[node].id,f+1,facepoints,MAX_FACEPOINTS);
-            memcpy(cache.points+storeOffset,facepoints,cache.counts[f]*sizeof(vector));
-            int count=cache.counts[f];
+        for(int f=0;f<faces;f++) {
+            int count=counts[f];
+            if(!count)continue;
+            brush_getfacepoints(item.model,item.id,f+1,points,capacity);
             for(int p=0;p<count;p++) {
                 int index=storeOffset+p;cache.lines[index*2]=index;
                 int next=p+1;if(next>=count)next=0;cache.lines[index*2+1]=storeOffset+next;
-                for(int a=0;a<3;a++)cache.vertices[index].xyz[a]=facepoints[p][a];
+                for(int a=0;a<3;a++)cache.vertices[index].xyz[a]=points[p][a];
                 cache.vertices[index].rgba[3]=1;
             }
-            storeOffset+=cache.counts[f];
+            storeOffset+=count;
         }
+        memfree(points);memfree(counts);
     }
     if(cache.color!=fb_visual_current_wire) {
         cache.color=fb_visual_current_wire;

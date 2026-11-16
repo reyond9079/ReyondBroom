@@ -2,6 +2,7 @@
 #pragma once
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cctype>
 #include <cmath>
 #include <map>
@@ -9,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <iomanip>
 #include "ftebroom_fgd_models.h"
@@ -38,6 +40,22 @@ struct EntityDefinition
   std::map<std::string, EntityProperty> properties;
 };
 using EntityDefinitions = std::map<std::string, EntityDefinition>;
+inline unsigned entityFlagMask(std::string_view value)
+{
+  while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front()))) value.remove_prefix(1);
+  while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back()))) value.remove_suffix(1);
+  if (value.empty()) return 0;
+  const char* end = value.data() + value.size();
+  if (value.front() == '-')
+  {
+    int mask = 0;
+    const auto [ptr, error] = std::from_chars(value.data(), end, mask);
+    return error == std::errc{} && ptr == end ? static_cast<unsigned>(mask) : 0;
+  }
+  unsigned mask = 0;
+  const auto [ptr, error] = std::from_chars(value.data(), end, mask);
+  return error == std::errc{} && ptr == end ? mask : 0;
+}
 inline std::string entityTrim(std::string s)
 {
   auto first = s.find_first_not_of(" \t\r\n"), last = s.find_last_not_of(" \t\r\n");
@@ -147,9 +165,13 @@ class EntityFgdReader
       throw std::runtime_error("Unexpected end of FGD");
     return tokens[pos++].text;
   }
+  bool at(const char* s, size_t offset = 0) const
+  {
+    return pos + offset < tokens.size() && !tokens[pos + offset].quoted && peek(offset) == s;
+  }
   bool accept(const char* s)
   {
-    if (peek() != s)
+    if (!at(s))
       return false;
     pos++;
     return true;
@@ -174,9 +196,9 @@ class EntityFgdReader
     while (pos < tokens.size() && depth)
     {
       bool quoted=tokens[pos].quoted;auto t = take();
-      if (t == open)
+      if (!quoted && t == open)
         depth++;
-      if (t == close)
+      if (!quoted && t == close)
         depth--;
       if (depth)
         {std::ostringstream text;if(preserveQuotes&&quoted)text<<std::quoted(t);else text<<t;value += (value.empty() ? "" : " ") + text.str();}
@@ -281,54 +303,56 @@ public:
       if (accept(":"))
         d.description = scalar();
       expect("[");
-      while (peek() != "]")
+      while (!at("]"))
       {
         EntityProperty p;
         p.key = take();
+        std::string normalized = p.key;
+        std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                       [](unsigned char c) { return char(std::tolower(c)); });
+        if (normalized == "spawnflags") p.key = std::move(normalized);
         p.label = p.key;
-        if (peek() == "(")
+        if (at("("))
         p.type = bracket("(", ")");
         std::transform(p.type.begin(),p.type.end(),p.type.begin(),[](unsigned char c){return char(std::tolower(c));});
         // Read optional readonly/report modifiers before the colon.
-        while (peek() != "[" && peek() != "=" && peek() != ":" && peek() != "]"
+        while (!at("[") && !at("=") && !at(":") && !at("]") && !at("(", 1)
                && pos < tokens.size() && tokens[pos].line == tokens[pos - 1].line)
           take();
         if (accept(":"))
         {
-          if (peek() != ":" && peek() != "=" && peek() != "]")
+          if (!at(":") && !at("=") && !at("]") && !at("(", 1))
             p.label = scalar();
         }
         if (accept(":"))
         {
-          if (peek() != ":" && peek() != "=" && peek() != "]")
+          if (!at(":") && !at("=") && !at("]") && !at("(", 1))
             p.value = scalar();
         }
         if (accept(":"))
         {
-          if (peek() != "=" && peek() != "]")
+          if (!at("=") && !at("]") && !at("(", 1))
             p.description = scalar();
         }
         if (accept("="))
         {
           expect("[");
-          unsigned long flags = 0;
-          while (peek() != "]")
+          unsigned flags = 0;
+          while (!at("]"))
           {
             EntityChoice c;
             c.value = take();
             expect(":");
             c.label = scalar();
-            if (accept(":"))
+            if (p.type=="flags" && accept(":") && !at(":") && !at("]"))
               c.enabled = take() != "0";
             if (accept(":"))
               c.description = scalar();
-            if (c.enabled && p.type == "flags")
-              try
+            if (p.type == "flags")
+              if (const auto bit = entityFlagMask(c.value))
               {
-                flags |= std::stoul(c.value);
-              }
-              catch (...)
-              {
+                c.value = std::to_string(bit);
+                if (c.enabled) flags |= bit;
               }
             p.choices.push_back(c);
           }
@@ -633,6 +657,26 @@ inline EntityDefinitions entityReadDef(const std::string& s)
   }
   return out;
 }
+inline void entityInheritProperty(std::map<std::string, EntityProperty>& properties,
+                                 const EntityProperty& inherited)
+{
+  auto [it, inserted] = properties.try_emplace(inherited.key, inherited);
+  if (inserted || inherited.key != "spawnflags" || inherited.type != "flags" ||
+      it->second.type != "flags")
+    return;
+  auto& property = it->second;
+  auto defaults = entityFlagMask(property.value);
+  for (const auto& choice : inherited.choices)
+  {
+    const auto matches = [&](const EntityChoice& current) { return current.value == choice.value; };
+    if (std::any_of(property.choices.begin(), property.choices.end(), matches))
+      continue;
+    property.choices.push_back(choice);
+    if (choice.enabled)
+      defaults |= entityFlagMask(choice.value);
+  }
+  property.value = std::to_string(defaults);
+}
 inline EntityDefinitions entityResolve(EntityDefinitions definitions)
 {
   std::set<std::string> done, visiting;
@@ -644,13 +688,12 @@ inline EntityDefinitions entityResolve(EntityDefinitions definitions)
     if (!visiting.insert(name).second)
       throw std::runtime_error("Cyclic FGD inheritance: " + name);
     auto& d = definitions.at(name);
-    std::map<std::string, EntityProperty> properties;
     for (const auto& base : d.bases)
     {
       self(self, base);
       const auto& b = definitions.at(base);
       for (const auto& p : b.properties)
-        properties[p.first] = p.second;
+        entityInheritProperty(d.properties, p.second);
       if (!d.hasBounds && b.hasBounds)
       {
         d.mins = b.mins;
@@ -677,9 +720,6 @@ inline EntityDefinitions entityResolve(EntityDefinitions definitions)
       if (d.modelKey.empty())
         d.modelKey = b.modelKey;
     }
-    for (const auto& p : d.properties)
-      properties[p.first] = p.second;
-    d.properties = std::move(properties);
     if(d.model.empty()&&!d.modelKey.empty()){auto p=d.properties.find(d.modelKey);if(p!=d.properties.end())d.model=p->second.value;}
     if(!d.modelRules.empty()){std::map<std::string,std::string> defaults;for(auto& p:d.properties)defaults[p.first]=p.second.value;
       for(auto& rule:d.modelRules)if(fgdCondition(rule.condition,defaults)){d.model=fgdValue(rule.path,defaults);d.modelSkin=fgdValue(rule.skin,defaults);d.modelFrame=fgdValue(rule.frame,defaults);d.modelScale=fgdValue(rule.scale,defaults);if(!rule.path.empty()&&rule.path[0]=='$')d.modelKey=rule.path.substr(1);break;}}

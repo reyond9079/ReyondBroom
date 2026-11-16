@@ -132,10 +132,15 @@ void fb_entity_property(string operation,string key,string value)
     for(int i=0;i<fb_property_entity_count;i++) {
         int id=fb_property_entities[i];string data="";
         hashtable fields=hash_createtab(32,EV_STRING);int count=fb_entity_tokenize(terrain_edit(TEREDIT_ENT_GET,id));
-        for(int k=0;k<count;k+=2)fields[argv(k)]=argv(k+1);
+        int hadValue=FALSE;
+        for(int k=0;k<count;k+=2) {
+            string field=argv(k);
+            fields[field]=argv(k+1);
+            if(field==name)hadValue=TRUE;
+        }
         if(op=="rename" && replacement!="") fields[replacement]=fields[name];
         if(op=="set")fields[name]=replacement;
-        if((op=="setflag" || op=="clearflag") && fields[name]=="" && (int)fb_entity_defaults!=0)fields[name]=fb_entity_defaults[strcat(fields["classname"],"/",name)];
+        if((op=="setflag" || op=="clearflag") && !hadValue && (int)fb_entity_defaults!=0)fields[name]=fb_entity_defaults[strcat(fields["classname"],"/",name)];
         if(op=="setflag")fields[name]=itos(stoi(fields[name])|stoi(replacement));
         if(op=="clearflag")fields[name]=itos(stoi(fields[name])&~stoi(replacement));
         for(int k=0;;k++) {

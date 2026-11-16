@@ -82,19 +82,27 @@ int fb_extrude_silhouette_pick(vector pixel,int view)
     }
     fb_hit_t direct={0};int hasDirect=FALSE;
     for(int h=0;h<fb_hit_count;h++)if(fb_hits[h].normal*ray<0 && (!hasDirect || fb_hits[h].distance<direct.distance)) {direct=fb_hits[h];hasDirect=TRUE;}
-    int best=-1,seam=-1;float nearest=100000000,seamDistance=100000000;vector bestPoint='0 0 0',seamPoint='0 0 0';
+    int best=-1,seam=-1,nearSide=-1;
+    float nearest=100000000,seamDistance=100000000,sideDistance=100000000,sideDepth=100000000;
+    vector bestPoint='0 0 0',seamPoint='0 0 0',sidePoint='0 0 0';
     for(int e=0;e<fb_extrude_edge_count;e++) {
         fb_extrude_edge_t edge=fb_extrude_edges[e];if(!edge.b)continue;
         float da=edge.na*ray,db=edge.nb*ray;
         if((da<0)==(db<0) || (fabs(da)<0.000001 && fabs(db)<0.000001))continue;
         vector point;float distance=fb_extrude_edge_distance(start,ray,edge.first,edge.last,&point);
         if(distance<nearest){nearest=distance;best=e;bestPoint=point;}
-        if(distance>=seamDistance || fb_pick_segment_distance(pixel,edge.first,edge.last)>autocvar_ftebroom_extrude_handle_radius)continue;
-        if(hasDirect && !(direct.node==edge.node && (direct.face==edge.a || direct.face==edge.b)) && (point-start)*ray>direct.distance+0.001)continue;
-        if(fb_extrude_seam(e)){seam=e;seamDistance=distance;seamPoint=point;}
+        if(fb_pick_segment_distance(pixel,edge.first,edge.last)>autocvar_ftebroom_extrude_handle_radius)continue;
+        float depth=(point-start)*ray;
+        int touchesDirect=hasDirect && direct.node==edge.node && (direct.face==edge.a || direct.face==edge.b);
+        if(hasDirect && !touchesDirect && depth>direct.distance+0.001)continue;
+        if(distance<seamDistance && fb_extrude_seam(e)){seam=e;seamDistance=distance;seamPoint=point;}
+        if(view && (distance<sideDistance-0.001 || (fabs(distance-sideDistance)<=0.001 && depth<sideDepth))) {
+            nearSide=e;sideDistance=distance;sideDepth=depth;sidePoint=point;
+        }
     }
     fb_hit_count=0;
     if(seam>=0){best=seam;bestPoint=seamPoint;}
+    else if(nearSide>=0){best=nearSide;bestPoint=sidePoint;}
     else if(hasDirect){if(view)return FALSE;fb_pick_add(direct);return TRUE;}
     if(best<0)return FALSE;
     fb_extrude_edge_t chosen=fb_extrude_edges[best];float da=chosen.na*ray,db=chosen.nb*ray;

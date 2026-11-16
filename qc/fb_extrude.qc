@@ -236,7 +236,7 @@ void fb_extrude_draw()
     if(cvar("ca_brush_view")) {
         for(int segment=0;segment<fb_extrude_outline_count;segment+=2) {
             vector a=project(fb_extrude_outline[segment]),b=project(fb_extrude_outline[segment+1]);
-            a_z=b_z=0;drawline(3,a,b,'1 1 0',1,0);
+            fb_view_stroke(a,b,3,'1 1 0',1);
         }
         cvar_set("ftebroom_selection_status",sprintf("Extrude: face %i / brush %i, distance 0",hit.face,hit.id));
         return;

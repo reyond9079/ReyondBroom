@@ -78,7 +78,7 @@ def verify(release, platform, version):
                                'manifest_files': len(manifest), 'components': {n:manifest[n] for n in names}}
 
 
-def launch(root, output):
+def launch(root, output, require_jam=False):
     with tempfile.TemporaryDirectory(prefix='reyond-release-smoke-') as directory:
         clone = Path(directory)/root.name
         shutil.copytree(root, clone)
@@ -86,14 +86,20 @@ def launch(root, output):
         (data/'qconsole.log').unlink(missing_ok=True)
         # SDL can spend several seconds retrying OpenGL without multisampling
         # before the first ImGui frame on a software-rendered runner.
-        (data/'ci-release-smoke.cfg').write_text('exec ftebroom.cfg\nset ftebroom_skip_setup 1\nin 4 echo RB_RELEASE_SMOKE_BOOT\nin 18 quit force\n')
+        config = 'exec ftebroom.cfg\nset ftebroom_skip_setup 1\nin 4 echo RB_RELEASE_SMOKE_BOOT\nin 18 quit force\n'
+        env = {**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}
+        if require_jam:
+            config += 'in 10 ftebroom_test_desktop releasejam\n'
+            for override in ('REYONDBROOM_JAM_PORT', 'REYONDBROOM_JAM_URL'):
+                env.pop(override, None)
+        (data/'ci-release-smoke.cfg').write_text(config)
         engine = clone/('bin/fteqw64.exe' if os.name == 'nt' else 'fteqw-gl64')
         render = ['+set', 'vid_renderer', os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
         with (output/'startup.log').open('wb') as stream:
             subprocess.run([str(engine), *render, '-ftebroom-child-processes', '-nohome', '-noupdates', '-nosound',
                             '-window', '-width', '960', '-height', '640', '-condebug', '-basedir', str(clone),
                             '+exec', 'ci-release-smoke.cfg'], cwd=clone, stdout=stream, stderr=subprocess.STDOUT,
-                           env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}, check=True, timeout=45)
+                           env=env, check=True, timeout=45)
         text = (output/'startup.log').read_text(errors='replace')
         if (data/'qconsole.log').exists():
             text += '\n'+(data/'qconsole.log').read_text(errors='replace')
@@ -101,6 +107,8 @@ def launch(root, output):
         assert 'RB_RELEASE_SMOKE_BOOT' in text
         assert re.search(r'Dear ImGui renderer initialized \(atlas [1-9]', text), 'Native editor did not initialize'
         assert not re.search(r'CSQC_Abort|Assertion .*failed|FTEBROOM_\w+_FAIL', text), 'Startup reported failure'
+        if require_jam:
+            assert 'FTEBROOM_DESKTOP_PASS release_mapping_jams_enabled' in text, 'Mapping Jams is missing from the packaged editor'
 
 
 def main():
@@ -108,10 +116,11 @@ def main():
     p.add_argument('release', type=Path)
     p.add_argument('--platform', required=True, choices=['Windows-x64', 'Linux-x64', 'Linux-SDL2-x64'])
     p.add_argument('--version', required=True)
+    p.add_argument('--require-jam', action='store_true')
     p.add_argument('--output', required=True, type=Path)
     a = p.parse_args(); a.output.mkdir(parents=True, exist_ok=True)
     root, proof = verify(a.release.resolve(), a.platform, a.version)
-    launch(root, a.output)
+    launch(root, a.output, a.require_jam)
     proof['native_startup'] = True
     (a.output/'results.json').write_text(json.dumps(proof, indent=2)+'\n')
     print('PASS packaged version, manifest, sources, archive checksums and native startup: '+a.platform)

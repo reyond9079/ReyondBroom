@@ -131,9 +131,13 @@ jobs:
         destination: deps/bullet-build
         platform: ${{ matrix.platform }}
         shell: bash
+    - name: Configure the public Mapping Jams endpoint
+      env:
+        REYONDBROOM_JAM_DEFAULT_URL: ${{ secrets.REYONDBROOM_JAM_DEFAULT_URL }}
+      run: python scripts/prepare-jam-release.py deps/jam-release-endpoint.h
     - name: Build and test the native module and profile importer
       run: |
-        g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
+        g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
     - name: Check changed audio DSP
       if: fromJSON(needs.plan.outputs.plan).flags.audio_core
       run: scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
@@ -201,7 +205,11 @@ jobs:
     - name: Validate every packaged release (short smoke)
       shell: bash
       run: xvfb-run -a -s '-screen 0 1280x800x24' python scripts/ci-release-smoke.py out/release --platform "$PLATFORM" --version "$VERSION"
-        --output qa/smoke
+        --output qa/smoke --require-jam
+    - name: Upload validated packages to the draft release
+      run: |
+        test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
+        gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 --clobber
     - name: Install selected plant import probes
       if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
@@ -235,10 +243,6 @@ jobs:
           qa/viewport-create-dark-1920/placed-models-scene.png
           qa/viewport-create-dark-1920/create-model-menu.png
         retention-days: 7
-    - name: Upload validated packages to the draft release
-      run: |
-        test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
-        gh release upload "v$VERSION" out/release/*.tar.gz out/release/*.zip out/release/*.sha256 --clobber
     - name: Collect compact release evidence
       if: always()
       run: python scripts/collect-release-qa.py --qa qa --release out/release --output qa-artifact
@@ -322,13 +326,18 @@ jobs:
       if: fromJSON(needs.plan.outputs.plan).flags.profile_core
       shell: msys2 {0}
       run: ctest --test-dir deps/profile-core -C Release --output-on-failure
+    - name: Configure the public Mapping Jams endpoint
+      shell: pwsh
+      env:
+        REYONDBROOM_JAM_DEFAULT_URL: ${{ secrets.REYONDBROOM_JAM_DEFAULT_URL }}
+      run: python scripts/prepare-jam-release.py deps/jam-release-endpoint.h
     - name: Build native editor and test the profile importer
       shell: msys2 {0}
       run: |
         mkdir -p audio-qa
         make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
         deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
-        g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+        g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
     - name: Check selected plant_core unit 1
       if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.plant_core
       run: |
@@ -397,12 +406,6 @@ jobs:
       run: |
         python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --engine deps/editor-engine/engine/release-editor/fteglqw64.exe --engine-source deps/editor-engine --audio-dir tools/audio --version "$VERSION" --output out/release
         (cd out/release && sha256sum -c ./*.sha256)
-    - name: Stage checksummed Windows packages in the draft before validation
-      shell: pwsh
-      run: |
-        if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
-        gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
-        if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
     - name: Materialize selected validation scope
       shell: pwsh
       env:
@@ -421,8 +424,14 @@ jobs:
     - name: Validate every packaged release (short smoke)
       shell: pwsh
       run: |-
-        python scripts/ci-release-smoke.py out/release --platform Windows-x64 --version $env:VERSION --output qa/smoke
+        python scripts/ci-release-smoke.py out/release --platform Windows-x64 --version $env:VERSION --output qa/smoke --require-jam
         if ($LASTEXITCODE) { throw 'Packaged smoke failed' }
+    - name: Upload validated packages to the draft release
+      shell: pwsh
+      run: |
+        if ((gh release view "v$env:VERSION" --json isDraft --jq .isDraft) -ne 'true') { throw 'Release must remain draft until all platforms pass' }
+        gh release upload "v$env:VERSION" out/release/*.zip out/release/*.sha256 --clobber
+        if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
     - name: Install selected plant import probes
       if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0

@@ -76,6 +76,28 @@ void fb_view_input(string kind,float dx,float dy,float scroll)
     for(int other=1;other<=3;other++) fb_view_centers[other]=fb_view_centers[view];
     fb_view_prepare();
 }
+// The engine's drawline always rasterizes a one-pixel GL line, regardless of width.
+void fb_view_stroke(vector a,vector b,float width,vector color,float alpha)
+{
+    a_z=b_z=0;
+    vector delta=b-a;
+    if(fabs(delta_x)<0.001) {
+        drawfill([floor(a_x-(width-1)*.5),min(a_y,b_y),0],[width,fabs(delta_y),0],color,alpha,0);
+        return;
+    }
+    if(fabs(delta_y)<0.001) {
+        drawfill([min(a_x,b_x),floor(a_y-(width-1)*.5),0],[fabs(delta_x),width,0],color,alpha,0);
+        return;
+    }
+    vector normal=normalize([-delta_y,delta_x,0])*width*.5;
+    shaderforname("ftebroom/orthostroke","{\ncull none\nprogram defaultfill\n{\nmap $whiteimage\nblendfunc blend\nrgbgen exactvertex\nalphagen vertex\n}\n}");
+    R_BeginPolygon("ftebroom/orthostroke",0,TRUE);
+    R_PolygonVertex(a-normal,'0 0 0',color,alpha);
+    R_PolygonVertex(b-normal,'0 0 0',color,alpha);
+    R_PolygonVertex(b+normal,'0 0 0',color,alpha);
+    R_PolygonVertex(a+normal,'0 0 0',color,alpha);
+    R_EndPolygon();
+}
 // Screen coordinates must not depend on the FBO's flipped projection matrix.
 // This also lets the cached grid render behind, rather than over, brush edges.
 vector fb_view_background_project(vector point)
@@ -90,14 +112,14 @@ void fb_view_background()
     int view=cvar("ca_brush_view");if(!view) return;
     fb_view_axes(view);
     vector size=getproperty(VF_SIZE),origin=getproperty(VF_MIN);
+    if(size_x<1 || size_y<1)return;
     float screenUnits=bound(1,cvar("ca_brush_viewsize"),262144)/max(size_x,size_y);
     vector centerView=fb_view_centers[view];
     vector lo=centerView-fb_view_right*size_x*screenUnits*.5-fb_view_up*size_y*screenUnits*.5;
     vector hi=centerView+fb_view_right*size_x*screenUnits*.5+fb_view_up*size_y*screenUnits*.5;
     float left=min(lo*fb_view_right,hi*fb_view_right),right=max(lo*fb_view_right,hi*fb_view_right);
     float bottom=min(lo*fb_view_up,hi*fb_view_up),top=max(lo*fb_view_up,hi*fb_view_up);
-    float step=fb_grid(),units=(right-left)/size_x;
-    while(step/units<4) step*=2;
+    float step=fb_grid(),opacity=bound(0,cvar("ftebroom_grid_alpha"),1);
     if(cvar("ftebroom_grid_visible")) {
         // FTE flips its 2D FBO projection, but scissor coordinates keep the
         // framebuffer origin. Reflect only the clip rectangle in cached views.
@@ -110,11 +132,20 @@ void fb_view_background()
             float depth=n*fb_view_normal*(lo*fb_view_normal)-n*autocvar_ftebroom_grid_origin;
             float low=min(nr*left,nr*right)+min(nu*bottom,nu*top)+depth;
             float high=max(nr*left,nr*right)+max(nu*bottom,nu*top)+depth;
-            float spacing=step;while((high-low)/spacing>1024)spacing*=2;
+            float projectedUnit=sqrt(den)*screenUnits;
+            float spacing=step;
+            while(spacing<4*projectedUnit || (high-low)/spacing>1024)spacing*=2;
+            // Fade every other line as the grid approaches the coarser step.
+            // The remaining lines stay at the same position and opacity.
+            float fine=bound(0,(spacing/projectedUnit-4)/4,1);
             vector tangent=normalize(fb_view_right*(-nu)+fb_view_up*nr)*(right-left+top-bottom)*2;
-            for(float level=ceil(low/spacing)*spacing;level<=high;level+=spacing) {
+            for(int index=ceil(low/spacing);index*spacing<=high;index++) {
+                float alpha=opacity;
+                if(index%2)alpha*=fine;
+                if(alpha<=0)continue;
+                float level=index*spacing;
                 vector center=(fb_view_right*nr+fb_view_up*nu)*((level-depth)/den)+fb_view_normal*(lo*fb_view_normal);
-                drawline(1,fb_view_background_project(center-tangent),fb_view_background_project(center+tangent),autocvar_ftebroom_grid_color,bound(0,cvar("ftebroom_grid_alpha"),1),0);
+                fb_view_stroke(fb_view_background_project(center-tangent),fb_view_background_project(center+tangent),1,autocvar_ftebroom_grid_color,alpha);
             }
         }
         drawresetcliparea();
@@ -123,8 +154,8 @@ void fb_view_background()
     string rn="X",un="Y";
     if(view==1) {rc='0.2 1 0.2';rn="Y";}
     if(view!=3) {uc='0.3 0.5 1';un="Z";}
-    drawline(2,fb_view_background_project(fb_view_right*left),fb_view_background_project(fb_view_right*right),rc,1,0);
-    drawline(2,fb_view_background_project(fb_view_up*bottom),fb_view_background_project(fb_view_up*top),uc,1,0);
+    fb_view_stroke(fb_view_background_project(fb_view_right*left),fb_view_background_project(fb_view_right*right),2,rc,1);
+    fb_view_stroke(fb_view_background_project(fb_view_up*bottom),fb_view_background_project(fb_view_up*top),2,uc,1);
     vector p=origin+[76,size_y-65,0];
     drawline(2,p,p+'36 0 0',rc,1,0);drawstring(p+'40 -5 0',rn,'8 8 0',rc,1,0);
     drawline(2,p,p+'0 -36 0',uc,1,0);drawstring(p+'-4 -50 0',un,'8 8 0',uc,1,0);

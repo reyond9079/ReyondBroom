@@ -949,11 +949,12 @@ void jamPanel()
         case jam::ResourcePhase::Checking: phaseText=jamText("Checking the resource pack…","Проверка набора ресурсов…"); break;
         case jam::ResourcePhase::Downloading: phaseText=jamText("Downloading the resource pack…","Загрузка набора ресурсов…"); break;
         case jam::ResourcePhase::Retrying: phaseText=jamText("Connection interrupted. Retrying…","Связь прервалась. Повтор загрузки…"); break;
-        case jam::ResourcePhase::Verifying: phaseText=jamText("Verifying the resource files…","Проверка файлов ресурсов…"); break;
+        case jam::ResourcePhase::Verifying: phaseText=jamText("Verifying the downloaded archive…","Проверка скачанного архива…"); break;
+        case jam::ResourcePhase::Installing: phaseText=jamText("Installing game resources…","Установка игровых ресурсов…"); break;
         case jam::ResourcePhase::Opening: phaseText=jamText("Opening the Jam board…","Открытие карты Jam…"); break;
       }
       ImGui::TextUnformatted(transfer->canceled ? jamText("Canceling…","Отмена…") : phaseText);
-      if (total && phase!=jam::ResourcePhase::Checking) {
+      if (total && (phase==jam::ResourcePhase::Downloading || phase==jam::ResourcePhase::Installing)) {
         char label[96];
         std::snprintf(label,sizeof label,jamText("%.1f / %.1f MiB","%.1f / %.1f МиБ"),bytes/1048576.,total/1048576.);
         ImGui::ProgressBar(float(bytes)/float(total),{-1,0},label);

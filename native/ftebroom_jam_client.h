@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #endif
 #include <chrono>
+#include <streambuf>
 #include <thread>
 
 #include "ftebroom_filesystem_path.h"
@@ -62,8 +63,9 @@ inline std::string fileBytes(const fs::path& file, std::size_t limit)
   return result;
 }
 
-inline void writeBytes(const fs::path& path, const std::string& bytes)
+inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTransfer* transfer = nullptr)
 {
+  if (transfer) transfer->check();
   const auto file=ftebroom::filesystemPath(path);
 #ifdef _WIN32
   // std::filesystem's recursive directory walk may misread the drive root
@@ -92,7 +94,18 @@ inline void writeBytes(const fs::path& path, const std::string& bytes)
   fs::create_directories(file.parent_path());
 #endif
   std::ofstream output(file, std::ios::binary | std::ios::trunc);
-  output.write(bytes.data(), bytes.size());
+  if (!transfer) {
+    output.write(bytes.data(),bytes.size());
+  } else {
+    while (!bytes.empty()) {
+      transfer->check();
+      const auto count = std::min<std::size_t>(bytes.size(),256*1024);
+      if (!output.write(bytes.data(),count))
+        throw std::runtime_error("Cannot write the Mapping Jam working file.");
+      transfer->bytes += count;
+      bytes.remove_prefix(count);
+    }
+  }
   output.close();
   if (!output) throw std::runtime_error("Cannot write the Mapping Jam working file.");
 }
@@ -185,10 +198,11 @@ inline void renameArtifactDirectory(const fs::path& source, const fs::path& targ
 #endif
 }
 
-inline bool validPack(const fs::path& destination, const Json& files)
+inline bool validPack(const fs::path& destination, const Json& files, ResourceTransfer* transfer)
 {
   const auto root = ftebroom::filesystemPath(destination);
   for (const auto& item : files) {
+    if (transfer) transfer->check();
     const auto name = item.at("path").get<std::string>();
     const auto length = item.at("sizeBytes").get<std::size_t>();
     const auto file = root / fs::u8path(name).make_preferred();
@@ -199,41 +213,83 @@ inline bool validPack(const fs::path& destination, const Json& files)
   return fs::is_regular_file(root / "lq1" / "pak0.pak");
 }
 
-inline bool installedPack(const fs::path& destination, const Json& manifest)
+inline Json packReceipt(const fs::path& root, const Json& manifest)
+{
+  const auto& files = manifest.at("files");
+  if (!files.is_array() || files.empty() || files.size()>64) return nullptr;
+  Json inventory = Json::object();
+  for (const auto& item : files) {
+    const auto name = item.at("path").get<std::string>();
+    if (!packEntry(name) || inventory.contains(name)) return nullptr;
+    const auto file = root/fs::u8path(name).make_preferred();
+    if (fs::is_symlink(file) || !fs::is_regular_file(file) ||
+        fs::file_size(file)!=item.at("sizeBytes").get<std::size_t>()) return nullptr;
+    inventory[name] = fs::last_write_time(file).time_since_epoch().count();
+  }
+  if (!inventory.contains("lq1/pak0.pak") || !inventory.contains("plants/builtin/catalog.json")) return nullptr;
+  return {{"manifest",manifest.at("sha256")},{"files",std::move(inventory)}};
+}
+
+inline void writePackReceipt(const fs::path& root, const Json& receipt)
+{
+  const auto marker=root/".verified-pack.json";
+  const auto temporary=root/(".verified-"+randomHex(8)+".tmp");
+  try {
+    writeBytes(temporary,receipt.dump());
+#ifdef _WIN32
+    if(!MoveFileExW(temporary.c_str(),marker.c_str(),MOVEFILE_REPLACE_EXISTING))throw std::runtime_error("Cannot replace the pack receipt.");
+#else
+    fs::rename(temporary,marker);
+#endif
+  } catch (const std::exception&) {
+    std::error_code ignored;
+    fs::remove(temporary,ignored);
+  }
+}
+
+inline bool installedPack(const fs::path& destination, const Json& manifest, ResourceTransfer* transfer = nullptr)
 {
   try {
     const auto root = ftebroom::filesystemPath(destination);
-    const auto& files = manifest.at("files");
-    if (!files.is_array() || files.empty() || files.size()>64) return false;
-    Json inventory = Json::object();
-    for (const auto& item : files) {
-      const auto name = item.at("path").get<std::string>();
-      const auto file = root/fs::u8path(name).make_preferred();
-      if (!packEntry(name) || fs::is_symlink(file) || !fs::is_regular_file(file) ||
-          fs::file_size(file)!=item.at("sizeBytes").get<std::size_t>()) return false;
-      inventory[name] = fs::last_write_time(file).time_since_epoch().count();
-    }
-    if (!inventory.contains("lq1/pak0.pak") || !inventory.contains("plants/builtin/catalog.json")) return false;
-    const Json receipt{{"manifest",manifest.at("sha256")},{"files",inventory}};
+    const auto receipt = packReceipt(root,manifest);
+    if (receipt.is_null()) return false;
     const auto marker = root/".verified-pack.json";
     if (fs::is_regular_file(marker) && !fs::is_symlink(marker) && fs::file_size(marker)<16384 &&
         Json::parse(fileBytes(marker,16384),nullptr,false)==receipt) return true;
-    if (!validPack(destination,files)) return false;
-    const auto temporary=root/(".verified-"+randomHex(8)+".tmp");
-    try {
-      writeBytes(temporary,receipt.dump());
-#ifdef _WIN32
-      if(!MoveFileExW(temporary.c_str(),marker.c_str(),MOVEFILE_REPLACE_EXISTING))throw std::runtime_error("Cannot replace the pack receipt.");
-#else
-      fs::rename(temporary,marker);
-#endif
-    } catch (const std::exception&) {
-      std::error_code ignored;
-      fs::remove(temporary,ignored);
-    }
+    if (!validPack(destination,manifest.at("files"),transfer)) return false;
+    if (transfer) transfer->check();
+    writePackReceipt(root,receipt);
     return true;
-  } catch (const std::exception&) {return false;}
+  } catch (const DownloadCanceled&) { throw; }
+    catch (const DownloadInterrupted&) { throw; }
+    catch (const std::exception&) {return false;}
 }
+
+// ZIP headers use seeks. Read them from the HTTP response without another
+// copy of the archive or a temporary ZIP on the user's filesystem.
+class ResourceArchive : public std::streambuf {
+  pos_type seekoff(off_type offset, std::ios_base::seekdir direction,
+                   std::ios_base::openmode mode) override
+  {
+    if (!(mode & std::ios_base::in)) return pos_type(-1);
+    const off_type size = egptr()-eback();
+    const off_type base = direction==std::ios_base::cur ? gptr()-eback() :
+                          direction==std::ios_base::end ? size : 0;
+    if (offset < -base || offset > size-base) return pos_type(-1);
+    setg(eback(),eback()+base+offset,egptr());
+    return pos_type(base+offset);
+  }
+  pos_type seekpos(pos_type position, std::ios_base::openmode mode) override
+  {
+    return seekoff(off_type(position),std::ios_base::beg,mode);
+  }
+public:
+  explicit ResourceArchive(std::string_view bytes)
+  {
+    auto* first = const_cast<char*>(bytes.data());
+    setg(first,first,first+bytes.size());
+  }
+};
 
 inline void download(const Client& client, const Json& manifest, const fs::path& destination, bool base,
                      const std::string& mapStem = "jam_map", bool reuse = false, ResourceTransfer* transfer = nullptr)
@@ -258,14 +314,12 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
       throw std::runtime_error("The Jam manifest contains an unexpected file.");
     total += count;
   }
-  if (!members.count(base ? "lq1/pak0.pak" : mapPath+".bsp"))
+  if (!members.count(base ? "lq1/pak0.pak" : mapPath+".bsp") ||
+      (base && !members.count("plants/builtin/catalog.json")))
     throw std::runtime_error("The Jam manifest is incomplete.");
   const auto target = ftebroom::filesystemPath(destination);
-  if (transfer) {
-    transfer->check();
-    transfer->phase = ResourcePhase::Verifying;
-  }
-  if (base && validPack(destination, files)) return;
+  if (transfer) transfer->check();
+  if (base && installedPack(destination, manifest,transfer)) return;
   if (!base && reuse) {
     const bool present = std::all_of(members.begin(),members.end(),[&](const auto& item) {
       const auto file = target/fs::u8path(item.first).make_preferred();
@@ -309,6 +363,8 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     throw Error("The Jam download failed (HTTP "+std::to_string(response.status)+").",false);
   if (transfer) {
     transfer->check();
+    transfer->total = 0;
+    transfer->bytes = 0;
     transfer->phase = ResourcePhase::Verifying;
   }
   if (response.body.size() != length ||
@@ -317,23 +373,43 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
 
   auto staging = target;
   staging += ".incoming-" + randomHex(8);
-  const auto archive = staging / "artifact.zip";
   try {
-    writeBytes(archive, response.body);
-    const auto entries = ftebroom::pak::zipDirectory(archive);
+    const std::string_view archive = response.body;
+    ResourceArchive buffer(archive);
+    std::istream input(&buffer);
+    const auto entries = ftebroom::pak::zipDirectory(input,archive.size());
     if (entries.size() != members.size()) throw std::runtime_error("Unexpected files in Jam download.");
+    if (transfer) {
+      transfer->total = total;
+      transfer->phase = ResourcePhase::Installing;
+    }
     for (const auto& entry : entries) {
       if (transfer) transfer->check();
       const auto i = members.find(entry.name);
       if (i == members.end() || entry.size != i->second.at("sizeBytes").get<std::size_t>())
         throw std::runtime_error("Unexpected file or size in Jam download.");
-      const auto bytes = ftebroom::pak::zipRead(archive, entry.name);
+      std::string inflated;
+      std::string_view bytes;
+      if (entry.method==0) {
+        if (entry.compressed!=entry.size) throw std::runtime_error("Invalid stored Jam file size.");
+        const auto offset = ftebroom::pak::zipData(input,entry,archive.size());
+        bytes = archive.substr(offset,entry.size);
+        if (crc32(0,reinterpret_cast<const Bytef*>(bytes.data()),entry.size)!=entry.crc)
+          throw std::runtime_error("A Jam file failed its ZIP checksum.");
+      } else {
+        inflated = ftebroom::pak::zipRead(input,archive.size(),entry);
+        bytes = inflated;
+      }
       if (sha256(bytes) != i->second.at("sha256").get<std::string>())
         throw std::runtime_error("An extracted Jam file did not match its manifest.");
-      writeBytes(staging / fs::u8path(entry.name).make_preferred(), bytes);
+      writeBytes(staging / fs::u8path(entry.name).make_preferred(),bytes,transfer);
+    }
+    if (base) {
+      const auto receipt = packReceipt(staging,manifest);
+      if (receipt.is_null()) throw std::runtime_error("The installed Jam resources failed verification.");
+      writePackReceipt(staging,receipt);
     }
     if (transfer) transfer->check();
-    fs::remove(archive);
     if (fs::exists(target)) {
       auto previous = target;
       previous += ".previous-" + randomHex(8);

@@ -543,7 +543,6 @@ void jamResources()
       throw std::runtime_error("The base pack version changed.");
     jam::download(client, manifest, destination, true,"jam_map",false,transfer.get());
     transfer->check();
-    if(!jam::installedPack(destination,manifest))throw std::runtime_error("The installed Jam resources failed verification.");
     transfer->phase = jam::ResourcePhase::Opening;
     return client.board(transfer.get());
   }, [destination](auto data) {
@@ -1351,10 +1350,16 @@ void jamTick()
     }
     catch (const jam::DownloadInterrupted& error) {
       jamLocal.status.clear();
-      jamLocal.error = resourceTransfer
-        ? jamText("The resource transfer stopped responding. Check your connection and retry.",
-                  "Передача ресурсов прервалась. Проверьте подключение и повторите загрузку.")
-        : error.what();
+      const auto phase = resourceTransfer ? resourceTransfer->phase.load() : jam::ResourcePhase::Downloading;
+      if (phase == jam::ResourcePhase::Installing || phase == jam::ResourcePhase::Verifying) {
+        jamLocal.error = jamText("Resource verification or installation timed out. Check available disk space and retry.",
+                                 "Проверка или установка ресурсов заняла слишком много времени. Проверьте свободное место и повторите попытку.");
+      } else {
+        jamLocal.error = resourceTransfer
+          ? jamText("The resource transfer stopped responding. Check your connection and retry.",
+                    "Передача ресурсов прервалась. Проверьте подключение и повторите загрузку.")
+          : error.what();
+      }
     }
     catch (const jam::Error& error) {
       if (!error.retryable) jamLocal.retryKey.clear();

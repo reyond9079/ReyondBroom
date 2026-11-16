@@ -40,7 +40,7 @@ struct DownloadCanceled : std::runtime_error {
   DownloadCanceled() : std::runtime_error("The Mapping Jam download was canceled.") {}
 };
 
-enum class ResourcePhase { Checking, Downloading, Retrying, Verifying, Opening };
+enum class ResourcePhase { Checking, Downloading, Retrying, Verifying, Installing, Opening };
 
 struct ResourceTransfer {
   using Clock = std::chrono::steady_clock;
@@ -214,6 +214,8 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
       throw std::runtime_error("Cannot configure the Mapping Jam HTTPS connection.");
   };
   struct Download { HttpResponse result{}; std::size_t limit; bool oversized = false; } download{{},limit};
+  if (transfer && transfer->phase == ResourcePhase::Downloading)
+    download.result.body.reserve(std::min(limit,transfer->total.load()));
   ResourceReadProgress progress(transfer);
   struct TransferContext { ResourceReadProgress* progress; std::exception_ptr error; } context{&progress,{}};
   const auto progressCallback = +[](void* data, curl_off_t, curl_off_t received, curl_off_t, curl_off_t) -> int {
@@ -379,8 +381,9 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
     if (n <= 0) throw std::runtime_error("The local request was interrupted.");
     sent += static_cast<std::size_t>(n);
   }
-  std::string received;
-  std::size_t offset = std::string::npos, expected = 0;
+  std::string responseHeaders;
+  std::size_t expected = 0;
+  bool hasHeaders = false;
   for (;;) {
     const auto n = recv(client.value, buffer.data(), buffer.size(), 0);
     if (n < 0) {
@@ -388,29 +391,34 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
       throw DownloadInterrupted("The Mapping Jam download was interrupted or timed out.");
     }
     if (!n) break;
-    received.append(buffer.data(), static_cast<std::size_t>(n));
-    if (offset == received.npos) {
-      const auto end = received.find("\r\n\r\n");
-      if (end == received.npos) {
-        if (received.size() > 16384) throw std::runtime_error("Invalid local HTTP headers.");
+    std::string_view chunk(buffer.data(),static_cast<std::size_t>(n));
+    if (!hasHeaders) {
+      responseHeaders.append(chunk);
+      const auto end = responseHeaders.find("\r\n\r\n");
+      if (end == responseHeaders.npos) {
+        if (responseHeaders.size() > 16384) throw std::runtime_error("Invalid local HTTP headers.");
         continue;
       }
-      if (received.rfind("HTTP/1.", 0) != 0 || end > 16384)
+      if (responseHeaders.rfind("HTTP/1.", 0) != 0 || end > 16384)
         throw std::runtime_error("Invalid local HTTP response.");
-      const auto length = received.find("\r\nContent-Length: ");
-      if (length == received.npos || length >= end || received.find("\r\nTransfer-Encoding:") < end)
+      const auto length = responseHeaders.find("\r\nContent-Length: ");
+      if (length == responseHeaders.npos || length >= end || responseHeaders.find("\r\nTransfer-Encoding:") < end)
         throw std::runtime_error("Invalid local HTTP length.");
-      result.status = std::stoi(received.substr(9, 3));
-      expected = std::stoull(received.substr(length + 18));
-      offset = end + 4;
+      result.status = std::stoi(responseHeaders.substr(9,3));
+      expected = std::stoull(responseHeaders.substr(length+18));
       if (expected > limit) throw std::runtime_error("The local response exceeds its size limit.");
+      result.body.reserve(expected);
+      hasHeaders = true;
+      chunk = std::string_view(responseHeaders).substr(end+4);
     }
-    progress.update(received.size() - offset);
-    if (received.size() - offset >= expected) break;
+    if (chunk.size() > expected-result.body.size())
+      throw std::runtime_error("The local response exceeded its declared length.");
+    result.body.append(chunk);
+    progress.update(result.body.size());
+    if (result.body.size()==expected) break;
   }
-  if (offset == received.npos || received.size() - offset != expected)
+  if (!hasHeaders || result.body.size()!=expected)
     throw DownloadInterrupted("The Mapping Jam download was incomplete.");
-  result.body.assign(received, offset, expected);
 #endif
   return result;
 }

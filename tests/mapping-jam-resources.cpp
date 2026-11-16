@@ -18,6 +18,21 @@ int main(int argc,char** argv)
     const bool base = std::string_view(argv[4])=="base";
     jam::ResourceTransfer transfer;
     const std::string_view mode = argv[5];
+    if (mode=="source-zip") {
+      const std::string map="{\n\"classname\" \"worldspawn\"\n}\n";
+      const auto checksum=jam::sha256(map);
+      const auto metadata=jam::Json{{"schemaVersion",1},{"sha256",checksum}}.dump();
+      std::ostringstream output;
+      ftebroom::pak::zipStore(output,{{"manifest.json",metadata},{"map/source.map",map}});
+      const auto payload=output.str();
+      std::istringstream input(payload);
+      const auto entries=ftebroom::pak::zipDirectory(input,payload.size());
+      if (entries.size()!=2 || entries[0].name!="manifest.json" || entries[1].name!="map/source.map" ||
+          ftebroom::pak::zipRead(input,payload.size(),entries[0])!=metadata ||
+          ftebroom::pak::zipRead(input,payload.size(),entries[1])!=map)
+        throw std::runtime_error("The in-memory Jam upload archive did not round trip.");
+      return 0;
+    }
     if (mode=="draft-file") {
       const auto name=jam::fs::u8path(u8"Tracé тест.map");
       const auto draft=target/name;

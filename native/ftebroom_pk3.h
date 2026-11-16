@@ -5,6 +5,44 @@ inline uint16_t half(const char* p){return (unsigned char)p[0]|uint16_t((unsigne
 inline void putHalf(std::ostream& out,uint16_t v){out.put(char(v));out.put(char(v>>8));}
 inline bool zipFile(const fs::path& path){auto ext=path.extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);return ext==".pk3";}
 inline bool zipName(std::string name){if(!name.empty()&&name.back()=='/')name.pop_back();if(name.empty()||name.size()>65534||name.front()=='/'||name.find_first_of("\\:\r\n")!=name.npos||name.find('\0')!=name.npos)return false;for(const auto& p:fs::u8path(name))if(p==".."||p==".")return false;return true;}
+inline void zipLocalHeader(std::ostream& out,ZipEntry& e){
+  const auto pos=out.tellp();
+  if(pos<0||std::uint64_t(pos)+30+e.name.size()+e.compressed>0xffff0000ULL)
+    throw std::runtime_error("PK3 requires unsupported ZIP64.");
+  e.offset=static_cast<uint32_t>(pos);
+  put(out,0x04034b50);putHalf(out,20);putHalf(out,e.flags);putHalf(out,e.method);put(out,0);
+  put(out,e.crc);put(out,e.compressed);put(out,e.size);putHalf(out,e.name.size());putHalf(out,0);
+  out.write(e.name.data(),e.name.size());
+}
+inline void zipCentralDirectory(std::ostream& out,const std::vector<ZipEntry>& entries){
+  if(entries.size()>=65535)throw std::runtime_error("Too many PK3 entries.");
+  const auto central=out.tellp();
+  for(const auto& e:entries){
+    put(out,0x02014b50);putHalf(out,20);putHalf(out,20);putHalf(out,e.flags);putHalf(out,e.method);
+    put(out,0);put(out,e.crc);put(out,e.compressed);put(out,e.size);putHalf(out,e.name.size());
+    putHalf(out,0);putHalf(out,0);putHalf(out,0);putHalf(out,0);put(out,0);put(out,e.offset);
+    out.write(e.name.data(),e.name.size());
+  }
+  const auto end=out.tellp();
+  if(central<0||end<0||std::uint64_t(end)>0xffff0000ULL)throw std::runtime_error("PK3 directory requires ZIP64.");
+  put(out,0x06054b50);put(out,0);putHalf(out,entries.size());putHalf(out,entries.size());
+  put(out,static_cast<uint32_t>(end-central));put(out,static_cast<uint32_t>(central));putHalf(out,0);
+}
+inline void zipStore(std::ostream& out,const std::map<std::string,std::string_view>& files){
+  std::vector<ZipEntry> entries;
+  for(const auto& [name,bytes]:files){
+    if(!zipName(name)||bytes.size()>512*1024*1024)throw std::runtime_error("Invalid ZIP member.");
+    ZipEntry entry;
+    entry.name=name;
+    entry.size=entry.compressed=static_cast<uint32_t>(bytes.size());
+    entry.crc=crc32(0,reinterpret_cast<const Bytef*>(bytes.data()),entry.size);
+    zipLocalHeader(out,entry);
+    out.write(bytes.data(),bytes.size());
+    entries.push_back(std::move(entry));
+  }
+  zipCentralDirectory(out,entries);
+  if(!out)throw std::runtime_error("Cannot finish ZIP.");
+}
 inline std::vector<ZipEntry> zipDirectory(std::istream& in,uint64_t size){
   if(size<22)throw std::runtime_error("Truncated PK3.");
   size_t tail=std::min<uintmax_t>(size,65557);std::string bytes(tail,0);in.seekg(size-tail);if(!in.read(bytes.data(),tail))throw std::runtime_error("Cannot read PK3 directory.");
@@ -71,15 +109,13 @@ inline void zipRewrite(const fs::path& archive,const std::map<std::string,std::s
       if(!from.empty()&&(e.name==from||e.name.rfind(from+"/",0)==0)){e.name=to+e.name.substr(from.size());matched=true;}
       if(!zipName(e.name)||!names.emplace(e.name,true).second)throw std::runtime_error("PK3 name conflict.");
       auto changed=changes.find(e.name);if(changed!=changes.end()){if(changed->second.size()>512*1024*1024)throw std::runtime_error("PK3 member too large.");e.size=e.compressed=changed->second.size();e.crc=crc32(0,(const Bytef*)changed->second.data(),e.size);e.method=0;}
-      auto pos=out.tellp();if(pos<0||uint64_t(pos)+30+e.name.size()+e.compressed>0xffff0000ULL)throw std::runtime_error("PK3 requires unsupported ZIP64.");e.offset=uint32_t(pos);e.flags&=2048;
-      put(out,0x04034b50);putHalf(out,20);putHalf(out,e.flags);putHalf(out,e.method);put(out,0);put(out,e.crc);put(out,e.compressed);put(out,e.size);putHalf(out,e.name.size());putHalf(out,0);out.write(e.name.data(),e.name.size());
+      e.flags&=2048;zipLocalHeader(out,e);
       if(changed!=changes.end())out.write(changed->second.data(),changed->second.size());else{in.seekg(sourceOffset);char block[65536];uint32_t left=e.compressed;while(left){auto n=std::min<size_t>(left,sizeof block);if(!in.read(block,n))throw std::runtime_error("Cannot copy PK3 member.");out.write(block,n);left-=n;}}
       written.push_back(e);
     };
     for(auto e:entries)write(e,true);for(const auto& c:changes)if(!names.count(c.first)){ZipEntry e;e.name=c.first;write(e,false);}
-    if(!matched)throw std::runtime_error("PK3 source not found.");if(written.size()>=65535)throw std::runtime_error("Too many PK3 entries.");auto central=out.tellp();
-    for(const auto& e:written){put(out,0x02014b50);putHalf(out,20);putHalf(out,20);putHalf(out,e.flags);putHalf(out,e.method);put(out,0);put(out,e.crc);put(out,e.compressed);put(out,e.size);putHalf(out,e.name.size());putHalf(out,0);putHalf(out,0);putHalf(out,0);putHalf(out,0);put(out,0);put(out,e.offset);out.write(e.name.data(),e.name.size());}
-    auto end=out.tellp();if(end<0||uint64_t(end)>0xffff0000ULL)throw std::runtime_error("PK3 directory requires ZIP64.");put(out,0x06054b50);put(out,0);putHalf(out,written.size());putHalf(out,written.size());put(out,uint32_t(end-central));put(out,uint32_t(central));putHalf(out,0);out.close();in.close();if(!out)throw std::runtime_error("Cannot finish PK3.");zipDirectory(temp);
+    if(!matched)throw std::runtime_error("PK3 source not found.");
+    zipCentralDirectory(out,written);out.close();in.close();if(!out)throw std::runtime_error("Cannot finish PK3.");zipDirectory(temp);
     if(fs::last_write_time(archive)!=stamp||fs::file_size(archive)!=size)throw std::runtime_error("PK3 changed during save.");if(keepBackup)fs::copy_file(archive,backup);
 #ifdef _WIN32
     if(!ReplaceFileW(archive.c_str(),temp.c_str(),nullptr,0,nullptr,nullptr))throw std::runtime_error("Cannot replace PK3; original and backup preserved.");

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <stdexcept>
+#include <string_view>
 #include "ftebroom_filesystem_path.h"
 #ifdef _WIN32
 #ifndef NOMINMAX

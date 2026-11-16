@@ -17,7 +17,8 @@ struct JamWorldState {
   std::future<JamJson> sync, content;
   std::future<void> uploadDraft;
   std::future<JamWorldHub> hubCheck;
-  std::chrono::steady_clock::time_point nextSync, nextContent, captureDeadline, nextCapture, nextHubCheck;
+  std::chrono::steady_clock::time_point nextSync, captureDeadline, nextCapture, nextHubCheck;
+  std::map<std::string,std::chrono::steady_clock::time_point> contentRetry;
   JamJson state, draft;
   std::map<std::string,JamWorldPreview> previews;
   std::map<std::string,std::string> online;
@@ -95,7 +96,7 @@ void jamWorldRefreshHub()
     const auto folder="jam-hub-"+hash;
     const auto destination=target/folder;
     const auto bsp=ftebroom::filesystemPath(destination/"maps/jam_hub.bsp");
-    if (version!=known || !JamFs::is_regular_file(bsp))
+    if (version!=known || !ftebroom::pak::regularFile(bsp))
       jam::download(client,manifest,destination,false,"jam_hub",true);
     return JamWorldHub{version,"maps/ftebroom-build/"+folder+"/maps/jam_hub.bsp"};
   });
@@ -110,7 +111,7 @@ bool jamWorldMaterial(const std::string& name)
 JamJson jamReadWorldCapture(int marker)
 {
   const auto path=documentPath("data/jam-world-draft.txt");
-  if (path.empty() || !JamFs::is_regular_file(ftebroom::filesystemPath(path))) return nullptr;
+  if (!ftebroom::pak::regularFile(path)) return nullptr;
   std::istringstream input(jam::fileBytes(path,512*1024));
   input.imbue(std::locale::classic());
   std::string header;
@@ -230,7 +231,7 @@ void jamWorldFetchContent(const std::string& local)
           // Wait for current metadata before starting another download.
           ++jamWorld.obsoletePreviews;
           jamWorld.nextSync=now;
-          jamWorld.nextContent=now+milliseconds(750);
+          jamWorld.contentRetry[jamWorld.requestedPlot]=now+milliseconds(750);
         } else {
           for (const auto& item:jamWorld.state.at("plots")) {
             if (jamField(item,"plot")!=jamWorld.requestedPlot ||
@@ -246,21 +247,23 @@ void jamWorldFetchContent(const std::string& local)
     } catch (const std::exception& error) {
       if (jamWorld.contentSession==jamWorld.session) {
         jamWorldIssue("preview",&error);
-        jamWorld.nextContent=now+seconds(2);
+        jamWorld.contentRetry[jamWorld.requestedPlot]=now+seconds(2);
       }
     }
   }
-  if (now<jamWorld.nextContent) return;
   for (const auto& item:jamWorld.state.at("plots")) {
     const auto plot=jamField(item,"plot"),revision=jamField(item,"revision"),mode=jamField(item,"mode");
     if (plot==local || !jamWorldPlot(plot) || !jam::hexId(revision,32)) continue;
     if (jamWorld.previews.count(plot) && jamWorld.previews.at(plot).revision==revision) continue;
     if (mode!="map" && mode!="bsp") continue;
+    const auto retry=jamWorld.contentRetry.find(plot);
+    if (retry!=jamWorld.contentRetry.end() && now<retry->second) continue;
     const auto client=jamLocal.client;
-    const auto cache=jamRoot()/"published"/revision;
-    const auto model="maps/ftebroom-build/world-"+revision+"/jam_map.bsp";
+    const auto folder="maps/ftebroom-build/world-"+revision;
+    const auto model=folder+"/maps/jam_map.bsp";
+    const auto cache=documentPath(folder);
     const auto target=documentPath(model);
-    if (target.empty()) continue;
+    if (cache.empty() || target.empty()) continue;
     jamWorld.requestedPlot=plot;
     jamWorld.requestedMode=mode;
     jamWorld.requestedRevision=revision;
@@ -277,11 +280,7 @@ void jamWorldFetchContent(const std::string& local)
           return nullptr;
         throw;
       }
-      for (const auto* extension:{".bsp",".lit"}) {
-        const auto from=ftebroom::filesystemPath(cache/"maps"/(std::string("jam_map")+extension));
-        auto to=target;to.replace_extension(extension);
-        if (JamFs::is_regular_file(from)) jam::writeBytes(to,jam::fileBytes(from,32*1024*1024));
-      }
+      if (!ftebroom::pak::regularFile(target)) throw std::runtime_error("Cannot open the downloaded Jam BSP preview.");
       return JamJson{{"revision",revision},{"model",model}};
     });
     break;
@@ -307,7 +306,7 @@ void jamWorldTick()
     jamWorld.nextHubCheck={};
     jamWorld.lastSync={};
     jamWorld.nextSync={};
-    jamWorld.nextContent={};
+    jamWorld.contentRetry.clear();
     jamWorld.outgoingMode.clear();
     jamWorld.activePlot.clear();
     jamWorld.knownPresence=false;
@@ -365,6 +364,19 @@ void jamWorldTick()
     try {
       auto state=jamWorld.sync.get();
       if (joined && jamWorld.syncSession==session && state.contains("plots")) {
+        // A freshly opened draft can take a few frames to upload. Keep
+        // requesting the playable publication until the first draft arrives.
+        for (auto& item : state.at("plots")) {
+          if (jamField(item,"mode")!="map" || jam::hexId(jamField(item,"revision"),32)) continue;
+          const auto cell=jamCell(jamField(item,"plot"));
+          if (!cell.is_object()) continue;
+          const auto& publication=cell.at("publication");
+          const auto revision=jamField(publication,"revisionId");
+          if (publication.is_object() && publication.value("playable",false) && jam::hexId(revision,32)) {
+            item["mode"]="bsp";
+            item["revision"]=revision;
+          }
+        }
         jamChatReceive(state);
         jamWorldPresence(state);
         if(editing) jamPoseLegacy(state,now);
@@ -411,7 +423,17 @@ void jamWorldTick()
       jamWorld.captureRevision=revision;
       std::error_code error;
       const auto path=documentPath("data/jam-world-draft.txt");
-      if (!path.empty()) JamFs::remove(ftebroom::filesystemPath(path),error);
+      if (!path.empty()) {
+#ifdef _WIN32
+        if (!DeleteFileW(ftebroom::filesystemPath(path).c_str())) {
+          const auto code=GetLastError();
+          if (code!=ERROR_FILE_NOT_FOUND && code!=ERROR_PATH_NOT_FOUND)
+            error=std::error_code(code,std::system_category());
+        }
+#else
+        JamFs::remove(path,error);
+#endif
+      }
       else error=std::make_error_code(std::errc::no_such_file_or_directory);
       if (error) {
         jamWorld.captureRevision=-1;

@@ -425,12 +425,14 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
   }
   if (!base && reuse) {
     const bool present = std::all_of(members.begin(),members.end(),[&](const auto& item) {
-      const auto file = target/fs::u8path(item.first).make_preferred();
-      return !fs::is_symlink(file) && fs::is_regular_file(file) &&
-        fs::file_size(file)==item.second.at("sizeBytes").template get<std::size_t>() &&
-        sha256(fileBytes(file,maxSize))==item.second.at("sha256").template get<std::string>();
+      try {
+        packFileStamp(target,item.first,item.second.at("sizeBytes").template get<std::uint64_t>());
+        return sha256(fileBytes(target/fs::u8path(item.first).make_preferred(),maxSize))==
+          item.second.at("sha256").template get<std::string>();
+      } catch (const std::exception&) { return false; }
     });
-    const bool staleLit = !members.count(mapPath+".lit") && fs::exists(target/fs::u8path(mapPath+".lit").make_preferred());
+    const bool staleLit = !members.count(mapPath+".lit") &&
+      ftebroom::pak::regularFile(target/fs::u8path(mapPath+".lit").make_preferred());
     if (present && !staleLit) return;
   }
 
@@ -549,7 +551,11 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     }
     if (transfer) transfer->check();
     if (transfer) transfer->record("activate_directory");
+#ifdef _WIN32
+    if (GetFileAttributesW(target.c_str())!=INVALID_FILE_ATTRIBUTES) {
+#else
     if (fs::exists(target)) {
+#endif
       auto previous = target;
       previous += ".previous-" + randomHex(8);
       renameArtifactDirectory(target,previous);
@@ -674,17 +680,16 @@ inline fs::path prepareBasePack(const Client& client, const Json& manifest, cons
 inline Json sendMap(const Client& client, const std::string& plot, const Json& rules,
                     const Json& baseRevision, const std::string& title, const fs::path& snapshot)
 {
-  const auto bytes = fileBytes(snapshot, 2 * 1024 * 1024);
+  const auto limit=rules.value("maxSourceBytes",2*1024*1024);
+  if (limit<=0 || limit>2*1024*1024) throw std::runtime_error("Invalid Mapping Jam upload limit.");
+  const auto bytes = fileBytes(snapshot,limit);
   if (bytes.empty()) throw std::runtime_error("The exported map is empty.");
-  const auto archive = ftebroom::filesystemPath(snapshot.parent_path() / "source.zip");
-  std::string empty(22, '\0');
-  empty.replace(0, 4, "PK\x05\x06", 4);
-  writeBytes(archive, empty);
-  ftebroom::pak::zipRewrite(archive, {
-    {"manifest.json", Json{{"schemaVersion", 1}, {"sha256", sha256(bytes)}}.dump()},
-    {"map/source.map", bytes}
-  }, {}, {}, {}, false);
-  const auto payload = fileBytes(archive, 2 * 1024 * 1024);
+  const auto manifest=Json{{"schemaVersion",1},{"sha256",sha256(bytes)}}.dump();
+  std::ostringstream archive;
+  ftebroom::pak::zipStore(archive,{{"manifest.json",manifest},{"map/source.map",bytes}});
+  const auto payload=archive.str();
+  if (payload.size()>static_cast<std::size_t>(limit))
+    throw std::runtime_error("The Mapping Jam upload archive exceeds the allowed size.");
   const auto upload = client.json("POST", client.prefix + "plots/" + plot + "/uploads",
     {{"title", title}, {"baseRevisionId", baseRevision}, {"rulesVersion", rules.at("rulesVersion")},
      {"packVersion", rules.at("packVersion")}, {"termsVersion", rules.at("termsVersion")},

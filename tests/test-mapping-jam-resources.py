@@ -132,6 +132,8 @@ def check(exe, root, source, peak_limit):
             print("PASS replacement finishes before old pack cleanup")
             run(destination="drafts",mode="draft-file")
             print("PASS the draft is readable and a second create preserves its contents")
+            run(mode="source-zip")
+            print("PASS the publication ZIP round trips in memory without a disk file")
             if os.name == "nt":
                 long_target = "/".join(("nested directory with spaces " + "x"*52,)*3 + ("installed",))
                 native_root = Path("\\\\?\\"+str(root))

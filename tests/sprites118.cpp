@@ -30,7 +30,15 @@ int main(int argc,char** argv){try{
  @PointClass sprite() = sprite_dynamic [model(studio):"Sprite":"sprites/default.spr"]
  @PointClass model("progs/model.mdl") iconsprite("progs/icon.spr") = prefer_model []
  @PointClass iconsprite("progs/icon.spr") model("progs/model.mdl") = prefer_model_reverse []
+ @PointClass base(BaseIcon) iconsprite("progs/override.spr") = icon_override []
  )FGD",".fgd");
- check(definitions.at("icon_child").model=="progs/inherited.spr","fgd_inherited_icon_sprite");check(definitions.at("icon_direct").model=="progs/direct.spr","fgd_iconsprite_case_insensitive");check(definitions.at("sprite_fixed").model=="sprites/fixed.spr","fgd_sprite_literal");check(definitions.at("sprite_dynamic").modelKey=="model"&&definitions.at("sprite_dynamic").model=="sprites/default.spr","fgd_sprite_property_and_default");check(definitions.at("prefer_model").model=="progs/model.mdl"&&definitions.at("prefer_model_reverse").model=="progs/model.mdl","explicit_model_precedes_icon");
+ check(definitions.at("icon_child").iconSprites==std::vector<std::string>{"progs/inherited.spr"},"fgd_inherited_icon_sprite");
+ check(definitions.at("icon_direct").iconSprites==std::vector<std::string>{"progs/direct.spr"},"fgd_iconsprite_case_insensitive");
+ check(definitions.at("icon_override").iconSprites==std::vector<std::string>{"progs/override.spr","progs/inherited.spr"},"fgd_icon_falls_back_to_inherited_path");
+ check(definitions.at("sprite_fixed").model=="sprites/fixed.spr","fgd_sprite_literal");check(definitions.at("sprite_dynamic").modelKey=="model"&&definitions.at("sprite_dynamic").model=="sprites/default.spr","fgd_sprite_property_and_default");
+ for(const auto* name:{"prefer_model","prefer_model_reverse"}) {
+  const auto& definition=definitions.at(name);
+  check(definition.model=="progs/model.mdl"&&definition.iconSprites==std::vector<std::string>{"progs/icon.spr"},name);
+ }
  if(argc>1){int count=0;for(int arg=1;arg<argc;arg++){std::ifstream in(argv[arg],std::ios::binary);std::string bytes((std::istreambuf_iterator<char>(in)),{});auto offset=quake1::word(bytes,4),length=quake1::word(bytes,8);quake1::range(bytes,offset,length);for(size_t at=offset;at<offset+length;at+=64){auto name=quake1::name(bytes,at,56);if(name.size()<4||name.substr(name.size()-4)!=".spr")continue;auto pos=quake1::word(bytes,at+56),len=quake1::word(bytes,at+60);quake1::range(bytes,pos,len);auto decoded=readSprite(bytes.substr(pos,len),palette);if(decoded.tga.empty())throw std::runtime_error("Empty AD sprite: "+name);count++;}}check(count>50,"actual_ad_pak_sprite_frames_decode");std::cout<<"Decoded "<<count<<" real mod sprites\n";}
  }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}}

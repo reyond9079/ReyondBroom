@@ -96,6 +96,8 @@ typedef struct
 	float scale;
     float modelskin,modelframe;
     vector modelaxes;
+    string iconShader;
+    vector iconSize;
     int pickMesh;
     vector pickLocalMin,pickLocalMax;
 	
@@ -165,6 +167,12 @@ trisoup_simple_vert_t *fb_entity_vertices(int index,int solid)
     return &editents[index].bboxverts[0];
 }
 string fb_entity_classname(int index){if(index>=0 && index<numents)return editents[index].fields["classname"];return "";}
+string fb_entity_icon_shader(int index)
+{
+    if(index<0 || index>=numents)return "";
+    return editents[index].iconShader;
+}
+vector fb_entity_icon_size(int index){return editents[index].iconSize;}
 int fb_entity_light_icon(int index)
 {
     if(index<0 || index>=numents || editents[index].modelSpecified || editents[index].modelindex || editents[index].isbsp)
@@ -460,6 +468,8 @@ void(float num) editor_ents_delete =
 	{
 		hash_destroytab(editents[num].fields);
 		editents[num].fields = 0i;
+        strunzone(editents[num].iconShader);
+        editents[num].iconShader="";
 		terrain_edit(TEREDIT_ENT_SET, num, __NULL__);
 	}
 };
@@ -517,6 +527,8 @@ int fb_entity_render_epoch;
 void(entedit_t *nent) editor_ents_updated =
 {
     fb_entity_render_epoch++;
+    strunzone(nent->iconShader);
+    nent->iconShader="";
 	float ang;
 	int i;
 
@@ -562,9 +574,11 @@ void(entedit_t *nent) editor_ents_updated =
 	}
 	else
 		nent->isbsp = substring(nent->fields["model"],0,1)=="*";
+    string iconPath="";
     int definition=-1;if(fb_entity_definition_index)definition=(int)fb_entity_definition_index[nent->fields["classname"]]-1i;
     if(definition>=0 && definition<fb_entity_definition_count){
         fb_entity_definition_t *def=&fb_entity_definitions[definition];
+        iconPath=def->iconSprite;
 		nent->mins=def->mins;nent->maxs=def->maxs;nent->colourmod=def->color;
 		if(!nent->isbsp) {
             nent->modelskin=stof(fb_definition_parameter(def->modelskin,nent->fields,nent->fields["skin"]));
@@ -611,8 +625,27 @@ void(entedit_t *nent) editor_ents_updated =
     // Cache geometric bounds outside the pointer/render loop. Sprites,
     // missing models and entity icons keep their ordinary selection box.
     nent->pickMesh=FALSE;
-    string suffix=strtolower(substring(modelnameforindex(nent->modelindex),-4,4));
-    if(nent->modelindex && !nent->isbsp && suffix!=".spr" && suffix!=".sp2" && suffix!="pr32" && suffix!="spr2"){
+    string modelPath=modelnameforindex(nent->modelindex);
+    string suffix=strtolower(substring(modelPath,-4,4));
+    int isSprite=suffix==".spr" || suffix==".sp2" || suffix=="pr32" || suffix=="spr2";
+    if(!nent->isbsp && checkbuiltin(spriteframe) && (iconPath!="" || isSprite)){
+        string shader="";
+        if(iconPath!="")shader=spriteframe(iconPath,0,0);
+        if(shader=="" && isSprite)shader=spriteframe(modelPath,(int)nent->modelframe,0);
+        if(shader!=""){
+            nent->iconShader=strzone(shader);
+            vector size=drawgetimagesize(nent->iconShader);
+            float span=max(size_x,size_y);
+            nent->iconSize='22 22 0';
+            if(size_x>0 && size_y>0)nent->iconSize=[size_x,size_y,0]*(22/span);
+            if(!nent->modelindex && iconPath!=""){
+                nent->modelindex=modelindexforname(iconPath);
+                nent->modelframe=0;
+                isSprite=TRUE;
+            }
+        }
+    }
+    if(nent->modelindex && !nent->isbsp && !isSprite){
         vector modelLow,modelHigh;
         if(checkbuiltin(editor_model_info)){
             modelLow=editor_model_info(nent->modelindex,0,1);modelHigh=editor_model_info(nent->modelindex,0,2);
@@ -691,7 +724,7 @@ void() editor_ents_reload =
 
 	if(!tempent) tempent=spawn();
 	fb_entity_vertex_pool_clear();
-	for(int old=0;old<numents;old++){if(editents[old].fields)hash_destroytab(editents[old].fields);fb_entity_release_vertices(&editents[old]);}
+	for(int old=0;old<numents;old++){if(editents[old].fields)hash_destroytab(editents[old].fields);strunzone(editents[old].iconShader);fb_entity_release_vertices(&editents[old]);}
 	memfree((__variant*)editents);
 	numents = terrain_edit(TEREDIT_ENT_COUNT);
 	editents_capacity=numents;
@@ -732,6 +765,7 @@ void editor_ents_update_one(int idx,string data)
     numents=max(numents,count);
     entedit_t *ent=&editents[idx];
     if(ent->fields)hash_destroytab(ent->fields);
+    strunzone(ent->iconShader);
     fb_entity_release_vertices(ent);
     memfill8((__variant*)ent,0,sizeof(entedit_t));
     if(data=="" || data==__NULL__){fb_entity_render_epoch++;return;}

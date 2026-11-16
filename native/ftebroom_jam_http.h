@@ -40,19 +40,45 @@ struct DownloadCanceled : std::runtime_error {
   DownloadCanceled() : std::runtime_error("The Mapping Jam download was canceled.") {}
 };
 
-enum class ResourcePhase { Checking, Downloading, Retrying, Verifying, Installing, Opening };
+enum class ResourcePhase { Checking, Downloading, Retrying, Verifying, Installing, Finalizing };
 
 struct ResourceTransfer {
   using Clock = std::chrono::steady_clock;
   const Clock::time_point deadline = Clock::now() + std::chrono::minutes(4);
+  static constexpr auto localIdleLimit = std::chrono::seconds(45);
   std::atomic<ResourcePhase> phase{ResourcePhase::Checking};
   std::atomic<std::size_t> bytes{0}, total{0};
-  std::atomic<bool> canceled{false};
+  std::atomic<Clock::time_point> lastLocalProgress{Clock::now()};
+  std::atomic<bool> canceled{false}, timedOut{false};
+
+  bool local() const
+  {
+    const auto step = phase.load();
+    return step == ResourcePhase::Verifying || step == ResourcePhase::Installing ||
+           step == ResourcePhase::Finalizing;
+  }
+
+  bool localStalled(Clock::time_point now = Clock::now()) const
+  {
+    return local() && now - lastLocalProgress.load() >= localIdleLimit;
+  }
+
+  void localPhase(ResourcePhase step)
+  {
+    lastLocalProgress = Clock::now();
+    phase = step;
+  }
+
+  void wrote(std::size_t count)
+  {
+    bytes += count;
+    lastLocalProgress = Clock::now();
+  }
 
   void check() const
   {
     if (canceled) throw DownloadCanceled();
-    if (Clock::now() >= deadline)
+    if (timedOut || (local() ? localStalled() : Clock::now() >= deadline))
       throw DownloadInterrupted("The Mapping Jam resource download reached its time limit.");
   }
 };

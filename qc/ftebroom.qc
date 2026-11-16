@@ -103,7 +103,9 @@ int fb_createbox(vector center, vector size)
     int model=fb_creation_model();
     if(!model) {fb_tx_cancel();return 0;}
     int id=brush_history_create(model,fb_preview,6,CONTENTBIT_SOLID,TRUE);
-    return fb_tx_commit()?id:0;
+    // QuakeC's mixed numeric ternary can round brush IDs beyond 24 bits.
+    if(!fb_tx_commit())return 0;
+    return id;
 }
 void fb_cancel()
 {

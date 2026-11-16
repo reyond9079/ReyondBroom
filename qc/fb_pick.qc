@@ -442,6 +442,12 @@ int fb_point_preview_cache_allowed();
 void fb_point_icon_2d(int id, string name, vector pixel, vector color)
 {
     pixel_z=0;
+    string icon=fb_entity_icon_shader(id);
+    if(icon!=""){
+        vector size=fb_entity_icon_size(id);
+        drawpic(pixel-size*.5,icon,size,'1 1 1',1,0);
+        return;
+    }
     if(fb_entity_light_icon(id)) {
         drawpic(pixel-'9 9 0',"icons/light-bulb.tga",'18 18 0','1 1 1',1,0);
         return;

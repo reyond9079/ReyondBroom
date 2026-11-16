@@ -940,7 +940,7 @@ void jamPanel()
     };
     feedback(jamLocal.status,ImGui::GetStyleColorVec4(ImGuiCol_Text));
     feedback(jamLocal.error,{1,.43f,.4f,1});
-    if (const auto transfer=jamLocal.resourceTransfer) {
+    if (const auto transfer=jamLocal.resourceTransfer; transfer && !transfer->timedOut) {
       const auto phase=transfer->phase.load();
       const auto total=transfer->total.load();
       const auto bytes=std::min(transfer->bytes.load(),total);
@@ -951,7 +951,7 @@ void jamPanel()
         case jam::ResourcePhase::Retrying: phaseText=jamText("Connection interrupted. Retrying…","Связь прервалась. Повтор загрузки…"); break;
         case jam::ResourcePhase::Verifying: phaseText=jamText("Verifying the downloaded archive…","Проверка скачанного архива…"); break;
         case jam::ResourcePhase::Installing: phaseText=jamText("Installing game resources…","Установка игровых ресурсов…"); break;
-        case jam::ResourcePhase::Opening: phaseText=jamText("Opening the Jam board…","Открытие карты Jam…"); break;
+        case jam::ResourcePhase::Finalizing: phaseText=jamText("Finishing resource installation…","Завершение установки ресурсов…"); break;
       }
       ImGui::TextUnformatted(transfer->canceled ? jamText("Canceling…","Отмена…") : phaseText);
       if (total && (phase==jam::ResourcePhase::Downloading || phase==jam::ResourcePhase::Installing)) {
@@ -960,7 +960,9 @@ void jamPanel()
         ImGui::ProgressBar(float(bytes)/float(total),{-1,0},label);
       }
       ImGui::BeginDisabled(transfer->canceled);
-      if (jamTrackedButton("cancel",jamText("Cancel download","Отменить загрузку"))) transfer->canceled=true;
+      const auto* cancel = transfer->local() ? jamText("Cancel installation","Отменить установку")
+                                             : jamText("Cancel download","Отменить загрузку");
+      if (jamTrackedButton("cancel",cancel)) transfer->canceled=true;
       ImGui::EndDisabled();
     }
     if (jamBusy() && jamLocal.status == jamText("Downloading the published map…","Загрузка опубликованной карты…") &&

@@ -129,7 +129,7 @@ static bool definitionsLoad(std::string selection, bool mapOverride)
       if(definitionsReadSource("quake1.ent",base)) {
         auto defaults=ftebroom::entityRead(base,".ent");
         for(auto& item:loaded)
-          if(auto fallback=defaults.find(item.first);item.second.model.empty()&&fallback!=defaults.end())
+          if(auto fallback=defaults.find(item.first);item.second.model.empty()&&item.second.iconSprites.empty()&&fallback!=defaults.end())
             item.second.model=fallback->second.model;
         // Some mods describe only classes implemented by their game code.
         for(const char* name:{"func_group","func_detail"})
@@ -145,9 +145,20 @@ static bool definitionsLoad(std::string selection, bool mapOverride)
       }
     }
     std::ostringstream out;
-    for (const auto& item : loaded)
+    std::map<std::string, bool> spriteFiles;
+    for (auto& item : loaded)
     {
-      const auto& d = item.second;
+      auto& d = item.second;
+      // Custom classes can override a base icon with an asset the mod has not installed yet.
+      for (const auto& candidate : d.iconSprites) {
+        auto [entry, first] = spriteFiles.try_emplace(candidate, false);
+        if (first) {
+          qhandle_t file;
+          auto size=files->Open(candidate.c_str(),&file,1);
+          if (size>=0) { files->Close(file); entry->second=size>0; }
+        }
+        if (entry->second) { d.iconSprite=candidate; break; }
+      }
       auto vec = [](const auto& v) {
         std::ostringstream s;
         s << v[0] << ' ' << v[1] << ' ' << v[2];
@@ -161,7 +172,7 @@ static bool definitionsLoad(std::string selection, bool mapOverride)
           << std::quoted(vec(d.maxs)) << ' ' << std::quoted(vec(d.color)) << ' '
           << std::quoted(model) << ' ' << std::quoted(d.modelKey) << ' '
           << std::quoted(d.modelSkin) << ' ' << std::quoted(d.modelFrame) << ' '
-          << std::quoted(d.modelScale) << '\n';
+          << std::quoted(d.modelScale) << ' ' << std::quoted(d.iconSprite) << '\n';
       out << "kind " << std::quoted(d.name) << ' ' << (d.brush ? 1 : 0) << '\n';
       for (const auto& prop : d.properties)
         out << "property " << std::quoted(d.name) << ' ' << std::quoted(prop.first) << ' '

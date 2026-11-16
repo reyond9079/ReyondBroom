@@ -46,9 +46,11 @@ static qhandle_t modelImage(std::string path,ftebroom::preview::Pixels* pixels=n
 }
 static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,float size){
  entityPreviewPump();
- if(def.brush||def.model.empty()||def.model.find_first_of("{}()\"'")!=std::string::npos)return false;
+ const bool icon=def.brush||def.model.empty();
+ const auto& model=icon?def.iconSprite:def.model;
+ if(model.empty()||model.find_first_of("{}()\"'")!=std::string::npos)return false;
  if(!ImGui::IsRectVisible(tile,{tile.x+size,tile.y+size}))return true;
- auto key=def.model+":"+def.modelSkin+(def.modelFrame.empty()?"":":"+def.modelFrame);auto it=entityPreviews.find(key);
+ auto key=model+":"+(icon?"":def.modelSkin)+(icon||def.modelFrame.empty()?"":":"+def.modelFrame);auto it=entityPreviews.find(key);
  if(it==entityPreviews.end()){
   // Loading engine resources and GPU uploads stay on the render thread. Only
   // one visible cache miss is admitted per frame; rasterization runs in one worker.
@@ -57,8 +59,8 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
   if(entityPreviews.size()>=128){auto oldest=std::min_element(entityPreviews.begin(),entityPreviews.end(),[](const auto& a,const auto& b){return a.second.used<b.second.used;});entityPreviewRelease(oldest->second);entityPreviews.erase(oldest);}
   EntityPreview preview;
   try {
-   auto bytes=modelResource(def.model);if(bytes.empty()||bytes.size()>64*1024*1024)throw std::runtime_error("Missing or oversized model");
-   const auto frame=std::max(0,std::atoi(def.modelFrame.c_str()));
+   auto bytes=modelResource(model);if(bytes.empty()||bytes.size()>64*1024*1024)throw std::runtime_error("Missing or oversized model");
+   const auto frame=icon?0:std::max(0,std::atoi(def.modelFrame.c_str()));
    if(bytes.substr(0,4)=="IDSP"||bytes.substr(0,4)=="IDS2"){
     auto sprite=ftebroom::readSprite(bytes,bytes.substr(0,4)=="IDSP"&&ftebroom::quake1::word(bytes,4)==1?modelResource("gfx/palette.lmp"):std::string{},frame);
     qhandle_t image=0;if(!sprite.image.empty())image=modelImage(sprite.image);
@@ -68,7 +70,7 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
    }else if(bytes.substr(0,4)=="IDST"||bytes.substr(0,4)=="IDP2"){
     std::string companion;
     if(bytes.substr(0,4)=="IDST"&&bytes.size()>=244&&!ftebroom::quake1::word(bytes,180)){
-      auto stem=def.model.substr(0,def.model.find_last_of('.'));companion=modelResource(stem+"t.mdl");if(companion.empty())companion=modelResource(stem+"T.mdl");}
+      auto stem=model.substr(0,model.find_last_of('.'));companion=modelResource(stem+"t.mdl");if(companion.empty())companion=modelResource(stem+"T.mdl");}
     auto parts=bytes.substr(0,4)=="IDP2"?ftebroom::legacyModels::md2(bytes,std::max(0,std::atoi(def.modelSkin.c_str())),frame):ftebroom::legacyModels::studio(bytes,companion,std::max(0,std::atoi(def.modelSkin.c_str())));
     for(size_t i=0;i<parts.size();i++){auto& part=parts[i];qhandle_t image=0;ftebroom::preview::Pixels pixels;
       if(!part.embedded.pixels.empty()){auto tga=ftebroom::quake1::tga(part.embedded,{});auto name="ftebroom/legacy-model-"+std::to_string(entityDefinitionEpoch)+"-"+std::to_string(std::hash<std::string>{}(key))+"-"+std::to_string(i)+".tga";draw->LoadImageData(name.c_str(),"image/tga",tga.data(),tga.size());image=draw->LoadImage(name.c_str());pixels=entityPreviewPixels(tga);}
@@ -78,7 +80,7 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
     auto surfaces=ftebroom::readMd3(bytes,frame);std::map<std::string,std::string> skins;
     if(def.modelSkin.find(".skin")!=std::string::npos){std::istringstream input(modelResource(def.modelSkin));std::string line;while(std::getline(input,line)){auto comma=line.find(',');if(comma!=line.npos){auto value=line.substr(comma+1);value.erase(0,value.find_first_not_of(" \t"));auto end=value.find_last_not_of(" \r\t");if(end!=value.npos)value.erase(end+1);skins[line.substr(0,comma)]=value;}}}
     for(auto& surface:surfaces){auto name=skins.count(surface.name)?skins[surface.name]:surface.shader;ftebroom::preview::Pixels pixels;auto image=modelImage(name,&pixels);preview.parts.push_back({image,std::move(surface.triangles),std::move(pixels)});}
-   }else if(std::filesystem::path(def.model).extension()==".bsp"){
+   }else if(std::filesystem::path(model).extension()==".bsp"){
     auto surfaces=ftebroom::bspUV::read(bytes,modelResource("gfx/palette.lmp"),{},true);
     for(auto& surface:surfaces){
      if(surface.triangles.empty())continue;
@@ -89,7 +91,7 @@ static bool entityModelTile(const ftebroom::EntityDefinition& def,ImVec2 tile,fl
     }
    }else{
     auto mdl=ftebroom::readMdl(bytes,std::atoi(def.modelSkin.c_str()),frame);auto palette=modelResource("gfx/palette.lmp");
-    auto base=def.model.substr(0,def.model.find_last_of('.'));ftebroom::preview::Pixels skinPixels;auto skin=modelImage(base+"_"+(def.modelSkin.empty()?"0":def.modelSkin),&skinPixels);
+    auto base=model.substr(0,model.find_last_of('.'));ftebroom::preview::Pixels skinPixels;auto skin=modelImage(base+"_"+(def.modelSkin.empty()?"0":def.modelSkin),&skinPixels);
     if(!skin){auto pixels=ftebroom::quake1::tga(mdl.skin,palette);auto name="ftebroom/model-"+std::to_string(entityDefinitionEpoch)+"-"+std::to_string(std::hash<std::string>{}(key))+".tga";
      draw->LoadImageData(name.c_str(),"image/tga",pixels.data(),pixels.size());skin=draw->LoadImage(name.c_str());skinPixels=entityPreviewPixels(pixels);}
     preview.parts.push_back({skin,std::move(mdl.triangles),std::move(skinPixels)});

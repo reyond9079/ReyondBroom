@@ -56,13 +56,7 @@ struct Client {
 
 inline std::string fileBytes(const fs::path& file, std::size_t limit)
 {
-  const auto nativeFile = ftebroom::filesystemPath(file);
-  const auto size = fs::file_size(nativeFile);
-  if (size > limit) throw std::runtime_error("The local file exceeds its size limit.");
-  std::string result(static_cast<std::size_t>(size), '\0');
-  std::ifstream in(nativeFile, std::ios::binary);
-  if (!in.read(result.data(), result.size())) throw std::runtime_error("Cannot read the local file.");
-  return result;
+  return ftebroom::pak::readFile(file,limit);
 }
 
 inline void createArtifactDirectories(const fs::path& directory)
@@ -135,6 +129,41 @@ inline void forgetSession(const fs::path& path)
 {
   std::error_code ignored;
   fs::remove(path,ignored);
+}
+
+inline void writeNewDraft(const fs::path& path, const std::string& bytes)
+{
+  const auto physical=ftebroom::filesystemPath(path);
+  createArtifactDirectories(physical.parent_path());
+#ifdef _WIN32
+  const auto handle=CreateFileW(physical.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,
+                                FILE_ATTRIBUTE_NORMAL,nullptr);
+  if (handle==INVALID_HANDLE_VALUE) {
+    const auto error=GetLastError();
+    if (error==ERROR_FILE_EXISTS || error==ERROR_ALREADY_EXISTS) return;
+    throw fs::filesystem_error("Cannot create the Jam draft",path,std::error_code(error,std::system_category()));
+  }
+  DWORD written=0;
+  const auto success=WriteFile(handle,bytes.data(),static_cast<DWORD>(bytes.size()),&written,nullptr);
+  const auto error=success ? ERROR_WRITE_FAULT : GetLastError();
+  const auto closed=CloseHandle(handle);
+  if (success && closed && written==bytes.size()) return;
+  DeleteFileW(physical.c_str());
+  throw fs::filesystem_error("Cannot write the Jam draft",path,std::error_code(error,std::system_category()));
+#else
+  const auto fd=open(physical.c_str(),O_WRONLY|O_CREAT|O_EXCL,0666);
+  if (fd<0) {
+    if (errno==EEXIST) return;
+    throw fs::filesystem_error("Cannot create the Jam draft",path,std::error_code(errno,std::generic_category()));
+  }
+  const auto count=write(fd,bytes.data(),bytes.size());
+  const auto error=count<0 ? errno : EIO;
+  const auto closed=close(fd);
+  if (count==static_cast<ssize_t>(bytes.size()) && closed==0) return;
+  std::error_code ignored;
+  fs::remove(physical,ignored);
+  throw fs::filesystem_error("Cannot write the Jam draft",path,std::error_code(error,std::generic_category()));
+#endif
 }
 
 #ifdef _WIN32
@@ -563,6 +592,23 @@ inline std::string basePackPrefix(const std::string& version, const Json& manife
   return version+"-"+digest.substr(0,16)+"-";
 }
 
+#ifdef _WIN32
+// MinGW's directory iterator can lose entries under an extended-length path.
+template<class Visitor>
+inline void windowsDirectoryEntries(const fs::path& directory, const std::string& pattern, Visitor visit)
+{
+  const auto glob = ftebroom::filesystemPath(directory)/fs::u8path(pattern);
+  WIN32_FIND_DATAW data{};
+  const auto search = FindFirstFileW(glob.c_str(),&data);
+  if (search==INVALID_HANDLE_VALUE) return;
+  const auto close = [](HANDLE handle) { FindClose(handle); };
+  const std::unique_ptr<void,decltype(close)> handle(search,close);
+  do {
+    if (!visit(fs::path(data.cFileName),data.dwFileAttributes)) return;
+  } while (FindNextFileW(search,&data));
+}
+#endif
+
 inline fs::path findBasePack(const fs::path& root, const fs::path& legacy, const std::string& prefix,
                              const Json& manifest, ResourceTransfer* transfer=nullptr)
 {
@@ -584,20 +630,13 @@ inline fs::path findBasePack(const fs::path& root, const fs::path& legacy, const
     return installedPack(pack,manifest,transfer) ? pack : fs::path{};
   };
 #ifdef _WIN32
-  // MinGW's directory iterator can lose entries under an extended-length path.
-  const auto glob = ftebroom::filesystemPath(root)/fs::u8path(prefix+"*");
-  WIN32_FIND_DATAW data{};
-  const auto search = FindFirstFileW(glob.c_str(),&data);
-  if (search!=INVALID_HANDLE_VALUE) {
-    const auto close = [](HANDLE handle) { FindClose(handle); };
-    const std::unique_ptr<void,decltype(close)> handle(search,close);
-    do {
-      if ((data.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))!=FILE_ATTRIBUTE_DIRECTORY)
-        continue;
-      const auto pack = candidate(data.cFileName);
-      if (!pack.empty()) return pack;
-    } while (FindNextFileW(search,&data));
-  }
+  fs::path pack;
+  windowsDirectoryEntries(root,prefix+"*",[&](const fs::path& leaf,DWORD attributes) {
+    if ((attributes&(FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))==FILE_ATTRIBUTE_DIRECTORY)
+      pack = candidate(leaf);
+    return pack.empty();
+  });
+  if (!pack.empty()) return pack;
 #else
   std::error_code iterationError;
   for (fs::directory_iterator it(root,iterationError), end; !iterationError && it!=end; it.increment(iterationError)) {

@@ -130,6 +130,8 @@ def check(exe, root, source, peak_limit):
             assert digest(replacement/"lq1/pak0.pak")==digest(source/"lq1/pak0.pak")
             assert not (replacement/"old-pack-marker").exists()
             print("PASS replacement finishes before old pack cleanup")
+            run(destination="drafts",mode="draft-file")
+            print("PASS the draft is readable and a second create preserves its contents")
             if os.name == "nt":
                 long_target = "/".join(("nested directory with spaces " + "x"*52,)*3 + ("installed",))
                 native_root = Path("\\\\?\\"+str(root))
@@ -141,11 +143,12 @@ def check(exe, root, source, peak_limit):
                     installed = run(destination=versioned_target,mode="versioned").stdout
                     assert installed.startswith("pack=")
                     assert run(destination=versioned_target,mode="versioned-probe").stdout==installed
+                    run(destination=long_target+"/drafts",mode="draft-file")
                 finally:
                     subtree = native_root/long_target.split("/")[0]
                     if subtree.is_dir():
                         shutil.rmtree(subtree)
-                print("PASS installs on a long Windows path and reports the exact invalid member and error code")
+                print("PASS installs and reuses resources and finds a Unicode map on a long Windows path")
                 blocked = root/"blocked"
                 blocked.mkdir()
                 (blocked/"old-pack-marker").write_text("keep until a verified replacement is active")

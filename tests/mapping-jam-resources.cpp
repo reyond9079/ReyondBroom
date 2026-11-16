@@ -18,6 +18,24 @@ int main(int argc,char** argv)
     const bool base = std::string_view(argv[4])=="base";
     jam::ResourceTransfer transfer;
     const std::string_view mode = argv[5];
+    if (mode=="draft-file") {
+      const auto name=jam::fs::u8path(u8"Tracé тест.map");
+      const auto draft=target/name;
+      jam::writeNewDraft(draft,"original draft");
+      jam::writeNewDraft(draft,"must not replace the original");
+      if (!ftebroom::pak::exists(draft) || ftebroom::pak::read(draft)!="original draft" ||
+          jam::fileBytes(draft,4096)!="original draft")
+        throw std::runtime_error("The draft could not be read or was overwritten.");
+#ifdef _WIN32
+      bool listed=false;
+      jam::windowsDirectoryEntries(target,"*.map",[&](const auto& leaf,DWORD attributes) {
+        if (leaf==name && !(attributes&FILE_ATTRIBUTE_DIRECTORY)) listed=true;
+        return true;
+      });
+      if (!listed) throw std::runtime_error("The saved draft was missing from the Windows directory listing.");
+#endif
+      return 0;
+    }
     if (mode=="watchdog") {
       transfer.localPhase(jam::ResourcePhase::Finalizing);
       const auto starting = transfer.lastLocalProgress.load();

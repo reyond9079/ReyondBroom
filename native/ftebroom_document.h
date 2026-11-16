@@ -11,6 +11,10 @@
 #endif
 #include "ftebroom_browser_navigation.h"
 
+namespace ftebroom::jam {
+inline void createArtifactDirectories(const std::filesystem::path& directory);
+}
+
 static std::map<std::string, ImVec2> fileBrowserTestItems;
 static void fileBrowserTestItem(const std::string& name)
 {
@@ -310,7 +314,8 @@ static void documentSaveFinished()
     bool packed=ftebroom::pak::split(target,archive,member);
     if(packed){if(savingExport)throw std::runtime_error("Export compiler input to a folder, not a PAK.");auto bytes=gameWad()?ftebroom::quake1::map(q1Read(source),gameProfile==2&&q1MapFormat==0,q1WadList(),true,gameProfile==4):q1Read(source);ftebroom::pak::replace(target,documentMetadata(bytes));}
     else {
-    std::filesystem::create_directories(ftebroom::filesystemAccessPath(target.parent_path()));
+    if (jamEditing()) ftebroom::jam::createArtifactDirectories(ftebroom::filesystemPath(target.parent_path()));
+    else std::filesystem::create_directories(ftebroom::filesystemAccessPath(target.parent_path()));
     // Stage beside the destination so replacement remains atomic across drives.
     const auto nativeTarget = ftebroom::filesystemAccessPath(target);
     auto adjacent = target;

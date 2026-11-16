@@ -50,9 +50,26 @@ inline std::string readRange(const fs::path& physical,uint64_t offset,uint64_t s
   if(!in || !in.read(result.data(),size))throw std::runtime_error("Cannot read "+physical.u8string());
   return result;
 }
-inline std::string readFile(const fs::path& path){
+inline bool regularFile(const fs::path& path){
+#ifdef _WIN32
+  if(path.empty())return false;
+  const auto attributes=GetFileAttributesW(filesystemPath(path).c_str());
+  if(attributes==INVALID_FILE_ATTRIBUTES || (attributes&FILE_ATTRIBUTE_DIRECTORY))return false;
+  if(!(attributes&FILE_ATTRIBUTE_REPARSE_POINT))return true;
+#endif
+  std::error_code error;
+  return fs::is_regular_file(filesystemAccessPath(path),error);
+}
+inline std::string readFile(const fs::path& path,std::size_t limit=512*1024*1024){
   const auto physical=filesystemAccessPath(path);
-  return readRange(physical,0,fs::file_size(physical));
+  std::ifstream in(physical,std::ios::binary|std::ios::ate);
+  const auto size=in.tellg();
+  if(size<0)throw std::runtime_error("Cannot open "+path.u8string());
+  if(static_cast<std::uint64_t>(size)>limit)throw std::runtime_error("The local file exceeds its size limit.");
+  std::string result(static_cast<std::size_t>(size),'\0');
+  in.seekg(0);
+  if(!in.read(result.data(),result.size()))throw std::runtime_error("Cannot read "+path.u8string());
+  return result;
 }
 inline std::string read(const fs::path& path){
   fs::path archive;
@@ -64,7 +81,7 @@ inline std::string read(const fs::path& path){
     if(e.name==member)return readRange(filesystemAccessPath(archive),e.offset,e.size);
   throw std::runtime_error("PAK entry not found: "+member);
 }
-inline bool exists(const fs::path& path){try{fs::path a;std::string m;if(!split(path,a,m))return fs::is_regular_file(filesystemAccessPath(path));for(const auto& e:directory(a,true))if(e.name==m)return true;}catch(...){}return false;}
+inline bool exists(const fs::path& path){try{fs::path a;std::string m;if(!split(path,a,m))return regularFile(path);for(const auto& e:directory(a,true))if(e.name==m)return true;}catch(...){}return false;}
 inline fs::path diskFolder(const fs::path& path){fs::path a;std::string m;return split(path,a,m)?a.parent_path():path;}
 inline std::vector<std::pair<bool,fs::path>> list(const fs::path& folder){
   std::vector<std::pair<bool,fs::path>> result;fs::path archive;std::string prefix;

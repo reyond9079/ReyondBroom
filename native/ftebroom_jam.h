@@ -834,10 +834,11 @@ bool jamMapPath(const JamFs::path& path)
 
 bool jamOwnedPlot(const std::string& plot)
 {
-  if (!jamLocal.board.is_object()) return false;
+  const auto account = jamField(jamLocal.account,"accountId");
+  if (!jamSafePlot(plot) || account.empty() || !jamLocal.board.is_object()) return false;
   for (const auto& cell : jamLocal.board.at("cells"))
     if (jamField(cell,"plotId")==plot)
-      return jamField(cell.at("owner"),"accountId")==jamField(jamLocal.account,"accountId");
+      return jamField(cell.at("owner"),"accountId")==account;
   return false;
 }
 
@@ -859,18 +860,49 @@ JamFs::path jamPublicationReceipt(const JamFs::path& draft)
   return receipt;
 }
 
-std::vector<JamFs::path> jamMaps()
+std::optional<std::int64_t> jamMapModified(const JamFs::path& path)
+{
+#ifdef _WIN32
+  WIN32_FILE_ATTRIBUTE_DATA info{};
+  if (!GetFileAttributesExW(ftebroom::filesystemPath(path).c_str(),GetFileExInfoStandard,&info) ||
+      (info.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) return {};
+  return (std::int64_t(info.ftLastWriteTime.dwHighDateTime)<<32) | info.ftLastWriteTime.dwLowDateTime;
+#else
+  std::error_code error;
+  const auto stamp = JamFs::last_write_time(path,error);
+  if (error) return {};
+  return stamp.time_since_epoch().count();
+#endif
+}
+
+std::vector<JamFs::path> jamMaps(const std::string& selectedPlot={})
 {
   std::vector<JamFs::path> maps;
   const auto root = jamDrafts();
-  if (root.empty() || !JamFs::is_directory(root)) return maps;
-  for (const auto& plot : JamFs::directory_iterator(root)) {
-    if (!jamOwnedPlot(plot.path().filename().u8string()) || plot.is_symlink() || !plot.is_directory()) continue;
-    for (const auto& entry : JamFs::directory_iterator(plot.path())) {
-      if (entry.path().filename()!="jam-draft.map" && jamMapPath(entry.path()) && JamFs::is_regular_file(ftebroom::filesystemPath(entry.path())))
-        maps.push_back(entry.path());
+  if (root.empty() || !jamLocal.board.is_object()) return maps;
+  // Enumerate the known, owned plots first. In particular, don't rely on
+  // std::filesystem finding the account's long Windows directory.
+  const auto collect = [&](const std::string& plot) {
+    if (!jamOwnedPlot(plot)) return;
+    const auto directory = root/plot;
+    const auto append = [&](const JamFs::path& path) {
+      if (path.filename()!="jam-draft.map" && jamMapPath(path)) maps.push_back(path);
+    };
+#ifdef _WIN32
+    jam::windowsDirectoryEntries(directory,"*.map",[&](const JamFs::path& leaf,DWORD attributes) {
+      if (!(attributes&(FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) append(directory/leaf);
+      return true;
+    });
+#else
+    std::error_code error;
+    for (JamFs::directory_iterator it(directory,error), end; !error && it!=end; it.increment(error)) {
+      std::error_code entryError;
+      if (it->is_regular_file(entryError)) append(it->path());
     }
-  }
+#endif
+  };
+  if (!selectedPlot.empty()) collect(selectedPlot);
+  else for (const auto& cell : jamLocal.board.at("cells")) collect(jamField(cell,"plotId"));
   std::sort(maps.begin(),maps.end(),[](const auto& a,const auto& b) {
     return a.filename()==b.filename() ? a<b : a.filename()<b.filename();
   });
@@ -879,8 +911,15 @@ std::vector<JamFs::path> jamMaps()
 
 void jamOpenMap(const JamFs::path& path)
 {
-  if (!jamMapPath(path) || !jamOwnedPlot(path.parent_path().filename().u8string()) || !JamFs::is_regular_file(ftebroom::filesystemPath(path)))
-    throw std::runtime_error(jamText("Choose one of your Jam maps.","Выбери одну из своих карт Jam."));
+  if (!jamMapPath(path))
+    throw std::runtime_error(jamText("This map path is outside the Jam workspace or points to a link.",
+                                    "Путь к карте находится вне рабочей области Jam или ведёт по ссылке."));
+  if (!jamOwnedPlot(path.parent_path().filename().u8string()))
+    throw std::runtime_error(jamText("You can only edit plots you own.","Редактировать можно только свои участки."));
+  if (!ftebroom::pak::regularFile(path))
+    throw std::runtime_error(jamText("The Jam map could not be opened. Check that the draft file is readable.",
+                                    "Карту Jam не удалось открыть. Проверьте, доступен ли файл черновика для чтения."));
+  jamLocal.error.clear();
   if (!jamEditing() && documentFile!=path) jamLocal.offlineMap = documentFile;
   jamLocal.open = false;
   documentRequest("@"+path.u8string());
@@ -1189,7 +1228,8 @@ bool jamSaveNamed()
   }
   std::error_code compareError;
   const auto physical=ftebroom::filesystemPath(target);
-  if (JamFs::exists(physical) && !JamFs::equivalent(physical,ftebroom::filesystemPath(documentFile),compareError)) {
+  if (ftebroom::pak::regularFile(target) && target!=documentFile &&
+      !JamFs::equivalent(physical,ftebroom::filesystemPath(documentFile),compareError)) {
     jamLocal.fileError = jamText("A map with that name already exists on this plot.",
                                  "На этом участке уже есть карта с таким названием.");
     return false;
@@ -1204,15 +1244,16 @@ bool jamSaveNamed()
 void jamOpenDraft()
 {
   try {
+    if (!jamOwnedPlot(jamLocal.selection))
+      throw std::runtime_error(jamText("You can only edit plots you own.","Редактировать можно только свои участки."));
     auto draft = jamDraft(jamLocal.selection);
-    if (jamEditing() && jamLocal.draftPlot==jamLocal.selection) {jamLocal.open=false;return;}
-    auto modified = JamFs::file_time_type::min();
-    for (const auto& map : jamMaps()) {
-      if (map.parent_path()!=draft.parent_path()) continue;
-      const auto stamp = JamFs::last_write_time(ftebroom::filesystemPath(map));
-      if (stamp>modified) {modified=stamp;draft=map;}
+    if (jamEditing() && jamLocal.draftPlot==jamLocal.selection) {jamLocal.error.clear();jamLocal.open=false;return;}
+    std::optional<std::int64_t> modified;
+    for (const auto& map : jamMaps(jamLocal.selection)) {
+      const auto stamp = jamMapModified(map);
+      if (stamp && (!modified || *stamp>*modified)) {modified=stamp;draft=map;}
     }
-    if (!JamFs::exists(ftebroom::filesystemPath(draft))) {
+    if (!ftebroom::pak::regularFile(draft)) {
       std::string bytes(jamStartMap);
       constexpr std::string_view wadMarker = "@jam-wad@";
       const auto wad = (jamLocal.pack / "lq1/texture-wads/lq_dev.wad").generic_u8string();
@@ -1220,7 +1261,7 @@ void jamOpenDraft()
       if (marker == bytes.npos || wad.find_first_of("\"\n\r") != wad.npos)
         throw std::runtime_error("The Jam template or texture package is invalid.");
       bytes.replace(marker, wadMarker.size(), wad);
-      jam::writeBytes(draft, bytes);
+      jam::writeNewDraft(draft,bytes);
     }
     jamOpenMap(draft);
   } catch (const std::exception& error) { jamLocal.error = error.what(); }

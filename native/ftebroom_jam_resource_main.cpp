@@ -27,40 +27,10 @@ static fs::path prepare(const Json& request, jam::ResourceTransfer& transfer)
   transfer.record("manifest_request");
   const auto manifest = client.json("GET",client.prefix+"packs/"+version+"/manifest",nullptr,{},{},&transfer);
   transfer.record("manifest_received");
-  if (manifest.at("packVersion") != version)
-    throw std::runtime_error("The base pack version changed.");
-  const std::string digest = manifest.at("sha256");
-  if (!jam::hexId(digest,64)) throw std::runtime_error("Invalid Mapping Jam pack checksum.");
   const auto root = fs::u8path(request.at("root").get<std::string>());
-  const auto prefix = version+"-"+digest.substr(0,16)+"-";
-  transfer.localPhase(jam::ResourcePhase::CheckingCache);
-  transfer.record("cache_scan");
-  if (!request.at("fresh").get<bool>()) {
-    std::error_code existing;
-    for (fs::directory_iterator it(root,existing), end; !existing && it!=end; it.increment(existing)) {
-      transfer.check();
-      const auto name = it->path().filename().u8string();
-      if (name.size()!=prefix.size()+16 || name.compare(0,prefix.size(),prefix)!=0 ||
-          it->is_symlink() || !it->is_directory()) continue;
-      const auto marker = it->path()/".verified-pack.json";
-      if (fs::is_regular_file(marker) && jam::installedPack(it->path(),manifest,&transfer)) {
-        transfer.record("cache_hit");
-        return it->path();
-      }
-    }
-    const auto legacy = fs::u8path(request.at("legacy").get<std::string>());
-    if (!legacy.empty() && jam::installedPack(legacy,manifest,&transfer)) {
-      transfer.record("cache_hit");
-      return legacy;
-    }
-  }
-  transfer.record("cache_miss");
-  if (!request.at("install").get<bool>()) return {};
-  transfer.record("cache_create");
-  fs::create_directories(root);
-  const auto destination = root/(prefix+jam::randomHex(8));
-  jam::download(client,manifest,destination,true,"jam_map",false,&transfer,nullptr,true);
-  return destination;
+  const auto legacy = fs::u8path(request.at("legacy").get<std::string>());
+  return jam::prepareBasePack(client,manifest,root,legacy,version,request.at("install").get<bool>(),
+                             request.at("fresh").get<bool>(),transfer);
 }
 
 int main()

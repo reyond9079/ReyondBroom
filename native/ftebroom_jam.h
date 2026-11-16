@@ -387,8 +387,9 @@ void jamJoin()
     const auto version = rules.at("packVersion").template get<std::string>();
     if(version=="librequake-0.09-plants-local1"){
       const auto manifest=client.json("GET",client.prefix+"packs/"+version+"/manifest");
-      if(jamField(manifest,"packVersion")==version && jam::installedPack(root/"packs"/version,manifest))
-        data["pack"]=(root/"packs"/version).u8string();
+      const auto packs=root/"packs";
+      if(jamField(manifest,"packVersion")==version)
+        data["pack"]=jam::findBasePack(packs,packs/version,jam::basePackPrefix(version,manifest),manifest).u8string();
     }
 #endif
     return data;
@@ -624,19 +625,18 @@ void jamResources(bool install)
     jamLocal.error = error.what();
   }
 #else
-  (void)install;
-  const auto destination = jamRoot() / "packs" / version;
+  const auto packs = jamRoot() / "packs";
   jamLocal.resourceTransfer = transfer;
-  jamStart({}, [version,destination,transfer](auto client) {
+  jamStart({}, [version,packs,install,transfer](auto client) {
     transfer->record("manifest_request");
     const auto manifest = client.json("GET", client.prefix + "packs/" + version + "/manifest",nullptr,{},{},transfer.get());
     transfer->record("manifest_received");
-    if (jamField(manifest,"packVersion") != version)
-      throw std::runtime_error("The base pack version changed.");
-    jam::download(client,manifest,destination,true,"jam_map",false,transfer.get(),&transfer->retiredPack);
-    return JamJson::object();
-  }, [destination](auto) {
-    jamLocal.pack = destination;
+    const auto pack=jam::prepareBasePack(client,manifest,packs,packs/version,version,install,false,
+                                         *transfer,&transfer->retiredPack);
+    return JamJson{{"pack",pack.u8string()}};
+  }, [](auto result) {
+    jamLocal.pack = JamFs::u8path(jamField(result,"pack"));
+    if(jamLocal.pack.empty()) return;
     // Join already fetched the board. A slow request or removal of an old
     // cache must not keep the completed installation on the resource screen.
     jamLocal.screen = JamScreen::Board;

@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #endif
 #include <chrono>
+#include <memory>
 #include <streambuf>
 #include <thread>
 
@@ -64,16 +65,13 @@ inline std::string fileBytes(const fs::path& file, std::size_t limit)
   return result;
 }
 
-inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTransfer* transfer = nullptr)
+inline void createArtifactDirectories(const fs::path& directory)
 {
-  if (transfer) transfer->check();
-  const auto file=ftebroom::filesystemPath(path);
-  if (transfer) transfer->record("file_directories");
 #ifdef _WIN32
   // std::filesystem's recursive directory walk may misread the drive root
   // of an extended-length Win32 path as a directory that needs creation.
   std::vector<fs::path> missing;
-  for (auto parent=file.parent_path(); !parent.empty(); parent=parent.parent_path()) {
+  for (auto parent=directory; !parent.empty(); parent=parent.parent_path()) {
     const auto attributes=GetFileAttributesW(parent.c_str());
     if (attributes!=INVALID_FILE_ATTRIBUTES) {
       if (!(attributes&FILE_ATTRIBUTE_DIRECTORY))
@@ -93,8 +91,16 @@ inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTra
       throw fs::filesystem_error("Cannot create the Jam directory",*entry,std::error_code(error,std::system_category()));
   }
 #else
-  fs::create_directories(file.parent_path());
+  fs::create_directories(directory);
 #endif
+}
+
+inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTransfer* transfer = nullptr)
+{
+  if (transfer) transfer->check();
+  const auto file=ftebroom::filesystemPath(path);
+  if (transfer) transfer->record("file_directories");
+  createArtifactDirectories(file.parent_path());
   if (transfer) transfer->record("file_open");
   std::ofstream output(file, std::ios::binary | std::ios::trunc);
   if (!output) throw fs::filesystem_error("Cannot open the Mapping Jam working file", file,
@@ -262,24 +268,38 @@ inline Json packReceipt(const fs::path& root, const Json& manifest, ResourceTran
   return receipt;
 }
 
-inline void writePackReceipt(const fs::path& root, const Json& receipt, ResourceTransfer* transfer=nullptr)
+inline void publishPackReceipt(const fs::path& root, const Json& receipt, ResourceTransfer* transfer=nullptr)
 {
   const auto marker=root/".verified-pack.json";
   const auto temporary=root/(".verified-"+randomHex(8)+".tmp");
   try {
-    writeBytes(temporary,receipt.dump());
+    writeBytes(temporary,receipt.dump(),transfer);
+    if (transfer) transfer->check();
 #ifdef _WIN32
     if(!MoveFileExW(temporary.c_str(),marker.c_str(),MOVEFILE_REPLACE_EXISTING))
-      throw fs::filesystem_error("Cannot replace the Jam pack receipt",marker.filename(),
+      throw fs::filesystem_error("Cannot publish the Jam pack receipt",marker.filename(),
                                  std::error_code(GetLastError(),std::system_category()));
 #else
     fs::rename(temporary,marker);
 #endif
+  } catch (...) {
+    // A failed new installation retires the whole directory. When updating a
+    // legacy receipt, only the temporary marker belongs to this operation.
+    if (!transfer) {
+      std::error_code ignored;
+      fs::remove(temporary,ignored);
+    }
+    throw;
+  }
+}
+
+inline void refreshPackReceipt(const fs::path& root, const Json& receipt, ResourceTransfer* transfer)
+{
+  try {
+    publishPackReceipt(root,receipt);
   } catch (const std::exception& error) {
     const auto* fsError=dynamic_cast<const fs::filesystem_error*>(&error);
     if (transfer) transfer->record("receipt_error",fsError ? fsError->code().value() : 0);
-    std::error_code ignored;
-    fs::remove(temporary,ignored);
   }
 }
 
@@ -301,7 +321,7 @@ inline bool installedPack(const fs::path& destination, const Json& manifest, Res
       if (transfer) transfer->wrote(0);
     }
     if (transfer) transfer->check();
-    writePackReceipt(root,receipt,transfer);
+    refreshPackReceipt(root,receipt,transfer);
     return true;
   } catch (const DownloadCanceled&) { throw; }
     catch (const DownloadInterrupted&) { throw; }
@@ -433,10 +453,14 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
   auto staging = target;
   if (transfer) transfer->record("staging_create");
   if (privatePack) {
-    // The worker owns this fresh directory. Only a completed receipt makes
-    // it discoverable, so installation needs no directory move or exchange.
+#ifdef _WIN32
+    if (!CreateDirectoryW(staging.c_str(),nullptr))
+      throw fs::filesystem_error("Cannot create the Mapping Jam installation directory",staging,
+                                 std::error_code(GetLastError(),std::system_category()));
+#else
     if (!fs::create_directory(staging))
       throw std::runtime_error("The Mapping Jam installation directory is already in use.");
+#endif
   } else staging += ".incoming-" + randomHex(8);
   try {
     const std::string_view archive = response.body;
@@ -486,10 +510,15 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
         throw fs::filesystem_error("The installed Jam resource inventory is invalid",
                                    std::make_error_code(std::errc::invalid_argument));
       if (transfer) { transfer->member = 0; transfer->record("receipt_write"); }
+      if (privatePack) {
+        // Publishing the receipt commits this directory. A concurrent editor
+        // may mount it immediately, so never delete it after this point.
+        publishPackReceipt(staging,receipt,transfer);
+        return;
+      }
       writeBytes(staging/".verified-pack.json",receipt.dump(),transfer);
     }
     if (transfer) transfer->check();
-    if (privatePack) return;
     if (transfer) transfer->record("activate_directory");
     if (fs::exists(target)) {
       auto previous = target;
@@ -524,6 +553,83 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
 inline bool hexId(const std::string& value, std::size_t size)
 {
   return value.size()==size && value.find_first_not_of("0123456789abcdef")==value.npos;
+}
+
+inline std::string basePackPrefix(const std::string& version, const Json& manifest)
+{
+  if (manifest.at("packVersion")!=version) throw std::runtime_error("The base pack version changed.");
+  const auto digest = manifest.at("sha256").get<std::string>();
+  if (!hexId(digest,64)) throw std::runtime_error("Invalid Mapping Jam pack checksum.");
+  return version+"-"+digest.substr(0,16)+"-";
+}
+
+inline fs::path findBasePack(const fs::path& root, const fs::path& legacy, const std::string& prefix,
+                             const Json& manifest, ResourceTransfer* transfer=nullptr)
+{
+  const auto candidate = [&](const fs::path& leaf) -> fs::path {
+    if (transfer) transfer->check();
+    const auto name = leaf.u8string();
+    if (name.size()!=prefix.size()+16 || name.compare(0,prefix.size(),prefix)!=0 ||
+        !hexId(name.substr(prefix.size()),16)) return {};
+    const auto pack = root/leaf;
+    const auto marker = ftebroom::filesystemPath(pack)/".verified-pack.json";
+#ifdef _WIN32
+    const auto attributes = GetFileAttributesW(marker.c_str());
+    if (attributes==INVALID_FILE_ATTRIBUTES ||
+        (attributes&(FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) return {};
+#else
+    std::error_code error;
+    if (!fs::is_regular_file(marker,error)) return {};
+#endif
+    return installedPack(pack,manifest,transfer) ? pack : fs::path{};
+  };
+#ifdef _WIN32
+  // MinGW's directory iterator can lose entries under an extended-length path.
+  const auto glob = ftebroom::filesystemPath(root)/fs::u8path(prefix+"*");
+  WIN32_FIND_DATAW data{};
+  const auto search = FindFirstFileW(glob.c_str(),&data);
+  if (search!=INVALID_HANDLE_VALUE) {
+    const auto close = [](HANDLE handle) { FindClose(handle); };
+    const std::unique_ptr<void,decltype(close)> handle(search,close);
+    do {
+      if ((data.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))!=FILE_ATTRIBUTE_DIRECTORY)
+        continue;
+      const auto pack = candidate(data.cFileName);
+      if (!pack.empty()) return pack;
+    } while (FindNextFileW(search,&data));
+  }
+#else
+  std::error_code iterationError;
+  for (fs::directory_iterator it(root,iterationError), end; !iterationError && it!=end; it.increment(iterationError)) {
+    if (transfer) transfer->check();
+    std::error_code entryError;
+    if (it->is_symlink(entryError) || entryError || !it->is_directory(entryError)) continue;
+    const auto pack = candidate(it->path().filename());
+    if (!pack.empty()) return pack;
+  }
+#endif
+  if (!legacy.empty() && installedPack(legacy,manifest,transfer)) return legacy;
+  return {};
+}
+
+inline fs::path prepareBasePack(const Client& client, const Json& manifest, const fs::path& root,
+                                const fs::path& legacy, const std::string& version, bool install, bool fresh,
+                                ResourceTransfer& transfer, fs::path* failedPack=nullptr)
+{
+  const auto prefix = basePackPrefix(version,manifest);
+  transfer.localPhase(ResourcePhase::CheckingCache);
+  transfer.record("cache_scan");
+  if (!fresh) {
+    const auto cached = findBasePack(root,legacy,prefix,manifest,&transfer);
+    if (!cached.empty()) { transfer.record("cache_hit"); return cached; }
+  }
+  transfer.record("cache_miss");
+  if (!install) return {};
+  transfer.record("cache_create");
+  createArtifactDirectories(ftebroom::filesystemPath(root));
+  const auto destination = root/(prefix+randomHex(8));
+  download(client,manifest,destination,true,"jam_map",false,&transfer,failedPack,true);
+  return destination;
 }
 
 inline Json sendMap(const Client& client, const std::string& plot, const Json& rules,

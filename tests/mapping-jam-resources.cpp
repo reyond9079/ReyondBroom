@@ -34,6 +34,22 @@ int main(int argc,char** argv)
     }
     if (mode=="cancel") transfer.canceled = true;
     jam::fs::path retired;
+    if (mode=="versioned" || mode=="versioned-probe") {
+      const auto version = manifest.at("packVersion").get<std::string>();
+      const auto pack = jam::prepareBasePack(client,manifest,target.parent_path(),target,version,
+                                            mode=="versioned",false,transfer,&retired);
+      for (const auto& event : transfer.takeEvents()) {
+        if (event.step=="activate_directory") throw std::runtime_error("A versioned pack moved a directory.");
+        if (mode=="versioned-probe" && event.step=="cache_hash")
+          throw std::runtime_error("A fresh cache receipt should avoid hashing the entire pack.");
+      }
+      if (pack.empty()) std::cout << "cache-miss\n";
+      else {
+        if (!jam::installedPack(pack,manifest)) throw std::runtime_error("The pack could not be reopened.");
+        std::cout << "pack=" << pack.filename().u8string() << '\n';
+      }
+      return 0;
+    }
 #ifdef _WIN32
     if (mode=="inventory-failure") {
       const auto root = ftebroom::filesystemPath(target);

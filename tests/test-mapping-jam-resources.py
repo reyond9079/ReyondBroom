@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise full-size Jam packs, corrupt ZIPs and compressed map installation."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import http.server
 import json
@@ -35,6 +36,7 @@ def fixture(root, source):
             archive.write(path,path.relative_to(source).as_posix())
     assert 70*1024*1024 <= pack.stat().st_size <= 128*1024*1024
     manifest = {"schemaVersion":1,"sizeBytes":pack.stat().st_size,"sha256":digest(pack),"downloadPath":"/v1/pack",
+                "packVersion":"librequake-0.09-plants-local1",
                 "files":[{"path":p.relative_to(source).as_posix(),"sizeBytes":p.stat().st_size,"sha256":digest(p)}
                          for p in files]}
     return source,pack,manifest
@@ -61,6 +63,7 @@ def check(exe, root, source, peak_limit):
             {"path":"maps/jam_map.bsp","sizeBytes":len(payload),"sha256":hashlib.sha256(payload).hexdigest()}]}))
     (root/"pack.json").write_text(json.dumps(manifest))
     downloads = []
+    pack_barrier = None
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -69,6 +72,8 @@ def check(exe, root, source, peak_limit):
                 self.send_error(404)
                 return
             downloads.append(self.path)
+            if self.path == "/v1/pack" and pack_barrier is not None:
+                pack_barrier.wait(timeout=15)
             self.send_response(200)
             self.send_header("Content-Length", str(path.stat().st_size))
             self.end_headers()
@@ -102,6 +107,9 @@ def check(exe, root, source, peak_limit):
             run()
             assert downloads==["/v1/pack"],downloads
             print("PASS reuses the verified installation without fetching the ZIP again")
+            assert "pack=installed" in run(mode="versioned-probe").stdout
+            assert downloads==["/v1/pack"],downloads
+            print("PASS recognizes the verified legacy fixed directory without downloading")
             if os.name == "nt":
                 cached = target/".verified-pack.json"
                 legacy = json.loads(cached.read_text())
@@ -129,6 +137,10 @@ def check(exe, root, source, peak_limit):
                     run(destination=long_target)
                     assert (native_root/long_target/".verified-pack.json").is_file()
                     run(destination=long_target,mode="inventory-failure")
+                    versioned_target = str(Path(long_target).parent/"packs"/manifest["packVersion"])
+                    installed = run(destination=versioned_target,mode="versioned").stdout
+                    assert installed.startswith("pack=")
+                    assert run(destination=versioned_target,mode="versioned-probe").stdout==installed
                 finally:
                     subtree = native_root/long_target.split("/")[0]
                     if subtree.is_dir():
@@ -140,6 +152,28 @@ def check(exe, root, source, peak_limit):
                 run(destination="blocked",mode="blocked-activation")
                 run(destination="blocked",mode="replace")
                 print("PASS returns a Windows activation error with deferred cleanup and can retry")
+            legacy = root/"versioned"/manifest["packVersion"]
+            legacy.mkdir(parents=True)
+            (legacy/"keep").write_text("old cache")
+            prefix = f'{manifest["packVersion"]}-{manifest["sha256"][:16]}-'
+            unfinished = legacy.parent/(prefix+"0"*16)
+            unfinished.mkdir()
+            (unfinished/".verified-partial.tmp").write_text("partial receipt")
+            relative = str(legacy.relative_to(root))
+            assert "cache-miss" in run(destination=relative,mode="versioned-probe").stdout
+            pack_barrier = threading.Barrier(2)
+            try:
+                with ThreadPoolExecutor(2) as workers:
+                    results = [workers.submit(run,destination=relative,mode="versioned") for _ in range(2)]
+                    names = {future.result().stdout.strip().removeprefix("pack=") for future in results}
+            finally:
+                pack_barrier = None
+            assert len(names)==2 and all(name.startswith(prefix) for name in names), names
+            for name in names:
+                assert (legacy.parent/name/".verified-pack.json").is_file(),name
+            assert (legacy/"keep").read_text()=="old cache" and not (unfinished/".verified-pack.json").exists()
+            assert run(destination=relative,mode="versioned-probe").stdout.strip().removeprefix("pack=") in names
+            print("PASS both concurrent installations published independent packs and the next client reused a complete one")
             assert "time limit" in run(mode="watchdog",expected=1).stderr
             print("PASS catches stalled filesystem work and renews the deadline on writes")
             assert "Canceled" in run(mode="cancel",expected=3).stderr

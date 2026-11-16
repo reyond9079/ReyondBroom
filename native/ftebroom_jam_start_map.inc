@@ -1,4 +1,5 @@
-// Game: Quake 1
+// SPDX-License-Identifier: GPL-2.0-or-later
+constexpr std::string_view jamStartMap = R"JamMap(// Game: Quake 1
 // Format: Standard
 {
 "classname" "worldspawn"
@@ -72,3 +73,4 @@
 ( -48 32 128 ) ( -48 48 128 ) ( 48 48 128 ) wall_pink_b 0 0 0 1 1
 }
 }
+)JamMap";

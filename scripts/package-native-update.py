@@ -74,10 +74,12 @@ shutil.copy2(a.csprogs, root/'ftebroom/csaddon.dat')
 # Application defaults belong to this source revision, just like the updater.
 for name in ('ftebroom.cfg', 'quake1.ent', 'update-ftebroom.py', 'update-ftebroom.ps1'):
     shutil.copy2(src/'runtime'/name, root/'ftebroom'/name)
-for name in ('mapping-jam-start.map', 'mapping-jam-hub.map'):
-    if (src/'runtime/maps'/name).is_file():
-        (root/'ftebroom/maps').mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src/'runtime/maps'/name, root/'ftebroom/maps'/name)
+# The draft template is embedded in the editor. Strip the obsolete loose
+# copy from the staged runtime when repackaging an older release.
+maps = root/'ftebroom/maps'
+maps.mkdir(parents=True, exist_ok=True)
+(maps/'mapping-jam-start.map').unlink(missing_ok=True)
+shutil.copy2(src/'runtime/maps/mapping-jam-hub.map', maps/'mapping-jam-hub.map')
 if a.engine:
     shutil.copy2(a.engine, root/('bin/fteqw64.exe' if windows else 'fteqw-gl64'))
     if not windows:

@@ -9,6 +9,8 @@ namespace {
 using JamJson = jam::Json;
 namespace JamFs = std::filesystem;
 
+#include "ftebroom_jam_start_map.inc"
+
 unsigned jamPort()
 {
   static const unsigned port = [] {
@@ -1211,12 +1213,13 @@ void jamOpenDraft()
       if (stamp>modified) {modified=stamp;draft=map;}
     }
     if (!JamFs::exists(ftebroom::filesystemPath(draft))) {
-      auto bytes = jam::fileBytes(documentPath("maps/mapping-jam-start.map"), 64*1024);
+      std::string bytes(jamStartMap);
+      constexpr std::string_view wadMarker = "@jam-wad@";
       const auto wad = (jamLocal.pack / "lq1/texture-wads/lq_dev.wad").generic_u8string();
-      const auto marker = bytes.find("@jam-wad@");
+      const auto marker = bytes.find(wadMarker);
       if (marker == bytes.npos || wad.find_first_of("\"\n\r") != wad.npos)
         throw std::runtime_error("The Jam template or texture package is invalid.");
-      bytes.replace(marker, 9, wad);
+      bytes.replace(marker, wadMarker.size(), wad);
       jam::writeBytes(draft, bytes);
     }
     jamOpenMap(draft);

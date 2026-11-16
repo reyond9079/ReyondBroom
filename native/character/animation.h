@@ -461,8 +461,8 @@ public:
             const double side = left ? 1. : -1.;
             // Drop the upper arm just behind the ribcage, bend gently at
             // the elbow and leave the wrist in line with the forearm.
-            poseArm(pose,left,{side*.085,-1,-.104+.017*b},
-                              {side*.018,-1,.184+.026*a},8.5,true);
+            poseArm(pose,left,{side*.11,-1,-.104+.017*b},
+                              {side*.075,-1,.184+.026*a},8.5,true);
           }
           hands(18);
         }

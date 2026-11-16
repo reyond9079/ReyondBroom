@@ -1,6 +1,7 @@
 static int selectedent;
 var vector autocvar_ftebroom_color_entity_bounds='0.65 0.8 0.4';
 var float autocvar_ftebroom_entity_bounds_class_colors=1;
+vector(float model,float sequence,float mode) editor_model_info = #0:editor_model_info;
 int *fb_selected_entities;
 int fb_selected_entity_count,fb_open_group;
 int fb_selected_entity() {if(fb_selected_entity_count>0) return fb_selected_entities[0];return -1;}
@@ -95,6 +96,8 @@ typedef struct
 	float scale;
     float modelskin,modelframe;
     vector modelaxes;
+    int pickMesh;
+    vector pickLocalMin,pickLocalMax;
 	
 	trisoup_simple_vert_t *bboxverts;
     trisoup_simple_vert_t *solidverts;
@@ -170,6 +173,64 @@ int fb_entity_light_icon(int index)
     return classname=="light" || substring(classname,0,6)=="light_";
 }
 int fb_entity_has_model(int index){if(index<0 || index>=numents)return FALSE;return (editents[index].modelindex && !editents[index].isbsp)||fb_entity_light_icon(index);}
+// The marker (or its class bounds) remains selectable when the model is hidden.
+int fb_entity_pick_mesh(int index)
+{
+    return index>=0 && index<numents && editents[index].pickMesh && cvar("ftebroom_show_models");
+}
+vector fb_entity_model_scale(entedit_t *item)
+{
+    if(item->modelaxes!='1 1 1')return item->modelaxes;
+    return [item->scale,item->scale,item->scale];
+}
+void fb_entity_model_vectors(entedit_t *item)
+{
+    if(item->modelaxes!='1 1 1'){
+        makevectors(item->ang); // The preview supplies RF_USEAXIS in this case.
+        return;
+    }
+    // Tag zero exposes the engine's model orientation, including the legacy
+    // pitch/roll convention used when rendering an alias model.
+    static entity probe;
+    if(!probe)probe=spawn();
+    probe.modelindex=item->modelindex;probe.angles=item->ang;
+    gettaginfo(probe,0);
+}
+float fb_entity_trace_mesh(int index,vector start,vector end,vector *normal)
+{
+    entedit_t *item=&editents[index];
+    vector scale=fb_entity_model_scale(item);
+    if(fabs(scale_x)<.000001 || fabs(scale_y)<.000001 || fabs(scale_z)<.000001)return -1;
+    fb_entity_model_vectors(item);
+    vector forward=v_forward,right=-v_right,up=v_up;
+    start-=item->org;end-=item->org;
+    vector localStart=[(start*forward)/scale_x,(start*right)/scale_y,(start*up)/scale_z];
+    vector localEnd=[(end*forward)/scale_x,(end*right)/scale_y,(end*up)/scale_z];
+
+    // Trace only this model in its local space. The existing engine trace
+    // uses the static model's acceleration structure and picks posed meshes.
+    static entity proxy;
+    if(!proxy)proxy=spawn();
+    proxy.modelindex=item->modelindex;
+    proxy.mins=item->pickLocalMin-'0.0625 0.0625 0.0625';
+    proxy.maxs=item->pickLocalMax+'0.0625 0.0625 0.0625';
+    proxy.frame=item->modelframe;
+    entity savedOther=other;other=proxy;
+    traceline(localStart,localEnd,MOVE_OTHERONLY+MOVE_HITMODEL,world);
+    float fraction=trace_fraction;
+    // Mesh collision can be single-sided. Open sheets (e.g. foliage cards)
+    // must also be selectable from their back.
+    if(fraction>=1){
+        traceline(localEnd,localStart,MOVE_OTHERONLY+MOVE_HITMODEL,world);
+        if(trace_fraction<1)fraction=1-trace_fraction;
+    }
+    other=savedOther;
+    if(fraction>=1 || trace_plane_normal=='0 0 0')return -1;
+    vector n=trace_plane_normal;
+    *normal=normalize(forward*(n_x/scale_x)+right*(n_y/scale_y)+up*(n_z/scale_z));
+    if(*normal*(end-start)>0)*normal=-*normal;
+    return fraction;
+}
 void fb_entity_draw_box(int index,vector colour,int solid,int wire,string shader)
 {
     if(index<0 || index>=numents)return;
@@ -547,13 +608,25 @@ void(entedit_t *nent) editor_ents_updated =
 	if (nent->isbsp)
 		nent->ang = '0 0 0';	//bsp entities should not be displayed rotated, because that just messes everything up.
 
-    // Use the actual generated model for picking/framing, rather than the
-    // generic func_model marker's tiny box. Cache its rotated world-axis box.
-    if(nent->fields["_reyondbroom_authoring"]=="1" && nent->modelindex && !nent->isbsp){
-        if(!tempent)tempent=spawn();setmodelindex(tempent,nent->modelindex);
-        vector modelLow=tempent.mins,modelHigh=tempent.maxs,modelAxes=nent->modelaxes;
-        if(modelAxes=='1 1 1')modelAxes=[nent->scale,nent->scale,nent->scale];
-        makevectors(nent->ang);vector modelForward=v_forward,modelRight=v_right,modelUp=v_up;
+    // Cache geometric bounds outside the pointer/render loop. Sprites,
+    // missing models and entity icons keep their ordinary selection box.
+    nent->pickMesh=FALSE;
+    string suffix=strtolower(substring(modelnameforindex(nent->modelindex),-4,4));
+    if(nent->modelindex && !nent->isbsp && suffix!=".spr" && suffix!=".sp2" && suffix!="pr32" && suffix!="spr2"){
+        vector modelLow,modelHigh;
+        if(checkbuiltin(editor_model_info)){
+            modelLow=editor_model_info(nent->modelindex,0,1);modelHigh=editor_model_info(nent->modelindex,0,2);
+        }else{
+            if(!tempent)tempent=spawn();setmodelindex(tempent,nent->modelindex);
+            modelLow=tempent.mins;modelHigh=tempent.maxs;
+        }
+        nent->pickLocalMin=modelLow;nent->pickLocalMax=modelHigh;
+        nent->pickMesh=modelLow_x<=modelHigh_x && modelLow_y<=modelHigh_y &&
+                       modelLow_z<=modelHigh_z && vlen(modelHigh-modelLow)>.001;
+    }
+    if(nent->pickMesh){
+        vector modelLow=nent->pickLocalMin,modelHigh=nent->pickLocalMax,modelAxes=fb_entity_model_scale(nent);
+        fb_entity_model_vectors(nent);vector modelForward=v_forward,modelRight=v_right,modelUp=v_up;
         nent->mins='100000000 100000000 100000000';nent->maxs='-100000000 -100000000 -100000000';
         for(int corner=0;corner<8;corner++){
             vector modelCorner=[(corner&1i)?modelHigh_x:modelLow_x,(corner&2i)?modelHigh_y:modelLow_y,(corner&4i)?modelHigh_z:modelLow_z];

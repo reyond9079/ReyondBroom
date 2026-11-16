@@ -57,6 +57,56 @@ float fb_pick_testcommand()
             vector ray=normalize(unproject(project('200 -16 216')+'0 0 8192')-unproject(project('200 -16 216')));
             fb_pick_expect(fb_hits[0].normal*ray>0,"near_back_face");
         }
+    } else if(mode=="mesh") {
+        vector origin='1000 1000 240',above='0 0 100',below='0 0 -100';
+        fb_entity_create("misc_model",FALSE,origin);
+        int id=fb_selected_entity();
+        fb_entity_property("set","model","models/qa/mesh-pick.obj");
+        fb_document_tick();editor_ents_reload();
+        fb_pick_expect(fb_entity_pick_mesh(id),"loaded_mesh_is_pickable");
+        vector bar=origin+'80 8 0',gap=origin+'80 80 0';
+        int kind=FB_HIT_ENTITY|FB_HIT_BRUSH;
+        fb_pick_query(bar+above,bar+below,'0 0 0',0,kind,FALSE);
+        fb_pick_expect(fb_hit_count>=1 && fb_hits[0].kind==FB_HIT_ENTITY &&
+            fb_hits[0].id==id && fabs(fb_hits[0].point[2]-origin_z)<.1,"mesh_surface_hit_at_its_depth");
+        fb_pick_query(bar+below,bar+above,'0 0 0',0,kind,FALSE);
+        fb_pick_expect(fb_hit_count>=1 && fb_hits[0].kind==FB_HIT_ENTITY && fb_hits[0].id==id,"open_face_pickable_from_back");
+        fb_pick_query(gap+above,gap+below,'0 0 0',0,kind,FALSE);
+        fb_pick_expect(!fb_hit_count,"empty_area_inside_model_box_is_not_pickable");
+        int behind=fb_createbox(gap+'0 0 -48','16 16 16');
+        fb_pick_query(gap+above,gap+below,'0 0 0',0,kind,FALSE);
+        fb_pick_expect(fb_hit_count>=1 && fb_hits[0].kind==FB_HIT_BRUSH && fb_hits[0].id==behind,"brush_pick_through_mesh_gap");
+        fb_pick_query(bar+above,bar+below,'0 0 0',FB_PICK_HOVER,FB_HIT_ENTITY,FALSE);
+        fb_pick_expect(!fb_hit_count,"frame_hover_does_not_trace_render_meshes");
+        fb_pick_query(gap+above,gap+below,'0 0 0',0,FB_HIT_ENTITY,TRUE);
+        fb_pick_expect(fb_hit_count>=1 && fb_hits[0].kind==FB_HIT_ENTITY && fb_hits[0].id==id,"orthographic_keeps_entity_box");
+        fb_entity_select(id,TRUE);
+        fb_entity_property("set","angles","0 90 0");
+        fb_entity_property("set","modelscale_vec","2 3 1");
+        fb_document_tick();editor_ents_reload();
+        bar=origin+'-24 160 0';gap=origin+'-240 160 0';
+        fb_pick_query(bar+above,bar+below,'0 0 0',0,FB_HIT_ENTITY,FALSE);
+        fb_pick_expect(fb_hit_count>=1 && fb_hits[0].kind==FB_HIT_ENTITY && fb_hits[0].id==id,"rotated_non_uniform_mesh_hit");
+        fb_pick_query(gap+above,gap+below,'0 0 0',0,FB_HIT_ENTITY,FALSE);
+        fb_pick_expect(!fb_hit_count,"rotated_non_uniform_mesh_gap");
+        // Vary the ray on every iteration to exercise the engine's broad
+        // phase and native mesh trace without relying on a cached hit.
+        float started=gettime(1);int hitCount=0;
+        for(int i=0;i<256;i++){
+            vector sample=bar+[0,i*.1,0];
+            if(fb_pick_query(sample+above,sample+below,'0 0 0',0,FB_HIT_ENTITY,FALSE))hitCount++;
+        }
+        fb_pick_expect(hitCount==256,"large_mesh_repeated_click_queries");
+        print(sprintf("FTEBROOM_MESH_PICK_BENCHMARK 256 changing rays, %g ms per query\n",(gettime(1)-started)*1000/256));
+        fb_entity_property("set","angles","40 27 13");
+        fb_entity_property("set","modelscale_vec","1 1 1");
+        fb_document_tick();editor_ents_reload();
+        makevectors([40*cvar("r_meshpitch"),27,13*cvar("r_meshroll")]);
+        bar=origin+v_forward*80-v_right*8;
+        vector up=v_up*100;
+        fb_pick_query(bar+up,bar-up,'0 0 0',0,FB_HIT_ENTITY,FALSE);
+        fb_pick_expect(fb_hit_count>=1 && fb_hits[0].id==id && vlen(fb_hits[0].point-bar)<.1,
+            "mesh_hit_uses_rendered_pitch_and_roll");
     } else if(mode=="click") {
         vector entityPixel=project('0 -200 128');entityPixel_z=0;
         fb_begin(entityPixel,0,cvar("ca_brush_view"));fb_finish(entityPixel,0,cvar("ca_brush_view"));

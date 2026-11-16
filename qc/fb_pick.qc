@@ -41,7 +41,7 @@ void fb_filter_prepare();
 #include "fb_label_visibility.qc"
 // SPDX-License-Identifier: GPL-2.0-or-later
 enum : int { FB_HIT_BRUSH=1, FB_HIT_PATCH=2, FB_HIT_ENTITY=4, FB_HIT_HANDLE=8 };
-enum : int { FB_PICK_HIDDEN=1, FB_PICK_LOCKED=2 };
+enum : int { FB_PICK_HIDDEN=1, FB_PICK_LOCKED=2, FB_PICK_HOVER=4 };
 typedef struct {
     int kind,model,id,face,node;
     float distance,area;
@@ -192,7 +192,7 @@ void fb_pick_patch(int node,vector start,vector direction,float length)
     if(hit.distance<=length) fb_pick_add(hit);
     memfree(mesh);
 }
-void fb_pick_entity(int node,vector start,vector direction,float length)
+void fb_pick_entity(int node,vector start,vector direction,float length,int flags,int orthographic)
 {
     fb_node_t item=fb_nodes[node];
     if(!item.fields || substring(item.fields["model"],0,1)=="*") return;
@@ -203,6 +203,15 @@ void fb_pick_entity(int node,vector start,vector direction,float length)
     fb_hit_t hit={0};hit.kind=FB_HIT_ENTITY;hit.node=node;hit.id=item.id;
     hit.model=0;hit.face=0;hit.distance=distance;hit.point=start+direction*distance;
     hit.normal='0 0 0';
+    if(!orthographic && fb_entity_pick_mesh(item.id)){
+        // Mouse-over runs as part of drawing. Keep triangle queries out of it.
+        if(flags&FB_PICK_HOVER)return;
+        vector normal;
+        float fraction=fb_entity_trace_mesh(item.id,start,start+direction*length,&normal);
+        if(fraction<0)return;
+        hit.distance=length*fraction;hit.point=start+direction*hit.distance;hit.normal=normal;
+        fb_pick_add(hit);return;
+    }
     int axis=0;
     for(int a=1;a<3;a++) if(fabs(direction[a])>fabs(direction[axis])) axis=a;
     hit.normal[axis]=direction[axis]>0?-1:1;
@@ -232,7 +241,7 @@ int fb_pick_query(vector start,vector end,vector pixel,int flags,int kinds,int o
         int kind=fb_nodes[node].kind;
         if(kind==FB_NODE_BRUSH && (kinds&FB_HIT_BRUSH)) fb_pick_brush(node,start,direction,length);
         else if(kind==FB_NODE_PATCH && (kinds&FB_HIT_PATCH)) fb_pick_patch(node,start,direction,length);
-        else if(kind==FB_NODE_ENTITY && (kinds&FB_HIT_ENTITY)) fb_pick_entity(node,start,direction,length);
+        else if(kind==FB_NODE_ENTITY && (kinds&FB_HIT_ENTITY)) fb_pick_entity(node,start,direction,length,flags,orthographic);
     }
     if(kinds&FB_HIT_HANDLE) for(int h=0;h<fb_pick_handle_count;h++) {
         fb_handle_t handle=fb_handles[h];
@@ -261,12 +270,15 @@ int fb_pick_query(vector start,vector end,vector pixel,int flags,int kinds,int o
     }
     return fb_hit_count;
 }
+int fb_pick_at(vector pixel,int flags)
+{
+    int orthographic=cvar("ca_brush_view")!=0;
+    vector start=unproject(pixel),end=unproject(pixel+[0,0,orthographic?1:8192]);
+    return fb_pick_query(start,end,pixel,flags,FB_HIT_BRUSH|FB_HIT_PATCH|FB_HIT_ENTITY|FB_HIT_HANDLE,orthographic);
+}
 int fb_pick(vector pixel)
 {
-    vector start=unproject(pixel),end=unproject(pixel+'0 0 8192');
-    if(cvar("ca_brush_view")) {end=unproject(pixel+'0 0 1');}
-    return fb_pick_query(start,end,pixel,0,
-        FB_HIT_BRUSH|FB_HIT_PATCH|FB_HIT_ENTITY|FB_HIT_HANDLE,cvar("ca_brush_view")!=0);
+    return fb_pick_at(pixel,0);
 }
 int *fb_point_draw_ids;vector *fb_point_draw_colors;int fb_point_draw_capacity;
 int fb_entity_classnames_visible(int ortho)

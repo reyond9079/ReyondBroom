@@ -103,12 +103,28 @@ public:
           stop();
           return packet;
         }
+        if (const auto trace=packet.find("trace");trace!=packet.end()) {
+          for (const auto& event : *trace) {
+            const auto phase=event.at("phase").get<int>();
+            if (phase<static_cast<int>(ResourcePhase::Checking) || phase>static_cast<int>(ResourcePhase::Finalizing))
+              throw std::runtime_error("Invalid Mapping Jam resource worker phase.");
+            transfer.phase = static_cast<ResourcePhase>(phase);
+            transfer.bytes = event.at("bytes").get<std::size_t>();
+            transfer.total = event.at("total").get<std::size_t>();
+            transfer.member = event.at("member").get<unsigned>();
+            transfer.forward({event.at("step").get<std::string>(),event.at("detail").get<int>(),
+                              transfer.phase.load(),transfer.bytes.load(),transfer.total.load(),transfer.member.load(),
+                              event.at("elapsed").get<std::int64_t>()});
+          }
+          continue;
+        }
         const auto phase = packet.at("phase").get<int>();
         if (phase<static_cast<int>(ResourcePhase::Checking) || phase>static_cast<int>(ResourcePhase::Finalizing))
           throw std::runtime_error("Invalid Mapping Jam resource worker phase.");
         transfer.phase = static_cast<ResourcePhase>(phase);
         transfer.total = packet.at("total").get<std::size_t>();
         transfer.bytes = packet.at("bytes").get<std::size_t>();
+        transfer.member = packet.value("member",0u);
         if (packet.value("stalled",false)) return Json{{"timeout",true},{"local",true}};
       }
     }

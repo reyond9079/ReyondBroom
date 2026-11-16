@@ -96,6 +96,7 @@ typedef struct
 	float scale;
     float modelskin,modelframe;
     vector modelaxes;
+    int renderSprite;
     string iconShader;
     vector iconSize;
     int pickMesh;
@@ -172,7 +173,11 @@ string fb_entity_icon_shader(int index)
     if(index<0 || index>=numents)return "";
     return editents[index].iconShader;
 }
-vector fb_entity_icon_size(int index){return editents[index].iconSize;}
+vector fb_entity_ortho_sprite_size(int index)
+{
+    if(index<0 || index>=numents || editents[index].isbsp || !editents[index].renderSprite)return '0 0 0';
+    return editents[index].iconSize*fabs(editents[index].scale);
+}
 int fb_entity_light_icon(int index)
 {
     if(index<0 || index>=numents || editents[index].modelSpecified || editents[index].modelindex || editents[index].isbsp)
@@ -181,6 +186,10 @@ int fb_entity_light_icon(int index)
     return classname=="light" || substring(classname,0,6)=="light_";
 }
 int fb_entity_has_model(int index){if(index<0 || index>=numents)return FALSE;return (editents[index].modelindex && !editents[index].isbsp)||fb_entity_light_icon(index);}
+int fb_entity_ortho_mesh(int index)
+{
+    return index>=0 && index<numents && editents[index].modelindex && !editents[index].isbsp && !editents[index].renderSprite;
+}
 // The marker (or its class bounds) remains selectable when the model is hidden.
 int fb_entity_pick_mesh(int index)
 {
@@ -630,14 +639,13 @@ void(entedit_t *nent) editor_ents_updated =
     int isSprite=suffix==".spr" || suffix==".sp2" || suffix=="pr32" || suffix=="spr2";
     if(!nent->isbsp && checkbuiltin(spriteframe) && (iconPath!="" || isSprite)){
         string shader="";
-        if(iconPath!="")shader=spriteframe(iconPath,0,0);
-        if(shader=="" && isSprite)shader=spriteframe(modelPath,(int)nent->modelframe,0);
+        if(isSprite)shader=spriteframe(modelPath,(int)nent->modelframe,0);
+        else if(iconPath!="")shader=spriteframe(iconPath,0,0);
         if(shader!=""){
             nent->iconShader=strzone(shader);
             vector size=drawgetimagesize(nent->iconShader);
-            float span=max(size_x,size_y);
             nent->iconSize='22 22 0';
-            if(size_x>0 && size_y>0)nent->iconSize=[size_x,size_y,0]*(22/span);
+            if(size_x>0 && size_y>0)nent->iconSize=[size_x,size_y,0];
             if(!nent->modelindex && iconPath!=""){
                 nent->modelindex=modelindexforname(iconPath);
                 nent->modelframe=0;
@@ -645,6 +653,7 @@ void(entedit_t *nent) editor_ents_updated =
             }
         }
     }
+    nent->renderSprite=isSprite;
     if(nent->modelindex && !nent->isbsp && !isSprite){
         vector modelLow,modelHigh;
         if(checkbuiltin(editor_model_info)){

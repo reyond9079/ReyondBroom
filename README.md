@@ -2,7 +2,7 @@
 
 ReyondBroom is an open-source level editor powered by FTE Quake for Windows and Linux. Edit maps for Quake, Quake II, Quake III Arena, Half-Life, and custom FTE games. Build and inspect BSPs, trace leaks in the viewport, and playtest with the runtime configured for your game.
 
-[**Download the latest alpha (0.6.0-alpha.10)**](https://github.com/reyond9079/ReyondBroom/releases/tag/v0.6.0-alpha.10) · [All releases](https://github.com/reyond9079/ReyondBroom/releases) · [Quick start](docs/quick-start.md) · [Documentation](docs/README.md) · [Discord](https://discord.gg/eDMf53Kny)
+[**Download the latest alpha (0.6.0-alpha.11)**](https://github.com/reyond9079/ReyondBroom/releases/tag/v0.6.0-alpha.11) · [All releases](https://github.com/reyond9079/ReyondBroom/releases) · [Quick start](docs/quick-start.md) · [Documentation](docs/README.md) · [Discord](https://discord.gg/eDMf53Kny)
 
 ![A textured basement map in ReyondBroom's 3D viewport with the Material Browser open](docs/images/reyondbroom-workspace.webp)
 

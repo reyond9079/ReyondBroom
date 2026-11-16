@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cstdint>
 #include <exception>
+#include <mutex>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -13,6 +14,7 @@
 #include <thread>
 #include <chrono>
 #include <utility>
+#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -44,12 +46,45 @@ enum class ResourcePhase { Checking, CheckingCache, Downloading, Retrying, Verif
 
 struct ResourceTransfer {
   using Clock = std::chrono::steady_clock;
-  const Clock::time_point deadline = Clock::now() + std::chrono::minutes(4);
+  const Clock::time_point started = Clock::now();
+  const Clock::time_point deadline = started + std::chrono::minutes(4);
+  Clock::time_point nextTraceProgress = started + std::chrono::seconds(10);
   static constexpr auto localIdleLimit = std::chrono::seconds(45);
   std::atomic<ResourcePhase> phase{ResourcePhase::Checking};
   std::atomic<std::size_t> bytes{0}, total{0};
   std::atomic<Clock::time_point> lastLocalProgress{Clock::now()};
   std::atomic<bool> canceled{false}, timedOut{false};
+  std::atomic<unsigned> member{0};
+  struct Trace {
+    std::string step;
+    int detail;
+    ResourcePhase phase;
+    std::size_t bytes, total;
+    unsigned member;
+    std::int64_t elapsed;
+  };
+  std::mutex traceMutex;
+  std::vector<Trace> events;
+  std::string traceId;
+  unsigned traceSequence = 0;
+
+  void record(std::string step, int detail = 0, std::int64_t elapsed = -1)
+  {
+    if (elapsed < 0) elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-started).count();
+    forward({std::move(step),detail,phase.load(),bytes.load(),total.load(),member.load(),elapsed});
+  }
+
+  void forward(Trace event)
+  {
+    std::lock_guard<std::mutex> lock(traceMutex);
+    if (events.size()<512) events.push_back(std::move(event));
+  }
+
+  std::vector<Trace> takeEvents()
+  {
+    std::lock_guard<std::mutex> lock(traceMutex);
+    return std::exchange(events,{});
+  }
 
   bool local() const
   {

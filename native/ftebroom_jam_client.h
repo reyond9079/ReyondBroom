@@ -33,6 +33,7 @@ struct Client {
   {
     const auto response = request(endpoint, method, path, token, key,
       method == "PUT" || path == "/v1/me/avatar" ? bytes : body.is_null() ? std::string{} : body.dump(), 512 * 1024, transfer);
+    if (transfer && transfer->phase==ResourcePhase::Checking) transfer->record("manifest_http",response.status);
     auto value = response.body.empty() ? Json::object() : Json::parse(response.body, nullptr, false);
     if (value.is_discarded() || !value.is_object()) throw Error("Invalid Mapping Jam API response.", true);
     if (response.status < 200 || response.status >= 300) {
@@ -67,6 +68,7 @@ inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTra
 {
   if (transfer) transfer->check();
   const auto file=ftebroom::filesystemPath(path);
+  if (transfer) transfer->record("file_directories");
 #ifdef _WIN32
   // std::filesystem's recursive directory walk may misread the drive root
   // of an extended-length Win32 path as a directory that needs creation.
@@ -93,7 +95,11 @@ inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTra
 #else
   fs::create_directories(file.parent_path());
 #endif
+  if (transfer) transfer->record("file_open");
   std::ofstream output(file, std::ios::binary | std::ios::trunc);
+  if (!output) throw fs::filesystem_error("Cannot open the Mapping Jam working file", file,
+                                          std::error_code(errno,std::generic_category()));
+  if (transfer) transfer->record("file_write");
   std::size_t finalChunk = 0;
   if (!transfer) {
     output.write(bytes.data(),bytes.size());
@@ -102,14 +108,17 @@ inline void writeBytes(const fs::path& path, std::string_view bytes, ResourceTra
       transfer->check();
       const auto count = std::min<std::size_t>(bytes.size(),256*1024);
       if (!output.write(bytes.data(),count))
-        throw std::runtime_error("Cannot write the Mapping Jam working file.");
+        throw fs::filesystem_error("Cannot write the Mapping Jam working file",file,
+                                   std::error_code(errno,std::generic_category()));
       bytes.remove_prefix(count);
       if (bytes.empty()) finalChunk = count;
       else transfer->wrote(count);
     }
   }
+  if (transfer) transfer->record("file_close");
   output.close();
-  if (!output) throw std::runtime_error("Cannot write the Mapping Jam working file.");
+  if (!output) throw fs::filesystem_error("Cannot close the Mapping Jam working file",file,
+                                          std::error_code(errno,std::generic_category()));
   if (transfer) {
     transfer->check();
     transfer->wrote(finalChunk);
@@ -236,7 +245,7 @@ inline Json packReceipt(const fs::path& root, const Json& manifest)
   return {{"manifest",manifest.at("sha256")},{"files",std::move(inventory)}};
 }
 
-inline void writePackReceipt(const fs::path& root, const Json& receipt)
+inline void writePackReceipt(const fs::path& root, const Json& receipt, ResourceTransfer* transfer=nullptr)
 {
   const auto marker=root/".verified-pack.json";
   const auto temporary=root/(".verified-"+randomHex(8)+".tmp");
@@ -247,7 +256,9 @@ inline void writePackReceipt(const fs::path& root, const Json& receipt)
 #else
     fs::rename(temporary,marker);
 #endif
-  } catch (const std::exception&) {
+  } catch (const std::exception& error) {
+    const auto* fsError=dynamic_cast<const fs::filesystem_error*>(&error);
+    if (transfer) transfer->record("receipt_error",fsError ? fsError->code().value() : 0);
     std::error_code ignored;
     fs::remove(temporary,ignored);
   }
@@ -257,14 +268,16 @@ inline bool installedPack(const fs::path& destination, const Json& manifest, Res
 {
   try {
     const auto root = ftebroom::filesystemPath(destination);
+    if (transfer) transfer->record("cache_inventory");
     const auto receipt = packReceipt(root,manifest);
     if (receipt.is_null()) return false;
     const auto marker = root/".verified-pack.json";
     if (fs::is_regular_file(marker) && !fs::is_symlink(marker) && fs::file_size(marker)<16384 &&
         Json::parse(fileBytes(marker,16384),nullptr,false)==receipt) return true;
+    if (transfer) transfer->record("cache_hash");
     if (!validPack(destination,manifest.at("files"),transfer)) return false;
     if (transfer) transfer->check();
-    writePackReceipt(root,receipt);
+    writePackReceipt(root,receipt,transfer);
     return true;
   } catch (const DownloadCanceled&) { throw; }
     catch (const DownloadInterrupted&) { throw; }
@@ -308,6 +321,7 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
   const std::string mapPath = "maps/" + mapStem;
   const std::size_t maxSize = base ? 128 * 1024 * 1024 : 32 * 1024 * 1024;
   const auto length = manifest.at("sizeBytes").get<std::size_t>();
+  if (transfer) transfer->record("manifest_validate");
   const auto& files = manifest.at("files");
   if (manifest.value("schemaVersion", 0) != 1 || !files.is_array() || files.empty() ||
       files.size() > 64 || !length || length > maxSize)
@@ -328,7 +342,14 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     throw std::runtime_error("The Jam manifest is incomplete.");
   const auto target = ftebroom::filesystemPath(destination);
   if (transfer) transfer->check();
-  if (base && !privatePack && installedPack(destination, manifest,transfer)) return;
+  if (base && !privatePack) {
+    if (transfer) transfer->localPhase(ResourcePhase::CheckingCache);
+    if (installedPack(destination, manifest,transfer)) {
+      if (transfer) transfer->record("cache_hit");
+      return;
+    }
+    if (transfer) transfer->record("cache_miss");
+  }
   if (!base && reuse) {
     const bool present = std::all_of(members.begin(),members.end(),[&](const auto& item) {
       const auto file = target/fs::u8path(item.first).make_preferred();
@@ -348,9 +369,11 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
       transfer->total = length;
       transfer->bytes = 0;
       transfer->phase = ResourcePhase::Downloading;
+      transfer->record("download_request",attempt+1);
     }
     try {
       response = request(client.endpoint,"GET",path,client.token,{},{},length+4096,transfer);
+      if (transfer) transfer->record("download_http",response.status);
       if (response.status==200 && response.body.size()<length)
         throw DownloadInterrupted("The Mapping Jam download was incomplete.");
       if (response.status!=408 && response.status!=429 && response.status!=500 &&
@@ -359,9 +382,10 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
         throw Error("The Mapping Jam server asked the client to wait.",true,"RATE_LIMITED");
       if (attempt==2) throw Error("The Jam download service is temporarily unavailable. Try again.",true);
     } catch (const DownloadInterrupted&) {
+      if (transfer) transfer->record("download_interrupted");
       if (attempt==2) throw;
     }
-    if (transfer) transfer->phase = ResourcePhase::Retrying;
+    if (transfer) {transfer->phase = ResourcePhase::Retrying;transfer->record("download_retry",attempt+1);}
     std::this_thread::sleep_for(std::chrono::seconds(attempt+1));
   }
   if (response.status == 404) throw Error("The Jam publication changed during download.", true, "ARTIFACT_CHANGED");
@@ -375,12 +399,14 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     transfer->total = 0;
     transfer->bytes = 0;
     transfer->localPhase(ResourcePhase::Verifying);
+    transfer->record("archive_hash");
   }
   if (response.body.size() != length ||
       sha256(response.body) != manifest.at("sha256").get<std::string>())
     throw std::runtime_error("The Jam download did not match its manifest.");
 
   auto staging = target;
+  if (transfer) transfer->record("staging_create");
   if (privatePack) {
     // The worker owns this fresh directory. Only a completed receipt makes
     // it discoverable, so installation needs no directory move or exchange.
@@ -391,15 +417,17 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     const std::string_view archive = response.body;
     ResourceArchive buffer(archive);
     std::istream input(&buffer);
+    if (transfer) transfer->record("zip_directory");
     const auto entries = ftebroom::pak::zipDirectory(input,archive.size());
     if (entries.size() != members.size()) throw std::runtime_error("Unexpected files in Jam download.");
     if (transfer) {
       transfer->check();
       transfer->total = total;
       transfer->localPhase(ResourcePhase::Installing);
+      transfer->record("install_start",static_cast<int>(entries.size()));
     }
     for (const auto& entry : entries) {
-      if (transfer) transfer->check();
+      if (transfer) {transfer->check();++transfer->member;transfer->record("member_inflate");}
       const auto i = members.find(entry.name);
       if (i == members.end() || entry.size != i->second.at("sizeBytes").get<std::size_t>())
         throw std::runtime_error("Unexpected file or size in Jam download.");
@@ -415,22 +443,28 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
         inflated = ftebroom::pak::zipRead(input,archive.size(),entry);
         bytes = inflated;
       }
+      if (transfer) transfer->record("member_hash");
       if (sha256(bytes) != i->second.at("sha256").get<std::string>())
         throw std::runtime_error("An extracted Jam file did not match its manifest.");
       writeBytes(staging / fs::u8path(entry.name).make_preferred(),bytes,transfer);
+      if (transfer) transfer->record("member_done");
     }
     if (transfer) {
       transfer->check();
       transfer->localPhase(ResourcePhase::Finalizing);
+      transfer->member = 0;
+      transfer->record("install_finalize");
     }
     if (base) {
       const auto receipt = packReceipt(staging,manifest);
       if (receipt.is_null()) throw std::runtime_error("The installed Jam resources failed verification.");
+      if (transfer) transfer->record("receipt_write");
       if (privatePack) writeBytes(staging/".verified-pack.json",receipt.dump());
-      else writePackReceipt(staging,receipt);
+      else writePackReceipt(staging,receipt,transfer);
     }
     if (transfer) transfer->check();
     if (privatePack) return;
+    if (transfer) transfer->record("activate_directory");
     if (fs::exists(target)) {
       auto previous = target;
       previous += ".previous-" + randomHex(8);
@@ -445,9 +479,13 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     } else {
       renameArtifactDirectory(staging,target);
     }
-  } catch (...) {
+  } catch (const std::exception& error) {
+    const auto* fsError=dynamic_cast<const fs::filesystem_error*>(&error);
+    if (transfer) transfer->record("operation_failed",fsError ? fsError->code().value() : 0);
+    if (transfer) transfer->record("cleanup_failed_install");
     std::error_code ignored;
     fs::remove_all(staging, ignored);
+    if (transfer && ignored) transfer->record("cleanup_error",ignored.value());
     throw;
   }
 }

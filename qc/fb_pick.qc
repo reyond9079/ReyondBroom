@@ -439,13 +439,12 @@ void fb_point_render_prepare()
     fb_commit_profile("fb_point_render_prepare",profile81Time);
 }
 int fb_point_preview_cache_allowed();
-void fb_point_icon_2d(int id, string name, vector pixel, vector color)
+void fb_point_icon_2d(int id, string name, vector pixel, vector color, vector spriteSize)
 {
     pixel_z=0;
     string icon=fb_entity_icon_shader(id);
-    if(icon!=""){
-        vector size=fb_entity_icon_size(id);
-        drawpic(pixel-size*.5,icon,size,'1 1 1',1,0);
+    if(spriteSize_x>0 && icon!=""){
+        drawpic(pixel-spriteSize*.5,icon,spriteSize,'1 1 1',1,0);
         return;
     }
     if(fb_entity_light_icon(id)) {
@@ -474,28 +473,65 @@ void fb_point_icon_2d(int id, string name, vector pixel, vector color)
         drawline(1,pixel+'0 5 0',pixel+'-5 0 0',color,1,0);
     }
 }
+int fb_point_project_bounds(int id, vector viewportMin, vector viewportMax, vector *rectangle, float padding)
+{
+    static vector bounds[2];
+    if(!fb_entity_bounds(id,bounds))return FALSE;
+    vector a=project(bounds[0]),b=project(bounds[1]);
+    rectangle[0]=[min(a_x,b_x),min(a_y,b_y),0];
+    rectangle[1]=[max(a_x,b_x),max(a_y,b_y),0];
+    vector lo=rectangle[0],hi=rectangle[1];
+    return hi_x>=viewportMin_x-padding && lo_x<viewportMax_x+padding &&
+           hi_y>=viewportMin_y-padding && lo_y<viewportMax_y+padding;
+}
+int fb_point_submit_ortho_models()
+{
+    if(!cvar("ftebroom_show_entity_icons_2d") || !cvar("ftebroom_show_models"))return FALSE;
+    fb_point_render_prepare();
+    vector viewportMin=getproperty(VF_MIN),viewportMax=viewportMin+getproperty(VF_SIZE);
+    static vector rectangle[2];
+    int submitted=FALSE;
+    for(int i=0;i<fb_point_model_count;i++){
+        int id=fb_point_models[i];
+        if(!fb_entity_ortho_mesh(id) || !fb_point_project_bounds(id,viewportMin,viewportMax,rectangle,0))continue;
+        fb_entity_draw_model(id);
+        submitted=TRUE;
+    }
+    return submitted;
+}
 void fb_point_draw_2d()
 {
     fb_point_render_prepare();
     vector viewportMin=getproperty(VF_MIN),viewportSize=getproperty(VF_SIZE);
     vector viewportMax=viewportMin+viewportSize;
     int icons=cvar("ftebroom_show_entity_icons_2d")!=0;
+    int models=cvar("ftebroom_show_models")!=0;
     int wire=cvar("ftebroom_show_entity_bounds")!=0;
-    static vector bounds[2];
+    vector fov=getproperty(VF_FOV);
+    float pixelsPerUnit=viewportSize_x/max(fov_x,1);
+    static vector rectangle[2];
     for(int i=0;i<fb_point_render_count;i++){
         fb_point_render_t *item=&fb_point_render[i];
-        if(!fb_entity_bounds(item->id,bounds))continue;
-        vector a=project(bounds[0]),b=project(bounds[1]);
-        float left=min(a_x,b_x),right=max(a_x,b_x),top=min(a_y,b_y),bottom=max(a_y,b_y);
-        if(right<viewportMin_x || left>=viewportMax_x || bottom<viewportMin_y || top>=viewportMax_y)continue;
+        vector spriteSize='0 0 0';
+        if(icons && models) {
+            spriteSize=fb_entity_ortho_sprite_size(item->id)*pixelsPerUnit;
+            float span=max(spriteSize_x,spriteSize_y);
+            if(span>0 && span<22)spriteSize*=22/span;
+        }
+        if(!fb_point_project_bounds(item->id,viewportMin,viewportMax,rectangle,icons?max(12,max(spriteSize_x,spriteSize_y)*.5):0))continue;
+        vector lo=rectangle[0],hi=rectangle[1];
         vector color=fb_entity_selected(item->id)?stov(cvar_string("ftebroom_color_selected")):item->color;
         if(wire) {
-            drawline(1,[left,top,0],[right,top,0],color,1,0);
-            drawline(1,[right,top,0],[right,bottom,0],color,1,0);
-            drawline(1,[right,bottom,0],[left,bottom,0],color,1,0);
-            drawline(1,[left,bottom,0],[left,top,0],color,1,0);
+            vector topRight=[hi_x,lo_y,0],bottomLeft=[lo_x,hi_y,0];
+            drawline(1,lo,topRight,color,1,0);
+            drawline(1,topRight,hi,color,1,0);
+            drawline(1,hi,bottomLeft,color,1,0);
+            drawline(1,bottomLeft,lo,color,1,0);
         }
-        if(icons)fb_point_icon_2d(item->id,item->name,project(item->center),color);
+        if(icons && !(models && fb_entity_ortho_mesh(item->id))) {
+            vector origin=spriteSize_x>0 ? fb_entity_origin(item->id) : item->center;
+            fb_point_icon_2d(item->id,item->name,project(origin),color,spriteSize);
+        }
     }
 }
 void fb_pick_draw_entities(int labelsOnly)

@@ -224,6 +224,9 @@ void jamQaTick()
         return;
       }
       if (retried && jamLocal.screen==JamScreen::Board) {
+        static const auto verifyUntil=std::chrono::steady_clock::now()+std::chrono::seconds(4);
+        if (std::chrono::steady_clock::now()<verifyUntil &&
+            (!jamTelemetry.pending.empty() || jamTelemetry.request.valid())) return;
         record(90,"Resource installation recovered after the first worker stalled.",true);
         finished = true;
         command("quit force\n");

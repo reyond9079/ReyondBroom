@@ -207,8 +207,26 @@ void jamRecordTelemetry(const char* kind, const char* name)
 {
   if (jamTelemetry.unsupported) return;
   if (std::string_view(kind)=="button") jamTelemetry.action=name;
-  if (jamTelemetry.pending.size()>=256) jamTelemetry.pending.erase(jamTelemetry.pending.begin());
+  if (jamTelemetry.pending.size()>=1024) jamTelemetry.pending.erase(jamTelemetry.pending.begin());
   jamTelemetry.pending.push_back({{"kind",kind},{"name",name},{"action",jamTelemetry.action}});
+}
+
+void jamCollectResourceTrace(jam::ResourceTransfer& transfer)
+{
+  auto events=transfer.takeEvents();
+  if (jamTelemetry.unsupported || transfer.traceId.empty()) return;
+#ifdef _WIN32
+  constexpr auto platform="windows";
+#else
+  constexpr auto platform="linux";
+#endif
+  for (const auto& event : events) {
+    if (jamTelemetry.pending.size()>=1024) jamTelemetry.pending.erase(jamTelemetry.pending.begin());
+    jamTelemetry.pending.push_back({{"kind","resource"},{"run",transfer.traceId},
+      {"sequence",++transfer.traceSequence},{"platform",platform},{"step",event.step},
+      {"phase",static_cast<int>(event.phase)},{"bytes",event.bytes},{"total",event.total},
+      {"member",event.member},{"detail",event.detail},{"elapsedMs",event.elapsed}});
+  }
 }
 
 bool jamEditing();
@@ -227,13 +245,20 @@ void jamTelemetryTick()
   }
   using namespace std::chrono;
   const auto now=steady_clock::now();
+  if (const auto& transfer=jamLocal.resourceTransfer) {
+    if (now>=transfer->nextTraceProgress && !transfer->canceled && !transfer->timedOut) {
+      transfer->record("progress");
+      transfer->nextTraceProgress=now+seconds(10);
+    }
+    jamCollectResourceTrace(*transfer);
+  }
   if (jamTelemetry.request.valid()) {
     if (jamTelemetry.request.wait_for(milliseconds(0))!=std::future_status::ready) return;
     const auto status=jamTelemetry.request.get();
     if (status==404) {jamTelemetry.unsupported=true;jamTelemetry.pending.clear();return;}
     if (!status || status==429 || status>=500) {
       auto& pending=jamTelemetry.pending;
-      for (auto it=jamTelemetry.inFlight.rbegin();it!=jamTelemetry.inFlight.rend() && pending.size()<256;++it)
+      for (auto it=jamTelemetry.inFlight.rbegin();it!=jamTelemetry.inFlight.rend() && pending.size()<1024;++it)
         pending.insert(pending.begin(),std::move(*it));
       jamTelemetry.next=now+seconds(10);
     }
@@ -241,11 +266,15 @@ void jamTelemetryTick()
   }
   if (jamTelemetry.unsupported || now<jamTelemetry.next || jamTelemetry.pending.empty() || !jamAlphaWarningAccepted()) return;
   JamJson batch=JamJson::array();
-  const auto count=std::min<std::size_t>(32,jamTelemetry.pending.size());
-  for (std::size_t index=0;index<count;index++) batch.push_back(std::move(jamTelemetry.pending[index]));
-  jamTelemetry.pending.erase(jamTelemetry.pending.begin(),jamTelemetry.pending.begin()+count);
+  const bool resources=jamTelemetry.pending.front().value("kind", "")=="resource";
+  const std::size_t limit=resources ? 32 : 16;
+  for (auto& event : jamTelemetry.pending) {
+    if (batch.size()==limit || (event.value("kind", "")=="resource")!=resources) break;
+    batch.push_back(std::move(event));
+  }
+  jamTelemetry.pending.erase(jamTelemetry.pending.begin(),jamTelemetry.pending.begin()+batch.size());
   const auto endpoint=jamEndpoint();
-  jamTelemetry.next=now+milliseconds(800);
+  jamTelemetry.next=now+milliseconds(resources ? 150 : 800);
   jamTelemetry.inFlight=batch;
   jamTelemetry.request=std::async(std::launch::async,[endpoint,batch=std::move(batch)]() {
     try {return jam::request(endpoint,"POST","/v1/telemetry",{},{},JamJson{{"events",batch}}.dump(),4096).status;}
@@ -560,6 +589,8 @@ void jamResources(bool install)
     return;
   }
   auto transfer = std::make_shared<jam::ResourceTransfer>();
+  transfer->traceId=jam::randomHex(16);
+  transfer->record(install ? "start_install" : "start_probe");
 #ifndef _WIN32
   try {
     const auto& endpoint = jamEndpoint();
@@ -584,6 +615,8 @@ void jamResources(bool install)
     jamLocal.status.clear();
     jamLocal.resourceTransfer = std::move(transfer);
   } catch (const std::exception& error) {
+    transfer->record("worker_error");
+    jamCollectResourceTrace(*transfer);
     jamLocal.error = error.what();
   }
 #else
@@ -591,7 +624,9 @@ void jamResources(bool install)
   const auto destination = jamRoot() / "packs" / version;
   jamLocal.resourceTransfer = transfer;
   jamStart({}, [version,destination,transfer](auto client) {
+    transfer->record("manifest_request");
     const auto manifest = client.json("GET", client.prefix + "packs/" + version + "/manifest",nullptr,{},{},transfer.get());
+    transfer->record("manifest_received");
     if (jamField(manifest,"packVersion") != version)
       throw std::runtime_error("The base pack version changed.");
     JamFs::path retired;
@@ -636,29 +671,38 @@ void jamTickResources()
     return;
   }
   bool refreshBoard = false;
+  auto& transfer=*jamLocal.resourceTransfer;
   try {
     const auto result = process.poll(*jamLocal.resourceTransfer);
     if (!result) return;
     if (result->value("timeout",false)) {
+      transfer.record("timeout");
       jamLocal.resourceRetryFresh = result->value("local",false);
       jamLocal.error = jamLocal.resourceRetryFresh ? jamResourceInstallTimeout() :
         jamText("The resource transfer timed out. Check your connection and retry.",
                 "Время загрузки истекло. Проверьте подключение и повторите попытку.");
     } else if (result->contains("error")) {
+      transfer.record("failed",result->value("detail",0));
       jamLocal.error = result->at("error").get<std::string>();
     } else if (const auto pack = jamField(*result,"pack"); !pack.empty()) {
       jamLocal.pack = JamFs::u8path(pack);
       jamLocal.resourceRetryFresh = false;
       jamLocal.screen = JamScreen::Board;
       refreshBoard = true;
+      transfer.record("ready");
+    } else {
+      transfer.record("probe_finished");
     }
   } catch (const jam::DownloadCanceled&) {
+    transfer.record("canceled");
     jamLocal.status = jamText("Resource preparation canceled. You can retry here.",
                              "Подготовка ресурсов отменена. Её можно запустить снова.");
   } catch (const std::exception& error) {
+    transfer.record("worker_error");
     jamLocal.error = error.what();
   }
   process.stop();
+  jamCollectResourceTrace(transfer);
   jamLocal.resourceTransfer.reset();
   if (refreshBoard) jamRefresh();
 }
@@ -1463,6 +1507,11 @@ void jamTick()
   if (jamLocal.work.valid() && jamLocal.work.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     auto done = std::move(jamLocal.ready);
     auto resourceTransfer = std::move(jamLocal.resourceTransfer);
+    const auto traceResource=[&](const char* step, int detail=0) {
+      if (!resourceTransfer) return;
+      resourceTransfer->record(step,detail);
+      jamCollectResourceTrace(*resourceTransfer);
+    };
     try {
       auto result = jamLocal.work.get();
       if (resourceTransfer && resourceTransfer->canceled) throw jam::DownloadCanceled();
@@ -1470,11 +1519,14 @@ void jamTick()
         throw jam::DownloadInterrupted("The local resource installation stopped responding.");
       jamLocal.status.clear();
       done(std::move(result));
+      traceResource("ready");
     }
     catch (const jam::DownloadCanceled&) {
+      traceResource("canceled");
       jamLocal.status = jamText("Download canceled. You can retry here.","Загрузка отменена. Её можно запустить снова.");
     }
     catch (const jam::DownloadInterrupted& error) {
+      traceResource(resourceTransfer && resourceTransfer->timedOut ? "timeout_finished" : "timeout");
       jamLocal.status.clear();
       if (resourceTransfer && resourceTransfer->local()) {
         jamLocal.error = jamResourceInstallTimeout();
@@ -1486,6 +1538,7 @@ void jamTick()
       }
     }
     catch (const jam::Error& error) {
+      traceResource("failed");
       if (!error.retryable) jamLocal.retryKey.clear();
       jamLocal.error = error.code == "RATE_LIMITED"
         ? jamText("Too many requests. Try again later.","Слишком много запросов. Попробуйте позже.")
@@ -1504,12 +1557,19 @@ void jamTick()
         jamLocal.confirm.clear();
         jamLocal.avatarTextures.clear();
       }
-    } catch (const std::exception& error) { jamLocal.error = error.what(); jamLocal.status.clear(); }
+    } catch (const JamFs::filesystem_error& error) {
+      traceResource("failed",error.code().value());
+      jamLocal.error = error.what(); jamLocal.status.clear();
+    } catch (const std::exception& error) {
+      traceResource("failed");
+      jamLocal.error = error.what(); jamLocal.status.clear();
+    }
   }
 #ifdef _WIN32
   else if (const auto& transfer = jamLocal.resourceTransfer) {
     if (!transfer->canceled && !transfer->timedOut && transfer->localStalled()) {
       transfer->timedOut = true;
+      transfer->record("timeout");
       jamLocal.error = jamResourceInstallTimeout();
     }
   }

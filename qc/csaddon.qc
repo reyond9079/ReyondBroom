@@ -116,6 +116,13 @@ void fb_view_cache_draw(int index,vector mn,vector sz)
     shaderforname(image,sprintf("{\n{\nmap $rt:ftebroom_viewcache%i\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}",index));
     drawsetcliparea(mn_x,mn_y,sz_x,sz_y);
     drawpic('0 0 0',image,vidsize,'1 1 1',1,0);
+    if(cvar("ftebroom_show_entity_icons_2d") && cvar("ftebroom_show_models")) {
+        // Keep models live while the 2D brush canvas is cached.
+        clearscene();
+        setproperty(VF_MIN,mn);setproperty(VF_SIZE,sz);fb_view_prepare();
+        setproperty(VF_DRAWWORLD,FALSE);
+        if(fb_point_submit_ortho_models())perf_renderscene();
+    }
     // Grid and axes are cached behind the wireframe, never painted over it.
     fb_point_draw_2d();fb_pick_draw_entities(TRUE);fb_visual_labels();
     drawresetcliparea();

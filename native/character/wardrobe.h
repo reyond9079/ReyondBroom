@@ -596,11 +596,13 @@ inline void fitHairFaces(std::vector<Vertex>& vertices,const Wardrobe& hair,
     const auto c = vertices[start+face[2]].position;
     const auto ab = sub(a,b), bc = sub(b,c), ca = sub(c,a);
     const auto longest = std::max({dot(ab,ab),dot(bc,bc),dot(ca,ca)});
-    if (longest<.014) continue;
+    if (longest<.005) continue;
     double lift = 0;
     for (const auto point : {mul(add(add(a,b),c),1./3),mul(add(a,b),.5),
                              mul(add(b,c),.5),mul(add(c,a),.5)}) {
-      const auto corrected = clearScalp(scalp,point,.027,followsNeck);
+      const auto temple=smoothBand(.64,.98,std::abs(point[0]))*
+                        smoothBand(14.94,15.39,point[1])*(1-smoothBand(15.65,16.05,point[1]));
+      const auto corrected = clearScalp(scalp,point,.027+.036*temple,followsNeck);
       lift = std::max(lift,bb::length(sub(corrected,point)));
     }
     if (lift<.006) continue;
@@ -811,8 +813,8 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
     eye.position[2] += .02*cornea;
     eye.uv = {std::clamp(.5+dx*3.52,0.,1.),std::clamp(.5+(pos[1]-15.462)*3.52,0.,1.)};
   }
-  const auto axes = outfit.utilityCut ? std::optional<ClothingAxes>(rig) : std::nullopt;
-  const auto sleeveAxes = outfit.utilityCut ? std::nullopt : std::optional<ClothingAxes>(rig);
+  const ClothingAxes garmentAxes(rig);
+  const auto* axes = outfit.utilityCut ? &garmentAxes : nullptr;
   std::vector<bool> hide(65536);
   std::uint32_t sourceOffset = 65536;
   const std::string_view hairMesh=hairstyle.mesh;
@@ -870,9 +872,9 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
       vertex.position = add(vertex.position,delta);
       if (material==3 && axes)
         vertex.position = add(vertex.position,axes->utilityEase(entry.vertex.position));
-      if (material==3 && sleeveAxes)
-        vertex.position = add(vertex.position,add(sleeveAxes->sleeveClearance(entry.vertex.position,anchor),
-                                                  sleeveAxes->collarClearance(entry.vertex.position,anchor)));
+      if (material==3 && !axes)
+        vertex.position = add(vertex.position,add(garmentAxes.sleeveClearance(entry.vertex.position,anchor),
+                                                  garmentAxes.collarClearance(entry.vertex.position,anchor)));
       if (material==4 && outfit.utilityCut && !doc.footwear)
         vertex.position = add(vertex.position,ClothingAxes::utilityBoot(entry.vertex.position));
       if (style || material==6) {
@@ -1015,7 +1017,7 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
         armShift[i] = armShift[joint.parent];
     }
   }
-  const bool utilityFit = fitBodyRig && axes.has_value();
+  const bool utilityFit = fitBodyRig && axes;
   const auto proportions = [](Vec3 point,double shift,bool utility,double legRise) {
     if (utility) {
       const auto y = point[1];

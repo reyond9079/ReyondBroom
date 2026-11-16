@@ -167,7 +167,7 @@ int main(int argc,char** argv) try {
     {Motion::Crouch,.45},{Motion::Wave,.55},{Motion::JumpLoop,.52},{Motion::DeathBack,.78},
   };
   unsigned cases=0, withIntersection=0;
-  for (unsigned outfit=0;outfit<10;++outfit) {
+  for (unsigned outfit=0;outfit<std::size(outfits);++outfit) {
     for (unsigned variant=0;variant<std::size(names);++variant) {
       Document doc;
       doc.outfit=outfit;
@@ -198,7 +198,8 @@ int main(int argc,char** argv) try {
       }
     }
   }
-  if (!report || (contacts.is_open() && !contacts) || cases!=400)
+  const auto expected=std::size(outfits)*std::size(names)*std::size(poses);
+  if (!report || (contacts.is_open() && !contacts) || cases!=expected)
     throw std::runtime_error("Could not complete the full garment fit matrix.");
   std::cout << "Ran " << cases << " garment/body/pose fits; " << withIntersection
             << " have mesh intersections requiring inspection.\n";

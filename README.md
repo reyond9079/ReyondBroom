@@ -6,8 +6,6 @@ ReyondBroom is an open-source level editor powered by FTE Quake for Windows and 
 
 ![A textured basement map in ReyondBroom's 3D viewport with the Material Browser open](docs/images/reyondbroom-workspace.webp)
 
-*The editor workspace in a 0.6.0 alpha build.*
-
 ## Get started
 
 1. Download and extract the **Windows x64**, **Linux x64**, or **Linux SDL2 x64** package.

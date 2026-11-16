@@ -340,9 +340,14 @@ class PackageGateTests(unittest.TestCase):
         files = {'ftebroom/csaddon.dat': b'qc', 'ftebroom/ui/update-splash.png': b'splash', 'build-info.txt': info.encode(),
                  'bin/fteqw64.exe' if windows else 'fteqw-gl64': b'engine',
                  'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so': b'plugin'}
+        worker = 'tools/mapping-jams/prepare-resources'
+        if not windows:
+            files[worker] = b'worker'
         files['distribution-manifest.json'] = json.dumps({n:hashlib.sha256(b).hexdigest() for n,b in files.items()}).encode()
         for name, body in files.items():
             p = root/root_name/name; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(body)
+            if name == worker:
+                p.chmod(0o755)
         archive = root/('ReyondBroom-'+version+'-'+platform+('.zip' if windows else '.tar.gz'))
         if windows:
             with zipfile.ZipFile(archive, 'w') as z:
@@ -350,7 +355,11 @@ class PackageGateTests(unittest.TestCase):
         else:
             with tarfile.open(archive, 'w:gz') as t:
                 for name, body in files.items():
-                    entry = tarfile.TarInfo(root_name+'/'+name); entry.size = len(body); t.addfile(entry, io.BytesIO(body))
+                    entry = tarfile.TarInfo(root_name+'/'+name)
+                    entry.size = len(body)
+                    if name == worker:
+                        entry.mode = 0o755
+                    t.addfile(entry, io.BytesIO(body))
         source = root/('ReyondBroom-'+version+'-'+platform+'-Sources.zip')
         with zipfile.ZipFile(source, 'w') as z:
             z.writestr('RELEASE-BUILD.txt', info)

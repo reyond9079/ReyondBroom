@@ -17,6 +17,8 @@ Mapping Jams is the online mode for creating and sharing Quake maps. The jam sup
 2. Choose **Create or continue map**. The editor uses the jam's Quake 1 setup and manages the paths for your jam maps. Use the provided resources when building your level.
 3. Use **Compile and upload map** to publish. The jam checks the map against its limits before other players can download it. **Back to editing** returns to the source MAP after you inspect the compiled result.
 
+The 3D editor shows published maps from other plots with their baked lighting while you edit your MAP. On the board or in the editor, use **Jam chat** to talk to the group. **Hide chat** collapses the panel, and new messages appear briefly above the sender in the 3D view when their avatar is visible.
+
 ## Play published maps
 
 Select a plot with a published map and use **Play** to download and launch it. The **HUB** also has portals to published maps. Use **Browse Jam** from the jam editor to return to the board.

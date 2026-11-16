@@ -300,6 +300,7 @@ void jamWorldLabels()
 {
   if (!jamWorld.active || jamWorld.lastScene.empty() || !jamWorld.state.contains("plots")) return;
   const auto own=jamWorldCenter(jamWorld.activePlot);
+  const auto now=std::chrono::steady_clock::now();
   for (int view=0;view<viewLayout;view++) {
     rbviewport::Projection projection;
     if (viewRects[view].type || !pluginProjection(view,projection)) continue;
@@ -319,6 +320,17 @@ void jamWorldLabels()
       ImVec2 where;
       if (!projection.project(point,where.x,where.y)) continue;
       const auto size=ImGui::CalcTextSize(name.c_str());
+      if (const auto* message=jamChatBubble(jamField(player,"accountId"),now)) {
+        auto* font=ImGui::GetFont();
+        const auto fontSize=ImGui::GetFontSize();
+        const float wrap=std::min(250*uiScale(),rect.w*.72f);
+        const auto bubble=font->CalcTextSizeA(fontSize,FLT_MAX,wrap,message->text.c_str());
+        const float x=std::clamp(where.x-bubble.x*.5f,rect.x+8.f,
+                                std::max(rect.x+8.f,rect.x+rect.w-bubble.x-8.f));
+        const float y=where.y-bubble.y-14*uiScale();
+        draw->AddRectFilled({x-6,y-4},{x+bubble.x+6,y+bubble.y+5},IM_COL32(13,33,46,248),6);
+        draw->AddText(font,fontSize,{x,y},IM_COL32(237,249,248,255),message->text.c_str(),nullptr,wrap);
+      }
       where.x-=size.x*.5f;
       draw->AddRectFilled({where.x-4,where.y-2},{where.x+size.x+4,where.y+size.y+2},IM_COL32(13,24,40,232),4);
       draw->AddText(where,IM_COL32(219,249,245,255),name.c_str());
@@ -433,6 +445,7 @@ static void panel(float w, float h)
     cvars->SetFloat("ftebroom_right",0);
     cvars->SetFloat("ftebroom_up",0);
     jamPanel();
+    jamChatPanel(true);
     jamEditorDialog();
     jamQaTick();
     uiCursorUpdate(false,uiCursorPercent/100.f);
@@ -462,6 +475,7 @@ static void panel(float w, float h)
   viewCompute(w, h);
   viewOverlay();
   jamViewportToolbar();
+  jamChatPanel(false);
   jamWorldLabels();
   if ((int)cvars->GetFloat("ftebroom_tool") == 1)
   {

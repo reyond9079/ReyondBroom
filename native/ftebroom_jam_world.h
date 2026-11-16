@@ -2,6 +2,7 @@
 #pragma once
 #include <iomanip>
 #include <locale>
+#include "ftebroom_jam_chat.h"
 
 namespace {
 struct JamWorldPreview {
@@ -20,6 +21,7 @@ struct JamWorldState {
   std::map<std::string,std::string> online;
   std::string outgoingMode, activePlot, document, lastScene, session;
   std::string syncSession, contentSession, hubSession, requestedPlot, requestedMode, requestedRevision;
+  std::optional<std::string> savedFullbright;
   JamWorldHub hub;
   std::chrono::steady_clock::time_point lastSync;
   uint64_t generation=0;
@@ -302,6 +304,7 @@ void jamWorldTick()
     jamWorld.knownPresence=false;
     jamWorld.online.clear();
     jamWorld.notices.clear();
+    jamChat={};
   }
   if (editing!=jamWorld.active) {
     jamWorld.active=editing;
@@ -310,6 +313,19 @@ void jamWorldTick()
       cvars->SetFloat("ftebroom_jam_scene",0);
       jamWorld.lastScene.clear();
     }
+  }
+  const bool ownPreview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
+  if (editing && !ownPreview) {
+    if (!jamWorld.savedFullbright) {
+      char previous[32]{};
+      cvars->GetString("r_fullbright",previous,sizeof previous);
+      jamWorld.savedFullbright=previous;
+    }
+    // Read-only BSP entities use the engine's baked lightmaps in the MAP view.
+    if (cvars->GetFloat("r_fullbright")) cvars->SetString("r_fullbright","0");
+  } else if (!editing && !ownPreview && jamWorld.savedFullbright) {
+    cvars->SetString("r_fullbright",jamWorld.savedFullbright->c_str());
+    jamWorld.savedFullbright.reset();
   }
   if (editing && (jamWorld.activePlot!=local || jamWorld.generation!=documentGeneration)) {
     const auto center=jamWorldCenter(local);
@@ -338,6 +354,7 @@ void jamWorldTick()
     try {
       auto state=jamWorld.sync.get();
       if (joined && jamWorld.syncSession==session && state.contains("plots")) {
+        jamChatReceive(state);
         jamWorldPresence(state);
         jamWorld.state=std::move(state);
         jamWorld.lastSync=now;
@@ -409,6 +426,10 @@ void jamWorldTick()
       if (plot.is_object() && plot.at("publication").is_object())
         update["publication"]=jamField(plot.at("publication"),"revisionId");
     } else update={{"mode",joined?"board":"leave"}};
+    if (joined) {
+      update["chat"]={{"after",jamChat.after}};
+      if (jamChat.pending) update["chat"]["send"]={{"id",jamChat.pending->id},{"text",jamChat.pending->text}};
+    }
     auto faces=canCapture ? std::exchange(jamWorld.draft,JamJson()) : JamJson();
     const auto client=jamLocal.client;
     jamWorld.outgoingMode=jamField(update,"mode");
@@ -469,5 +490,6 @@ void jamBackgroundShutdown()
   drain(jamLocal.work);
   drain(jamLocal.presenceWork);
   drain(jamLocal.packCleanup);
+  if (jamWorld.savedFullbright) cvars->SetString("r_fullbright",jamWorld.savedFullbright->c_str());
 }
 } // namespace

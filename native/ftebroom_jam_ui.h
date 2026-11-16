@@ -9,11 +9,91 @@ bool jamModeActive()
 }
 
 ImVec2 jamQaPlayButton, jamQaUploadButton, jamQaBrowseButton, jamQaAlphaButton;
+ImVec2 jamQaChatToggle, jamQaChatSend;
 enum class JamCompileButton { Upload, View, Edit };
 JamCompileButton jamCompileButton()
 {
   if (cvars->GetFloat("ftebroom_bsp_preview") || buildPreviewRequested) return JamCompileButton::Edit;
   return jamPublishedCurrent() ? JamCompileButton::View : JamCompileButton::Upload;
+}
+
+void jamChatPanel(bool board)
+{
+  if (!jamLocal.liveWorld || jamLocal.client.token.empty() || jamLocal.screen!=JamScreen::Board) return;
+  const auto* viewport=ImGui::GetMainViewport();
+  ImVec2 pos=viewport->WorkPos,size=viewport->WorkSize;
+  if (!board) {
+    if (!jamEditing() || !uiHasScene || modEmbedded || bbActive || modelViewerOpen) return;
+    const ViewRect* pane=&viewRects[viewFocus];
+    for (int i=0;i<viewLayout;++i) if (!viewRects[i].type && viewRects[i].w>0) {pane=&viewRects[i];break;}
+    pos={pane->x,pane->y};size={pane->w,pane->h};
+  }
+  const float u=uiScale();
+  if (size.x<174*u || size.y<50*u) return;
+  JamWindowStyle style;
+  const bool expanded=!jamChat.collapsed && size.y>=135*u;
+  const float width=expanded ? std::min(size.x-24*u,400*u) : 148*u;
+  ImGui::SetNextWindowPos({pos.x+12*u,pos.y+size.y-12*u},ImGuiCond_Always,{0,1});
+  ImGui::SetNextWindowSize({width,0});
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{10*u,8*u});
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,6*u);
+  ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(.06f,.105f,.175f,.94f));
+  constexpr auto flags=ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoDocking|
+    ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoFocusOnAppearing|ImGuiWindowFlags_AlwaysAutoResize;
+  if (ImGui::Begin("##jam-chat",nullptr,flags)) {
+    const auto recordButton=[](ImVec2& point) {
+      if (!std::getenv("REYONDBROOM_JAM_QA_CHAT")) return;
+      const auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
+      point={(a.x+b.x)*.5f,(a.y+b.y)*.5f};
+    };
+    const bool toggle=ImGui::Button(expanded ? jamText("Hide chat","Свернуть чат") : jamText("Jam chat","Чат Jam"),
+                                    {expanded ? 0.f : -1.f,0});
+    recordButton(jamQaChatToggle);
+    if (toggle) {
+      if (jamChat.supported) jamRecordTelemetry("button","chat_toggle");
+      jamChat.collapsed=expanded;
+      jamChat.follow=!expanded;
+    }
+    if (expanded && !jamChat.supported) {
+      ImGui::TextDisabled("%s",jamText("Chat is unavailable.","Чат недоступен."));
+    } else if (expanded) {
+      const auto height=std::clamp(size.y*.26f,50*u,156*u);
+      if (ImGui::BeginChild("##jam-chat-history",{0,height},ImGuiChildFlags_Borders)) {
+        const bool atBottom=ImGui::GetScrollY()>=ImGui::GetScrollMaxY()-3*u;
+        const auto line=[](const JamChatMessage& message) {
+          const auto text=message.nickname+": "+message.text;
+          ImGui::TextUnformatted(text.c_str());
+        };
+        ImGui::PushTextWrapPos(0);
+        for (const auto& message:jamChat.history) line(message);
+        if (jamChat.pending) {
+          ImGui::PushStyleColor(ImGuiCol_Text,ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+          line(*jamChat.pending);
+          ImGui::PopStyleColor();
+        }
+        ImGui::PopTextWrapPos();
+        if (jamChat.follow || atBottom) ImGui::SetScrollHereY(1.f);
+        jamChat.follow=false;
+      }
+      ImGui::EndChild();
+      const char* send=jamText("Send","Отправить");
+      const float button=ImGui::CalcTextSize(send).x+ImGui::GetStyle().FramePadding.x*2;
+      ImGui::SetNextItemWidth(std::max(1.f,ImGui::GetContentRegionAvail().x-button-ImGui::GetStyle().ItemSpacing.x));
+      const bool submitted=ImGui::InputTextWithHint("##jam-chat-input",jamText("Write a message…","Написать сообщение…"),
+        jamChat.input.data(),jamChat.input.size(),ImGuiInputTextFlags_EnterReturnsTrue);
+      if (submitted) ImGui::SetKeyboardFocusHere(-1);
+      ImGui::SameLine();
+      ImGui::BeginDisabled(jamChat.pending.has_value() || !jamChat.input[0]);
+      const bool clicked=ImGui::Button(send);
+      recordButton(jamQaChatSend);
+      ImGui::EndDisabled();
+      if ((submitted || clicked) && jamChatSend(jamChat.input.data())) jamWorld.nextSync={};
+      if (!jamChat.error.empty()) ImGui::TextWrapped("%s",jamChat.error.c_str());
+    }
+  }
+  ImGui::End();
+  ImGui::PopStyleColor();
+  ImGui::PopStyleVar(2);
 }
 
 void jamViewportToolbar()

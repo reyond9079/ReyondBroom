@@ -24,6 +24,7 @@ bool jamQaWorldTransitions()
   static std::string initialRevision, initialHubModel, initialHubVersion;
   static auto captureAt=steady_clock::time_point{};
   const bool testHub=std::getenv("REYONDBROOM_JAM_QA_HUB")!=nullptr;
+  const bool testChat=std::getenv("REYONDBROOM_JAM_QA_CHAT")!=nullptr;
   if (step<0) return true;
   const auto signals=JamFs::u8path(directory);
   const auto received=[&](const char* signal) { return JamFs::is_regular_file(signals/signal); };
@@ -41,6 +42,42 @@ bool jamQaWorldTransitions()
         step=2;
       }
     } else if (step>=2 && jamWorld.active) {
+      if (testChat && step==2) {
+        static int chatStep=0;
+        static auto screenshotAt=steady_clock::time_point{};
+        const bool author=std::string_view(ownPlot)==authorPlot;
+        const char* own=author ? "Hello from the author" : "Reply from the observer";
+        const char* other=author ? "Reply from the observer" : "Hello from the author";
+        const auto receivedMessage=[](const char* text) {
+          return std::find_if(jamChat.history.begin(),jamChat.history.end(),[&](const auto& m){return m.text==text;});
+        };
+        if (chatStep<4) {
+          if (!jamChat.supported || jamWorld.online.empty() || jamQaChatToggle.x<=0) return true;
+          if (chatStep==0) {
+            jamQaClick(jamQaChatToggle);
+            chatStep=1;
+          } else if (chatStep==1 && jamChat.collapsed) {
+            jamQaClick(jamQaChatToggle);
+            chatStep=2;
+          } else if (chatStep==2 && !jamChat.collapsed && jamQaChatSend.x>0 &&
+                     (author || receivedMessage(other)!=jamChat.history.end())) {
+            jamAssign(jamChat.input.data(),jamChat.input.size(),own);
+            jamQaClick(jamQaChatSend);
+            chatStep=3;
+          } else if (chatStep==3 && !jamChat.pending && receivedMessage(own)!=jamChat.history.end()) {
+            const auto reply=receivedMessage(other);
+            if (reply==jamChat.history.end()) return true;
+            if (!jamChatBubble(reply->account,steady_clock::now())) throw std::runtime_error("Missing chat bubble for remote sender.");
+            command(author ? "ftebroom_camera_restore 512 0 128 0 0 0 90\n" : "ftebroom_camera_restore -512 0 128 0 180 0 90\n");
+            command("in 0.25 screenshot jam-chat.png\n");
+            screenshotAt=steady_clock::now()+seconds(1);
+            chatStep=4;
+            core->Print("FTEBROOM_JAM_CHAT_PASS sent_received_collapsed_and_bubble\n");
+          }
+          return true;
+        }
+        if (steady_clock::now()<screenshotAt) return true;
+      }
       if (testHub && initialHubModel.empty()) {
         if (jamWorld.hub.model.empty() || jamWorld.lastScene.find("model "+jamWorld.hub.model)==std::string::npos) return true;
         const auto tested=cvars->GetFloat("ftebroom_jam_qa_hub");
@@ -99,6 +136,13 @@ bool jamQaWorldTransitions()
         } else if (step==3 && inScene) {
           if (!JamFs::is_regular_file(ftebroom::filesystemPath(documentPath(view.model))))
             throw std::runtime_error("The remote BSP did not reach the local scene.");
+          if (testChat) {
+            auto lit=documentPath(view.model);lit.replace_extension(".lit");
+            if (cvars->GetFloat("ftebroom_bsp_preview") || cvars->GetFloat("r_fullbright") ||
+                !JamFs::is_regular_file(ftebroom::filesystemPath(lit)))
+              throw std::runtime_error("Remote BSP lighting was unavailable in a local MAP viewport.");
+            core->Print("FTEBROOM_JAM_CHAT_PASS remote_lit_bsp_in_map_view\n");
+          }
           send("published-bsp");
           step=4;
         } else if (step==4 && view.model.empty() && view.revision!=initialRevision && view.faces.size()>initialFaces &&

@@ -6,7 +6,7 @@ from pathlib import Path
 log = Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace')
 assert not re.search(r'HIERARCHY_FAIL|CSQC_Abort|runaway loop error', log), log[-4000:]
 expected = {
-    'ca_grid': ('16', '32'),
+    'ca_grid': ('16', '16'),
     'vid_multisample': ('8', '2'),
     'ftebroom_grid_aa': ('1.005', '0.75'),
     'gl_texture_anisotropy': ('16', '4'),

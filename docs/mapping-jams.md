@@ -23,5 +23,5 @@ Select a plot with a published map and use **Play** to download and launch it. T
 
 ## Troubleshooting
 
-- If **Game resources** stalls, note whether it is downloading, verifying, installing, or finishing the installation. On Linux, check the [HTTPS download dependencies](linux.md) and use a writable installation folder.
+- If **Game resources** stalls, note whether it is downloading, verifying, installing, or finishing the installation. On Linux, choose **Prepare Jam resources** again after a timeout. New packs use `$XDG_CACHE_HOME/reyondbroom` or `~/.cache/reyondbroom` when available. See the [HTTPS download dependencies](linux.md).
 - If a map fails to compile, open the local build log. Include the exact stage and error message when [reporting an issue](https://github.com/reyond9079/ReyondBroom/issues).

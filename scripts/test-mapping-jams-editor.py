@@ -9,7 +9,7 @@ from pathlib import Path
 from PIL import Image
 
 
-def run(bundle, state, port):
+def run(bundle, state, port, resource_retry=False):
     bundle = bundle.resolve()
     game_dir = bundle / "ftebroom"
     config = game_dir / "jam-test.cfg"
@@ -22,8 +22,16 @@ def run(bundle, state, port):
     engine = bundle / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
     report = game_dir / "mapping-jams-qa.json"
     started = time.time()
-    launch = [str(engine), "-nohome", "-noupdates", "-basedir", str(bundle),
+    launch = [str(engine), "-ftebroom-child-processes", "-nohome", "-noupdates", "-basedir", str(bundle),
               "-window", "-width", "1280", "-height", "800", "-condebug", "+exec", config.name]
+    if resource_retry:
+        stall_library = state.resolve() / "qa-resource-stall.so"
+        stall_marker = state.resolve() / "qa-resource-stall-marker"
+        assert not stall_marker.exists(), "Use a clean disposable test server state."
+        fault = Path(__file__).resolve().parents[1] / "tests/mapping-jam-resource-stall.c"
+        subprocess.run(["cc","-shared","-fPIC",str(fault),"-ldl","-o",str(stall_library)],check=True)
+        env.update({"LD_PRELOAD":str(stall_library), "RB_QA_STALL_MARKER":str(stall_marker),
+                    "REYONDBROOM_JAM_QA_RESOURCE_RETRY":"1"})
     with subprocess.Popen(launch, cwd=bundle, env=env) as editor:
         try:
             editor.wait(timeout=155)
@@ -34,6 +42,17 @@ def run(bundle, state, port):
     assert report.is_file() and report.stat().st_mtime >= started - 1, "No fresh native test report."
     result = json.loads(report.read_text(encoding="utf-8"))
     assert result["passed"], result
+    if resource_retry:
+        assert result["stage"] == 90 and stall_marker.is_file(), result
+        print(result["message"])
+        env.pop("LD_PRELOAD")
+        env.pop("REYONDBROOM_JAM_QA_RESOURCE_RETRY")
+        report.unlink()
+        subprocess.run(launch, cwd=bundle, env={**env,"REYONDBROOM_JAM_QA_RESUME":"1"}, timeout=40, check=True)
+        resumed = json.loads(report.read_text(encoding="utf-8"))
+        assert resumed["passed"] and resumed["stage"] == 100, resumed
+        print(resumed["message"])
+        return
     draft = bundle / "mapping-jams-local" / str(port) / "drafts"
     built = [path for path in (game_dir / "cache/jam-builds").glob("*/snapshot.bsp")
              if path.stat().st_mtime >= started-1]
@@ -48,6 +67,7 @@ def run(bundle, state, port):
     errors = ("couldn't spawn server", "could not load maps/jam_map", "couldn't load maps/jam_map", "couldn't load progs.dat")
     for log in logs:
         game_log = log.read_text(encoding="utf-8", errors="replace")
+        assert not any(text in game_log.lower() for text in errors), "The game failed to load the map."
         if "SpawnServer: jam_hub" in game_log:
             hub_runs += 1
             if "execing jam-return-menu.cfg" in game_log:
@@ -57,8 +77,11 @@ def run(bundle, state, port):
             assert any(log.parent.joinpath("maps").glob("jam_??.bsp")), "The Hub plot maps were not staged."
         elif "SpawnServer: jam_map" in game_log:
             direct_runs += 1
-        assert "client Player connected" in game_log, "The game never admitted the local player."
-        assert not any(text in game_log.lower() for text in errors), "The game failed to load the map."
+        else:
+            # FTE can start additional console logs while searching fallback game directories.
+            continue
+        assert ("client Player connected" in game_log or "Player joined the server" in game_log), (
+            "The game never admitted the local player.")
     assert direct_runs >= 3 and hub_runs >= 2, "Expected fresh engine logs for the draft, owner, visitor and Hub."
     assert returns_to_draft == 1, "The in-game Return to editing action did not run."
     print(result["message"])
@@ -76,5 +99,8 @@ if __name__ == "__main__":
     parser.add_argument("--bundle", required=True, type=Path)
     parser.add_argument("--state", required=True, type=Path)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--resource-retry",action="store_true",help="Simulate a stalled local receipt write on Linux")
     args = parser.parse_args()
-    run(args.bundle, args.state, args.port)
+    if args.resource_retry and os.name != "posix":
+        parser.error("--resource-retry needs the Linux editor")
+    run(args.bundle, args.state, args.port, args.resource_retry)

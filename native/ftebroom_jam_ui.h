@@ -947,6 +947,7 @@ void jamPanel()
       const char* phaseText="";
       switch (phase) {
         case jam::ResourcePhase::Checking: phaseText=jamText("Checking the resource pack…","Проверка набора ресурсов…"); break;
+        case jam::ResourcePhase::CheckingCache: phaseText=jamText("Checking local game resources…","Проверка локальных ресурсов игры…"); break;
         case jam::ResourcePhase::Downloading: phaseText=jamText("Downloading the resource pack…","Загрузка набора ресурсов…"); break;
         case jam::ResourcePhase::Retrying: phaseText=jamText("Connection interrupted. Retrying…","Связь прервалась. Повтор загрузки…"); break;
         case jam::ResourcePhase::Verifying: phaseText=jamText("Verifying the downloaded archive…","Проверка скачанного архива…"); break;

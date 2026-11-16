@@ -212,6 +212,27 @@ void jamQaTick()
     jamLogin();
   };
   try {
+#ifndef _WIN32
+    if (stage==5 && std::getenv("REYONDBROOM_JAM_QA_RESOURCE_RETRY")) {
+      static bool retried = false;
+      if (!retried && jamLocal.error==jamResourceInstallTimeout()) {
+        if (jamBusy() || jamLocal.resourceTransfer || !jamLocal.resourceRetryFresh)
+          throw std::runtime_error("A timed-out resource worker kept the retry button disabled.");
+        core->Print("FTEBROOM_JAM_RESOURCE_PASS timed_out_worker_released_ui\n");
+        retried = true;
+        jamResources();
+        return;
+      }
+      if (retried && jamLocal.screen==JamScreen::Board) {
+        record(90,"Resource installation recovered after the first worker stalled.",true);
+        finished = true;
+        command("quit force\n");
+        return;
+      }
+      if (!retried && jamLocal.screen==JamScreen::Board)
+        throw std::runtime_error("The resource worker did not encounter the simulated stall.");
+    }
+#endif
     if (!jamLocal.error.empty()) throw std::runtime_error(jamLocal.error);
     if (std::chrono::steady_clock::now() - start > std::chrono::seconds(120))
       throw std::runtime_error("Editor integration test timed out.");

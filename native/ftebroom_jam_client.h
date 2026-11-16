@@ -299,8 +299,10 @@ public:
 
 inline void download(const Client& client, const Json& manifest, const fs::path& destination, bool base,
                      const std::string& mapStem = "jam_map", bool reuse = false,
-                     ResourceTransfer* transfer = nullptr, fs::path* retired = nullptr)
+                     ResourceTransfer* transfer = nullptr, fs::path* retired = nullptr,
+                     bool privatePack = false)
 {
+  if (privatePack && !base) throw std::logic_error("A private installation requires a base pack.");
   if (!base && (mapStem != "jam_map" && mapStem != "jam_hub"))
     throw std::runtime_error("Unknown Jam map name.");
   const std::string mapPath = "maps/" + mapStem;
@@ -326,7 +328,7 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     throw std::runtime_error("The Jam manifest is incomplete.");
   const auto target = ftebroom::filesystemPath(destination);
   if (transfer) transfer->check();
-  if (base && installedPack(destination, manifest,transfer)) return;
+  if (base && !privatePack && installedPack(destination, manifest,transfer)) return;
   if (!base && reuse) {
     const bool present = std::all_of(members.begin(),members.end(),[&](const auto& item) {
       const auto file = target/fs::u8path(item.first).make_preferred();
@@ -379,7 +381,12 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     throw std::runtime_error("The Jam download did not match its manifest.");
 
   auto staging = target;
-  staging += ".incoming-" + randomHex(8);
+  if (privatePack) {
+    // The worker owns this fresh directory. Only a completed receipt makes
+    // it discoverable, so installation needs no directory move or exchange.
+    if (!fs::create_directory(staging))
+      throw std::runtime_error("The Mapping Jam installation directory is already in use.");
+  } else staging += ".incoming-" + randomHex(8);
   try {
     const std::string_view archive = response.body;
     ResourceArchive buffer(archive);
@@ -419,9 +426,11 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     if (base) {
       const auto receipt = packReceipt(staging,manifest);
       if (receipt.is_null()) throw std::runtime_error("The installed Jam resources failed verification.");
-      writePackReceipt(staging,receipt);
+      if (privatePack) writeBytes(staging/".verified-pack.json",receipt.dump());
+      else writePackReceipt(staging,receipt);
     }
     if (transfer) transfer->check();
+    if (privatePack) return;
     if (fs::exists(target)) {
       auto previous = target;
       previous += ".previous-" + randomHex(8);

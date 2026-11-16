@@ -60,6 +60,9 @@ def verify(release, platform, version):
     assert '\nEditor revision: '+revision+'\n' in info, 'Wrong packaged source revision'
     names = ['ftebroom/csaddon.dat', 'ftebroom/ui/update-splash.png', 'bin/fteqw64.exe' if windows else 'fteqw-gl64',
              'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so']
+    if not windows:
+        names.append('tools/mapping-jams/prepare-resources')
+        assert os.access(release/root_name/names[-1], os.X_OK), 'Jam resource worker is not executable'
     for name in names:
         assert name in manifest
         with (release/root_name/name).open('rb') as stream:

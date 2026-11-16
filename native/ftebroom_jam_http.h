@@ -40,7 +40,7 @@ struct DownloadCanceled : std::runtime_error {
   DownloadCanceled() : std::runtime_error("The Mapping Jam download was canceled.") {}
 };
 
-enum class ResourcePhase { Checking, Downloading, Retrying, Verifying, Installing, Finalizing };
+enum class ResourcePhase { Checking, CheckingCache, Downloading, Retrying, Verifying, Installing, Finalizing };
 
 struct ResourceTransfer {
   using Clock = std::chrono::steady_clock;
@@ -54,7 +54,7 @@ struct ResourceTransfer {
   bool local() const
   {
     const auto step = phase.load();
-    return step == ResourcePhase::Verifying || step == ResourcePhase::Installing ||
+    return step == ResourcePhase::CheckingCache || step == ResourcePhase::Verifying || step == ResourcePhase::Installing ||
            step == ResourcePhase::Finalizing;
   }
 

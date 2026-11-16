@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import io
 import json
+import runpy
 import shutil
 import subprocess
 import tarfile
@@ -93,6 +94,8 @@ if a.engine:
             if name and (a.engine_source/name).is_file():
                 archive.write(a.engine_source/name, name)
 subprocess.run(['strip', str(root / module_name)], check=True)
+if not windows:
+    runpy.run_path(str(src/'scripts/package-jam-resource-worker.py'))['bundle'](src,root)
 shutil.copy2(src / 'runtime/fonts/FTEBroom-CJK.otf', root / 'ftebroom/fonts/FTEBroom-CJK.otf')
 shutil.copytree(src / 'docs', root / 'docs', dirs_exist_ok=True)
 shutil.copytree(src / 'runtime/plants', root / 'ftebroom/plants', dirs_exist_ok=True)

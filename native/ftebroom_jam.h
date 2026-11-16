@@ -2,6 +2,7 @@
 #pragma once
 #include <future>
 #include "ftebroom_jam_client.h"
+#include "ftebroom_jam_resource_process.h"
 
 namespace jam = ftebroom::jam;
 namespace {
@@ -75,6 +76,10 @@ struct JamLocal {
   std::string retryKey, retryIntent;
   JamFs::path pack;
   std::shared_ptr<jam::ResourceTransfer> resourceTransfer;
+#ifndef _WIN32
+  jam::ResourceProcess resourceProcess;
+  bool resourceRetryFresh = false;
+#endif
   std::future<void> packCleanup;
   std::optional<JamUpload> snapshot;
   JamJson account, rules, board, wallet;
@@ -108,7 +113,13 @@ struct JamLocal {
 } jamLocal;
 
 bool jamEnabled() { return jamEndpoint().port != 0; }
-bool jamBusy() { return jamLocal.work.valid(); }
+bool jamBusy()
+{
+#ifndef _WIN32
+  if (jamLocal.resourceProcess.active()) return true;
+#endif
+  return jamLocal.work.valid();
+}
 const char* jamText(const char* en, const char* ru) { return uiLanguage == 1 ? ru : en; }
 
 std::string jamDisplayMessage(std::string message)
@@ -320,9 +331,16 @@ void jamRefresh()
     });
 }
 
+void jamResources(bool install = true);
+
 void jamJoin()
 {
-  jamStart(jamText("Checking Jam resources…","Проверка ресурсов Jam…"), [root=jamRoot()](auto client) {
+#ifdef _WIN32
+  const auto root = jamRoot();
+  jamStart(jamText("Checking Jam resources…","Проверка ресурсов Jam…"), [root](auto client) {
+#else
+  jamStart(jamText("Checking Jam resources…","Проверка ресурсов Jam…"), [](auto client) {
+#endif
     auto info = client.json("GET", "/v1/jams/current").at("jam");
     client.prefix = "/v1/jams/" + info.at("jamId").template get<std::string>() + "/";
     auto rules = client.json("GET", client.prefix + "rules");
@@ -332,12 +350,14 @@ void jamJoin()
     data["rules"] = rules;
     data["canPublish"] = info.value("canPublish",false);
     data["liveWorld"] = info.value("liveWorld",false);
-    const auto version=rules.at("packVersion").template get<std::string>();
+#ifdef _WIN32
+    const auto version = rules.at("packVersion").template get<std::string>();
     if(version=="librequake-0.09-plants-local1"){
       const auto manifest=client.json("GET",client.prefix+"packs/"+version+"/manifest");
       if(jamField(manifest,"packVersion")==version && jam::installedPack(root/"packs"/version,manifest))
         data["pack"]=(root/"packs"/version).u8string();
     }
+#endif
     return data;
   }, [](auto data) {
     jamLocal.client.prefix = data.at("prefix");
@@ -348,6 +368,10 @@ void jamJoin()
     jamApplyBoard(std::move(data));
     jamLocal.pack=JamFs::u8path(pack);
     jamLocal.screen = pack.empty() ? JamScreen::Resources : JamScreen::Board;
+#ifndef _WIN32
+    jamLocal.resourceRetryFresh = false;
+    jamResources(false);
+#endif
   });
 }
 
@@ -527,7 +551,7 @@ void jamSaveProfile(bool skip)
   });
 }
 
-void jamResources()
+void jamResources(bool install)
 {
   if (jamBusy()) return;
   const auto version = jamField(jamLocal.rules, "packVersion");
@@ -535,8 +559,36 @@ void jamResources()
     jamLocal.error = jamText("Unsupported local pack version.","Эта версия локального пакета не поддерживается.");
     return;
   }
-  const auto destination = jamRoot() / "packs" / version;
   auto transfer = std::make_shared<jam::ResourceTransfer>();
+#ifndef _WIN32
+  try {
+    const auto& endpoint = jamEndpoint();
+    const auto portable = settingsPath().parent_path();
+    const auto key = endpoint.hostname.empty() ? std::to_string(endpoint.port) : jam::sha256(endpoint.hostname);
+    const auto localRoot = portable/(endpoint.hostname.empty() ? "mapping-jams-local" : "mapping-jams")/key;
+    auto packs = localRoot/"packs";
+    if (!endpoint.hostname.empty()) {
+      const auto* xdg = std::getenv("XDG_CACHE_HOME");
+      const auto* home = std::getenv("HOME");
+      auto cache = xdg ? JamFs::u8path(xdg) : JamFs::path{};
+      if (!cache.is_absolute() && home && JamFs::u8path(home).is_absolute())
+        cache = JamFs::u8path(home)/".cache";
+      if (cache.is_absolute()) packs = cache/"reyondbroom"/"mapping-jams"/key/"packs";
+    }
+    jamLocal.resourceProcess.start(portable/"tools/mapping-jams/prepare-resources",
+      {{"version",version},{"port",endpoint.port},{"hostname",endpoint.hostname},
+       {"prefix",jamLocal.client.prefix},{"token",jamLocal.client.token},
+       {"root",packs.u8string()},{"legacy",(localRoot/"packs"/version).u8string()},
+       {"install",install},{"fresh",jamLocal.resourceRetryFresh}});
+    jamLocal.error.clear();
+    jamLocal.status.clear();
+    jamLocal.resourceTransfer = std::move(transfer);
+  } catch (const std::exception& error) {
+    jamLocal.error = error.what();
+  }
+#else
+  (void)install;
+  const auto destination = jamRoot() / "packs" / version;
   jamLocal.resourceTransfer = transfer;
   jamStart({}, [version,destination,transfer](auto client) {
     const auto manifest = client.json("GET", client.prefix + "packs/" + version + "/manifest",nullptr,{},{},transfer.get());
@@ -561,13 +613,56 @@ void jamResources()
     }
     jamRefresh();
   });
+#endif
 }
 
 const char* jamResourceInstallTimeout()
 {
+#ifdef _WIN32
   return jamText("The local drive stopped responding while installing Jam resources. If it stays unresponsive, return to the editor.",
                  "Локальный диск не отвечает при установке ресурсов Jam. Если это продолжается, вернитесь в редактор.");
+#else
+  return jamText("Preparing Jam resources timed out. Try Prepare Jam resources again.",
+                 "Время ожидания ресурсов Jam истекло. Нажмите «Подготовить ресурсы Jam» ещё раз.");
+#endif
 }
+
+#ifndef _WIN32
+void jamTickResources()
+{
+  auto& process = jamLocal.resourceProcess;
+  if (!process.active()) {
+    process.reap();
+    return;
+  }
+  bool refreshBoard = false;
+  try {
+    const auto result = process.poll(*jamLocal.resourceTransfer);
+    if (!result) return;
+    if (result->value("timeout",false)) {
+      jamLocal.resourceRetryFresh = result->value("local",false);
+      jamLocal.error = jamLocal.resourceRetryFresh ? jamResourceInstallTimeout() :
+        jamText("The resource transfer timed out. Check your connection and retry.",
+                "Время загрузки истекло. Проверьте подключение и повторите попытку.");
+    } else if (result->contains("error")) {
+      jamLocal.error = result->at("error").get<std::string>();
+    } else if (const auto pack = jamField(*result,"pack"); !pack.empty()) {
+      jamLocal.pack = JamFs::u8path(pack);
+      jamLocal.resourceRetryFresh = false;
+      jamLocal.screen = JamScreen::Board;
+      refreshBoard = true;
+    }
+  } catch (const jam::DownloadCanceled&) {
+    jamLocal.status = jamText("Resource preparation canceled. You can retry here.",
+                             "Подготовка ресурсов отменена. Её можно запустить снова.");
+  } catch (const std::exception& error) {
+    jamLocal.error = error.what();
+  }
+  process.stop();
+  jamLocal.resourceTransfer.reset();
+  if (refreshBoard) jamRefresh();
+}
+#endif
 
 JamJson jamCell(const std::string& selection)
 {
@@ -1215,13 +1310,13 @@ void jamLaunchMap(const std::string& plot, bool hub, bool fromDraft, const std::
 {
   if (jamBusy() || jamLocal.child) return;
   const auto base = jamLocal.pack;
+  const auto pack = jamField(jamLocal.rules,"packVersion");
   const auto cache = jamRoot();
   const auto root = cache / "play" / jam::randomHex(12);
   const auto draft = fromDraft ? documentFile : JamFs::path{};
   jamLocal.playCanceled = false;
   jamStart(jamText("Downloading the published map…","Загрузка опубликованной карты…"),
-    [plot,base,root,cache,hub,fromDraft,expectedRevision](auto client) {
-      const auto pack = base.filename().u8string();
+    [plot,base,pack,root,cache,hub,fromDraft,expectedRevision](auto client) {
       const auto game = root / "lq1";
       if (hub) jamStageHub(client,game,cache,pack);
       else {
@@ -1331,6 +1426,9 @@ void jamSignOut()
 void jamTick()
 {
   if (!jamEnabled()) return;
+#ifndef _WIN32
+  jamTickResources();
+#endif
   jamResumeSession();
   jamPresenceTick();
   jamTelemetryTick();
@@ -1407,12 +1505,15 @@ void jamTick()
         jamLocal.avatarTextures.clear();
       }
     } catch (const std::exception& error) { jamLocal.error = error.what(); jamLocal.status.clear(); }
-  } else if (const auto& transfer = jamLocal.resourceTransfer) {
+  }
+#ifdef _WIN32
+  else if (const auto& transfer = jamLocal.resourceTransfer) {
     if (!transfer->canceled && !transfer->timedOut && transfer->localStalled()) {
       transfer->timedOut = true;
       jamLocal.error = jamResourceInstallTimeout();
     }
   }
+#endif
   if (!jamBusy() && !savingDocument && jamLocal.snapshot) {
     auto upload = std::move(*jamLocal.snapshot);
     jamLocal.snapshot.reset();

@@ -459,6 +459,9 @@ void jamBackgroundShutdown()
     if (future.valid()) {try {(void)future.get();} catch (const std::exception&) {}}
   };
   if (jamLocal.resourceTransfer) jamLocal.resourceTransfer->canceled=true;
+#ifndef _WIN32
+  jamLocal.resourceProcess.stop();
+#endif
   drain(jamWorld.sync);
   drain(jamWorld.content);
   drain(jamWorld.hubCheck);

@@ -1,6 +1,8 @@
 # Model authoring
 
-![Monster template, UV texture and hierarchy](images/model-authoring-monster.png)
+![A model mesh in the viewport, its UV layout on the left, and model properties on the right](images/reyondbroom-model-editor.webp)
+
+*The Model Editor in a 0.6.0 alpha build.*
 
 The Model editor has two workflows. Open a compiled native model to inspect,
 transform and export it using the existing editor. Choose **File > Convert to

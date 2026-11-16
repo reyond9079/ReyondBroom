@@ -1,5 +1,5 @@
 # ReyondBroom user manual
-[Keyboard reference](shortcuts.md) · [Release history](../README.md)
+[Documentation index](README.md) · [Keyboard reference](shortcuts.md) · [Release history](https://github.com/reyond9079/ReyondBroom/releases)
 
 This guide covers the editor's available workflows. Screenshots show actual editor
 sessions; older screenshots may use earlier labels or layouts. Game assets are not

@@ -80,6 +80,14 @@
     "gesture": ""
   },
   {
+    "id": "Menu/File/Export TrenchBroom MAP...",
+    "label": "Export TrenchBroom MAP...",
+    "keys": "",
+    "context": "CtxAny",
+    "command": "ftebroom_ui exporttrenchmap",
+    "gesture": ""
+  },
+  {
     "id": "Menu/File/Export OBJ...",
     "label": "Export OBJ...",
     "keys": "",

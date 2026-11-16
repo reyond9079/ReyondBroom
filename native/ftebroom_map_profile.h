@@ -3,9 +3,41 @@
 #include <string>
 #include <cctype>
 #include <sstream>
+#include <iomanip>
 #include <algorithm>
 namespace ftebroom {
 struct MapProfile { int profile=-1, format=-1; bool terrain=false; };
+inline std::string mapDocumentHeader(int profile,bool valve,bool terrain,bool compatible) {
+  profile=std::clamp(profile,0,4);
+  const char* names[]={"Quake 3","Quake 3","Quake","Quake 2","Half-Life"};
+  const char* keys[]={"quake3","when-the-sky-went-dark","quake1","quake2","halflife"};
+  const char* format=terrain?"fte-terrain":(profile>=3||(profile==2&&valve))?"valve220":profile==2?"quake-standard":"quake3";
+  std::string header;
+  if(!terrain&&compatible) {
+    const char* tbFormat=profile<2?"Quake3 (Valve)":profile==3?"Quake2 (Valve)":profile==2&&!valve?"Standard":"Valve";
+    header=std::string("// Game: ")+names[profile]+"\n// Format: "+tbFormat+"\n";
+  }
+  return header+"// ReyondBroom profile="+keys[profile]+" format="+format+"\n";
+}
+// Native saves use patchDef3 for fixed tessellation, WS for vertex colors,
+// and the FTE dimension order for rectangular patchDef2 grids.
+inline bool trenchBroomMapCompatible(const std::string& bytes,int profile,bool rectangularPatches=false) {
+  if(bytes.rfind("terrain\n",0)==0||bytes.rfind("terrain\r\n",0)==0)return false;
+  if(bytes.find("patchDef")==bytes.npos)return true;
+  std::istringstream input(bytes);
+  std::string line;
+  while(std::getline(input,line)) {
+    const auto start=line.find_first_not_of(" \t\r");
+    if(start==line.npos||line.compare(start,8,"patchDef")!=0)continue;
+    if(profile>=2||line.compare(start,9,"patchDef2")!=0||line.find_first_not_of(" \t\r",start+9)!=line.npos)return false;
+    std::string brace,material;
+    int rows=0,columns=0;
+    char open=0;
+    if(!(input>>brace>>std::quoted(material)>>open>>rows>>columns)||brace!="{"||open!='('||
+       rows<3||columns<3||rows%2==0||columns%2==0||(!rectangularPatches&&rows!=columns))return false;
+  }
+  return true;
+}
 inline MapProfile mapProfile(const std::string& bytes) {
   std::istringstream input(bytes.substr(0,16384));std::string line,game,format;MapProfile result;
   while(std::getline(input,line)) {

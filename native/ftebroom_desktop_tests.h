@@ -13,6 +13,22 @@ static void testDesktop(){
     expect(jamEnabled() && !jamEndpoint().hostname.empty(),"release_mapping_jams_enabled");
     return;
   }
+  if(std::string_view(mode)=="trenchexport"||std::string_view(mode)=="trenchexportcheck"){
+    static std::filesystem::path source;
+    static std::string name;
+    const auto copy=documentPath("maps/qa-trenchbroom-export.map");
+    if(std::string_view(mode)=="trenchexport") {
+      source=documentFile;name=documentName;
+      expect(documentSave(documentName,false,copy,false,true),"trench_export_started");
+    }else {
+      expect(!savingDocument&&documentFile==source&&documentName==name,"trench_export_preserves_open_document");
+      const auto bytes=q1Read(copy);
+      expect(bytes.rfind("// Game: Quake 3\n// Format: Quake3 (Valve)\n",0)==0&&
+             bytes.find("patchDef2\n")!=bytes.npos&&bytes.find("patchDef3")==bytes.npos&&
+             bytes.find("patchDef2WS")==bytes.npos,"trench_export_writes_compatible_patch");
+    }
+    return;
+  }
   if(std::string_view(mode)=="adproperties" || std::string_view(mode)=="adpropertieschanged"){
     recentWindow=false;setupNeeded=false;firstSetupStep=-1;selectEntityTab=true;
     entityTestItems.clear();
@@ -1681,7 +1697,7 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
 
    auto oldProfile=gameProfile;auto oldFormat=q1MapFormat;
 
-   for(int profile=0;profile<3;profile++){gameProfile=profile;documentTerrain=false;auto bytes=documentMetadata("{\n}\n");expect(bytes.rfind("// ReyondBroom profile=",0)==0,"map_profile_marker");}
+   for(int profile=0;profile<3;profile++){gameProfile=profile;documentTerrain=false;auto bytes=documentMetadata("{\n}\n");expect(bytes.rfind("// Game: ",0)==0&&ftebroom::mapProfile(bytes).profile==profile,"map_profile_marker");}
 
    gameProfile=oldProfile;q1MapFormat=oldFormat;
 

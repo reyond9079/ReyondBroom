@@ -7,7 +7,7 @@ def add(group,label,key="",context="CtxAny",command=None,gesture=""):
 for label,key in [
 ("New","Ctrl+n"),("Open...","Ctrl+o"),("Save","Ctrl+s"),("Save as...","Ctrl+Shift+s"),("Close","Ctrl+w"),("Key X","x"),
 ("Reload Material Collections",""),("Reload Entity Definitions",""),("Preferences...",""),
-("Export Map...",""),("Export OBJ...",""),("Export selected BSP model...",""),("Load Point File...",""),("Reload Point File",""),("Unload Point File",""),
+("Export Map...",""),("Export TrenchBroom MAP...",""),("Export OBJ...",""),("Export selected BSP model...",""),("Load Point File...",""),("Reload Point File",""),("Unload Point File",""),
 ("Load Portal File...",""),("Reload Portal File",""),("Unload Portal File",""),("Revert",""),("Game / resources...",""),("Exit","")]:
     cmd={"New":"ftebroom_ui new","Close":"ftebroom_ui close","Exit":"ftebroom_ui exit","Save as...":"ftebroom_ui saveas","Open...":"ftebroom_ui open","Save":"ftebroom_ui save","Game / resources...":"ftebroom_ui resources","Reload Material Collections":"ftebroom_assets_ready","Preferences...":"ftebroom_ui preferences"}.get(label)
     add("Edit" if label=="Preferences..." else "File",label,key,command=cmd)
@@ -110,7 +110,7 @@ for index,(label,gesture,ctx) in enumerate(gestures):
     if label in ("Select face","Toggle face","Paint faces","All brush faces","Add all brush faces","Coplanar flood","Add coplanar flood"):
         gestures[index]=(label,gesture,"CtxView3D|CtxNoTool")
 for row in rows:
-    organize={"Export Map...":"ftebroom_ui exportmap","Group":"ftebroom_ui group","Rename Groups":"ftebroom_ui renamegroups","Ungroup":"ftebroom_organize ungroup","Make Structural":"ftebroom_organize structural","Hide":"ftebroom_visibility hide","Isolate":"ftebroom_visibility isolate","Show All":"ftebroom_visibility showall","Entity Inspector":"ftebroom_ui entity","Reload Entity Definitions":"ftebroom_definitions"}
+    organize={"Export Map...":"ftebroom_ui exportmap","Export TrenchBroom MAP...":"ftebroom_ui exporttrenchmap","Group":"ftebroom_ui group","Rename Groups":"ftebroom_ui renamegroups","Ungroup":"ftebroom_organize ungroup","Make Structural":"ftebroom_organize structural","Hide":"ftebroom_visibility hide","Isolate":"ftebroom_visibility isolate","Show All":"ftebroom_visibility showall","Entity Inspector":"ftebroom_ui entity","Reload Entity Definitions":"ftebroom_definitions"}
     if row["label"] in organize: row["command"]=organize[row["label"]]
     if row["id"] == "Menu/Edit/Group": row["context"] = "CtxAnyView|CtxNoTool|CtxNodeSelection"
     if row["id"]=="Menu/Edit/Deselect All": row["command"]="ftebroom_deselect"

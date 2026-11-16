@@ -1,0 +1,91 @@
+--- a/engine/gl/gl_heightmap.c
++++ b/engine/gl/gl_heightmap.c
+@@ -8555,7 +8555,7 @@
+ 	G_INT(OFS_RETURN) = r;
+ }
+ 
+-void Terr_WriteBrushInfo(vfsfile_t *file, brushes_t *br)
++static void Terr_WriteBrushInfo(vfsfile_t *file, brushes_t *br, qboolean trenchbroom)
+ {
+ 	double point[3][3];
+ 	int i, x, y;
+@@ -8570,9 +8570,9 @@
+ 			if (br->patch->cp[y].rgba[0] != 1.0 || br->patch->cp[y].rgba[1] != 1.0 || br->patch->cp[y].rgba[2] != 1.0 || br->patch->cp[y].rgba[3] != 1.0)
+ 				break;
+ 		}
+-		hasrgba = (y < br->patch->numcp[1]*br->patch->numcp[0]);
+-
+-		if (br->patch->subdiv[0]>=0 && br->patch->subdiv[1]>=0)
++		hasrgba = !trenchbroom && (y < br->patch->numcp[1]*br->patch->numcp[0]);
++
++		if (!trenchbroom && br->patch->subdiv[0]>=0 && br->patch->subdiv[1]>=0)
+ 		{
+ 			VFS_PRINTF(file, "\n\tpatchDef3%s\n\t{\n\t\t\"%s\"\n\t\t( %u %u %u %u %.9g %.9g %.9g )\n\t\t(\n",
+ 					hasrgba?"WS":"",
+@@ -8590,8 +8590,8 @@
+ 			VFS_PRINTF(file, "\n\tpatchDef2%s\n\t{\n\t\t\"%s\"\n\t\t( %u %u %.9g %.9g %.9g )\n\t\t(\n",
+ 					hasrgba?"WS":"",
+ 					br->patch->tex?br->patch->tex->shadername:"",
+-					br->patch->numcp[0]/*width*/,
+-					br->patch->numcp[1]/*height*/,
++					br->patch->numcp[trenchbroom ? 1 : 0],
++					br->patch->numcp[trenchbroom ? 0 : 1],
+ 					0.0/*rotation*/,
+ 					1.0/*xscale*/,
+ 					1.0/*yscale*/);
+@@ -8694,7 +8694,7 @@
+ 
+ 	VFS_PRINTF(file, "\n}");
+ }
+-void Terr_WriteMapFile(vfsfile_t *file, model_t *mod)
++static void Terr_WriteMapFileFormat(vfsfile_t *file, model_t *mod, qboolean trenchbroom)
+ {
+ 	char token[8192];
+ 	int nest = 0;
+@@ -8729,7 +8729,7 @@
+ 				// TrenchBroom expects every entity property before the first brush.
+ 				if (brushmodel)
+ 					for (i = 0; i < brushmodel->numbrushes; i++)
+-						Terr_WriteBrushInfo(file, &brushmodel->wbrushes[i]);
++						Terr_WriteBrushInfo(file, &brushmodel->wbrushes[i], trenchbroom);
+ 				brushmodel = NULL;
+ 				entnum++;
+ 			}
+@@ -8780,6 +8780,10 @@
+ 		start = entities;
+ 	}
+ }
++void Terr_WriteMapFile(vfsfile_t *file, model_t *mod)
++{
++	Terr_WriteMapFileFormat(file, mod, false);
++}
+ void Mod_Terrain_Save_f(void)
+ {
+ 	vfsfile_t *file;
+@@ -8842,7 +8846,7 @@
+ 			Con_TPrintf("unable to open %s\n", fname);
+ 		else
+ 		{
+-			Terr_WriteMapFile(file, mod);
++			Terr_WriteMapFileFormat(file, mod, !strcmp(Cmd_Argv(3), "trenchbroom"));
+ 			VFS_CLOSE(file);
+ 			FS_FlushFSHashWritten(fname);
+ 		}
+@@ -9077,11 +9081,12 @@
+ 					if (parsergba)
+ 					{	//the following four lines are stupid.
+ 						entities = COM_ParseTokenOut(entities, brushpunct, token, sizeof(token), NULL);
+-						if (strcmp(token, ")")) {Con_Printf(CON_ERROR "%s: invalid patch\n", mod->name);return false;}
+-						entities = COM_ParseTokenOut(entities, brushpunct, token, sizeof(token), NULL);
+-						if (strcmp(token, "(")) {Con_Printf(CON_ERROR "%s: invalid patch\n", mod->name);return false;}
+-
+-						entities = COM_ParseTokenOut(entities, brushpunct, token, sizeof(token), NULL);
++						if (!strcmp(token, ")"))
++						{
++							entities = COM_ParseTokenOut(entities, brushpunct, token, sizeof(token), NULL);
++							if (strcmp(token, "(")) {Con_Printf(CON_ERROR "%s: invalid patch\n", mod->name);return false;}
++							entities = COM_ParseTokenOut(entities, brushpunct, token, sizeof(token), NULL);
++						}
+ 						patch_v[y][x].rgba[0] = atof(token);
+ 						entities = COM_ParseTokenOut(entities, brushpunct, token, sizeof(token), NULL);
+ 						patch_v[y][x].rgba[1] = atof(token);

@@ -31,11 +31,11 @@ static std::string pendingDocumentAlias;
 static int saveRevision;
 static uint64_t documentGeneration=0;
 static std::chrono::steady_clock::time_point saveProfileStarted;
-static bool savingDocument, savingBackup, savingExport, confirmDocument;
+static bool savingDocument, savingBackup, savingExport, savingTrenchMap, confirmDocument;
 static bool savePakDetached;
 static std::string savePakBase,savePakMod,savePakMapPaths;
 static void restorePakMounts(){if(!savePakDetached)return;cvars->SetString("ftebroom_assetpath",savePakBase.c_str());cvars->SetString("ftebroom_modassetpath",savePakMod.c_str());cvars->SetString("ftebroom_mapassetpaths",savePakMapPaths.c_str());savePakDetached=false;command("fs_restart\n");}
-static bool exportRequest;
+static bool exportRequest, trenchMapRequest;
 static bool objRequest, fileBrowserObj, savingObj;
 static std::filesystem::path objDestination;
 static bool documentUntitled;
@@ -72,12 +72,12 @@ static std::filesystem::path documentDefaultFolder()
 #include "ftebroom_lines.h"
 #include "ftebroom_trace_files.h"
 // Only known identifiers are accepted; map comments never contain local configuration.
-static std::string documentMetadata(std::string bytes)
+static std::string documentMetadata(std::string bytes,bool trenchMap=false)
 {
   if(bytes.rfind("// ReyondBroom profile=",0)==0 || bytes.rfind("// FTEBroom profile=",0)==0)bytes.erase(0,bytes.find('\n')+1);
-  const char* profile=gameProfileKey(gameProfile);
-  const char* format=documentTerrain?"fte-terrain":gameProfile>=3?"valve220":gameProfile==2?(q1MapFormat?"valve220":"quake-standard"):"quake3";
-  return std::string("// ReyondBroom profile=")+profile+" format="+format+"\n"+bytes;
+  const bool compatible=!documentTerrain&&ftebroom::trenchBroomMapCompatible(bytes,gameProfile,trenchMap);
+  if(trenchMap&&!compatible)throw std::runtime_error("TrenchBroom MAP export requires odd patch grid sizes of at least 3 and cannot include FTE terrain.");
+  return ftebroom::mapDocumentHeader(gameProfile,q1MapFormat!=0,documentTerrain,compatible)+bytes;
 }
 static void mapModsOpenSource(const std::string& source);
 static std::string mapModsPrepareScene(const std::string& source);
@@ -224,7 +224,8 @@ static bool documentSave(
   const std::string& name,
   bool backup = false,
   const std::filesystem::path& destination = {},
-  bool compile = false)
+  bool compile = false,
+  bool trenchMap = false)
 {
   if (
     savingDocument
@@ -232,6 +233,24 @@ static bool documentSave(
     return false;
   if (!backup && !compile && !jamCanSaveTo(destination,name)) return false;
   documentError.clear();
+  if(trenchMap) {
+    if(jamEditing()||documentTerrain||gameClassic()) {
+      documentError="TrenchBroom MAP export is available for offline Quake III and FTE maps without FTE terrain.";
+      return false;
+    }
+    std::filesystem::path archive;std::string member;
+    if(ftebroom::pak::split(destination,archive,member)) {
+      documentError="Export the TrenchBroom copy to a folder outside the PAK.";
+      return false;
+    }
+    const auto source=documentFile.empty()?documentPath("maps/"+documentName+".map"):documentFile;
+    std::error_code error;
+    if(destination.empty()||destination.lexically_normal()==source.lexically_normal()||
+       std::filesystem::equivalent(ftebroom::filesystemAccessPath(destination),ftebroom::filesystemAccessPath(source),error)) {
+      documentError="Choose a separate file for the TrenchBroom copy.";
+      return false;
+    }
+  }
   saveProfileStarted=std::chrono::steady_clock::now();
   const auto serial = std::chrono::system_clock::now().time_since_epoch().count();
   saveTemporary =
@@ -277,6 +296,7 @@ static bool documentSave(
   savingDocument = true;
   savingBackup = backup;
   savingExport = compile;
+  savingTrenchMap = trenchMap;
   if (compile)
   {
     cvars->SetFloat("ftebroom_export_status", 0);
@@ -284,7 +304,7 @@ static bool documentSave(
     return true;
   }
   if(documentTerrain)command("ftebroom_terrain_save\n");
-  action(("mod_terrain_save \"\" " + saveTemporary + "\nftebroom_save_finish\n").c_str());
+  action(("mod_terrain_save \"\" " + saveTemporary + (trenchMap ? " trenchbroom" : "") + "\nftebroom_save_finish\n").c_str());
   return true;
 }
 static void documentSaveFinished()
@@ -297,6 +317,7 @@ static void documentSaveFinished()
     documentPath(savingExport ? "data/export-map.map" : "maps/" + saveTemporary + ".map");
   const auto target =
     saveNativeTarget.empty() ? documentPath(saveDestination) : saveNativeTarget;
+  const bool savingCopy=savingExport||savingTrenchMap;
   std::filesystem::path pakArchive;std::string pakMember;
   if(!savePakDetached&&ftebroom::pak::split(target,pakArchive,pakMember)){
     char base[4096]={},mod[4096]={},paths[32768]={};cvars->GetString("ftebroom_assetpath",base,sizeof base);cvars->GetString("ftebroom_modassetpath",mod,sizeof mod);cvars->GetString("ftebroom_mapassetpaths",paths,sizeof paths);savePakBase=base;savePakMod=mod;savePakMapPaths=paths;
@@ -323,7 +344,7 @@ static void documentSaveFinished()
     adjacent = ftebroom::filesystemAccessPath(adjacent);
     if(gameWad()){auto converted=ftebroom::quake1::map(q1Read(source),savingExport?false:gameProfile==2&&q1MapFormat==0,savingExport?q1CompilerWads(target.parent_path(),q1Read(source)):q1WadList(),true,gameProfile==4);
       std::ofstream output(adjacent,std::ios::binary);output<<(savingExport?converted:documentMetadata(converted));output.close();if(!output)throw std::runtime_error("Cannot write Quake map.");}
-    else {std::ofstream output(adjacent,std::ios::binary);auto bytes=q1Read(source);output<<(savingExport?bytes:documentMetadata(bytes));output.close();if(!output)throw std::runtime_error("Cannot write map.");}
+    else {auto bytes=q1Read(source);if(!savingExport)bytes=documentMetadata(std::move(bytes),savingTrenchMap);std::ofstream output(adjacent,std::ios::binary);output<<bytes;output.close();if(!output)throw std::runtime_error("Cannot write map.");}
 #ifdef _WIN32
     if (!MoveFileExW(
           adjacent.c_str(),
@@ -337,7 +358,7 @@ static void documentSaveFinished()
     std::filesystem::rename(adjacent, target);
 #endif
     }
-    if(documentTerrain&&!savingExport) {char loaded[256]={};cvars->GetString("mapname",loaded,sizeof loaded);auto stem=std::filesystem::u8path(loaded).stem().u8string();terrainCopySections(documentPath("maps/"+stem),target.parent_path()/target.stem());}
+    if(documentTerrain&&!savingCopy) {char loaded[256]={};cvars->GetString("mapname",loaded,sizeof loaded);auto stem=std::filesystem::u8path(loaded).stem().u8string();terrainCopySections(documentPath("maps/"+stem),target.parent_path()/target.stem());}
     restorePakMounts();
     std::error_code cleanupError;
     std::filesystem::remove(nativeSource, cleanupError);
@@ -353,7 +374,7 @@ static void documentSaveFinished()
         std::error_code ignored;std::filesystem::remove(old,ignored);old+=".source";std::filesystem::remove(old,ignored);
       }
     }
-    if (!savingBackup && !savingExport)
+    if (!savingBackup && !savingCopy)
     {
       documentIndexLines(ftebroom::filesystemAccessPath(target));
       documentFile = target;
@@ -382,7 +403,7 @@ static void documentSaveFinished()
     restorePakMounts();
     documentError = error.what();
     documentNext.clear();
-    if (!savingBackup && !savingExport) jamSaved(false);
+    if (!savingBackup && !savingCopy) jamSaved(false);
     core->Print(("ReyondBroom save failed: " + documentError + "\n").c_str());
   }
 }
@@ -568,7 +589,7 @@ static void testBackups()
 }
 
 // Paths stay in native filesystem APIs; only generated ASCII aliases reach FTE commands.
-static bool fileBrowserSaving, fileBrowserExport, fileBrowserDefinitions,
+static bool fileBrowserSaving, fileBrowserExport, fileBrowserTrenchMap, fileBrowserDefinitions,
   definitionsRequest;
 static bool definitionsChoose(const std::filesystem::path& path,std::string& error);
 static std::filesystem::path definitionsBrowseFolder();
@@ -601,12 +622,12 @@ static std::optional<std::filesystem::path> fileBrowserFolderTree(const std::fil
 static void documentFileBrowser()
 {
   if (jamEditing()) {
-    newMapRequest = openRequest = saveRequest = definitionsRequest = exportRequest = objRequest = false;
+    newMapRequest = openRequest = saveRequest = definitionsRequest = exportRequest = trenchMapRequest = objRequest = false;
     traceRequest = 0;
     return;
   }
   const bool pending = newMapRequest || openRequest || saveRequest || definitionsRequest ||
-                       exportRequest || traceRequest || objRequest;
+                       exportRequest || trenchMapRequest || traceRequest || objRequest;
   if (pending && !ImGui::GetTopMostPopupModal())
   {
     cancelGesture();
@@ -614,7 +635,8 @@ static void documentFileBrowser()
     fileBrowserTrace = traceRequest;
     traceRequest = 0;
     fileBrowserObj = objRequest; objRequest = false;
-    fileBrowserSaving = fileBrowserNew || saveRequest || exportRequest || fileBrowserObj;
+    fileBrowserTrenchMap = trenchMapRequest; trenchMapRequest = false;
+    fileBrowserSaving = fileBrowserNew || saveRequest || exportRequest || fileBrowserTrenchMap || fileBrowserObj;
     fileBrowserExport = exportRequest;
     exportRequest = false;
     fileBrowserDefinitions = definitionsRequest;
@@ -632,7 +654,7 @@ static void documentFileBrowser()
       fileBrowserName,
       sizeof fileBrowserName,
       "%s",
-      fileBrowserSaving ? (documentName + (fileBrowserObj ? ".obj" : ".map")).c_str() : "");
+      fileBrowserSaving ? (documentName + (fileBrowserObj ? ".obj" : fileBrowserTrenchMap ? "-trenchbroom.map" : ".map")).c_str() : "");
     if(fileBrowserNew){
       std::snprintf(fileBrowserName,sizeof fileBrowserName,"untitled.map");
       auto root=newMapProfile==3?std::string(q2Mod):newMapProfile==4?std::string(hlMod):newMapProfile==2?(q1UseLibre?libreMod():std::string(q1Mod)):std::string(baseq3);
@@ -667,11 +689,14 @@ static void documentFileBrowser()
       fileBrowserObj          ? "Export Wavefront OBJ + MTL (omitted layers excluded)"
       : fileBrowserTrace == 1 ? "Load point file (.lin / .pts)"
       : fileBrowserTrace == 2  ? "Load portal file (.prt)"
+      : fileBrowserTrenchMap  ? "Export TrenchBroom MAP"
       : fileBrowserExport     ? "Export map for compilation (omitted layers excluded)"
       : fileBrowserDefinitions ? "Open entity definitions"
       : fileBrowserNew         ? "Choose where to create the map"
       : fileBrowserSaving      ? "Save map as"
                                : "Open map");
+    if(fileBrowserTrenchMap)
+      ImGui::TextWrapped("The copy retains patch shape and UVs. TrenchBroom uses automatic subdivisions and has no patch vertex colors.");
     bool canGoUp=fileBrowserFolder.has_parent_path()&&fileBrowserFolder.parent_path()!=fileBrowserFolder;
     ImGui::BeginDisabled(!canGoUp);bool up=browserNavigationButton(true);ImGui::EndDisabled();fileBrowserTestItem("up");welcomeQaItem("files/up");
     if(up){fileBrowserFolder=fileBrowserFolder.parent_path();documentError.clear();if(!fileBrowserSaving)fileBrowserName[0]=0;}
@@ -781,9 +806,8 @@ static void documentFileBrowser()
         try {
           if(std::filesystem::exists(target))throw std::runtime_error("Choose a new filename; existing maps are not replaced.");
           std::filesystem::create_directories(target.parent_path());
-          const char* profile=gameProfileKey(newMapProfile);
           std::ofstream out(target,std::ios::binary);
-          std::ostringstream scene;scene<<"// ReyondBroom profile="<<profile<<" format="<<(newMapProfile>=3?"valve220":newMapProfile==2?(q1MapFormat?"valve220":"quake-standard"):"quake3")<<"\n{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \""<<(newMapProfile!=0?"info_player_start":"info_player_deathmatch")<<"\"\n\"origin\" \"0 0 64\"\n}\n";
+          std::ostringstream scene;scene<<ftebroom::mapDocumentHeader(newMapProfile,q1MapFormat!=0,false,true)<<"{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \""<<(newMapProfile!=0?"info_player_start":"info_player_deathmatch")<<"\"\n\"origin\" \"0 0 64\"\n}\n";
           out<<mapModsPrepareScene(scene.str());
           out.close();if(!out)throw std::runtime_error("Cannot create map.");
           documentNext="@"+target.u8string();documentProceed();fileBrowserNew=false;ImGui::CloseCurrentPopup();
@@ -796,7 +820,7 @@ static void documentFileBrowser()
           overwriteTarget = target;
           ImGui::OpenPopup("Replace map?");
         }
-        else if (fileBrowserObj ? objSave(target) : documentSave(documentName, false, target, fileBrowserExport))
+        else if (fileBrowserObj ? objSave(target) : documentSave(documentName, false, target, fileBrowserExport,fileBrowserTrenchMap))
           ImGui::CloseCurrentPopup();
       }
       else
@@ -820,7 +844,7 @@ static void documentFileBrowser()
       ImGui::TextWrapped("Replace %s?", overwriteTarget.u8string().c_str());
       if (ImGui::Button("Replace"))
       {
-        if (fileBrowserObj ? objSave(overwriteTarget) : documentSave(documentName, false, overwriteTarget, fileBrowserExport))
+        if (fileBrowserObj ? objSave(overwriteTarget) : documentSave(documentName, false, overwriteTarget, fileBrowserExport,fileBrowserTrenchMap))
         {
           ImGui::CloseCurrentPopup();
           fileBrowserSaving = false;

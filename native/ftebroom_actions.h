@@ -307,6 +307,11 @@ static void executeAction(const Action& a, bool down = true)
       selectMapTab = true;
     else if (name == "exportmap")
       exportRequest = true;
+    else if (name == "exporttrenchmap")
+    {
+      if(!gameClassic()&&!documentTerrain)trenchMapRequest=true;
+      else documentError=documentTerrain?"TrenchBroom does not support FTE terrain sections.":"Use Save As. This profile already saves in TrenchBroom's MAP format.";
+    }
     else if (name == "exportbspmodel")
       bspModelShow();
     else if (name == "exportobj")

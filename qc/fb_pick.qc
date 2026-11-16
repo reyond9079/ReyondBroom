@@ -427,11 +427,42 @@ void fb_point_render_prepare()
     fb_commit_profile("fb_point_render_prepare",profile81Time);
 }
 int fb_point_preview_cache_allowed();
+void fb_point_icon_2d(int id, string name, vector pixel, vector color)
+{
+    pixel_z=0;
+    if(fb_entity_light_icon(id)) {
+        drawpic(pixel-'9 9 0',"icons/light-bulb.tga",'18 18 0','1 1 1',1,0);
+        return;
+    }
+    drawfill(pixel-'8 8 0','16 16 0','0.07 0.09 0.10',.92,0);
+    if(substring(name,0,11)=="info_player") {
+        drawline(2,pixel+'0 -6 0',pixel+'-5 5 0',color,1,0);
+        drawline(2,pixel+'0 -6 0',pixel+'5 5 0',color,1,0);
+        drawline(2,pixel+'-5 5 0',pixel+'0 2 0',color,1,0);
+        drawline(2,pixel+'5 5 0',pixel+'0 2 0',color,1,0);
+    } else if(substring(name,0,8)=="monster_") {
+        drawfill(pixel+'-5 -4 0','10 7 0',color,1,0);
+        drawfill(pixel+'-3 -1 0','2 2 0','0.07 0.09 0.10',1,0);
+        drawfill(pixel+'1 -1 0','2 2 0','0.07 0.09 0.10',1,0);
+        drawfill(pixel+'-2 3 0','4 3 0',color,1,0);
+    } else if(substring(name,0,5)=="item_" || substring(name,0,7)=="weapon_" ||
+              substring(name,0,5)=="ammo_") {
+        drawline(2,pixel+'-5 0 0',pixel+'5 0 0',color,1,0);
+        drawline(2,pixel+'0 -5 0',pixel+'0 5 0',color,1,0);
+    } else {
+        drawline(1,pixel+'-5 0 0',pixel+'0 -5 0',color,1,0);
+        drawline(1,pixel+'0 -5 0',pixel+'5 0 0',color,1,0);
+        drawline(1,pixel+'5 0 0',pixel+'0 5 0',color,1,0);
+        drawline(1,pixel+'0 5 0',pixel+'-5 0 0',color,1,0);
+    }
+}
 void fb_point_draw_2d()
 {
     fb_point_render_prepare();
     vector viewportMin=getproperty(VF_MIN),viewportSize=getproperty(VF_SIZE);
     vector viewportMax=viewportMin+viewportSize;
+    int icons=cvar("ftebroom_show_entity_icons_2d")!=0;
+    int wire=cvar("ftebroom_show_entity_bounds")!=0;
     static vector bounds[2];
     for(int i=0;i<fb_point_render_count;i++){
         fb_point_render_t *item=&fb_point_render[i];
@@ -440,10 +471,13 @@ void fb_point_draw_2d()
         float left=min(a_x,b_x),right=max(a_x,b_x),top=min(a_y,b_y),bottom=max(a_y,b_y);
         if(right<viewportMin_x || left>=viewportMax_x || bottom<viewportMin_y || top>=viewportMax_y)continue;
         vector color=fb_entity_selected(item->id)?stov(cvar_string("ftebroom_color_selected")):item->color;
-        drawline(1,[left,top,0],[right,top,0],color,1,0);
-        drawline(1,[right,top,0],[right,bottom,0],color,1,0);
-        drawline(1,[right,bottom,0],[left,bottom,0],color,1,0);
-        drawline(1,[left,bottom,0],[left,top,0],color,1,0);
+        if(wire) {
+            drawline(1,[left,top,0],[right,top,0],color,1,0);
+            drawline(1,[right,top,0],[right,bottom,0],color,1,0);
+            drawline(1,[right,bottom,0],[left,bottom,0],color,1,0);
+            drawline(1,[left,bottom,0],[left,top,0],color,1,0);
+        }
+        if(icons)fb_point_icon_2d(item->id,item->name,project(item->center),color);
     }
 }
 void fb_pick_draw_entities(int labelsOnly)

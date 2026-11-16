@@ -372,6 +372,38 @@ int fb_vertex_replaces(int model,int id)
     for(int b=0;b<fb_vertex_brushcount;b++) if(fb_vertex_brushes[b].model==model && fb_vertex_brushes[b].id==id && (fb_vertex_brushes[b].controlCount||fb_vertex_brushes[b].changed)) return TRUE;
     return FALSE;
 }
+// Draw the exact handle that would receive the mouse-down, in screen space.
+void fb_vertex_hover_2d(vector pixel,int view)
+{
+    if(!fb_vertex_tool() || fb_vertex_drag || fb_vertex_mode==FB_TOOL_CONTROLPOINT)return;
+    int handle=fb_vertex_pick(pixel,view);
+    if(handle<0)return;
+    if(fb_vertex_mode==FB_TOOL_VERTEX) {
+        vector point=project(fb_vertex_handles[handle].point);point_z=0;
+        drawfill(point-'4 4 0','8 8 0','1 1 0',1,0);
+        return;
+    }
+    for(int b=0;b<fb_vertex_brushcount;b++) {
+        fb_vertex_brush_t *item=&fb_vertex_brushes[b];fb_poly_t *poly=&item->source;
+        int edges=fb_vertex_mode==FB_TOOL_EDGE;
+        int count=edges?poly->ne:poly->nf;
+        for(int n=0;n<count;n++) {
+            if(item->handles[n]!=handle)continue;
+            if(edges) {
+                vector a=project(poly->vertices[poly->edges[n].a]),z=project(poly->vertices[poly->edges[n].b]);a_z=z_z=0;
+                drawline(3,a,z,'1 1 0',1,0);
+                continue;
+            }
+            fb_poly_face_t face=poly->faces[n];
+            for(int e=0;e<face.count;e++) {
+                vector a=project(poly->vertices[poly->indices[face.start+e]]);
+                vector z=project(poly->vertices[poly->indices[face.start+(e+1)%face.count]]);
+                a_z=z_z=0;
+                drawline(3,a,z,'1 1 0',1,0);
+            }
+        }
+    }
+}
 void fb_vertex_draw()
 {
     cvar_set("ftebroom_vertex_handles","0");if(!fb_vertex_tool() && !fb_vertex_scope) return;

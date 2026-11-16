@@ -47,6 +47,71 @@ static std::set<std::string> protectedPropertyKeys(const std::map<std::string,st
   if(!key.empty())result.insert(key);
   return result;
 }
+static void entityPropertyDescription(const ftebroom::EntityProperty& property)
+{
+  if (!property.label.empty() && property.label != property.key)
+    ImGui::TextWrapped("%s", property.label.c_str());
+  if (!property.description.empty())
+    ImGui::TextWrapped("%s", property.description.c_str());
+}
+static void entityPropertyFlags(const std::string& key, const ftebroom::EntityProperty& definition)
+{
+  for (const auto& choice : definition.choices)
+  {
+    unsigned bit;
+    try
+    {
+      bit = std::stoul(choice.value);
+    }
+    catch (...)
+    {
+      continue;
+    }
+    bool enabled = false, first = true, mixed = false;
+    for (const auto& e : entityProperties)
+    {
+      std::string value;
+      if (auto p = e.second.find(key); p != e.second.end())
+        value = p->second;
+      else if (auto cls = e.second.find("classname"); cls != e.second.end())
+        if (
+          auto def = entityDefinitions.find(cls->second);
+          def != entityDefinitions.end())
+          if (
+            auto p = def->second.properties.find(key);
+            p != def->second.properties.end())
+            value = p->second.value;
+      unsigned flags = 0;
+      try
+      {
+        flags = std::stoul(value);
+      }
+      catch (...)
+      {
+      }
+      bool current = (flags & bit) != 0;
+      if (first)
+      {
+        enabled = current;
+        first = false;
+      }
+      else
+        mixed |= current != enabled;
+    }
+    ImGui::PushID(choice.value.c_str());
+    if (mixed)
+      ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+    bool changed = ImGui::Checkbox(choice.label.c_str(), &enabled);
+    if (mixed)
+      ImGui::PopItemFlag();
+    if (ImGui::IsItemHovered() && !choice.description.empty())
+      ImGui::SetTooltip("%s", choice.description.c_str());
+    if (changed)
+      entityProperty(enabled ? "setflag" : "clearflag", key, std::to_string(bit));
+    ImGui::PopID();
+  }
+}
+
 static void entityPropertyTable()
 {
   const bool linked=entitySelectionLinked;
@@ -55,6 +120,7 @@ static void entityPropertyTable()
   static std::vector<PropertyRow> rows;
   static std::vector<int> now;
   static std::map<std::string, unsigned> protectedCounts;
+  static bool singleClass;
   static int selectionEpoch=-2, definitionsEpoch=-2, mapEpoch=-2;
   // Aggregation depends on the published data, not the frame rate or camera.
   if(selectionEpoch!=entitySelectionEpoch || definitionsEpoch!=entityDefinitionEpoch || mapEpoch!=organizationMapEpoch)
@@ -77,6 +143,7 @@ static void entityPropertyTable()
       keys.insert(p.first);
     for(const auto& key:protectedPropertyKeys(entity.second)){keys.insert(key);protectedCounts[key]++;}
   }
+  singleClass = classes.size()==1;
   for (const auto& key : keys)
   {
     if (!entityPublicProperty(key))
@@ -170,6 +237,12 @@ static void entityPropertyTable()
     if (!list.empty())
       command(("ftebroom_entity_remove " + list + "\n").c_str());
   };
+  const auto spawnflags=definitions.find("spawnflags");
+  if (singleClass && spawnflags!=definitions.end() && spawnflags->second.type=="flags" &&
+      !spawnflags->second.choices.empty() && uiInspectorFold("Spawn flags",ImGuiTreeNodeFlags_DefaultOpen)) {
+    entityPropertyDescription(spawnflags->second);
+    entityPropertyFlags("spawnflags",spawnflags->second);
+  }
   ImGui::BeginChild(
     "Property list",
     {0, 0},
@@ -323,8 +396,16 @@ static void entityPropertyTable()
           entityTestItem((col ? "value/" : "key/") + row.key);
         }
         if (ImGui::IsItemHovered())
-          if (auto def = definitions.find(row.key); def != definitions.end())
-            ImGui::SetTooltip("%s", def->second.description.c_str());
+          if (auto def = definitions.find(row.key); def != definitions.end()) {
+            const auto& property=def->second;
+            if ((!property.label.empty() && property.label!=row.key) || !property.description.empty()) {
+              ImGui::BeginTooltip();
+              ImGui::PushTextWrapPos(ImGui::GetFontSize()*32.f);
+              entityPropertyDescription(property);
+              ImGui::PopTextWrapPos();
+              ImGui::EndTooltip();
+            }
+          }
         ImGui::PopID();
       }
       if (!row.explicitValue && uiItalicFonts[uiScaleChoice])
@@ -390,58 +471,11 @@ static void entityPropertyTable()
   const auto& row = rows[selectedIndex];
   auto definition = definitions.find(selected);
   uiSectionHeading(selected.c_str());
+  if (definition != definitions.end())
+    entityPropertyDescription(definition->second);
   if (definition != definitions.end() && definition->second.type == "flags")
   {
-    for (const auto& choice : definition->second.choices)
-    {
-      unsigned bit;
-      try
-      {
-        bit = std::stoul(choice.value);
-      }
-      catch (...)
-      {
-        continue;
-      }
-      bool enabled = false, first = true, mixed = false;
-      for (const auto& e : entityProperties)
-      {
-        std::string value;
-        if (auto p = e.second.find(selected); p != e.second.end())
-          value = p->second;
-        else if (auto cls = e.second.find("classname"); cls != e.second.end())
-          if (
-            auto def = entityDefinitions.find(cls->second);
-            def != entityDefinitions.end())
-            if (
-              auto p = def->second.properties.find(selected);
-              p != def->second.properties.end())
-              value = p->second.value;
-        unsigned flags = 0;
-        try
-        {
-          flags = std::stoul(value);
-        }
-        catch (...)
-        {
-        }
-        bool current = (flags & bit) != 0;
-        if (first)
-        {
-          enabled = current;
-          first = false;
-        }
-        else
-          mixed |= current != enabled;
-      }
-      if (mixed)
-        ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
-      bool changed = ImGui::Checkbox(choice.label.c_str(), &enabled);
-      if (mixed)
-        ImGui::PopItemFlag();
-      if (changed)
-        entityProperty(enabled ? "setflag" : "clearflag", selected, std::to_string(bit));
-    }
+    if (selected != "spawnflags")entityPropertyFlags(selected,definition->second);
   }
   else if (definition != definitions.end() && !definition->second.choices.empty())
   {

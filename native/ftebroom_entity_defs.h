@@ -18,6 +18,7 @@ struct EntityChoice
 {
   std::string value, label;
   bool enabled = false;
+  std::string description;
 };
 struct EntityProperty
 {
@@ -310,7 +311,8 @@ public:
             c.label = scalar();
             if (accept(":"))
               c.enabled = take() != "0";
-            if (accept(":"))scalar(); // Per-choice help text (TrenchBroom FGD).
+            if (accept(":"))
+              c.description = scalar();
             if (c.enabled && p.type == "flags")
               try
               {

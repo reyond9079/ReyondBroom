@@ -58,6 +58,7 @@ static void viewOptionsRestoreDefaults(){
   cvars->SetFloat("ftebroom_render_faces",0);cvars->SetFloat("r_fog_enabled",0);
   cvars->SetFloat("ftebroom_bounds_visible",1);cvars->SetFloat("ftebroom_entity_links",1);
   cvars->SetFloat("ftebroom_show_entity_names_2d",1);
+  cvars->SetFloat("ftebroom_show_entity_icons_2d",1);
   cvars->SetFloat("ftebroom_isolate_entity_classes",0);
   cvars->SetString("ftebroom_hidden_classes","");
 }
@@ -124,6 +125,7 @@ static void viewOptionsRenderer(){
   uiSectionHeading("Entities");
   viewOption("Show entity classnames in 3D","ftebroom_show_entity_names");
   viewOption("Show entity classnames in 2D","ftebroom_show_entity_names_2d");
+  viewOption("Show point entity icons in 2D","ftebroom_show_entity_icons_2d");
   viewOption("Show group bounds and names","ftebroom_show_group_bounds");
   viewOption("Show brush entity bounds","ftebroom_show_brush_entity_bounds");
   viewOption("Show point entity bounds","ftebroom_show_entity_bounds");
@@ -151,7 +153,7 @@ static void viewOptionsRenderer(){
 }
 static std::string viewOptionsSettings(){
   std::string result;char value[16384]{};
-  for(auto name:{"ftebroom_show_entity_names_2d","ftebroom_isolate_entity_classes"}){cvars->GetString(name,value,sizeof value);result+=name;result+='=';result+=value;result+='\n';}
+  for(auto name:{"ftebroom_show_entity_names_2d","ftebroom_show_entity_icons_2d","ftebroom_isolate_entity_classes"}){cvars->GetString(name,value,sizeof value);result+=name;result+='=';result+=value;result+='\n';}
   for(auto name:{"ftebroom_show_brushes","ftebroom_show_patches","ftebroom_show_points","ftebroom_show_models","ftebroom_show_entity_names","ftebroom_show_group_bounds","ftebroom_show_brush_entity_bounds","ftebroom_show_entity_bounds","ftebroom_hidden_tags","ftebroom_hidden_classes","ftebroom_render_faces","ftebroom_shade_faces","ftebroom_show_edges","r_fog_enabled","ftebroom_entity_links","ftebroom_bounds_visible","ftebroom_grid_plane","ftebroom_sky_overlays","ftebroom_tool_opacity","ftebroom_label_distance","v_gamma","v_contrast","vid_multisample","ftebroom_grid_aa","ftebroom_grid_fade_start","ftebroom_grid_fade_end","gl_texture_anisotropy","gl_texturemode"}){cvars->GetString(name,value,sizeof value);result+=name;result+='=';result+=value;result+='\n';}
   return result;
 }

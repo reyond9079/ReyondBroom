@@ -116,10 +116,14 @@ float fb_viewopts_testcommand()
     for(int q=0;q<fb_point_render_count;q++)if(fb_point_render[q].id==light)hiddenLabel=TRUE;
     fb_viewopts_expect(!fb_render_allowed(lightNode,FB_PICK_LOCKED) && !hiddenLabel,"deselected_hidden_class_removes_point_and_label_entry");cvar_set("ftebroom_show_points",ftos(points));cvar_set("ftebroom_hidden_classes","");fb_filter_prepare();
     cvar_set("ftebroom_isolate_entity_classes","1");fb_filter_prepare();
-    fb_viewopts_expect(!fb_render_allowed(lightNode,FB_PICK_LOCKED),"hide_all_isolates_no_classes");
+    fb_viewopts_expect(!fb_render_allowed(lightNode,FB_PICK_LOCKED) && !fb_render_allowed(brushNode,FB_PICK_LOCKED)
+        && !fb_render_allowed(patchNode,FB_PICK_LOCKED),"hide_all_isolates_no_classes_or_world_geometry");
     cvar_set("ftebroom_hidden_classes","|light|");fb_filter_prepare();
-    fb_viewopts_expect(fb_render_allowed(lightNode,FB_PICK_LOCKED),"one_class_visible_after_hide_all");
-    cvar_set("ftebroom_isolate_entity_classes","0");cvar_set("ftebroom_hidden_classes","");
+    fb_viewopts_expect(fb_render_allowed(lightNode,FB_PICK_LOCKED) && !fb_render_allowed(brushNode,FB_PICK_LOCKED),
+        "one_class_visible_after_hide_all");
+    cvar_set("ftebroom_isolate_entity_classes","0");cvar_set("ftebroom_hidden_classes","");fb_filter_prepare();
+    fb_viewopts_expect(fb_render_allowed(lightNode,FB_PICK_LOCKED) && fb_render_allowed(brushNode,FB_PICK_LOCKED),
+        "show_all_restores_world_and_entities");
     float old2d=cvar("ftebroom_show_entity_names_2d");
     float names=cvar("ftebroom_show_entity_names"),bounds=cvar("ftebroom_show_brush_entity_bounds"),groups=cvar("ftebroom_show_group_bounds");
     cvar_set("ftebroom_show_entity_names","1");cvar_set("ftebroom_show_entity_names_2d","0");

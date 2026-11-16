@@ -600,7 +600,9 @@ static void documentFileBrowser()
     traceRequest = 0;
     return;
   }
-  if (newMapRequest || openRequest || saveRequest || definitionsRequest || exportRequest || traceRequest || objRequest)
+  const bool pending = newMapRequest || openRequest || saveRequest || definitionsRequest ||
+                       exportRequest || traceRequest || objRequest;
+  if (pending && !ImGui::GetTopMostPopupModal())
   {
     cancelGesture();
     fileBrowserNew=newMapRequest;newMapRequest=false;
@@ -635,8 +637,16 @@ static void documentFileBrowser()
     documentError.clear();
     fileBrowserTree.clear();
     ImGui::OpenPopup("Map files");
+    const auto* viewport = ImGui::GetMainViewport();
+    const auto* previous = ImGui::FindWindowByName("Map files");
+    const auto size = previous ? previous->SizeFull : ImVec2{760*uiScale(),540*uiScale()};
+    const auto center = viewport->GetCenter();
+    ImGui::SetNextWindowViewport(viewport->ID);
+    // The floating-window bounds pass clears ImGui's deferred pivot.
+    ImGui::SetNextWindowPos(
+      {center.x-.5f*std::min(size.x,viewport->Size.x-24),
+       center.y-.5f*std::min(size.y,viewport->Size.y-64)}, ImGuiCond_Always);
   }
-  ImGui::SetNextWindowSize({720, 520}, ImGuiCond_FirstUseEver);
   if (uiDialog("Map files",{760,540}))
   {
     welcomeQaWindow("files/window");

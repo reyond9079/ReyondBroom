@@ -233,6 +233,14 @@ void fb_extrude_draw()
         }
     }
     }
+    if(cvar("ca_brush_view")) {
+        for(int segment=0;segment<fb_extrude_outline_count;segment+=2) {
+            vector a=project(fb_extrude_outline[segment]),b=project(fb_extrude_outline[segment+1]);
+            a_z=b_z=0;drawline(3,a,b,'1 1 0',1,0);
+        }
+        cvar_set("ftebroom_selection_status",sprintf("Extrude: face %i / brush %i, distance 0",hit.face,hit.id));
+        return;
+    }
     shaderforname("ftebroom/extrude","{\n{\nmap $whiteimage\nrgbgen vertex\nalphagen vertex\nblendfunc blend\nnodepthtest\n}\n}");
     for(int edge=0;edge<fb_extrude_outline_count;edge+=2) {
         R_BeginPolygon("ftebroom/extrude");

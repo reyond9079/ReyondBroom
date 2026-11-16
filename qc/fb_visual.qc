@@ -551,12 +551,19 @@ void fb_visual_draw()
 void fb_visual_face_hover()
 {
     int testHover=cvar("ftebroom_skip_setup") && cvar("ftebroom_test_face_hover");
-    if((!cvar("ftebroom_shift") && !testHover) || fb_active || cvar("ftebroom_camera_captured"))return;
+    if(fb_active || cvar("ftebroom_camera_captured"))return;
     vector pointer=curmousepos;
     if(testHover){pointer=project('0 -64 64');pointer_z=0;}
     vector mn=getproperty(VF_MIN),sz=getproperty(VF_SIZE);
     if(pointer_x<mn_x || pointer_y<mn_y || pointer_x>=mn_x+sz_x || pointer_y>=mn_y+sz_y)return;
-    int ortho=cvar("ca_brush_view");
+    int ortho=cvar("ca_brush_view"),tool=cvar("ftebroom_tool"),shift=cvar("ftebroom_shift");
+    if(ortho && fb_vertex_tool()){
+        drawsetcliparea(mn_x,mn_y,sz_x,sz_y);fb_vertex_hover_2d(pointer,ortho);drawresetcliparea();return;
+    }
+    if(ortho && !tool && shift && !testHover && !cvar("ftebroom_alt") && !cvar("ftebroom_ctrl")){
+        drawsetcliparea(mn_x,mn_y,sz_x,sz_y);fb_extrude_draw();drawresetcliparea();return;
+    }
+    if(!shift && !testHover && !(ortho && tool==FB_TOOL_CLIP))return;
     static string last="";static vector points[256];static int count;
     string key=strcat(sprintf("%v %v %v %v %v %i %g",pointer,getproperty(VF_ORIGIN),getproperty(VF_ANGLES),mn,sz,ortho,cvar("ca_brush_viewsize")),sprintf(" %i %i %i %i",fb_grid_geometry_epoch,fb_visibility_epoch,fb_filter_epoch,fb_incremental_epoch)," ",itos(fb_selection_epoch));
     if(key!=last){strunzone(last);last=strzone(key);count=0;

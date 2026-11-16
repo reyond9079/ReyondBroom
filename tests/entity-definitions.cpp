@@ -18,12 +18,13 @@ int main() {
 @PointClass base(Actor) studio("models/player.md3") = player : "Player start" [
 health(integer) : "Health" : 200
 mode(choices) : "Mode" : 0 = [ 0 : "Off" 1 : "On" ]
-spawnflags(flags) = [ 1 : "Fast" : 1 4 : "Silent" : 0 ]
+spawnflags(flags) = [ 1 : "Fast" : 1 : "Moves at double speed" 4 : "Silent" : 0 ]
 ]
 @SolidClass = func_wall [ ])", ".fgd");
   assert(fgd.size()==2 && fgd.at("player").properties.at("targetname").type=="string");
   assert(fgd.at("player").properties.at("health").value=="200");
   assert(fgd.at("player").properties.at("spawnflags").value=="1");
+  assert(fgd.at("player").properties.at("spawnflags").choices.front().description=="Moves at double speed");
   assert(fgd.at("player").properties.at("mode").choices.size()==2);
   assert(fgd.at("player").mins[2]==-24 && fgd.at("player").model=="models/player.md3");
   auto prefixed=entityRead(R"(@PointClass model({{ skin -> ":models/alternate.md2", ":models/default.md2" }}) = q2_item [skin(integer) : "Skin" : 0])",".fgd");

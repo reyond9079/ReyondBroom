@@ -13,6 +13,7 @@ var float autocvar_ftebroom_bounds_visible=1;
 var float autocvar_ftebroom_hidden_tags=0,autocvar_ftebroom_entity_links=1;
 var string autocvar_ftebroom_hidden_classes="";
 var float autocvar_ftebroom_isolate_entity_classes=0,autocvar_ftebroom_show_entity_names_2d=1;
+var float autocvar_ftebroom_show_entity_icons_2d=1;
 int *fb_filter_tags;
 int *fb_filter_node_tags;
 int *fb_filter_all_faces_hidden;
@@ -106,7 +107,7 @@ void fb_filter_prepare()
     signature=strcat(signature," patches=",ftos(autocvar_ftebroom_show_patches)," fog=",cvar_string("r_fog_enabled"));
     signature=strcat(signature," water=",cvar_string("r_wateralpha")," tools=",cvar_string("ftebroom_tool_opacity"));
     signature=strcat(signature," ",cvar_string("r_lavaalpha")," ",cvar_string("r_slimealpha")," ",cvar_string("r_telealpha"));
-    int selectionMatters=!autocvar_ftebroom_show_brushes || !autocvar_ftebroom_show_patches || !autocvar_ftebroom_show_points || autocvar_ftebroom_hidden_tags || autocvar_ftebroom_hidden_classes!="";
+    int selectionMatters=autocvar_ftebroom_isolate_entity_classes || !autocvar_ftebroom_show_brushes || !autocvar_ftebroom_show_patches || !autocvar_ftebroom_show_points || autocvar_ftebroom_hidden_tags || autocvar_ftebroom_hidden_classes!="";
     signature=strcat(signature," selected=",itos(selectionMatters?fb_selection_epoch:0)," isolate=",ftos(autocvar_ftebroom_isolate_entity_classes));
     if(signature!=previous){strunzone(previous);previous=strzone(signature);fb_filter_epoch++;}
     int materialEpoch=cvar("ftebroom_material_tag_epoch");
@@ -138,6 +139,16 @@ int fb_filter_allowed(int node)
 {
     if(node<0 || node>=fb_node_count)return TRUE;
     if(fb_filter_selected(node))return TRUE;
+    // Isolating a class also hides worldspawn geometry, including groups of
+    // world brushes. A brush entity's own geometry follows its class instead.
+    if(autocvar_ftebroom_isolate_entity_classes && fb_nodes[node].kind>=FB_NODE_BRUSH) {
+        int parent=fb_nodes[node].parent;
+        for(int steps=0;parent>=2 && parent<fb_node_count && steps<fb_node_count;steps++) {
+            if(fb_nodes[parent].kind==FB_NODE_ENTITY)break;
+            parent=fb_nodes[parent].parent;
+        }
+        if(parent<2 || parent>=fb_node_count || fb_nodes[parent].kind!=FB_NODE_ENTITY)return FALSE;
+    }
     if(fb_nodes[node].kind==FB_NODE_BRUSH && !autocvar_ftebroom_show_brushes)return FALSE;
     if(fb_nodes[node].kind==FB_NODE_PATCH && !autocvar_ftebroom_show_patches)return FALSE;
     if(fb_nodes[node].kind==FB_NODE_ENTITY) {

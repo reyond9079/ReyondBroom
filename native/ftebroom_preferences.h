@@ -14,7 +14,7 @@ static const char* preferenceVariables[] = {
   "ftebroom_show_entity_names","ftebroom_show_entity_names_2d","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
   "ftebroom_grid_plane","ftebroom_show_brushes","ftebroom_show_points","ftebroom_show_models","ftebroom_show_patches",
-  "ftebroom_render_faces","ftebroom_shade_faces","ftebroom_hidden_tags","ftebroom_hidden_classes","ftebroom_isolate_entity_classes","ftebroom_entity_links","r_fog_enabled",
+  "ftebroom_show_entity_icons_2d","ftebroom_render_faces","ftebroom_shade_faces","ftebroom_hidden_tags","ftebroom_hidden_classes","ftebroom_isolate_entity_classes","ftebroom_entity_links","r_fog_enabled",
   "ftebroom_texture_lock","ftebroom_uv_lock","ftebroom_auto_integer_snap","ftebroom_sky_overlays","ftebroom_bounds_visible","ftebroom_map_bounds",
   "ftebroom_new_scale_x","ftebroom_new_scale_y","ftebroom_new_angle",
   "ftebroom_new_offset_x","ftebroom_new_offset_y","ftebroom_extrude_handle_radius","ftebroom_grid_rotation",

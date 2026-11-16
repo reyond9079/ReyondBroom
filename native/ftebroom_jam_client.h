@@ -213,36 +213,53 @@ inline void renameArtifactDirectory(const fs::path& source, const fs::path& targ
 #endif
 }
 
-inline bool validPack(const fs::path& destination, const Json& files, ResourceTransfer* transfer)
+inline std::int64_t packFileStamp(const fs::path& root, const std::string& name, std::uint64_t size)
 {
-  const auto root = ftebroom::filesystemPath(destination);
-  for (const auto& item : files) {
-    if (transfer) transfer->check();
-    const auto name = item.at("path").get<std::string>();
-    const auto length = item.at("sizeBytes").get<std::size_t>();
-    const auto file = root / fs::u8path(name).make_preferred();
-    if (!packEntry(name) || fs::is_symlink(file) || !fs::is_regular_file(file) || fs::file_size(file) != length ||
-        sha256(fileBytes(file, 64 * 1024 * 1024)) != item.at("sha256").get<std::string>())
-      return false;
-  }
-  return fs::is_regular_file(root / "lq1" / "pak0.pak");
+  const auto relative = fs::u8path(name).make_preferred();
+  const auto file = root/relative;
+#ifdef _WIN32
+  WIN32_FILE_ATTRIBUTE_DATA data{};
+  if (!GetFileAttributesExW(file.c_str(),GetFileExInfoStandard,&data))
+    throw fs::filesystem_error("Cannot inspect the installed Jam resource",relative,
+                               std::error_code(GetLastError(),std::system_category()));
+  if (data.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))
+    throw fs::filesystem_error("The installed Jam resource is not a regular file",relative,
+                               std::error_code(ERROR_FILE_INVALID,std::system_category()));
+  if ((std::uint64_t(data.nFileSizeHigh)<<32 | data.nFileSizeLow) != size)
+    throw fs::filesystem_error("The installed Jam resource size does not match",relative,
+                               std::error_code(ERROR_BAD_LENGTH,std::system_category()));
+  return std::int64_t(data.ftLastWriteTime.dwHighDateTime)<<32 | data.ftLastWriteTime.dwLowDateTime;
+#else
+  if (!fs::is_regular_file(fs::symlink_status(file)))
+    throw fs::filesystem_error("The installed Jam resource is missing or is not a regular file",relative,
+                               std::make_error_code(std::errc::invalid_argument));
+  if (fs::file_size(file)!=size)
+    throw fs::filesystem_error("The installed Jam resource size does not match",relative,
+                               std::make_error_code(std::errc::message_size));
+  return fs::last_write_time(file).time_since_epoch().count();
+#endif
 }
 
-inline Json packReceipt(const fs::path& root, const Json& manifest)
+inline Json packReceipt(const fs::path& root, const Json& manifest, ResourceTransfer* transfer=nullptr)
 {
   const auto& files = manifest.at("files");
   if (!files.is_array() || files.empty() || files.size()>64) return nullptr;
   Json inventory = Json::object();
+  if (transfer) transfer->member = 0;
   for (const auto& item : files) {
+    if (transfer) { transfer->check(); ++transfer->member; }
     const auto name = item.at("path").get<std::string>();
     if (!packEntry(name) || inventory.contains(name)) return nullptr;
-    const auto file = root/fs::u8path(name).make_preferred();
-    if (fs::is_symlink(file) || !fs::is_regular_file(file) ||
-        fs::file_size(file)!=item.at("sizeBytes").get<std::size_t>()) return nullptr;
-    inventory[name] = fs::last_write_time(file).time_since_epoch().count();
+    inventory[name] = packFileStamp(root,name,item.at("sizeBytes").get<std::uint64_t>());
+    if (transfer) transfer->wrote(0);
   }
   if (!inventory.contains("lq1/pak0.pak") || !inventory.contains("plants/builtin/catalog.json")) return nullptr;
-  return {{"manifest",manifest.at("sha256")},{"files",std::move(inventory)}};
+  Json receipt = {{"manifest",manifest.at("sha256")},{"files",std::move(inventory)}};
+#ifdef _WIN32
+  // Older clients stored the C++ filesystem clock; check their files once before reusing the cache.
+  receipt["fileTimeFormat"] = "win32";
+#endif
+  return receipt;
 }
 
 inline void writePackReceipt(const fs::path& root, const Json& receipt, ResourceTransfer* transfer=nullptr)
@@ -252,7 +269,9 @@ inline void writePackReceipt(const fs::path& root, const Json& receipt, Resource
   try {
     writeBytes(temporary,receipt.dump());
 #ifdef _WIN32
-    if(!MoveFileExW(temporary.c_str(),marker.c_str(),MOVEFILE_REPLACE_EXISTING))throw std::runtime_error("Cannot replace the pack receipt.");
+    if(!MoveFileExW(temporary.c_str(),marker.c_str(),MOVEFILE_REPLACE_EXISTING))
+      throw fs::filesystem_error("Cannot replace the Jam pack receipt",marker.filename(),
+                                 std::error_code(GetLastError(),std::system_category()));
 #else
     fs::rename(temporary,marker);
 #endif
@@ -269,13 +288,18 @@ inline bool installedPack(const fs::path& destination, const Json& manifest, Res
   try {
     const auto root = ftebroom::filesystemPath(destination);
     if (transfer) transfer->record("cache_inventory");
-    const auto receipt = packReceipt(root,manifest);
+    const auto receipt = packReceipt(root,manifest,transfer);
     if (receipt.is_null()) return false;
     const auto marker = root/".verified-pack.json";
     if (fs::is_regular_file(marker) && !fs::is_symlink(marker) && fs::file_size(marker)<16384 &&
         Json::parse(fileBytes(marker,16384),nullptr,false)==receipt) return true;
     if (transfer) transfer->record("cache_hash");
-    if (!validPack(destination,manifest.at("files"),transfer)) return false;
+    for (const auto& item : manifest.at("files")) {
+      if (transfer) transfer->check();
+      const auto file = root/fs::u8path(item.at("path").get<std::string>()).make_preferred();
+      if (sha256(fileBytes(file,64*1024*1024))!=item.at("sha256").get<std::string>()) return false;
+      if (transfer) transfer->wrote(0);
+    }
     if (transfer) transfer->check();
     writePackReceipt(root,receipt,transfer);
     return true;
@@ -396,6 +420,7 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     throw Error("The Jam download failed (HTTP "+std::to_string(response.status)+").",false);
   if (transfer) {
     transfer->check();
+    transfer->member = 0;
     transfer->total = 0;
     transfer->bytes = 0;
     transfer->localPhase(ResourcePhase::Verifying);
@@ -456,11 +481,12 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
       transfer->record("install_finalize");
     }
     if (base) {
-      const auto receipt = packReceipt(staging,manifest);
-      if (receipt.is_null()) throw std::runtime_error("The installed Jam resources failed verification.");
-      if (transfer) transfer->record("receipt_write");
-      if (privatePack) writeBytes(staging/".verified-pack.json",receipt.dump());
-      else writePackReceipt(staging,receipt,transfer);
+      const auto receipt = packReceipt(staging,manifest,transfer);
+      if (receipt.is_null())
+        throw fs::filesystem_error("The installed Jam resource inventory is invalid",
+                                   std::make_error_code(std::errc::invalid_argument));
+      if (transfer) { transfer->member = 0; transfer->record("receipt_write"); }
+      writeBytes(staging/".verified-pack.json",receipt.dump(),transfer);
     }
     if (transfer) transfer->check();
     if (privatePack) return;
@@ -483,9 +509,14 @@ inline void download(const Client& client, const Json& manifest, const fs::path&
     const auto* fsError=dynamic_cast<const fs::filesystem_error*>(&error);
     if (transfer) transfer->record("operation_failed",fsError ? fsError->code().value() : 0);
     if (transfer) transfer->record("cleanup_failed_install");
-    std::error_code ignored;
-    fs::remove_all(staging, ignored);
-    if (transfer && ignored) transfer->record("cleanup_error",ignored.value());
+    if (retired) {
+      // Return the original error even when removing the unpublished files would block.
+      *retired = std::move(staging);
+    } else {
+      std::error_code ignored;
+      fs::remove_all(staging, ignored);
+      if (transfer && ignored) transfer->record("cleanup_error",ignored.value());
+    }
     throw;
   }
 }

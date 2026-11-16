@@ -79,8 +79,10 @@ struct JamLocal {
 #ifndef _WIN32
   jam::ResourceProcess resourceProcess;
   bool resourceRetryFresh = false;
-#endif
+#else
   std::future<void> packCleanup;
+  std::vector<JamFs::path> retiredPacks;
+#endif
   std::optional<JamUpload> snapshot;
   JamJson account, rules, board, wallet;
   JamJson players = JamJson::array();
@@ -629,23 +631,13 @@ void jamResources(bool install)
     transfer->record("manifest_received");
     if (jamField(manifest,"packVersion") != version)
       throw std::runtime_error("The base pack version changed.");
-    JamFs::path retired;
-    jam::download(client, manifest, destination, true,"jam_map",false,transfer.get(),&retired);
-    return JamJson{{"retired",retired.u8string()}};
-  }, [destination](auto data) {
+    jam::download(client,manifest,destination,true,"jam_map",false,transfer.get(),&transfer->retiredPack);
+    return JamJson::object();
+  }, [destination](auto) {
     jamLocal.pack = destination;
     // Join already fetched the board. A slow request or removal of an old
     // cache must not keep the completed installation on the resource screen.
     jamLocal.screen = JamScreen::Board;
-    const auto retired = jamField(data,"retired");
-    if (!retired.empty() && !jamLocal.packCleanup.valid()) {
-      try {
-        jamLocal.packCleanup = std::async(std::launch::async,[retired] {
-          std::error_code ignored;
-          JamFs::remove_all(JamFs::u8path(retired),ignored);
-        });
-      } catch (const std::system_error&) {}
-    }
     jamRefresh();
   });
 #endif
@@ -1500,10 +1492,21 @@ void jamTick()
       jamBeginPublish(jamLocal.draftPlot,std::exchange(jamLocal.publishPlayAfterSave,false));
     }
   }
+#ifdef _WIN32
   if (jamLocal.packCleanup.valid() &&
       jamLocal.packCleanup.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     try { jamLocal.packCleanup.get(); } catch (const std::exception&) {}
   }
+  if (!jamLocal.packCleanup.valid() && !jamLocal.retiredPacks.empty()) {
+    try {
+      jamLocal.packCleanup = std::async(std::launch::async,[retired=jamLocal.retiredPacks.back()] {
+        std::error_code ignored;
+        JamFs::remove_all(retired,ignored);
+      });
+      jamLocal.retiredPacks.pop_back();
+    } catch (const std::system_error&) {}
+  }
+#endif
   if (jamLocal.work.valid() && jamLocal.work.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     auto done = std::move(jamLocal.ready);
     auto resourceTransfer = std::move(jamLocal.resourceTransfer);
@@ -1564,6 +1567,10 @@ void jamTick()
       traceResource("failed");
       jamLocal.error = error.what(); jamLocal.status.clear();
     }
+#ifdef _WIN32
+    if (resourceTransfer && !resourceTransfer->retiredPack.empty())
+      jamLocal.retiredPacks.push_back(std::move(resourceTransfer->retiredPack));
+#endif
   }
 #ifdef _WIN32
   else if (const auto& transfer = jamLocal.resourceTransfer) {

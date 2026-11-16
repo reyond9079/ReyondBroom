@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cstdint>
 #include <exception>
+#include <filesystem>
 #include <mutex>
 #include <random>
 #include <stdexcept>
@@ -55,6 +56,10 @@ struct ResourceTransfer {
   std::atomic<Clock::time_point> lastLocalProgress{Clock::now()};
   std::atomic<bool> canceled{false}, timedOut{false};
   std::atomic<unsigned> member{0};
+#ifdef _WIN32
+  // The UI takes ownership after the resource worker finishes.
+  std::filesystem::path retiredPack;
+#endif
   struct Trace {
     std::string step;
     int detail;

@@ -34,6 +34,43 @@ int main(int argc,char** argv)
     }
     if (mode=="cancel") transfer.canceled = true;
     jam::fs::path retired;
+#ifdef _WIN32
+    if (mode=="inventory-failure") {
+      const auto root = ftebroom::filesystemPath(target);
+      const auto firstName = manifest.at("files").front().at("path").get<std::string>();
+      const auto file = root/jam::fs::u8path(firstName).make_preferred();
+      jam::writeBytes(file,"short copy");
+      transfer.localPhase(jam::ResourcePhase::Finalizing);
+      try { jam::packReceipt(root,manifest,&transfer); }
+      catch (const jam::fs::filesystem_error& error) {
+        if (transfer.member==1 && error.code().value()==ERROR_BAD_LENGTH &&
+            error.path1().generic_u8string()==firstName) return 0;
+        throw;
+      }
+      throw std::runtime_error("A mismatched installed file was not reported.");
+    }
+    if (mode=="blocked-activation") {
+      const auto root = ftebroom::filesystemPath(target);
+      const auto marker = root/"old-pack-marker";
+      const auto handle = CreateFileW(marker.c_str(),GENERIC_READ,FILE_SHARE_READ,
+                                      nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+      if (handle==INVALID_HANDLE_VALUE) throw std::runtime_error("Cannot lock a file in the old pack directory.");
+      try { jam::download(client,manifest,target,base,"jam_map",true,&transfer,&retired); }
+      catch (const jam::fs::filesystem_error& error) {
+        CloseHandle(handle);
+        bool activationFailed=false;
+        for (const auto& event : transfer.takeEvents()) {
+          if (event.step=="operation_failed" && event.detail==error.code().value()) activationFailed=true;
+        }
+        if (error.code().value()!=0 && activationFailed &&
+            jam::fs::is_regular_file(root/"old-pack-marker") &&
+            jam::fs::is_regular_file(retired/".verified-pack.json")) return 0;
+        throw;
+      }
+      CloseHandle(handle);
+      throw std::runtime_error("A locked old pack was unexpectedly replaced.");
+    }
+#endif
     jam::download(client,manifest,target,base,"jam_map",true,&transfer,mode=="replace" ? &retired : nullptr);
     if (base && !jam::installedPack(target,manifest))
       throw std::runtime_error("The installed resource pack could not be reopened.");

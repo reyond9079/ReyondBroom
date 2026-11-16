@@ -522,7 +522,9 @@ void jamBackgroundShutdown()
   drain(jamTelemetry.request);
   drain(jamLocal.work);
   drain(jamLocal.presenceWork);
+#ifdef _WIN32
   drain(jamLocal.packCleanup);
+#endif
   if (jamWorld.savedFullbright) cvars->SetString("r_fullbright",jamWorld.savedFullbright->c_str());
 }
 } // namespace

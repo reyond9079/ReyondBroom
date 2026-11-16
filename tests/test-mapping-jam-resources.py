@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import http.server
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -101,6 +102,14 @@ def check(exe, root, source, peak_limit):
             run()
             assert downloads==["/v1/pack"],downloads
             print("PASS reuses the verified installation without fetching the ZIP again")
+            if os.name == "nt":
+                cached = target/".verified-pack.json"
+                legacy = json.loads(cached.read_text())
+                del legacy["fileTimeFormat"]
+                cached.write_text(json.dumps(legacy))
+                run()
+                assert downloads==["/v1/pack"] and json.loads(cached.read_text())["fileTimeFormat"]=="win32"
+                print("PASS checks an old Windows receipt without fetching the ZIP")
             run("bad",expected=1)
             assert digest(target/"lq1/pak0.pak")==digest(source/"lq1/pak0.pak")
             assert not list(root.glob("installed.incoming-*"))
@@ -113,6 +122,24 @@ def check(exe, root, source, peak_limit):
             assert digest(replacement/"lq1/pak0.pak")==digest(source/"lq1/pak0.pak")
             assert not (replacement/"old-pack-marker").exists()
             print("PASS replacement finishes before old pack cleanup")
+            if os.name == "nt":
+                long_target = "/".join(("nested directory with spaces " + "x"*52,)*3 + ("installed",))
+                native_root = Path("\\\\?\\"+str(root))
+                try:
+                    run(destination=long_target)
+                    assert (native_root/long_target/".verified-pack.json").is_file()
+                    run(destination=long_target,mode="inventory-failure")
+                finally:
+                    subtree = native_root/long_target.split("/")[0]
+                    if subtree.is_dir():
+                        shutil.rmtree(subtree)
+                print("PASS installs on a long Windows path and reports the exact invalid member and error code")
+                blocked = root/"blocked"
+                blocked.mkdir()
+                (blocked/"old-pack-marker").write_text("keep until a verified replacement is active")
+                run(destination="blocked",mode="blocked-activation")
+                run(destination="blocked",mode="replace")
+                print("PASS returns a Windows activation error with deferred cleanup and can retry")
             assert "time limit" in run(mode="watchdog",expected=1).stderr
             print("PASS catches stalled filesystem work and renews the deadline on writes")
             assert "Canceled" in run(mode="cancel",expected=3).stderr

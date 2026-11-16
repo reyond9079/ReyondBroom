@@ -31,6 +31,12 @@ void fb_entity_targets()
     memfree(chosen);
     if(!fb_property_entity_count) fb_property_entities[fb_property_entity_count++]=0;
 }
+string fb_entity_inspector_row(int id,string key,string value)
+{
+    // The inspector edits messages on one line using the same escapes as a MAP.
+    if(fb_entity_message_key(key))value=strreplace("\n","\\n",strreplace("\\","\\\\",value));
+    return sprintf("p %i \"%s\" \"%s\"\n",id,fb_organize_escape(key),fb_organize_escape(value));
+}
 void fb_entity_publish()
 {
     static string previous="";fb_document_tick();fb_entity_targets();
@@ -52,7 +58,7 @@ void fb_entity_publish()
     for(int i=0;i<fb_property_entity_count;i++) {
         int id=fb_property_entities[i];fputs(stream,sprintf("e %i\n",id));
         int n=fb_entity_tokenize(terrain_edit(TEREDIT_ENT_GET,id));
-        for(int k=0;k<n;k+=2) fputs(stream,sprintf("p %i \"%s\" \"%s\"\n",id,fb_organize_escape(argv(k)),fb_organize_escape(argv(k+1))));
+        for(int k=0;k<n;k+=2) fputs(stream,fb_entity_inspector_row(id,argv(k),argv(k+1)));
     }
     // Usage counts and the document's definition path are independent of selection.
     for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY)fputs(stream,sprintf("u %i \"%s\"\n",fb_nodes[n].id,fb_organize_escape(fb_nodes[n].fields["classname"])));
@@ -92,7 +98,7 @@ string ReyondBroom_UIQuery(float operation,float cursor)
         for(int entry=begin;entry<min(begin+64,fb_property_entity_count);entry++) {
             int id=fb_property_entities[entry];result=strcat(result,sprintf("e %i\n",id));
             int count=fb_entity_tokenize(terrain_edit(TEREDIT_ENT_GET,id));
-            for(int field=0;field<count;field+=2)result=strcat(result,sprintf("p %i \"%s\" \"%s\"\n",id,fb_organize_escape(argv(field)),fb_organize_escape(argv(field+1))));
+            for(int field=0;field<count;field+=2)result=strcat(result,fb_entity_inspector_row(id,argv(field),argv(field+1)));
         }
     }else if(operation==2) {
         for(int node=begin;node<min(begin+128,fb_node_count);node++) {
@@ -139,7 +145,8 @@ void fb_entity_property(string operation,string key,string value)
             if(field==name)hadValue=TRUE;
         }
         if(op=="rename" && replacement!="") fields[replacement]=fields[name];
-        if(op=="set")fields[name]=replacement;
+        if(op=="set")
+            fields[name]=fb_entity_message_key(name)?fb_entity_message_text(replacement):replacement;
         if((op=="setflag" || op=="clearflag") && !hadValue && (int)fb_entity_defaults!=0)fields[name]=fb_entity_defaults[strcat(fields["classname"],"/",name)];
         if(op=="setflag")fields[name]=itos(stoi(fields[name])|stoi(replacement));
         if(op=="clearflag")fields[name]=itos(stoi(fields[name])&~stoi(replacement));

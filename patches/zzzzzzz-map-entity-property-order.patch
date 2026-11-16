@@ -1,0 +1,42 @@
+--- a/engine/gl/gl_heightmap.c
++++ b/engine/gl/gl_heightmap.c
+@@ -8702,6 +8702,7 @@
+ 	int i;
+ 	unsigned int entnum = 0;
+ 	heightmap_t *hm;
++	heightmap_t *brushmodel = NULL;
+ 	
+ 	hm = mod->terrain;
+ 	if (hm && hm->legacyterrain)
+@@ -8723,10 +8724,13 @@
+ 					hm = mod->terrain;
+                     if(hm && Cvar_Get("ftebroom_terrain_document", "0", 0, "FTEBroom")->value)
+                         VFS_PRINTF(file,"\n\"_segmentsize\" \"%g\"\n\"_minxsegment\" \"%i\"\n\"_minysegment\" \"%i\"\n\"_maxxsegment\" \"%i\"\n\"_maxysegment\" \"%i\"\n",hm->sectionsize,hm->firstsegx-CHUNKBIAS,hm->firstsegy-CHUNKBIAS,hm->maxsegx-CHUNKBIAS,hm->maxsegy-CHUNKBIAS);
+-					if (hm)
+-						for (i = 0; i < hm->numbrushes; i++)
+-							Terr_WriteBrushInfo(file, &hm->wbrushes[i]);
++					brushmodel = hm;
+ 				}
++				// TrenchBroom expects every entity property before the first brush.
++				if (brushmodel)
++					for (i = 0; i < brushmodel->numbrushes; i++)
++						Terr_WriteBrushInfo(file, &brushmodel->wbrushes[i]);
++				brushmodel = NULL;
+ 				entnum++;
+ 			}
+ 		}
+@@ -8761,12 +8765,9 @@
+ 					submod = Mod_FindName (token);
+ 
+ //					VFS_PRINTF(file, "\nBrushes for %s go here", token);
+-					hm = submod->terrain;
+-					if (hm)
++					if (submod->terrain)
+ 					{
+-						for (i = 0; i < hm->numbrushes; i++)
+-							Terr_WriteBrushInfo(file, &hm->wbrushes[i]);
+-
++						brushmodel = submod->terrain;
+ 						start = entities;
+ 					}
+ 				}

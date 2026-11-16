@@ -724,7 +724,7 @@ float(string txt, string info) CSQC_ConsoleLink =
 
 float(string cmd) CSQC_ConsoleCommand =
 {
-    fb_entity_tokenize(cmd);
+    fb_tokenize_escaped(cmd,FALSE);
     if(argv(0)=="ftebroom_test_jam_foreign"){fb_jam_foreign_pick_test(stoi(argv(1)));return TRUE;}
     if(argv(0)=="ftebroom_test_jam_hub"){fb_jam_hub_test(stoi(argv(1)));return TRUE;}
     if(argv(0)=="ftebroom_test_jam_bounds"){fb_jam_tool_test();return TRUE;}
@@ -741,7 +741,7 @@ float(string cmd) CSQC_ConsoleCommand =
         setproperty(VF_ANGLES,(vector)getproperty(VF_CL_VIEWANGLES));setproperty(VF_AFOV,fb_camera_zoom);
         fb_view_prepare();
     }
-    fb_entity_tokenize(cmd);
+    fb_tokenize_escaped(cmd,FALSE);
     if(argv(0)=="ftebroom_view_reset") {fb_view_reset();return TRUE;}
     if(argv(0)=="ftebroom_test_terrain32"){fb_terrain_test32(stoi(argv(1)));return TRUE;}
     if(argv(0)=="ftebroom_test_terrain"){fb_terrain_test(stoi(argv(1)));return TRUE;}

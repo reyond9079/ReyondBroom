@@ -70,6 +70,13 @@ float fb_entity_testcommand()
     fb_entity_property("clearflag","spawnflags","2");
     fb_entity_expect(fb_entity_field(player,"spawnflags")=="0" && fb_entity_field(light,"spawnflags")=="8","flags_clear_only_requested_bit");
     fb_selection_clear();fb_entity_property("set","message","Entity test map");fb_entity_expect(fb_entity_field(0,"message")=="Entity test map","unselected_edits_worldspawn");
+    fb_entity_property("set","message","First\\n\\nSecond \\\\nLiteral");
+    string worldMessage=fb_entity_field(0,"message");
+    fb_entity_expect(worldMessage=="First\n\nSecond \\nLiteral" &&
+        fb_map_quote(worldMessage)=="\"First\\n\\nSecond \\\\nLiteral\"","message_paragraphs_survive_export");
+    int messageFields=fb_entity_tokenize("\"message2\" \"First\\nSecond\" \"noise\" \"misc\\next.wav\"");
+    fb_entity_expect(messageFields==4 && argv(1)=="First\nSecond" && argv(3)=="misc\\next.wav","numbered_messages_preserve_path_escapes");
+    fb_entity_property("set","message","Entity test map");
     fb_createbox('256 0 64','64 64 64');fb_createbox('384 0 64','64 64 64');
     fb_entity_create("func_door",TRUE,'0 0 0');fb_document_tick();int door=-1;
     for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY && fb_nodes[n].name=="func_door")door=fb_nodes[n].id;

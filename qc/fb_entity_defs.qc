@@ -17,7 +17,7 @@ void fb_entity_definitions_load()
     if(fb_entity_kinds)hash_destroytab(fb_entity_kinds);fb_entity_kinds=hash_createtab(256,EV_INTEGER);
     if(fb_entity_definition_index)hash_destroytab(fb_entity_definition_index);fb_entity_definition_index=hash_createtab(256,EV_INTEGER);
     string line;while((line=fgets(stream))) {
-        int count=fb_entity_tokenize(line);
+        int count=fb_tokenize_escaped(line,FALSE);
         if(count==3 && argv(0)=="kind"){fb_entity_kinds[argv(1)]=stoi(argv(2))+1i;continue;}
         if(count==4 && argv(0)=="property"){
             // Definitions without a default still appear in the native inspector.

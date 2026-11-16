@@ -113,7 +113,7 @@ void fb_visual_prepare()
         return;
     }
     strunzone(fb_visual_pick_key);fb_visual_pick_key=strzone(key);fb_visual_pick_time=gettime(0);
-    if(fb_pick(pixel)>0 && fb_hits[0].kind!=FB_HIT_HANDLE) {
+    if(fb_pick_at(pixel,FB_PICK_HOVER)>0 && fb_hits[0].kind!=FB_HIT_HANDLE) {
         fb_visual_hover=fb_selection_target(fb_hits[0].node);
         if(fb_selection_selected(fb_visual_hover)) fb_visual_spikes=TRUE;
     }

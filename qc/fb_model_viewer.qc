@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-vector(float model,float sequence,float mode) editor_model_info = #0:editor_model_info;
 entity fb_modelviewer_entity;
 string fb_modelviewer_path;
 float fb_modelviewer_skeleton;

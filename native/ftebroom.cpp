@@ -298,8 +298,7 @@ static void worldOpen();
 namespace {
 void jamWorldLabels()
 {
-  if (!jamWorld.active || jamWorld.lastScene.empty() || !jamWorld.state.contains("plots")) return;
-  const auto own=jamWorldCenter(jamWorld.activePlot);
+  if (!jamWorld.active || jamPose.avatars.empty()) return;
   const auto now=std::chrono::steady_clock::now();
   for (int view=0;view<viewLayout;view++) {
     rbviewport::Projection projection;
@@ -307,20 +306,15 @@ void jamWorldLabels()
     const auto rect=viewRects[view];
     auto* draw=ImGui::GetBackgroundDrawList();
     draw->PushClipRect({rect.x,rect.y},{rect.x+rect.w,rect.y+rect.h},true);
-    for (const auto& other:jamWorld.state.at("plots")) {
-      const auto plot=jamField(other,"plot");
-      if (plot==jamWorld.activePlot || !jamWorldPlot(plot) || !other.contains("player")) continue;
-      const auto center=jamWorldCenter(plot);
-      const auto& player=other.at("player");
-      const auto name=jamField(player,"nickname");
-      const auto& pose=player.at("pose");
-      if (name.empty() || !pose.is_array() || pose.size()!=4) continue;
-      rbviewport::V point{pose[0].get<float>()+center[0]-own[0],pose[1].get<float>()+center[1]-own[1],
-                          pose[2].get<float>()+22};
+    for (const auto& avatar:jamPose.avatars) {
+      const auto& name=avatar.nickname;
+      const auto& pose=avatar.pose;
+      if(name.empty())continue;
+      rbviewport::V point{pose[0],pose[1],pose[2]+22};
       ImVec2 where;
       if (!projection.project(point,where.x,where.y)) continue;
       const auto size=ImGui::CalcTextSize(name.c_str());
-      if (const auto* message=jamChatBubble(jamField(player,"accountId"),now)) {
+      if (const auto* message=jamChatBubble(avatar.account,now)) {
         auto* font=ImGui::GetFont();
         const auto fontSize=ImGui::GetFontSize();
         const float wrap=std::min(250*uiScale(),rect.w*.72f);

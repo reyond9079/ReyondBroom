@@ -236,6 +236,17 @@ inline std::string sha256(std::string_view bytes)
   return result;
 }
 
+struct PoseHttpConnection {
+  void *session=nullptr,*host=nullptr;
+#ifdef _WIN32
+  decltype(&WinHttpCloseHandle) closeHandle=nullptr;
+  ~PoseHttpConnection() { if(host)closeHandle(host);if(session)closeHandle(session); }
+#else
+  void (*closeHandle)(CURL*)=nullptr;
+  ~PoseHttpConnection() { if(session)closeHandle(static_cast<CURL*>(session)); }
+#endif
+};
+
 #ifndef _WIN32
 template<class T> inline T curlSymbol(void* library, const char* name)
 {
@@ -246,7 +257,8 @@ template<class T> inline T curlSymbol(void* library, const char* name)
 
 inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& method,
                                  const std::string& path, const std::string& headers,
-                                 const std::string& body, std::size_t limit, ResourceTransfer* transfer)
+                                 const std::string& body, std::size_t limit, ResourceTransfer* transfer,
+                                 PoseHttpConnection* persistent)
 {
   static auto* const library = dlopen("libcurl.so.4", RTLD_NOW | RTLD_LOCAL);
   static const auto globalInit = curlSymbol<decltype(&curl_global_init)>(library,"curl_global_init");
@@ -259,9 +271,15 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
   static const auto info = curlSymbol<decltype(&curl_easy_getinfo)>(library,"curl_easy_getinfo");
   static const auto append = curlSymbol<decltype(&curl_slist_append)>(library,"curl_slist_append");
   static const auto freeList = curlSymbol<decltype(&curl_slist_free_all)>(library,"curl_slist_free_all");
-  struct Handle { CURL* value; ~Handle() { if (value) cleanup(value); } } handle{init()};
+  if(persistent && !persistent->session) {
+    persistent->closeHandle=cleanup;
+    persistent->session=init();
+  }
+  struct Handle { CURL* value; bool owns; ~Handle() { if (value && owns) cleanup(value); } }
+    handle{persistent ? static_cast<CURL*>(persistent->session) : init(), !persistent};
   struct Headers { curl_slist* value = nullptr; ~Headers() { freeList(value); } } list;
   if (!handle.value) throw std::runtime_error("Cannot start the Mapping Jam HTTPS client.");
+  if(persistent) curlSymbol<decltype(&curl_easy_reset)>(library,"curl_easy_reset")(handle.value);
   for (std::size_t pos = 0; pos < headers.size();) {
     const auto next = headers.find("\r\n",pos);
     const auto line = headers.substr(pos,next-pos);
@@ -296,13 +314,19 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
     catch (...) { return 0; }
     return length;
   };
-  const auto url = "https://"+endpoint.hostname+path;
+  const auto url = endpoint.hostname.empty() ? "http://127.0.0.1:"+std::to_string(endpoint.port)+path : "https://"+endpoint.hostname+path;
   configure(CURLOPT_URL,url.c_str());
+  if(endpoint.hostname.empty()) configure(CURLOPT_NOPROXY,"*");
   configure(CURLOPT_FOLLOWLOCATION,0L);
   configure(CURLOPT_SSL_VERIFYPEER,1L);
   configure(CURLOPT_SSL_VERIFYHOST,2L);
   configure(CURLOPT_CONNECTTIMEOUT,6L);
   configure(CURLOPT_TIMEOUT,method=="GET" && limit>512*1024 ? 600L : 60L);
+  if(persistent) {
+    configure(CURLOPT_CONNECTTIMEOUT_MS,1500L);
+    configure(CURLOPT_TIMEOUT_MS,2000L);
+    configure(CURLOPT_TCP_NODELAY,1L);
+  }
   configure(CURLOPT_LOW_SPEED_LIMIT,128L);
   configure(CURLOPT_LOW_SPEED_TIME,30L);
   configure(CURLOPT_NOSIGNAL,1L);
@@ -340,13 +364,14 @@ inline HttpResponse requestHttps(const Endpoint& endpoint, const std::string& me
 
 inline HttpResponse request(const Endpoint& endpoint, const std::string& method, const std::string& path,
                             const std::string& token, const std::string& key, const std::string& body,
-                            std::size_t limit, ResourceTransfer* transfer = nullptr)
+                            std::size_t limit, ResourceTransfer* transfer = nullptr,
+                            PoseHttpConnection* persistent = nullptr)
 {
   const unsigned port = endpoint.port;
   const bool secure = !endpoint.hostname.empty();
   if (!safePath(path) || (secure ? port != 443 : (port < 1024 || port > 65535)))
     throw std::runtime_error("Invalid Mapping Jam endpoint.");
-  std::string headers = "Connection: close\r\n";
+  std::string headers = persistent ? "Connection: keep-alive\r\n" : "Connection: close\r\n";
   if (!token.empty()) headers += "Authorization: Bearer " + token + "\r\n";
   if (!key.empty()) headers += "Idempotency-Key: " + key + "\r\n";
   if (method != "GET") headers += std::string("Content-Type: ") +
@@ -372,15 +397,26 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
     decltype(close) release;
     ~Handle() { if (value) release(value); }
   };
-  Handle session{open(L"ReyondBroom Mapping Jams", WINHTTP_ACCESS_TYPE_NO_PROXY, nullptr, nullptr, 0), close};
-  const int ioTimeout = transfer ? 5000 : 12000;
-  if (!session.value || !timeout(session.value, 3000, 3000, ioTimeout, ioTimeout))
+  Handle session{nullptr,close},host{nullptr,close};
+  auto sessionHandle=persistent ? persistent->session : nullptr;
+  if(!sessionHandle) {
+    session.value=open(L"ReyondBroom Mapping Jams", WINHTTP_ACCESS_TYPE_NO_PROXY, nullptr, nullptr, 0);
+    const int ioTimeout = persistent ? 1800 : transfer ? 5000 : 12000;
+    if (!session.value || !timeout(session.value, persistent?1500:3000,persistent?1500:3000,ioTimeout,ioTimeout))
     throw std::runtime_error("Cannot start the local HTTP client.");
-  const std::wstring hostname = secure ? std::wstring(endpoint.hostname.begin(),endpoint.hostname.end()) : L"127.0.0.1";
-  Handle host{connect(session.value, hostname.c_str(), static_cast<INTERNET_PORT>(port), 0), close};
-  if (!host.value) throw std::runtime_error("Cannot open the Mapping Jam server.");
+    sessionHandle=session.value;
+    if(persistent) {persistent->closeHandle=close;persistent->session=std::exchange(session.value,nullptr);}
+  }
+  auto hostHandle=persistent ? persistent->host : nullptr;
+  if(!hostHandle) {
+    const std::wstring hostname = secure ? std::wstring(endpoint.hostname.begin(),endpoint.hostname.end()) : L"127.0.0.1";
+    host.value=connect(sessionHandle, hostname.c_str(), static_cast<INTERNET_PORT>(port), 0);
+    if (!host.value) throw std::runtime_error("Cannot open the Mapping Jam server.");
+    hostHandle=host.value;
+    if(persistent) persistent->host=std::exchange(host.value,nullptr);
+  }
   const std::wstring verb(method.begin(), method.end()), route(path.begin(), path.end());
-  Handle req{openRequest(host.value, verb.c_str(), route.c_str(), nullptr, nullptr, nullptr,
+  Handle req{openRequest(hostHandle, verb.c_str(), route.c_str(), nullptr, nullptr, nullptr,
                          secure ? WINHTTP_FLAG_SECURE : 0), close};
   DWORD disabled = WINHTTP_DISABLE_REDIRECTS | WINHTTP_DISABLE_COOKIES | WINHTTP_DISABLE_AUTHENTICATION;
   const std::wstring wideHeaders(headers.begin(), headers.end());
@@ -422,7 +458,7 @@ inline HttpResponse request(const Endpoint& endpoint, const std::string& method,
   if (hasLength && result.body.size() != expected)
     throw DownloadInterrupted("The Mapping Jam download was incomplete.");
 #else
-  if (secure) return requestHttps(endpoint,method,path,headers,body,limit,transfer);
+  if (secure || persistent) return requestHttps(endpoint,method,path,headers,body,limit,transfer,persistent);
   struct Socket { int value; ~Socket() { if (value >= 0) close(value); } };
   Socket client{socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)};
   sockaddr_in host{};

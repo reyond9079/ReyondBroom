@@ -7,6 +7,7 @@ vector *fb_jam_uv;
 int fb_jam_faces_count,fb_jam_vertices_count;
 .entity fb_jam_next;
 entity fb_jam_models;
+entity fb_jam_players[25];
 int fb_jam_scene_seen;
 
 void fb_jam_scene_clear()
@@ -122,7 +123,7 @@ void fb_jam_scene_load()
             setmodel(item,model);
             if(!item.modelindex){remove(item);continue;}
             item.solid=SOLID_NOT;
-            item.origin=position;item.angles_y=yaw;if (model=="progs/player.mdl") item.effects=EF_FULLBRIGHT;
+            item.origin=position;item.angles_y=yaw;
             item.fb_jam_next=fb_jam_models;fb_jam_models=item;
         }
         if(argv(0)=="face" && argc==3 && fb_jam_faces_count<32768){
@@ -141,6 +142,31 @@ void fb_jam_scene_load()
         }
     }
     fclose(file);
+}
+
+void fb_jam_draw_players()
+{
+    string poses=cvar_string("ftebroom_jam_players");
+    int start=0;
+    while(start<strlen(poses)) {
+        int end=strstrofs(poses,";",start);
+        if(end<0)break;
+        int fields=tokenize(substring(poses,start,end-start));
+        start=end+1;
+        if(fields!=5)continue;
+        int slot=stoi(argv(0));
+        if(slot<0 || slot>=25)continue;
+        entity avatar=fb_jam_players[slot];
+        if(!avatar) {
+            avatar=spawn();setmodel(avatar,"progs/player.mdl");
+            if(!avatar.modelindex){remove(avatar);continue;}
+            avatar.solid=SOLID_NOT;avatar.effects=EF_FULLBRIGHT;
+            fb_jam_players[slot]=avatar;
+        }
+        avatar.origin=[stof(argv(1)),stof(argv(2)),stof(argv(3))];
+        avatar.angles_y=stof(argv(4));
+        addentity(avatar);
+    }
 }
 
 void fb_jam_border(vector center, float halfSize,vector colour)
@@ -171,6 +197,7 @@ void fb_jam_world_draw()
     }
     fb_jam_border('4096 -4096 0'-own,3072,'.7 .45 .99');
     if(cvar("ca_brush_view"))return;
+    fb_jam_draw_players();
     for(entity item=fb_jam_models;item;item=item.fb_jam_next)addentity(item);
     for(int i=0;i<fb_jam_faces_count;i++){
         fb_jam_face_t *face=&fb_jam_faces[i];

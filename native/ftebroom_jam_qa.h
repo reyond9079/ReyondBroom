@@ -25,6 +25,7 @@ bool jamQaWorldTransitions()
   static auto captureAt=steady_clock::time_point{};
   const bool testHub=std::getenv("REYONDBROOM_JAM_QA_HUB")!=nullptr;
   const bool testChat=std::getenv("REYONDBROOM_JAM_QA_CHAT")!=nullptr;
+  const bool testPose=std::getenv("REYONDBROOM_JAM_QA_POSE")!=nullptr;
   if (step<0) return true;
   const auto signals=JamFs::u8path(directory);
   const auto received=[&](const char* signal) { return JamFs::is_regular_file(signals/signal); };
@@ -88,6 +89,45 @@ bool jamQaWorldTransitions()
         }
         initialHubModel=jamWorld.hub.model;
         initialHubVersion=jamWorld.hub.version;
+      }
+      if(testPose && step==2) {
+        static bool moving=false;
+        static auto poseStart=steady_clock::time_point{};
+        static unsigned firstSamples=0,displayed=0;
+        static int firstScene=0;
+        static float lastPosition=0,largestStep=0;
+        const bool author=std::string_view(ownPlot)==authorPlot;
+        if(author) {
+          if(!received("pose-ready"))return true;
+          if(!moving) {
+            command("set ftebroom_fly_speed 180\nset ftebroom_test_motion \"0 1 0\"\n");
+            send("pose-moving");moving=true;
+          }
+          if(!received("pose-done"))return true;
+          command("set ftebroom_test_motion \"\"\n");
+        } else if(!received("pose-done")) {
+          if(jamPose.avatars.empty() || jamWorld.lastScene.find("face ")==std::string::npos)return true;
+          if(!received("pose-ready"))send("pose-ready");
+          if(!received("pose-moving"))return true;
+          const float position=jamPose.avatars.front().pose[1];
+          const auto now=steady_clock::now();
+          if(poseStart==steady_clock::time_point{}) {
+            poseStart=now;firstSamples=jamPose.accepted;firstScene=jamWorld.scene;lastPosition=position;
+          } else if(std::abs(position-lastPosition)>.001f) {
+            largestStep=std::max(largestStep,std::abs(position-lastPosition));
+            lastPosition=position;++displayed;
+          }
+          const auto elapsed=duration<double>(now-poseStart).count();
+          if(elapsed<3.4)return true;
+          const auto samples=jamPose.accepted-firstSamples;
+          const auto rate=samples/elapsed;
+          if(rate<9.8 || rate>15.2 || displayed<samples*1.35 || largestStep>30 || jamWorld.scene!=firstScene)
+            throw std::runtime_error("Pose rate/smoothness/scene QA: rate="+std::to_string(rate)+" frames="+
+              std::to_string(displayed)+" maxstep="+std::to_string(largestStep)+" scene_delta="+std::to_string(jamWorld.scene-firstScene));
+          core->Print(("FTEBROOM_JAM_POSE_PASS rate="+std::to_string(rate)+" frames="+std::to_string(displayed)+
+                      " maxstep="+std::to_string(largestStep)+" scene_delta=0\n").c_str());
+          send("pose-done");
+        }
       }
       const auto hubUpdated=[&] {
         if (!testHub) return true;

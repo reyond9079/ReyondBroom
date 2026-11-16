@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <locale>
 #include "ftebroom_jam_chat.h"
+#include "ftebroom_jam_pose.h"
 
 namespace {
 struct JamWorldPreview {
@@ -14,13 +15,14 @@ struct JamWorldHub {
 };
 struct JamWorldState {
   std::future<JamJson> sync, content;
+  std::future<void> uploadDraft;
   std::future<JamWorldHub> hubCheck;
   std::chrono::steady_clock::time_point nextSync, nextContent, captureDeadline, nextCapture, nextHubCheck;
   JamJson state, draft;
   std::map<std::string,JamWorldPreview> previews;
   std::map<std::string,std::string> online;
-  std::string outgoingMode, activePlot, document, lastScene, session;
-  std::string syncSession, contentSession, hubSession, requestedPlot, requestedMode, requestedRevision;
+  std::string outgoingMode, activePlot, document, lastScene, sceneKey, session, draftDocument;
+  std::string syncSession, syncDocument, readyDocument, contentSession, hubSession, requestedPlot, requestedMode, requestedRevision;
   std::optional<std::string> savedFullbright;
   JamWorldHub hub;
   std::chrono::steady_clock::time_point lastSync;
@@ -168,6 +170,14 @@ void jamWorldPresence(const JamJson& state)
 
 void jamWriteWorldScene(const std::string& local)
 {
+  std::string key=local+"|"+jamWorld.hub.model;
+  for(const auto& other:jamWorld.state.at("plots")) {
+    const auto plot=jamField(other,"plot"),revision=jamField(other,"revision");
+    const auto cached=jamWorld.previews.find(plot);
+    if(plot!=local && cached!=jamWorld.previews.end() && cached->second.revision==revision)
+      key+="|"+plot+":"+revision+":"+cached->second.model;
+  }
+  if(key==jamWorld.sceneKey)return;
   std::ostringstream scene;
   scene.imbue(std::locale::classic());
   scene<<std::setprecision(7);
@@ -181,11 +191,6 @@ void jamWriteWorldScene(const std::string& local)
     if (plot==local || !jamWorldPlot(plot)) continue;
     auto offset=jamWorldCenter(plot);
     for (int axis=0;axis<3;axis++) offset[axis]-=own[axis];
-    if (other.contains("player")) {
-      const auto& pose=other.at("player").at("pose");
-      scene<<"model progs/player.mdl "<<pose.at(0).get<float>()+offset[0]<<' '
-        <<pose.at(1).get<float>()+offset[1]<<' '<<pose.at(2).get<float>()-20<<' '<<pose.at(3).get<float>()<<'\n';
-    }
     const auto cached=jamWorld.previews.find(plot);
     if (cached==jamWorld.previews.end() || cached->second.revision!=jamField(other,"revision")) continue;
     if (!cached->second.model.empty()) {
@@ -203,10 +208,12 @@ void jamWriteWorldScene(const std::string& local)
     }
   }
   auto result=scene.str();
-  if (result==jamWorld.lastScene) return;
-  jam::writeBytes(documentPath("data/jam-world-scene.txt"),result);
-  jamWorld.lastScene=std::move(result);
-  cvars->SetFloat("ftebroom_jam_scene",++jamWorld.scene);
+  if(result!=jamWorld.lastScene) {
+    jam::writeBytes(documentPath("data/jam-world-scene.txt"),result);
+    jamWorld.lastScene=std::move(result);
+    cvars->SetFloat("ftebroom_jam_scene",++jamWorld.scene);
+  }
+  jamWorld.sceneKey=std::move(key);
 }
 
 void jamWorldFetchContent(const std::string& local)
@@ -295,6 +302,8 @@ void jamWorldTick()
     jamWorld.state=nullptr;
     jamWorld.previews.clear();
     jamWorld.hub={};
+    jamWorld.sceneKey.clear();
+    jamWorld.readyDocument.clear();
     jamWorld.nextHubCheck={};
     jamWorld.lastSync={};
     jamWorld.nextSync={};
@@ -312,6 +321,7 @@ void jamWorldTick()
     if (!editing) {
       cvars->SetFloat("ftebroom_jam_scene",0);
       jamWorld.lastScene.clear();
+      jamWorld.sceneKey.clear();
     }
   }
   const bool ownPreview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
@@ -333,6 +343,7 @@ void jamWorldTick()
     jamWorld.activePlot=local;
     jamWorld.generation=documentGeneration;
     jamWorld.document=jam::randomHex(16);
+    jamWorld.readyDocument.clear();
     jamWorld.pendingCapture=0;
     jamWorld.captureRevision=-1;
     jamWorld.nextCapture={};
@@ -356,6 +367,8 @@ void jamWorldTick()
       if (joined && jamWorld.syncSession==session && state.contains("plots")) {
         jamChatReceive(state);
         jamWorldPresence(state);
+        if(editing) jamPoseLegacy(state,now);
+        if(editing && jamWorld.syncDocument==jamWorld.document)jamWorld.readyDocument=jamWorld.document;
         jamWorld.state=std::move(state);
         jamWorld.lastSync=now;
       }
@@ -370,6 +383,7 @@ void jamWorldTick()
   const bool compiled=editing && (cvars->GetFloat("ftebroom_bsp_preview") || buildPreviewRequested);
   if (compiled!=jamWorld.compiled) {
     jamWorld.compiled=compiled;
+    jamWorld.readyDocument.clear();
     jamWorld.pendingCapture=0;
     jamWorld.captureRevision=-1;
     jamWorld.draft=nullptr;
@@ -430,25 +444,42 @@ void jamWorldTick()
       update["chat"]={{"after",jamChat.after}};
       if (jamChat.pending) update["chat"]["send"]={{"id",jamChat.pending->id},{"text",jamChat.pending->text}};
     }
-    auto faces=canCapture ? std::exchange(jamWorld.draft,JamJson()) : JamJson();
     const auto client=jamLocal.client;
     jamWorld.outgoingMode=jamField(update,"mode");
     jamWorld.syncSession=session;
+    jamWorld.syncDocument=editing?jamWorld.document:std::string{};
     jamWorld.nextSync=now+milliseconds(750);
-    jamWorld.sync=std::async(std::launch::async,[client,update=std::move(update),faces=std::move(faces)](){
-      auto result=client.json("POST",client.prefix+"world",update);
-      if (!faces.is_null()) {
-        try {client.json("POST",client.prefix+"world/draft",{{"document",update.at("document")},{"faces",faces}});}
-        catch (const jam::Error& error) {if (error.code!="DRAFT_INACTIVE") throw;}
-      }
-      return result;
+    jamWorld.sync=std::async(std::launch::async,[client,update=std::move(update)](){
+      return client.json("POST",client.prefix+"world",update);
     });
   }
+  if(jamWorld.uploadDraft.valid() && jamWorld.uploadDraft.wait_for(milliseconds(0))==std::future_status::ready) {
+    try {jamWorld.uploadDraft.get();}
+    catch(const std::exception& error) {
+      if(canCapture && jamWorld.document==jamWorld.draftDocument) {
+        jamWorld.captureRevision=-1;
+        jamWorld.nextCapture=now+milliseconds(350);
+        const auto* problem=dynamic_cast<const jam::Error*>(&error);
+        if(!problem || (problem->code!="DRAFT_INACTIVE" && problem->code!="RATE_LIMITED"))jamWorldIssue("draft-upload",&error);
+      }
+    }
+  }
+  if(canCapture && jamWorld.readyDocument==jamWorld.document && !jamWorld.uploadDraft.valid() && !jamWorld.draft.is_null()) {
+    auto faces=std::exchange(jamWorld.draft,JamJson());
+    const auto client=jamLocal.client;
+    jamWorld.draftDocument=jamWorld.document;
+    jamWorld.uploadDraft=std::async(std::launch::async,[client,document=jamWorld.draftDocument,faces=std::move(faces)] {
+      client.json("POST",client.prefix+"world/draft",{{"document",document},{"faces",faces}});
+    });
+  }
+  const auto poseInterval=jamWorld.state.is_object()?jamWorld.state.value("poseIntervalMs",0):0;
+  jamPoseTick(editing,jamLocal.client,jamWorld.document,local,poseInterval,now);
   if (editing && jamWorld.state.contains("plots") && now-jamWorld.lastSync<seconds(15)) {
     try {jamWorldFetchContent(local);jamWorldRefreshHub();jamWriteWorldScene(local);}
     catch (const std::exception& error) {jamWorldIssue("scene",&error);}
   } else if (editing && !jamWorld.lastScene.empty()) {
     jamWorld.lastScene.clear();
+    jamWorld.sceneKey.clear();
     cvars->SetFloat("ftebroom_jam_scene",0);
   }
 }
@@ -484,6 +515,8 @@ void jamBackgroundShutdown()
   jamLocal.resourceProcess.stop();
 #endif
   drain(jamWorld.sync);
+  drain(jamWorld.uploadDraft);
+  for(auto& lane:jamPose.lanes)drain(lane.work);
   drain(jamWorld.content);
   drain(jamWorld.hubCheck);
   drain(jamTelemetry.request);

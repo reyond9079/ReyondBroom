@@ -700,9 +700,9 @@ struct ClothingAxes {
     return mul(outward,weight*std::clamp(clearance,0.,.19));
   }
 
-  Vec3 collarClearance(const Vec3& base,const Vec3& anchor) const {
+  Vec3 collarClearance(const Vec3& base,const Vec3& anchor,double collarBase) const {
     const auto width=std::abs(base[0]);
-    const auto weight=smoothBand(13.25,13.86,base[1])*(1-smoothBand(14.16,14.66,base[1]))*
+    const auto weight=smoothBand(collarBase,collarBase+.61,base[1])*(1-smoothBand(14.16,14.66,base[1]))*
                       (1-smoothBand(.68,1.25,width));
     if (weight==0) return {};
     const auto axis=unit(sub(neckTop,neckBase));
@@ -787,6 +787,7 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
   const auto& hairstyle = hairstyles[doc.hairstyle];
   const auto scalpEdge = *hat ? 0. : scalpHairEdge(hairstyle);
   const bool openCollar = doc.customWardrobe.empty() && (doc.outfit==1 || doc.outfit==4 || doc.outfit==7 || doc.outfit==8);
+  const auto collarBase = std::string_view(outfit.clothes)=="male_casualsuit01" ? 12.85 : 13.25;
   const bool closedCasualShoulders = outfit.utilityCut || std::string_view(outfit.clothes)=="male_casualsuit03";
   std::vector<int> eyeSide(points.size());
   for (const auto& face : rig.triangles) if (face.material==1)
@@ -874,7 +875,7 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
         vertex.position = add(vertex.position,axes->utilityEase(entry.vertex.position));
       if (material==3 && !axes)
         vertex.position = add(vertex.position,add(garmentAxes.sleeveClearance(entry.vertex.position,anchor),
-                                                  garmentAxes.collarClearance(entry.vertex.position,anchor)));
+                                                  garmentAxes.collarClearance(entry.vertex.position,anchor,collarBase)));
       if (material==4 && outfit.utilityCut && !doc.footwear)
         vertex.position = add(vertex.position,ClothingAxes::utilityBoot(entry.vertex.position));
       if (style || material==6) {

@@ -71,9 +71,9 @@ package into the disposable test directory and call `validateBytes` on
 `character.glb`. The npm package is a development tool.
 
 Use `--catalog-only` with `test-character-placement.py` to select ten presets,
-inspect each tab and check pixel changes while scrubbing a walking sequence.
-The script captures the actual preview and verifies that the retired preset
-is absent from the menu.
+inspect each tab and render all thirteen outfits, eight hairstyles and four
+beard choices. The script captures the actual preview, checks pixel changes
+while scrubbing a walking sequence and checks that the retired preset is absent.
 
 Native smoke runs use a copy of the editor with `runtime/characters` installed
 as `ftebroom/characters`. Start the editor, use **Plugins > Character Creator**

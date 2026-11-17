@@ -32,7 +32,7 @@ def world_pose(parents, local):
     return result
 
 
-def glb(path):
+def glb(path, vertex_reference=None):
     data = path.read_bytes()
     magic, version, length, json_size, json_magic = struct.unpack_from("<4sIII4s", data)
     assert (magic, version, length, json_magic) == (b"glTF", 2, len(data), b"JSON")
@@ -54,7 +54,8 @@ def glb(path):
         return list(fmt.iter_unpack(binary[start:start+size]))
 
     skin, = doc["skins"]
-    assert len(skin["joints"]) == len(accessor(skin["inverseBindMatrices"])) == 79
+    inverse_bind = accessor(skin["inverseBindMatrices"])
+    assert len(skin["joints"]) == len(inverse_bind) == 79
     mesh, = doc["meshes"]
     attrs = mesh["primitives"][0]["attributes"]
     joints, weights = accessor(attrs["JOINTS_0"]), accessor(attrs["WEIGHTS_0"])
@@ -106,6 +107,21 @@ def glb(path):
                        "gear.head":"head", "gear.back":"spine03"}
     rest = [node["translation"] for node in doc["nodes"][:79]]
     poses = {}
+    largest_vertex_error = 0.
+    if vertex_reference:
+        positions = accessor(attrs["POSITION"])
+        target = accessor(mesh["primitives"][0]["targets"][0]["POSITION"])
+        skinned_samples = []
+        for i in vertex_reference["indices"]:
+            point = tuple(a + b for a,b in zip(positions[i],target[i]))
+            influences = []
+            for joint, weight in zip(joints[i],weights[i]):
+                if weight:
+                    inverse = inverse_bind[joint]
+                    local = tuple(inverse[row]*point[0]+inverse[4+row]*point[1]+
+                                  inverse[8+row]*point[2]+inverse[12+row] for row in range(3))
+                    influences.append((joint,weight,local))
+            skinned_samples.append(influences)
     for clip in doc["animations"]:
         changed = False
         local = {}
@@ -128,7 +144,26 @@ def glb(path):
             changed |= any(a != b for a,b in zip(keys,keys[1:]))
         assert changed, clip["name"]
         poses[clip["name"]] = {frame:world_pose(parents,pose) for frame,pose in local.items()}
+        if vertex_reference:
+            expected = vertex_reference["clips"][clip["name"]]
+            for frame,pose in poses[clip["name"]].items():
+                wanted_frame = expected[str(frame)]
+                assert len(wanted_frame) == len(skinned_samples)
+                for influences, wanted in zip(skinned_samples,wanted_frame):
+                    point = [0.,0.,0.]
+                    for joint,weight,bind_local in influences:
+                        p,q = pose[joint]
+                        rotated = rotate(q,bind_local)
+                        for axis in range(3):
+                            point[axis] += (p[axis]+rotated[axis])*weight
+                    error = math.dist(point,wanted)
+                    assert math.isfinite(error)
+                    largest_vertex_error = max(largest_vertex_error,error)
     assert rotations > 70
+    if vertex_reference:
+        assert largest_vertex_error < .0001, largest_vertex_error
+        print(f"PASS independent GLB skinning of {len(skinned_samples)} source vertices across all clips, "
+              f"max error {largest_vertex_error:.8f} m")
     return list(poses),poses
 
 
@@ -319,7 +354,8 @@ if __name__ == "__main__":
     parser.add_argument("iqm",type=Path)
     parser.add_argument("--legacy",type=Path)
     args = parser.parse_args()
-    names,poses = glb(args.glb)
+    reference = json.loads((args.legacy/"glb-vertex-reference.json").read_text()) if args.legacy else None
+    names,poses = glb(args.glb,reference)
     assert len(set(names)) >= 25 and names == iqm(args.iqm,poses)
     print(f"PASS independent GLB and IQM decoding with {len(names)} named, moving clips")
     if args.legacy:

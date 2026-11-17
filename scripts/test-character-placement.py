@@ -347,7 +347,11 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             click("character/tab-body")
             wait(lambda:len([k for k in live()["widgets"] if k.startswith("character/morph/")])==14)
             test_controls()
+            panel = live()["widgets"]["character/morph/calf"]["clip"]
+            ui.move((panel[0]+panel[2])*.5,(panel[1]+panel[3])*.5)
+            ui.scroll(30)
             click("character/tab-wardrobe")
+            wait(lambda:state()["tab"]==3)
             choose("character/hairstyle",0)
             wait(lambda:state()["hairstyle"]==0 and fitted())
             click("character/tab-face")
@@ -501,6 +505,10 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             wait(lambda:state()["path"] and not state()["dirty"])
             check(Path(state()["path"])==path,"Open can discard local changes and reopen the saved source")
             click("character/tab-export")
+            choose("character/export-target",3)
+            click("character/export-selected")
+            check(not live()["widgets"].get("file-choose",{}).get("visible"),
+                  "Quake MDL export is disabled while the Quake III map supplies no Quake palette")
             choose("character/export-target",2)
             click("character/save")
             wait(lambda:json.loads(path.read_text(encoding="utf-8")).get("exportProfile")=="fte")
@@ -518,8 +526,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             check(export_path.read_bytes().startswith(b"INTERQUAKEMODEL\0") and live()["profile"]==0,
                   "Reopened character uses its selected FTE export target without switching map profile")
             click("character/tab-body")
-            click("character/clip")
-            click("character/clip/walk_forward")
+            choose("character/clip","walk_forward")
             wait(lambda:state()["clip"]=="walk_forward")
             click("character/frame-forward")
             wait(lambda:0<state()["time"]<.1 and not state()["playing"])

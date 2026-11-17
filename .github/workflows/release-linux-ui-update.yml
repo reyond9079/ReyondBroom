@@ -46,11 +46,15 @@ run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
         description: Successful build run for the exact candidate checked by the acceptance run
         type: string
         default: ''
+      rb21_evidence_commit:
+        description: Child commit containing the reviewed QA evidence for this source revision
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
   plan:
-    if: inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == ''
+    if: inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == '' && inputs.rb21_evidence_commit == ''
     uses: ./.github/workflows/ci-plan.yml
     with:
       base: ${{ inputs.validation_base }}
@@ -472,7 +476,7 @@ jobs:
     needs: plan
 
   upload-draft:
-    if: inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != ''
+    if: inputs.rb21_evidence_commit == '' && (inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
     runs-on: ubuntu-24.04
     environment: rb21-release
     permissions:
@@ -520,3 +524,57 @@ jobs:
       run: |
         test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
         gh release upload "v$VERSION" release-packages/release-packages-*/* --clobber
+
+  import-rb21-evidence:
+    if: inputs.rb21_evidence_commit != '' && inputs.rb21_evidence_run_id == '' && github.actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PROOF_COMMIT: ${{ inputs.rb21_evidence_commit }}
+      CANDIDATE_RUN: ${{ inputs.rb21_candidate_run_id }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Verify candidate run and extract evidence files
+      shell: bash
+      run: |
+        [[ "$PROOF_COMMIT" =~ ^[0-9a-f]{40}$ && "$CANDIDATE_RUN" =~ ^[0-9]+$ ]]
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" | \
+          jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
+            '.head_sha == $sha and .conclusion == "success" and .head_repository.full_name == $repo'
+        git fetch --no-tags --depth=2 origin "$PROOF_COMMIT"
+        test "$(git rev-list --parents -n1 "$PROOF_COMMIT")" = "$PROOF_COMMIT $GITHUB_SHA"
+        proof="$PROOF_COMMIT:qa/rb-21/evidence"
+        git ls-tree -r "$proof" > proof-files.txt
+        test -s proof-files.txt
+        awk '$1 != "100644" || $2 != "blob" {exit 1}' proof-files.txt
+        mkdir acceptance
+        git archive "$proof" | tar -x -C acceptance
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: release-packages-*
+        github-token: ${{ github.token }}
+        run-id: ${{ inputs.rb21_candidate_run_id }}
+        path: release-packages
+    - name: Validate evidence and package digests
+      shell: bash
+      run: |
+        python3 - <<'PY'
+        from datetime import datetime, timezone
+        from pathlib import Path
+        import os
+        import runpy
+
+        verifier = runpy.run_path("scripts/check-character-release.py")
+        for platform in verifier["PLATFORMS"]:
+            verifier["validate"](Path("acceptance"), Path("release-packages/release-packages-" + platform),
+                                 os.environ["GITHUB_SHA"], platform, datetime.now(timezone.utc))
+        PY
+    - uses: actions/upload-artifact@v4
+      with:
+        name: rb21-release-evidence
+        path: acceptance
+        if-no-files-found: error
+        retention-days: 7

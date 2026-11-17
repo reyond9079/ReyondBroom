@@ -48,6 +48,14 @@ timestamp, a PASS result and hashed proof files for every ID listed in
 The development report above records partial results for diagnosis. Acceptance
 needs the complete report and the required real application and game evidence.
 
+To register the reviewed evidence, put the report and its hashed files in
+`qa/rb-21/evidence` in a separate child commit of the candidate. Keep private
+paths, credentials and account information out of the evidence. Dispatch the
+native release workflow from the candidate ref with its build run ID and the
+`rb21_evidence_commit` SHA. This checks the report against the candidate's
+packages and uploads `rb21-release-evidence`. Use that successful run as the
+evidence run for the draft upload.
+
 Before any draft upload, the workflow checks both runs, the archive hashes,
 and the repository owner's GitHub approval for the `rb21-release` environment.
 Configure that environment with the owner as required reviewer and protect the
@@ -82,6 +90,8 @@ Use `--catalog-only` with `test-character-placement.py` to select ten presets,
 inspect each tab and render all thirteen outfits, eight hairstyles and four
 beard choices. The script captures the actual preview, checks pixel changes
 while scrubbing a walking sequence and checks that the retired preset is absent.
+On X11, use `--morph-sweep` to click and drag each of the 48 sliders, compare
+the saved values at both endpoints and capture both poses in the live viewport.
 
 Native smoke runs use a copy of the editor with `runtime/characters` installed
 as `ftebroom/characters`. Start the editor, use **Plugins > Character Creator**

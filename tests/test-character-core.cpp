@@ -80,6 +80,36 @@ static void exerciseSkinnedPoses(const Humanoid& fitted) {
             << std::size(clips) << " clips, max error " << maxError << " authoring units\n";
 }
 
+static Json glbVertexReference(const Humanoid& base, const Document& doc, const GlbExpression& expression) {
+  std::array<std::set<unsigned>,materialCount> materialVertices;
+  for (const auto& triangle : base.triangles)
+    materialVertices[triangle.material].insert(triangle.indices.begin(),triangle.indices.end());
+  std::set<unsigned> samples;
+  for (const auto& indices : materialVertices) {
+    const unsigned stride = std::max<std::size_t>(1,indices.size()/16);
+    unsigned i = 0;
+    for (const auto index : indices) if (i++%stride==0) samples.insert(index);
+  }
+  const double metres = bodyScale(doc)*.1;
+  const Animator animator(base);
+  Json output{{"indices",samples},{"clips",Json::object()}};
+  for (const auto& clip : clips) {
+    const unsigned steps = unsigned(std::ceil(30*clip.seconds));
+    const unsigned count = steps+1-unsigned(clip.loop);
+    for (const auto frame : {0u,count/4,count/2,count*3/4,count-1}) {
+      const auto pose = animator.sample(clip,clip.seconds*frame/steps);
+      Json points = Json::array();
+      for (const auto index : samples) {
+        auto vertex = base.vertices[index];
+        vertex.position = add(vertex.position,expression.positions[index]);
+        points.push_back(mul(skinReference(base,pose,vertex),metres));
+      }
+      output["clips"][clip.id][std::to_string(frame)] = std::move(points);
+    }
+  }
+  return output;
+}
+
 static std::string motionFixture(const Humanoid& rig,bool wrongOrder=false) {
   GlbBuffer buffer;
   Json nodes=Json::array(), joints=Json::array();
@@ -980,6 +1010,7 @@ int main(int argc, char** argv) try {
     write("goldsrc.mdl",exportStudio(fitted,doc,&textured));
     write("framegroups.json",quake1.frameGroups.dump(2));
     write("quake3.md3.framegroups",engineFrameGroups(quake3.frameGroups).dump(2));
+    write("glb-vertex-reference.json",glbVertexReference(expressionBase,expressionDoc,expressionTargets[0]).dump());
     std::filesystem::create_directories(directory/"characters");
     for (std::size_t i=0; i<10; ++i) {
       const auto sample = applyPreset({},presets[i]);

@@ -29,14 +29,18 @@ if(std::string_view(mode).rfind("welcome132",0)==0){
       expect(welcomeQaItems.count(id)&&welcomeQaItems[id]["frame"]==ImGui::GetFrameCount(),"welcome132_checking_has_progress_and_skip");
   }
   if(std::string_view(mode)=="welcome132check-error"){
-    welcomeStartup();updateStarted=true;updateCommitted=false;updateAutomaticCheck=false;updateStage="error";frame();frame();
+    // The prior successful fixture left a status file. Stop accepting its session
+    // so polling cannot replace this simulated failure while the UI is inspected.
+    welcomeStartup();updateStarted=true;updateCommitted=false;updateAutomaticCheck=false;updateSession.clear();
+    updateStage="error";frame();frame();
     expect(welcomeQaItems["update/check"]["frame"]==ImGui::GetFrameCount()&&welcomeQaItems["update/skip"]["frame"]==ImGui::GetFrameCount(),
            "welcome132_error_can_retry_or_continue");
   }
   if(std::string_view(mode)=="welcome132no-update"){
     updateStarted=true;updateSession="qa-no-update";updateCommitted=false;updateStage="current";
     recentStage=WelcomeStage::Updates;recentWindow=true;recoveryChecked=true;recoveryRequest=true;frame();frame();
-    expect(recentStage==WelcomeStage::Recovery,"welcome132_no_update_proceeds_to_recovery");
+    expect(recentStage==(jamEnabled()?WelcomeStage::Jam:WelcomeStage::Recovery),
+           "welcome132_no_update_proceeds_to_next_welcome_stage");
     expect(!ImGui::IsPopupOpen("Recover autosave?",ImGuiPopupFlags_AnyPopupId),"welcome132_no_parallel_recovery_modal");
   }
   if(std::string_view(mode)=="welcome132protocol"){

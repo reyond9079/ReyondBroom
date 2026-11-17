@@ -26,10 +26,13 @@ inline Humanoid previewLod(const Humanoid& rig,std::size_t target) {
   throw std::runtime_error("Preview LOD cannot preserve the current materials at this triangle limit.");
 }
 
+enum class PreviewShading { Materials, Normals, SkinWeights };
+
 inline std::string previewMesh(const Humanoid& rig, const Document& doc,
                                const std::vector<Vec3>& rest, const AnimationPose& pose,
                                const std::array<std::string,materialCount>& textures,
-                               const std::array<Vec3,materialCount>& tints, Vec3 view,bool pbr=false) {
+                               const std::array<Vec3,materialCount>& tints, Vec3 view, bool pbr=false,
+                               PreviewShading shading=PreviewShading::Materials, std::size_t joint=0) {
   const auto skin = skinMatrices(rig, pose.rotations, pose.root);
   std::vector<Vec3> points;
   points.reserve(rest.size());
@@ -51,8 +54,9 @@ inline std::string previewMesh(const Humanoid& rig, const Document& doc,
   for (unsigned material = 0; material < materialCount; ++material) {
     const auto& surface = surfaces[material];
     if (surface.empty()) continue;
-    const std::string_view name = textures[material].empty() ? std::string_view("$whiteimage")
-                                                              : textures[material];
+    const bool useMaterials = shading == PreviewShading::Materials;
+    const std::string_view name = !useMaterials || textures[material].empty()
+        ? std::string_view("$whiteimage") : textures[material];
     const double shine[]{.105,.13,.06,.08,.12,.045,.07,.055,.05,.04};
     const double gloss[]{24,40,28,13,29,14,12,13,14,18};
     for (std::size_t first = 0; first < surface.size(); first += batchFaces) {
@@ -98,7 +102,17 @@ inline std::string previewMesh(const Humanoid& rig, const Document& doc,
         }
         for (unsigned channel = 0; channel < 3; ++channel)
           color[channel] = std::clamp(color[channel]*tints[material][channel]*vertexColor[channel],0.,1.);
-        const auto alpha = glSkin ? skinVertexMask(rig.vertices[index]) :
+        if (shading == PreviewShading::Normals) {
+          color = mul(add(bb::bbToQuake(normal),{1,1,1}),.5);
+        } else if (shading == PreviewShading::SkinWeights) {
+          const auto& skinVertex = rig.vertices[index];
+          double weight = 0;
+          for (std::size_t i=0; i<skinVertex.joints.size(); ++i)
+            if (skinVertex.joints[i] == joint) weight += skinVertex.weights[i];
+          const Vec3 unweighted{.12,.16,.24}, weighted{1,.67,.13};
+          color = add(unweighted,mul(sub(weighted,unweighted),std::clamp(weight,0.,1.)));
+        }
+        const auto alpha = !useMaterials ? 1. : glSkin ? skinVertexMask(rig.vertices[index]) :
             pbr && (material==3 || material==4 || material==6) ? fabricVertexMask(material,doc) :
             surfaceOpacity(material);
         const float vertex[]{float(point[0]),float(point[1]),float(point[2]),float(uv[0]),

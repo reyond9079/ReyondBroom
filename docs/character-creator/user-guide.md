@@ -1,6 +1,7 @@
 # Character Creator
 
-Open **Plugins > Character Creator** in an offline editor session.
+Open **File > Character Creator** in an offline editor session. The command
+is also available under **Plugins**.
 Use **Character preset** for a starting character, then edit Body, Face,
 Appearance and Wardrobe. Choose a clip in the animation selector, press
 **Play**, or drag the timeline to a particular time. **Preview blend** mixes
@@ -11,7 +12,9 @@ the named clips individually.
 Drag the preview with the left button to orbit, the right or middle button
 to pan, or use the wheel to zoom. **Front**, **Side**, and **Frame** reset
 parts of the camera. The **Rig** tab shows the skeleton and lets you select
-and highlight a joint. **Portrait** frames the face, and **Upper body**
+and highlight a joint. Use **Shading > Skin weights** to inspect the selected
+joint's influence. **Shading > Normals** displays the orientation of the
+animated surface. **Portrait** frames the face, and **Upper body**
 shows the shoulders and clothing. **Appearance > Complexion** selects a UV
 skin texture. The skin and hair color controls tint the selected textures. Enable **Dockable panes** to arrange the viewport,
 properties and timeline independently. The wardrobe lets you choose shoes

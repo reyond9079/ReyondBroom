@@ -301,6 +301,7 @@ bool jamOffer()
   if (join) jamLocal.open = true;
   ImGui::TableNextColumn();
   const bool offline = ImGui::Button(jamText("Work offline","Работать офлайн"), {-1,0});
+  welcomeQaItem("jam/offline");
   ImGui::EndTable();
   return join || offline;
 }

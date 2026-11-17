@@ -64,6 +64,7 @@ struct CharacterEditorState {
   std::uint64_t revision = 1, submitted = 0, applied = 0;
   bool open = false, owner = false, uploaded = false, playing = false;
   bool wire = false, ortho = false, grid = true;
+  cc::PreviewShading shading = cc::PreviewShading::Materials;
   bool skinShaderActive = false;
   bool pbrPreview = false;
   bool fitBodyRig = false;
@@ -793,7 +794,8 @@ static bool characterViewport(const cc::Clip& clip) {
     ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
     s.zoom = std::clamp(s.zoom * std::pow(1.12f,-io.MouseWheel),.18f,4.f);
   }
-  const bool skinShader = gameProfile==1 && !s.wire;
+  const bool useMaterials = s.shading == cc::PreviewShading::Materials;
+  const bool skinShader = useMaterials && gameProfile==1 && !s.wire;
   const bool pbr = skinShader && bbSmoothNormals();
   if (skinShader!=s.skinShaderActive || pbr!=s.pbrPreview) {
     if (!bbActive && !plantState.owner) {
@@ -810,7 +812,8 @@ static bool characterViewport(const cc::Clip& clip) {
     if (!api) throw std::runtime_error("The engine does not provide the native mesh preview.");
     const auto pose = previewPose();
     const auto maps = cc::surfaceMaps(s.doc,s.pbrPreview);
-    const auto textures = characterPreviewMaterials(s,maps);
+    const auto textures = useMaterials ? characterPreviewMaterials(s,maps)
+                                       : std::array<std::string,cc::materialCount>{};
     std::array<cc::Vec3,cc::materialCount> tints;
     for (unsigned i = 0; i < maps.size(); ++i)
       tints[i] = cc::surfaceTint(i,s.doc,maps[i]);
@@ -819,7 +822,7 @@ static bool characterViewport(const cc::Clip& clip) {
     const bool useLod=s.reduced && s.applied==s.revision &&
         s.tab!=CharacterEditorState::Tab::Face && s.framing!=CharacterEditorState::Framing::Portrait;
     const auto mesh = cc::previewMesh(useLod ? *s.reduced : s.fitted,s.doc,
-        useLod ? s.reducedRest : s.rest,pose,textures,tints,view,s.pbrPreview);
+        useLod ? s.reducedRest : s.rest,pose,textures,tints,view,s.pbrPreview,s.shading,s.bone);
     if (!api->upload(mesh.data(),mesh.size()))
       throw std::runtime_error("The engine rejected the character mesh.");
     s.uploaded = true;
@@ -1218,6 +1221,19 @@ static void characterProperties() {
   }
   if (s.tab==Tab::Rig) {
     ImGui::Text("RB_Humanoid_v1 | %zu joints",s.rig->joints.size());
+    const char* shadingModes[]{"Materials","Normals","Skin weights"};
+    const bool choosingShading = characterPropertyCombo("Shading",shadingModes[int(s.shading)]);
+    placementRect("character/shading");
+    if (choosingShading) {
+      for (int index=0; index<IM_ARRAYSIZE(shadingModes); ++index) {
+        if (ImGui::Selectable(shadingModes[index],index==int(s.shading))) {
+          s.shading = static_cast<cc::PreviewShading>(index);
+          s.uploaded = false;
+        }
+        placementRect(("character/shading/"+std::to_string(index)).c_str());
+      }
+      ImGui::EndCombo();
+    }
     ImGui::Checkbox("Bone overlay",&s.bones);
     ImGui::Checkbox("Gear sockets",&s.showSockets);
     placementRect("character/gear-sockets");
@@ -1225,7 +1241,11 @@ static void characterProperties() {
       const auto& joint = s.rig->joints[i];
       auto label = joint.name;
       if (joint.parent >= 0) label += " / " + s.rig->joints[joint.parent].name;
-      if (ImGui::Selectable(label.c_str(),s.bone == i)) { s.bone = i; s.bones = true; }
+      if (ImGui::Selectable(label.c_str(),s.bone == i)) {
+        s.bone = i;
+        s.bones = true;
+        if (s.shading == cc::PreviewShading::SkinWeights) s.uploaded = false;
+      }
     }
   }
 }

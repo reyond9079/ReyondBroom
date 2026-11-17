@@ -549,9 +549,15 @@ static void actionMenus()
   if(runUiLive)runUiGlobalRects=nlohmann::json::object();
   for (auto group : {"File", "Edit", "View", "Run", "Help"}){
     const bool opened=ImGui::BeginMenu(group);runUiRecordGlobal(std::string("menu/")+group);
+    if (std::string_view(group) == "File") placementRect("menu/file");
     if (opened)
     {
       actionMenuGroup(group);
+      if (std::string_view(group) == "File" && characterAvailable()) {
+        if (ImGui::MenuItem("Character Creator...")) command("ftebroom_character\n");
+        runUiRecordGlobal("Menu/File/Character Creator...");
+        placementRect("menu/file/character");
+      }
       if(!jamEditing()&&std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
       if(std::string(group)=="Edit") {
         if(!jamEditing()&&ImGui::MenuItem("Plant Editor..."))plantShow();

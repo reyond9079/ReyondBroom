@@ -87,6 +87,11 @@ def shot(name):
  ui.settle();ImageGrab.grab().save(caseout/(name+'.png'));(caseout/(name+'.json')).write_text(json.dumps(live(),indent=2))
 def no_splash(label):
  if a.require_splash:check('update/splash' not in live()['widgets'],'startup splash is hidden '+label)
+def wait_for_recovery(action):
+ wait(lambda:live()['welcomeStage'] in ('jam','recovery'))
+ if live()['welcomeStage']=='jam':
+  click('jam/offline')
+ wait(lambda:live()['welcomeStage']=='recovery' and action in live()['widgets'])
 def start(label):
  global process,stream,ui,root,data,state,caseout
  caseout=out/label;caseout.mkdir(exist_ok=True);root=caseout/'editor-runtime'
@@ -148,15 +153,15 @@ try:
  check(live()['currentVersion']==current and live()['availableVersion']==latest,'welcome clearly reports current and available versions')
  ui.console('ftebroom_test_desktop welcome132protocol');wait(lambda:'welcome132_verified_ready_status' in (data/'qconsole.log').read_text(errors='replace'))
  check('FTEBROOM_DESKTOP_FAIL welcome132' not in (data/'qconsole.log').read_text(errors='replace'),'malformed, stale and foreign updater records cannot change welcome state')
- shot('01-update-offer');click('update/skip');wait(lambda:live()['welcomeStage']=='recovery' and 'recovery/keep-editing' in live()['widgets'])
+ shot('01-update-offer');click('update/skip');wait_for_recovery('recovery/keep-editing')
  check(not live()['legacyRecoveryPopup'] and 'recent/another-map' not in live()['widgets'],'recovery uses one Welcome window before recent maps');shot('02-recovery')
  click('recovery/keep-editing');wait(lambda:live()['welcomeStage']=='recent' and 'recent/another-map' in live()['widgets']);shot('03-recent-maps')
  click('menu/File',True);click('Menu/File/Open...',True);wait(lambda:live()['windowOpen'] and live()['welcomeStage']=='recent')
  check(not live()['mapFilesOpen'],'File > Open defaults to recently edited maps')
  click('recent/another-map');wait(lambda:live()['mapFilesOpen'] and 'files/cancel' in live()['widgets'])
  check(not live()['windowOpen'],'Open another map replaces Welcome with the map browser');shot('04-map-browser');click('files/cancel');wait(lambda:not live()['mapFilesOpen'])
- ui.console('ftebroom_test_desktop welcome132no-update');wait(lambda:live()['welcomeStage']=='recovery' and 'recovery/recover' in live()['widgets'])
- check(not live()['legacyRecoveryPopup'],'no-update result proceeds directly to recovery without a parallel popup')
+ ui.console('ftebroom_test_desktop welcome132no-update');wait_for_recovery('recovery/recover')
+ check(not live()['legacyRecoveryPopup'],'no-update result reaches recovery without a parallel popup')
  click('recovery/recover');wait(lambda:not live()['windowOpen'] and not live()['recoveryOpening'])
  check(live()['document']=='','Recover opens the autosave as an unsaved document')
  ui.console('ftebroom_test_desktop welcome132updates');wait(lambda:live()['stage']=='available' and 'update/start' in live()['widgets'])

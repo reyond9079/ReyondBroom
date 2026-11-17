@@ -282,8 +282,8 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             return live()["character"]
 
         def exercise_catalog():
-            click("menu/plugins")
-            click("menu/plugins/character")
+            click("menu/file")
+            click("menu/file/character")
             wait(lambda:state()["open"] and state()["applied"])
             names = ("Casey", "Morgan", "Riley", "Sam", "Devin", "Jordan", "Jamie", "Drew", "Taylor", "Robin")
 
@@ -320,6 +320,19 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                 wait(lambda:state()["tab"]==tab_id)
                 screenshot("tab-"+tab_name+".png")
             check(True,"Body, Face, Appearance, Wardrobe and Rig render after native tab changes")
+
+            for mode, name in ((1,"normals"),(2,"skin-weights"),(0,"materials")):
+                before = presented_preview()
+                choose("character/shading",mode)
+                def changed_shading():
+                    current = presented_preview()
+                    if before is None or current is None or before.size != current.size:
+                        return False
+                    difference = ImageChops.difference(before,current).convert("L").histogram()
+                    return sum(difference[20:]) > 250
+                wait(changed_shading)
+                screenshot("shading-"+name+".png")
+                check(True,"Native viewport renders "+name)
 
             click("character/tab-wardrobe")
             wait(lambda:state()["tab"]==3)

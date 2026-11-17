@@ -42,7 +42,9 @@ placement writes the target model bundle and updates the linked map entity.
 Use the regular map Undo/Redo for changes to the linked entity.
 
 **Export GLB** produces a portable skeletal model. **Export for game
-profile** creates the model format used by the current project. Use a new
+profile** creates the model format used by the current project. Use the
+**Export** tab to save a separate target in the character document. Map
+placement still uses the active map profile. Use a new
 filename to keep existing exports intact, and keep the model and its
 companion files together. Runtime animation for a placed model depends on
 the mod and entity class. See the separate testing document for the current

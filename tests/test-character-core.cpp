@@ -692,6 +692,19 @@ int main(int argc, char** argv) try {
     check(writeDocument(readDocument(json, rig), rig).dump() == json, "Document round trip drifted");
   }
   auto json = writeDocument(doc, rig);
+  check(!json.contains("exportProfile") && readDocument(json.dump(),rig).exportProfile==-1,
+        "Documents without a preferred export profile must follow the active map");
+  for (std::size_t profile=0; profile<std::size(exportProfileIds); ++profile) {
+    auto preferred = doc;
+    preferred.exportProfile = int(profile);
+    const auto saved = writeDocument(preferred,rig);
+    check(saved["exportProfile"]==exportProfileIds[profile] &&
+          readDocument(saved.dump(),rig).exportProfile==preferred.exportProfile,
+          "Preferred export profile did not round trip");
+  }
+  json["exportProfile"] = "unknown";
+  rejects([&] { readDocument(json.dump(),rig); },"Accepted unknown character export profile");
+  json.erase("exportProfile");
   json["rigSha256"] = "different";
   rejects([&] { readDocument(json.dump(), rig); }, "Accepted incompatible rig");
   json = writeDocument(doc, rig);

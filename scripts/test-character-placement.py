@@ -41,7 +41,7 @@ def editor_process(arguments, root, stream, hardware=False):
 
 def exercise(root, out, compile_assets, document_only=False, startup_placement=False, motion_fixture=None,
              legacy_fixture=None, fit_fixture=None, pose_phase=.25, benchmark=False, export_goldsrc=False,
-             export_iqm=None, catalog_only=False):
+             export_iqm=None, catalog_only=False, morph_sweep=False):
     data = root / "ftebroom"
     telemetry = data / "placement-ui-live.json"
     telemetry.unlink(missing_ok=True)
@@ -62,7 +62,8 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             texture = folder/name
             texture.parent.mkdir(parents=True,exist_ok=True)
             texture.write_bytes(bytes(header) + bytes([116,108,92]) * (64*64))
-    profile = 4 if export_goldsrc else 1 if startup_placement or fit_fixture or catalog_only else 0
+    startup_map = startup_placement or fit_fixture or catalog_only or morph_sweep
+    profile = 4 if export_goldsrc else 1 if startup_map else 0
     (root / "ftebroom-game-profile.txt").write_text(f'{profile} 0 "" "" "" "" 1 0 "" 1 1\n')
     fit_command = ""
     if fit_fixture:
@@ -72,7 +73,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
     performance_setup = ("vid_vsync 0\ncl_maxfps 0\ncl_yieldcpu 0\n"
                          "set ftebroom_character_benchmark_frames 240\n") if benchmark else ""
     (data / "rb21-placement.cfg").write_text(
-        ("exec ftebroom.cfg\n" if startup_placement or fit_fixture or catalog_only else "exec qa-clip.cfg\n")+
+        ("exec ftebroom.cfg\n" if startup_map else "exec qa-clip.cfg\n")+
         "set ftebroom_placement_qa 1\n"
         +fit_command+performance_setup+
         "in 11 echo RB_CHARACTER_FIXTURE_READY\n"
@@ -281,17 +282,89 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
         def state():
             return live()["character"]
 
+        def preview():
+            rect = live()["widgets"]["character/viewport"]
+            x, y, w, h = (int(rect[key]) for key in ("x", "y", "width", "height"))
+            return capture().convert("RGB").crop((x+3,y+3,x+w-3,y+h-3))
+
+        def exercise_morphs():
+            click("menu/file")
+            click("menu/file/character")
+            wait(lambda:state()["open"] and state()["applied"])
+            click("character/save")
+            path = Path(wait(lambda:(p := live()["browsePath"]) and p.endswith(".rbchar") and p))
+            click("file-choose")
+            wait(path.is_file)
+            baseline = json.loads(path.read_text(encoding="utf-8"))["morphs"]
+            results = {}
+
+            def fitted():
+                ready = state()
+                return ready["applied"]==ready["revision"] and not ready["error"]
+
+            def visible_slider(key):
+                for _ in range(20):
+                    rect = wait(lambda:live()["widgets"].get(key),timeout=5)
+                    left, top, right, bottom = rect["clip"]
+                    y = rect["y"]+rect["height"]*.5
+                    if top+3 < y < bottom-3:
+                        return rect["x"]+3,y,rect["x"]+rect["width"]-3
+                    ui.move((left+right)*.5,(top+bottom)*.5)
+                    ui.scroll(2 if y<top+3 else -2)
+                raise AssertionError(f"Could not scroll {key} fully into view")
+
+            def endpoint(name,key,value):
+                wait(lambda:live()["widgets"][key]["value"]==value and fitted())
+                ui.move(10,120)
+                view = preview()
+                view.save(out/f"{name}-{value:+d}.png")
+                click("character/save")
+                wait(lambda:not state()["dirty"])
+                saved = json.loads(path.read_text(encoding="utf-8"))
+                assert saved["morphs"]==dict(baseline,**{name:value}),name
+                return view
+
+            def test_controls():
+                widgets = live()["widgets"]
+                keys = sorted((key for key in widgets if key.startswith("character/morph/")),
+                              key=lambda key:widgets[key]["y"])
+                for key in keys:
+                    name = key.rsplit("/",1)[1]
+                    assert name not in results,name
+                    left,y,right = visible_slider(key)
+                    ui.click(left,y)
+                    first = endpoint(name,key,-1)
+                    ui.orbit(left,y,right)
+                    last = endpoint(name,key,1)
+                    changed = sum(ImageChops.difference(first,last).convert("L").histogram()[9:])
+                    check(changed>=5,f"{name} has independent -1/+1 slider values and {changed} changed pixels")
+                    results[name] = {"minimum":-1,"maximum":1,"pixelsChanged":changed}
+                    (out/"endpoint-results.json").write_text(json.dumps(results,indent=2)+"\n")
+                    click("character/undo")
+                    click("character/undo")
+                    wait(lambda:live()["widgets"][key]["value"]==baseline[name] and fitted())
+
+            click("character/tab-body")
+            wait(lambda:len([k for k in live()["widgets"] if k.startswith("character/morph/")])==14)
+            test_controls()
+            click("character/tab-wardrobe")
+            choose("character/hairstyle",0)
+            wait(lambda:state()["hairstyle"]==0 and fitted())
+            click("character/tab-face")
+            click("character/side")
+            rect = live()["widgets"]["character/viewport"]
+            x,y = rect["x"]+90,rect["y"]+rect["height"]*.55
+            ui.orbit(x,y,x+113)
+            click("character/all-face-details")
+            wait(lambda:len([k for k in live()["widgets"] if k.startswith("character/morph/")])==34)
+            test_controls()
+            check(len(results)==48 and set(results)==set(baseline),"All 48 native morph sliders passed")
+
         def exercise_catalog():
             click("menu/file")
             click("menu/file/character")
             wait(lambda:state()["open"] and state()["applied"])
             names = ("Casey", "Morgan", "Riley", "Sam", "Devin", "Jordan", "Jamie", "Drew", "Taylor", "Robin")
-
-            def preview():
-                rect = live()["widgets"]["character/viewport"]
-                x, y, w, h = (int(rect[key]) for key in ("x", "y", "width", "height"))
-                frame = capture().convert("RGB")
-                return frame.crop((x+3,y+3,x+w-3,y+h-3))
 
             def presented_preview():
                 view = preview()
@@ -315,11 +388,12 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             assert "character/preset/Field Technician" not in live()["widgets"]
             ui.key("esc")
             check(len(images)==len(names),"Ten preset selections render distinct previews and Field Technician is absent")
-            for tab_id,tab_name in enumerate(("body","face","appearance","wardrobe","rig")):
+            for tab_id,tab_name in enumerate(("body","face","appearance","wardrobe","rig","export")):
                 click("character/tab-"+tab_name)
                 wait(lambda:state()["tab"]==tab_id)
                 screenshot("tab-"+tab_name+".png")
-            check(True,"Body, Face, Appearance, Wardrobe and Rig render after native tab changes")
+            check(True,"Body, Face, Appearance, Wardrobe, Rig and Export render after native tab changes")
+            click("character/tab-rig")
 
             for mode, name in ((1,"normals"),(2,"skin-weights"),(0,"materials")):
                 before = presented_preview()
@@ -426,6 +500,24 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             click("character/unsaved-discard")
             wait(lambda:state()["path"] and not state()["dirty"])
             check(Path(state()["path"])==path,"Open can discard local changes and reopen the saved source")
+            click("character/tab-export")
+            choose("character/export-target",2)
+            click("character/save")
+            wait(lambda:json.loads(path.read_text(encoding="utf-8")).get("exportProfile")=="fte")
+            click("character/new")
+            wait(lambda:not state()["path"])
+            click("character/open")
+            click("file-entry/"+path.name)
+            click("file-choose")
+            wait(lambda:Path(state()["path"])==path and state()["revision"]==state()["applied"])
+            click("character/tab-export")
+            click("character/export-selected")
+            export_path = Path(wait(lambda: (p := live()["browsePath"]) and Path(p).name=="human.iqm" and p))
+            click("file-choose")
+            wait(export_path.is_file,timeout=60)
+            check(export_path.read_bytes().startswith(b"INTERQUAKEMODEL\0") and live()["profile"]==0,
+                  "Reopened character uses its selected FTE export target without switching map profile")
+            click("character/tab-body")
             click("character/clip")
             click("character/clip/walk_forward")
             wait(lambda:state()["clip"]=="walk_forward")
@@ -540,11 +632,14 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             check(True,"A guarded map change releases the closed character preview")
 
         try:
-            if not startup_placement and not fit_fixture and not catalog_only:
+            if not startup_map:
                 wait(lambda:live()["mapPath"].replace("\\","/").endswith("/maps/qa_clip.map"))
             wait(lambda:"RB_CHARACTER_FIXTURE_READY" in
                  "\n".join(p.read_text(errors="replace") for p in (log,data/"qconsole.log") if p.is_file()))
             ui.position()
+            if morph_sweep:
+                exercise_morphs()
+                return
             if catalog_only:
                 exercise_catalog()
                 return
@@ -712,6 +807,7 @@ def main():
     parser.add_argument("--compile-assets",action="store_true",help="Compile a sealed room with the placed model")
     parser.add_argument("--document-only",action="store_true",help="Exercise document guards and animation controls")
     parser.add_argument("--catalog-only",action="store_true",help="Inspect native previews, tabs and one rendered animation")
+    parser.add_argument("--morph-sweep",action="store_true",help="Verify all 48 sliders using native X11 input")
     parser.add_argument("--motion-fixture",type=Path,help="Canonical animation GLB for the document import test")
     parser.add_argument("--legacy-fixture",type=Path,help="Previously saved Field Technician document")
     parser.add_argument("--startup-placement",action="store_true",help="Place an IQM character on the untitled FTE-specific startup map")
@@ -725,6 +821,8 @@ def main():
         parser.error("--pose-phase must be between 0 and 1")
     if args.benchmark and not args.fit_fixture:
         parser.error("--benchmark requires --fit-fixture with a looping animation")
+    if args.morph_sweep and os.name=="nt":
+        parser.error("--morph-sweep requires the X11 test driver")
     if args.export_goldsrc and (not args.fit_fixture or args.benchmark):
         parser.error("--export-goldsrc requires --fit-fixture and runs separately from --benchmark")
     if args.export_iqm and (not re.fullmatch(r"[A-Za-z0-9_-]{1,32}",args.export_iqm)
@@ -738,7 +836,7 @@ def main():
                  args.motion_fixture.resolve() if args.motion_fixture else None,
                  args.legacy_fixture.resolve() if args.legacy_fixture else None,
                  args.fit_fixture.resolve() if args.fit_fixture else None,args.pose_phase,args.benchmark,
-                 args.export_goldsrc,args.export_iqm,args.catalog_only)
+                 args.export_goldsrc,args.export_iqm,args.catalog_only,args.morph_sweep)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ namespace cc = ftebroom::character;
 static void characterPublishPlacement();
 static void characterFinishPlacement();
 static void characterExportProfile(const std::filesystem::path& path,int profile);
+static const char* characterExtension(int profile);
 
 static cc::Document characterNewDocument() {
   cc::Document doc;
@@ -69,7 +70,7 @@ struct CharacterEditorState {
   bool pbrPreview = false;
   bool fitBodyRig = false;
   enum class Framing { Manual, Body, Portrait, UpperBody } framing = Framing::Body;
-  enum class Tab { Body, Face, Appearance, Wardrobe, Rig } tab = Tab::Body;
+  enum class Tab { Body, Face, Appearance, Wardrobe, Rig, Export } tab = Tab::Body;
   int faceRegion = -1, sculptSide = 1, faceTypes = 0;
   bool sculptDepth = false;
   bool suppressFaceOrbit = false;
@@ -726,6 +727,7 @@ static bool characterViewport(const cc::Clip& clip) {
     if (ImGui::Button("Front")) { s.yaw = s.pitch = 0; s.uploaded = false; }
     ImGui::SameLine();
     if (ImGui::Button("Side")) { s.yaw = 90; s.pitch = 0; s.uploaded = false; }
+    placementRect("character/side");
     ImGui::SameLine();
     const bool resetFrame = ImGui::Button("Frame");
     placementRect("character/frame");
@@ -908,8 +910,15 @@ static void characterMorphSliders(std::size_t first, std::size_t end) {
     ImGui::PushID(label);
     if (stacked) ImGui::TextUnformatted(label);
     ImGui::SetNextItemWidth(stacked ? -FLT_MIN : std::min({135*uiScale(),width*.52f,fieldRoom}));
+    const auto sliderWidth = ImGui::CalcItemWidth();
     const bool changed = ImGui::SliderFloat(stacked ? "##value" : label,&amount,-1,1,"%.2f",
                                           ImGuiSliderFlags_AlwaysClamp);
+    if (placementQa()) {
+      const auto id = std::string("character/morph/")+cc::morphs[i].id;
+      placementRect(id.c_str());
+      placementWidgets[id]["width"] = sliderWidth;
+      placementWidgets[id]["value"] = amount;
+    }
     if (ImGui::IsItemActivated()) s.gesture = before;
     if (changed) {
       s.doc.values[i] = amount;
@@ -1029,12 +1038,55 @@ static void characterChangeTab(CharacterEditorState::Tab tab) {
   }
 }
 
+static void characterChooseProfileExport(int profile) {
+  const auto mapProfile = gameProfile;
+  const auto filename = std::string("human")+characterExtension(profile);
+  runUiChoose((documentDefaultFolder()/filename).u8string(),[profile,mapProfile](const std::string& path) {
+    characterRequireOffline();
+    if (gameProfile!=mapProfile) throw std::runtime_error("The game profile changed.");
+    characterExportProfile(std::filesystem::u8path(path),profile);
+  },true);
+}
+
+static void characterExportSettings() {
+  auto& s = characterEditor;
+  constexpr const char* profiles[]{"Use active map profile","Quake III Arena","FTE Custom game",
+                                    "Quake 1","Quake II","Half-Life"};
+  static_assert(std::size(profiles)==std::size(cc::exportProfileIds)+1);
+  const bool choose = characterPropertyCombo("Target",profiles[s.doc.exportProfile+1]);
+  placementRect("character/export-target");
+  if (choose) {
+    for (int i=0; i<int(std::size(profiles)); ++i) {
+      const bool selected = ImGui::Selectable(profiles[i],i==s.doc.exportProfile+1);
+      placementRect(("character/export-target/"+std::to_string(i)).c_str());
+      if (selected && i!=s.doc.exportProfile+1) {
+        characterCheckpoint(s.doc);
+        s.doc.exportProfile = i-1;
+      }
+    }
+    ImGui::EndCombo();
+  }
+  const int target = s.doc.exportProfile<0 ? gameProfile : s.doc.exportProfile;
+  const bool needsPalette = (target==2 || target==3) && target!=gameProfile;
+  if (target==1) ImGui::TextWrapped("IQM with a weighted skeleton, named clips and material files.");
+  else if (target==4) ImGui::TextWrapped("Studio MDL with a skeleton and named sequences.");
+  else ImGui::TextWrapped("Vertex animation. The game or mod must advance the frames.");
+  if (needsPalette) ImGui::TextWrapped("Select the matching game profile to supply its palette.");
+  ImGui::BeginDisabled(needsPalette);
+  const bool exportModel = placementButton("Export model...","character/export-selected");
+  ImGui::EndDisabled();
+  if (exportModel) {
+    try { characterChooseProfileExport(target); }
+    catch (const std::exception& error) { s.error = error.what(); }
+  }
+}
+
 static void characterProperties() {
   auto& s = characterEditor;
   using Tab = CharacterEditorState::Tab;
-  constexpr const char* sections[]{"Body","Face","Appearance","Wardrobe","Rig"};
+  constexpr const char* sections[]{"Body","Face","Appearance","Wardrobe","Rig","Export"};
   constexpr const char* ids[]{"character/tab-body","character/tab-face","character/tab-appearance",
-                             "character/tab-wardrobe","character/tab-rig"};
+                             "character/tab-wardrobe","character/tab-rig","character/tab-export"};
   // Keep a single selection when docking changes the available width.
   const auto& style = ImGui::GetStyle();
   float remaining = ImGui::GetContentRegionAvail().x;
@@ -1103,7 +1155,9 @@ static void characterProperties() {
         }
       ImGui::EndCombo();
     }
-    if (ImGui::CollapsingHeader("All facial details")) {
+    const bool allDetails = ImGui::CollapsingHeader("All facial details");
+    placementRect("character/all-face-details");
+    if (allDetails) {
       ImGui::PushID("all facial details");
       characterMorphSliders(cc::bodyMorphCount,cc::morphCount);
       ImGui::PopID();
@@ -1249,6 +1303,7 @@ static void characterProperties() {
       }
     }
   }
+  if (s.tab==Tab::Export) characterExportSettings();
 }
 
 static void characterTimeline(bool compact = false) {
@@ -1552,7 +1607,7 @@ static void characterPanel() {
         ++s.revision;
       }
       ImGui::SameLine();
-      if (ImGui::Button("Undo")) characterHistory(false);
+      if (placementButton("Undo","character/undo")) characterHistory(false);
       ImGui::SameLine();
       if (ImGui::Button("Redo")) characterHistory(true);
       ImGui::SameLine();
@@ -1587,16 +1642,7 @@ static void characterPanel() {
       ImGui::SameLine();
       const bool exportProfile = ImGui::Button("Export for game profile...");
       placementRect("character/export-profile");
-      if (exportProfile) {
-        const int profile = gameProfile;
-        const char* extensions[]{".md3",".iqm",".mdl",".md2",".mdl"};
-        runUiChoose((documentDefaultFolder()/("human"+std::string(extensions[profile]))).u8string(),
-                    [profile](const std::string& path) {
-          characterRequireOffline();
-          if (gameProfile != profile) throw std::runtime_error("The game profile changed.");
-          characterExportProfile(std::filesystem::u8path(path),profile);
-        },true);
-      }
+      if (exportProfile) characterChooseProfileExport(gameProfile);
       ImGui::SameLine();
       if (ImGui::Checkbox("Dockable panes",&s.separatePanes))
         cvars->SetFloat("ftebroom_character_dock_panes",s.separatePanes);

@@ -14,14 +14,25 @@ static std::string read(const std::filesystem::path& path) {
 }
 
 int main(int argc,char** argv) try {
-  if (argc != 2 && argc != 3)
-    throw std::runtime_error("Expected runtime/characters path and optional round-trip output directory");
+  const bool reopen = argc == 4 && std::string_view(argv[3])=="--reopen";
+  if (argc != 2 && argc != 3 && !reopen)
+    throw std::runtime_error("Expected runtime/characters path, optional round-trip directory and optional --reopen");
   const std::filesystem::path path(argv[1]);
-  const auto saved = argc == 3 ? std::filesystem::path(argv[2]) : std::filesystem::path{};
-  if (!saved.empty()) std::filesystem::create_directories(saved);
+  const auto saved = argc >= 3 ? std::filesystem::path(argv[2]) : std::filesystem::path{};
   auto rig = readHumanoid(read(path/"humanoid-v1.rbh"));
   readFaceShapes(rig,read(path/"adult-face-shapes.rbf"));
   readBodyShapes(rig,read(path/"adult-body-shapes.rbs"));
+  if (reopen) {
+    for (unsigned seed=0; seed<1000; seed+=10) {
+      const auto source = read(saved/("character-"+std::to_string(seed)+".rbchar"));
+      const auto doc = readDocument(source,rig);
+      if (doc.seed!=seed || writeDocument(doc,rig).dump()+'\n'!=source)
+        throw std::runtime_error("Character changed after process restart: "+std::to_string(seed));
+    }
+    std::cout << "PASS 100 character documents restored with all values unchanged in a fresh process\n";
+    return 0;
+  }
+  if (!saved.empty()) std::filesystem::create_directories(saved);
   std::map<std::string,Wardrobe> assets;
   for (const auto& file : std::filesystem::directory_iterator(path/"wardrobe"))
     if (file.path().extension() == ".rbw")
@@ -38,6 +49,7 @@ int main(int argc,char** argv) try {
     randomize(doc,seed);
     doc.bodyProfile = bodyProfiles[seed%std::size(bodyProfiles)];
     if (!saved.empty() && seed % 10 == 0) {
+      doc.exportProfile = int((seed/10)%(std::size(exportProfileIds)+1))-1;
       auto file = saved/("character-"+std::to_string(seed)+".rbchar");
       auto expected = writeDocument(doc,rig);
       std::ofstream stream(file,std::ios::binary);

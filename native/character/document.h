@@ -71,6 +71,8 @@ inline constexpr std::size_t bodyMorphCount = 14;
 inline constexpr const char* expressions[]{"Neutral","Smile","Frown","Surprise","Blink","Anger"};
 inline constexpr const char* beards[]{"None","Moustache","Goatee","Full beard"};
 
+inline constexpr const char* exportProfileIds[]{"quake3","fte","quake1","quake2","halflife"};
+
 struct Document {
   std::string name = "Human";
   std::array<double, morphCount> values{};
@@ -91,6 +93,7 @@ struct Document {
   double hairVolume = 0, hairLength = 0, hairline = 0;
   double faceAsymmetry = 0;
   bool hat = true;
+  int exportProfile = -1; // Follow the map profile unless the document specifies a target.
 };
 inline constexpr unsigned outfitCount = 13, hairstyleCount = 18, complexionCount = 8;
 inline constexpr unsigned selectableFaceTemplateCount = 4;
@@ -125,6 +128,8 @@ inline nlohmann::json writeDocument(const Document& doc, const Humanoid& rig) {
           {"faceAsymmetry",doc.faceAsymmetry}};
   if (!doc.animationAsset.empty()) output["animationAsset"]=doc.animationAsset;
   if (!doc.customWardrobe.empty()) output["customWardrobe"]=doc.customWardrobe;
+  if (doc.exportProfile>=0 && std::size_t(doc.exportProfile)<std::size(exportProfileIds))
+    output["exportProfile"]=exportProfileIds[doc.exportProfile];
   return output;
 }
 
@@ -166,6 +171,12 @@ inline Document decodeDocument(const nlohmann::json& value, const Humanoid& rig)
   };
   doc.animationAsset=readAsset("animationAsset");
   doc.customWardrobe=readAsset("customWardrobe");
+  if (value.contains("exportProfile")) {
+    const auto profile = value.at("exportProfile").get<std::string>();
+    const auto match = std::find(std::begin(exportProfileIds),std::end(exportProfileIds),profile);
+    if (match==std::end(exportProfileIds)) throw std::runtime_error("Unknown character export profile");
+    doc.exportProfile=int(match-std::begin(exportProfileIds));
+  }
   doc.clip = value.at("clip").get<std::string>();
   if ((doc.clip!=importedClipId || doc.animationAsset.empty()) &&
       std::none_of(std::begin(clips), std::end(clips), [&](const Clip& clip) { return doc.clip == clip.id; }))

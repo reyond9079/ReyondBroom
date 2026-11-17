@@ -494,6 +494,13 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                       "An existing Field Technician document opens and saves without losing its preset data")
                 screenshot("legacy-field-technician.png")
 
+            click("character/randomize")
+            wait(lambda:state()["dirty"] and state()["previewResident"])
+            ui.console("ftebroom_ui new")
+            click("character/unsaved-discard")
+            wait(lambda:not state()["open"] and not state()["previewResident"])
+            check(True,"A guarded map change releases the closed character preview")
+
         try:
             if not startup_placement and not fit_fixture and not catalog_only:
                 wait(lambda:live()["mapPath"].replace("\\","/").endswith("/maps/qa_clip.map"))

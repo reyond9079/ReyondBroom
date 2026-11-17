@@ -50,7 +50,8 @@ struct CharacterEditorState {
   std::future<RuntimeAsset> placementJob;
   cc::Humanoid fitted;
   std::optional<cc::Humanoid> reduced;
-  std::map<std::string,cc::Wardrobe> wardrobe;
+  // Jobs copy the lookup table and share immutable meshes with the editor.
+  std::map<std::string,std::shared_ptr<const cc::Wardrobe>> wardrobe;
   std::map<std::string,std::string> importedFiles;
   std::map<std::string,std::shared_ptr<const cc::ImportedMotion>> importedMotions;
   std::size_t importedBytes=0;
@@ -113,8 +114,7 @@ static void characterRegisterImport(const std::string& id,std::string data,bool 
     for (const auto& entry : clothing.vertices)
       if (entry.vertex.position[1]<0 || entry.vertex.position[1]>15.2)
         throw std::runtime_error("Import a garment fitted to the torso or legs of the canonical body.");
-    if (s.morphJob.valid()) s.morphJob.wait();
-    s.wardrobe.emplace(id,std::move(clothing));
+    s.wardrobe.emplace(id,std::make_shared<const cc::Wardrobe>(std::move(clothing)));
   }
   s.importedBytes+=data.size();
   s.importedFiles.emplace(id,std::move(data));
@@ -274,7 +274,7 @@ static void characterOpen() {
       const auto item = characterAsset("characters/wardrobe/" + std::string(id) + ".rbw",4*1024*1024);
       if (ftebroom::jam::sha256(item) != it->at("sha256"))
         throw std::runtime_error("A wardrobe asset failed verification.");
-      s.wardrobe.emplace(id,cc::readWardrobe(item,rig,id));
+      s.wardrobe.emplace(id,std::make_shared<const cc::Wardrobe>(cc::readWardrobe(item,rig,id)));
     };
     for (const auto& outfit : cc::outfits) {
       install(outfit.clothes);
@@ -323,11 +323,10 @@ static void characterTickMorph() {
   }
   if (s.morphJob.valid() || s.submitted == s.revision) return;
   const auto* rig = &*s.rig;
-  const auto* clothes = &s.wardrobe;
-  s.morphJob = std::async(std::launch::async, [rig,clothes,doc=s.doc,revision=s.revision,fit=s.fitBodyRig,
+  s.morphJob = std::async(std::launch::async, [rig,clothes=s.wardrobe,doc=s.doc,revision=s.revision,fit=s.fitBodyRig,
                                              detail=s.detailLevel] {
     CharacterEditorState::MorphResult result{revision, cc::assemble(*rig,doc,[&](const auto& id) -> const auto& {
-      return clothes->at(id);
+      return *clothes.at(id);
     },fit),{}};
     if (detail) result.reduced=cc::previewLod(result.fitted,detail==1 ? 15000 : 9000);
     return result;
@@ -453,6 +452,7 @@ static void characterClose() {
   auto& s = characterEditor;
   if (characterDirty()) characterReset(cc::readDocument(s.saved,*s.rig),s.file);
   s.open = false;
+  characterReleasePreview();
 }
 
 static bool characterBeforeDocument(const std::string& next) {
@@ -1503,7 +1503,7 @@ static void characterPanel() {
             throw std::runtime_error("Choose a new filename with the .glb extension.");
           const auto& state = characterEditor;
           const cc::WardrobeReader wardrobe=[&](const auto& id) -> const auto& {
-            return state.wardrobe.at(id);
+            return *state.wardrobe.at(id);
           };
           auto neutral=state.doc;
           neutral.expression=0;

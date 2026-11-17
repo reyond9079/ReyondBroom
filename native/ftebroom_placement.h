@@ -202,6 +202,8 @@ static void placementWriteQa(){
  j["bspPreview"]=cvars->GetFloat("ftebroom_bsp_preview")!=0;
  j["buildRunning"]=buildRunning;
  j["character"]={{"open",characterEditor.open},{"available",characterAvailable()},
+                 {"previewResident",characterEditor.owner || characterEditor.uploaded ||
+                    !characterEditor.materialUploads.empty()},
                  {"path",characterEditor.file.u8string()},{"placement",binding(characterEditor.placement)},
                  {"error",characterEditor.error},{"status",characterEditor.status},
                  {"tab",int(characterEditor.tab)},{"framing",int(characterEditor.framing)},

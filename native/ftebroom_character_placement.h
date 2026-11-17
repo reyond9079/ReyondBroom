@@ -132,7 +132,7 @@ static void characterExportProfile(const std::filesystem::path& path,int profile
     throw std::runtime_error("Use 1–32 ASCII letters, digits, hyphens or underscores for a game model name.");
   const auto& s = characterEditor;
   const auto fitted = cc::assemble(*s.rig,s.doc,[&](const auto& name) -> const auto& {
-    return s.wardrobe.at(name);
+    return *s.wardrobe.at(name);
   },profile==1);
   std::map<std::string,std::string> bundle;
   const auto modelName = path.filename().u8string();
@@ -186,7 +186,7 @@ static void characterPublishPlacement() {
     dependencies["models/reyond-plugins/rbchar-assets/"+s.doc.customWardrobe+".rbw"]=s.importedFiles.at(s.doc.customWardrobe);
   const auto motion=characterImportedMotion(s.doc);
   s.placementJob = std::async(std::launch::async,
-      [rig=&*s.rig, wardrobe=&s.wardrobe, doc=s.doc, source=s.saved,
+      [rig=&*s.rig, wardrobe=s.wardrobe, doc=s.doc, source=s.saved,
        profile=binding.profile, bindingId=binding.id, palette=std::move(palette),
        images=std::move(images), visual=s.materialDigest, motion, dependencies=std::move(dependencies),
        shader=binding.profile==1 ? characterAsset(cc::surfaceProgramPath,64*1024) : std::string{},
@@ -202,7 +202,7 @@ static void characterPublishPlacement() {
       const auto manifest = model + ".reyond.json";
       auto& bundle = asset.files;
       const auto fitted = cc::assemble(*rig,doc,[&](const auto& name) -> const auto& {
-        return wardrobe->at(name);
+        return *wardrobe.at(name);
       },profile==1);
       const auto textures = std::string(profile == 3 ? "models/reyond-plugins/" : "textures/reyond-plugins/") + id;
       characterRuntimeFiles(bundle,model,textures,fitted,doc,profile,palette,images,shader,detail,fabric,{},motion.get());

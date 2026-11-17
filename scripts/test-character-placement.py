@@ -316,6 +316,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             restart_marker = "ReyondBroom: restored ImGui atlas after renderer restart."
             console_log = data/"qconsole.log"
             restarts = console_log.read_text(errors="replace").count(restart_marker)
+            second.save(out/"preview-before-renderer-restart.png")
             ui.console("vid_restart")
             wait(lambda:console_log.read_text(errors="replace").count(restart_marker)>restarts)
             ui.position()
@@ -323,6 +324,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                  live()["widgets"].get("character/viewport"))
             ui.settle()
             restored = preview()
+            restored.save(out/"preview-after-renderer-restart.png")
             check(restored.size==second.size,"Renderer restart restores the same preview bounds")
             difference = ImageChops.difference(second,restored).convert("L").histogram()
             check(sum(difference[20:])<restored.width*restored.height*.003,

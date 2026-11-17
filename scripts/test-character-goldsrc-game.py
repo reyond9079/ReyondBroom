@@ -125,7 +125,7 @@ def main():
         commands += (["snapshot"] + ["wait"]*11)*12 + ["wait"]*12 + ["quit"]
         (mod / "capture.cfg").write_text("\n".join(commands) + "\n", encoding="ascii")
         subprocess.run([str(game / "hl.exe"), "-game", mod.name, "-window", "-w", "1280", "-h", "800",
-                        "-nojoy", "+exec", "capture.cfg"], cwd=game, check=True, timeout=90)
+                        "-nomouse", "-nojoy", "+exec", "capture.cfg"], cwd=game, check=True, timeout=90)
         screenshots = sorted(mod.glob(f"{ROOM}*.bmp"))
         for screenshot in screenshots:
             with Image.open(screenshot) as frame:

@@ -469,6 +469,31 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                     dependency = path.parent/"rbchar-assets"/(digest+extension)
                     check(hashlib.sha256(dependency.read_bytes()).hexdigest()==digest,
                           f"Saved {extension} character dependency matches its source")
+                original_document = path.read_bytes()
+                conflict = path.parent/"rbchar-assets"/(garment+".rbw")
+                original_garment = conflict.read_bytes()
+                conflict_bytes = b"test-bad-sidecar"
+                conflict.write_bytes(conflict_bytes)
+                click("character/tab-body")
+                click("character/randomize")
+                wait(lambda:state()["dirty"])
+                click("character/save")
+                wait(lambda:"Conflicting imported asset" in state()["error"])
+                check(path.read_bytes()==original_document and conflict.read_bytes()==conflict_bytes,
+                      "Rejected save leaves the previous document and conflicting sidecar intact")
+                conflict.write_bytes(original_garment)
+                blocker = path.with_suffix(path.suffix+".bak")
+                blocker.unlink(missing_ok=True)
+                blocker.mkdir()
+                click("character/save")
+                wait(lambda:state()["error"] and "Conflicting imported asset" not in state()["error"])
+                check(path.read_bytes()==original_document and blocker.is_dir(),
+                      "Failed atomic backup retains the previous character")
+                blocker.rmdir()
+                click("character/save")
+                wait(lambda:not state()["dirty"] and not state()["error"])
+                check(path.read_bytes()!=original_document,
+                      "Removing the filesystem obstacle lets the edited character save")
                 click("character/new")
                 wait(lambda:not state()["path"])
                 click("character/open")

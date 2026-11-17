@@ -396,6 +396,7 @@ static void characterSave(const std::filesystem::path& path) {
   s.saved = json.dump();
   s.file = path;
   if (s.placement.active) characterPublishPlacement();
+  s.error.clear();
 }
 
 static void characterChooseSave(std::function<void()> saved = {}) {
@@ -1506,12 +1507,17 @@ static void characterPanel() {
       ImGui::BeginDisabled(s.placement.active && (s.placement.awaiting || s.placementJob.valid()));
       const bool save = ImGui::Button("Save");
       placementRect("character/save");
-      if (save) {
-        if (s.file.empty()) characterChooseSave(); else characterSave(s.file);
-      }
       ImGui::SameLine();
-      if (ImGui::Button("Save As...")) characterChooseSave();
+      const bool saveAs = ImGui::Button("Save As...");
       ImGui::EndDisabled();
+      if (save || saveAs) {
+        try {
+          if (saveAs || s.file.empty()) characterChooseSave();
+          else characterSave(s.file);
+        } catch (const std::exception& error) {
+          s.error = error.what();
+        }
+      }
       ImGui::SameLine();
       const bool exportGlb = ImGui::Button("Export GLB...");
       placementRect("character/export-glb");

@@ -50,9 +50,12 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
         benchmark_result.unlink(missing_ok=True)
     game = root / "test-game" / "baseq3"
     game.mkdir(parents=True)
-    if compile_assets:
+    if morph_sweep:
+        (game/"maps").mkdir()
+    if compile_assets or morph_sweep:
         for folder in (root,data):
             (folder/"ftebroom-project.txt").write_text(game.as_posix(),encoding="utf-8")
+    if compile_assets:
         # Give the room a material available to both the compiler and runtime.
         name = Path("textures/rb21/compile-room.tga")
         header = bytearray(18)
@@ -79,10 +82,12 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
         "in 11 echo RB_CHARACTER_FIXTURE_READY\n"
     )
     engine = root / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
+    renderer = os.environ.get("RB_QA_RENDERER")
+    renderer_args = ["+set", "vid_renderer", renderer] if renderer and not benchmark else []
     arguments = [str(engine), "-ftebroom-child-processes", "-basedir", str(root), "-nohome", "-noupdates", "-nosound",
                  "-condebug", "-window", "-width", "1920" if benchmark else "1440",
                  "-height", "1080" if benchmark else "900", "+set",
-                 "ftebroom_skip_setup", "1", "+set", "ftebroom_input_qa", "1", "+exec",
+                 "ftebroom_skip_setup", "1", "+set", "ftebroom_input_qa", "1", *renderer_args, "+exec",
                  "rb21-placement.cfg"]
     log = out / "editor.log"
     checks = []
@@ -293,6 +298,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             wait(lambda:state()["open"] and state()["applied"])
             click("character/save")
             path = Path(wait(lambda:(p := live()["browsePath"]) and p.endswith(".rbchar") and p))
+            assert path.parent.resolve() == (game/"maps").resolve(), path
             click("file-choose")
             wait(path.is_file)
             baseline = json.loads(path.read_text(encoding="utf-8"))["morphs"]

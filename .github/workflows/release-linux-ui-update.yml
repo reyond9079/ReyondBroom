@@ -443,6 +443,7 @@ jobs:
       shell: pwsh
       run: |-
         . ./scripts/setup-ci-renderer.ps1 -Runtime out/release/ReyondBroom-Windows-x64
+        "RB_QA_RENDERER=$env:RB_QA_RENDERER" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         python -m pip install Pillow pywinauto
         if ($LASTEXITCODE) { throw 'Probe dependency install failed' }
     - name: Validate every packaged release (short smoke)

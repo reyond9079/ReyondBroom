@@ -2191,6 +2191,7 @@ static void QDECL videoChanged(int width,int height,qboolean restarted)
   bbImages.clear();bbImageRevisions.clear();bbImageTimes.clear();bbCheckerReady=false;bbRenderRevision=0;
   modelViewerImage=0;modelViewerSkinTexture=0;modelViewerSkinTextureIndex=-1;
   characterEditor.uploaded=false;
+  characterEditor.materialUploads.clear();
   plantVideoChanged();
   uploadFontAtlas();
   ImGui::GetIO().DisplaySize={float(width),float(height)};

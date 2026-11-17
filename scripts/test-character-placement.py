@@ -313,6 +313,21 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             second=preview()
             changed=ImageChops.difference(first,second).convert("L").histogram()
             check(sum(changed[16:])>250,"Native timeline scrubbing changes the actual preview pixels")
+            restart_marker = "ReyondBroom: restored ImGui atlas after renderer restart."
+            console_log = data/"qconsole.log"
+            restarts = console_log.read_text(errors="replace").count(restart_marker)
+            ui.console("vid_restart")
+            wait(lambda:console_log.read_text(errors="replace").count(restart_marker)>restarts)
+            ui.position()
+            wait(lambda:state()["open"] and state()["applied"]==state()["revision"] and
+                 live()["widgets"].get("character/viewport"))
+            ui.settle()
+            restored = preview()
+            check(restored.size==second.size,"Renderer restart restores the same preview bounds")
+            difference = ImageChops.difference(second,restored).convert("L").histogram()
+            check(sum(difference[20:])<restored.width*restored.height*.003,
+                  "Renderer restart preserves the paused pose and visible character materials")
+            screenshot("after-renderer-restart.png")
             screenshot("walk-scrubbed.png")
 
         def exercise_document():

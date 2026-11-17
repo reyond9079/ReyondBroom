@@ -11,6 +11,13 @@ Pass `--sanitize` on Linux to run the parser, fitting, and export checks
 with AddressSanitizer and UndefinedBehaviorSanitizer.
 Pass `--legacy-fixture` with an existing Field Technician `.rbchar` to test
 opening and saving the retired preset. The original file is only read.
+Pass `--goldsrc-game` on Windows with the path to an installed Steam Half-Life.
+The runner exports Casey using the Half-Life profile, compiles the synthetic
+test room with the runtime's SDHLT tools, then runs Half-Life in a temporary
+local mod. It verifies visible changes in three named animation sequences with
+a fixed camera and saves their frames and the exported MDL hash. The test
+requires a running Steam client and permission to create the temporary mod
+directory inside the Half-Life installation. Game assets stay on that machine.
 
 The suite writes `fit-matrix.csv` and `fit-contacts.csv` after sampling all 13
 outfits with five body shapes and eight poses each. It checks actual

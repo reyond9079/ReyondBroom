@@ -24,6 +24,9 @@ def main():
                         help="Looping .rbchar to benchmark on a real GPU and active desktop")
     parser.add_argument("--fte-game-qcc", type=Path,
                         help="FTEQCC for the standalone IQM test using the Linux runtime under Xvfb")
+    parser.add_argument("--goldsrc-game", type=Path, help="Installed Steam Half-Life with hl.exe")
+    parser.add_argument("--goldsrc-fixture", type=Path, default=ROOT/"tests/fixtures/character-goldsrc-room.map",
+                        help="Override the default GoldSrc QA room with a precompiled BSP")
     parser.add_argument("--cxx", default="g++")
     parser.add_argument("--sanitize", action="store_true", help="Also run core ASan/UBSan checks")
     args = parser.parse_args()
@@ -114,6 +117,18 @@ def main():
                 block("STANDALONE-FTE-IQM", "The three native exports must succeed")
         else:
             block("STANDALONE-FTE-IQM", "Supply --fte-game-qcc on Linux with Xvfb")
+        if args.goldsrc_game and os.name=="nt":
+            goldsrc_output = output/"goldsrc"
+            fixture = ROOT/"runtime/characters/examples/Casey.rbchar"
+            if run("NATIVE-GOLDSRC-EXPORT", "test-character-placement.py", runtime, goldsrc_output/"export",
+                   "--fit-fixture", fixture, "--export-goldsrc") == 0:
+                run("STANDALONE-GOLDSRC", "test-character-goldsrc-game.py", args.goldsrc_game.resolve(),
+                    args.goldsrc_fixture.resolve(), goldsrc_output/"export/human.mdl", goldsrc_output/"game",
+                    "--compilers", runtime/"tools/sdhlt")
+            else:
+                block("STANDALONE-GOLDSRC", "The native GoldSrc export must succeed")
+        else:
+            block("STANDALONE-GOLDSRC", "Supply --goldsrc-game on Windows")
         if args.benchmark_fixture:
             run("VIEWPORT-HARDWARE-FRAMES", "test-character-placement.py", runtime,
                 output/"hardware-frames", "--fit-fixture", args.benchmark_fixture.resolve(), "--benchmark")
@@ -125,6 +140,7 @@ def main():
         block("NATIVE-MAP-Q3-BUNDLE", "Supply a prepared runtime and a usable desktop")
         block("NATIVE-MAP-FTE-STARTUP", "Supply a prepared runtime and a usable desktop")
         block("STANDALONE-FTE-IQM", "Supply a Linux runtime, FTEQCC and Xvfb")
+        block("STANDALONE-GOLDSRC", "Supply a Windows runtime, installed Half-Life and the BSP QA room")
         block("VIEWPORT-HARDWARE-FRAMES", "Supply a prepared runtime, a hardware desktop and a looping fixture")
     run_command("RELEASE-LOCK-DRY-RUN", [sys.executable,ROOT/"tests/test-character-release-lock.py"],
                 "Reject unapproved, incomplete, stale or hash-mismatched inputs locally")

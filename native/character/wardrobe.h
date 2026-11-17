@@ -684,7 +684,7 @@ struct ClothingAxes {
     return mul(radial,fullness/std::max(.46,bb::length(radial)));
   }
 
-  Vec3 sleeveClearance(const Vec3& base,const Vec3& anchor) const {
+  Vec3 sleeveClearance(const Vec3& base,const Vec3& anchor,double forearmEase) const {
     const auto width=std::abs(base[0]);
     const auto weight=smoothBand(1.74,2.32,width)*smoothBand(9.42,10.25,base[1]);
     if (weight==0) return {};
@@ -696,8 +696,11 @@ struct ClothingAxes {
     };
     const auto upper=radial(anchor,arm.root,arm.middle), lower=radial(anchor,arm.middle,arm.end);
     const auto outward=unit(dot(upper,upper)<dot(lower,lower) ? upper : lower);
-    const auto clearance=.10-dot(sub(base,anchor),outward);
-    return mul(outward,weight*std::clamp(clearance,0.,.19));
+    // Add ease where the binding is still on the forearm, leaving the
+    // cuff's free edge on its authored line.
+    const auto forearm=smoothBand(2.95,3.95,width)*smoothBand(9.65,10.28,anchor[1]);
+    const auto clearance=.10+forearmEase*forearm-dot(sub(base,anchor),outward);
+    return mul(outward,weight*std::clamp(clearance,0.,.19+forearmEase));
   }
 
   Vec3 collarClearance(const Vec3& base,const Vec3& anchor,double collarBase) const {
@@ -816,6 +819,19 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
   }
   const ClothingAxes garmentAxes(rig);
   const auto* axes = outfit.utilityCut ? &garmentAxes : nullptr;
+  const double sleeveEase=std::string_view(outfit.clothes)=="male_casualsuit05" ? .085 : 0.;
+  FittingSurface napeSurface;
+  if (axes && fitBodyRig) {
+    for (const auto& face : rig.triangles) {
+      if (face.material!=0 || !std::all_of(face.indices.begin(),face.indices.end(),[&](unsigned id) {
+            const auto& point=rig.vertices[id].position;
+            return point[1]>13.20 && point[1]<14.75 && point[2]<.45 && std::abs(point[0])<1.55;
+          })) continue;
+      const auto [a,b,c]=face.indices;
+      napeSurface.addTriangle(points[a],points[b],points[c]);
+    }
+    if (!napeSurface.faces.empty()) napeSurface.subdivide(0,unsigned(napeSurface.faces.size()));
+  }
   std::vector<bool> hide(65536);
   std::uint32_t sourceOffset = 65536;
   const std::string_view hairMesh=hairstyle.mesh;
@@ -871,10 +887,22 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
 
       }
       vertex.position = add(vertex.position,delta);
-      if (material==3 && axes)
+      if (material==3 && axes) {
         vertex.position = add(vertex.position,axes->utilityEase(entry.vertex.position));
+        const auto& base=entry.vertex.position;
+        const auto nape=smoothBand(13.20,13.78,base[1])*(1-smoothBand(-.08,.40,base[2]))*
+                        (1-smoothBand(.70,1.33,std::abs(base[0])));
+        if (nape>0 && fitBodyRig) {
+          // Fit both sides of the sewn seam against the morphed neck so its
+          // vertices stay together as the back of the collar clears the skin.
+          const auto outward=unit(Vec3{base[0]*.80,0,-1});
+          constexpr double clearance=.138;
+          const auto depth=napeSurface.farthest(vertex.position,outward,-clearance,.47,.16);
+          vertex.position=add(vertex.position,mul(outward,(depth+clearance)*nape));
+        }
+      }
       if (material==3 && !axes)
-        vertex.position = add(vertex.position,add(garmentAxes.sleeveClearance(entry.vertex.position,anchor),
+        vertex.position = add(vertex.position,add(garmentAxes.sleeveClearance(entry.vertex.position,anchor,sleeveEase),
                                                   garmentAxes.collarClearance(entry.vertex.position,anchor,collarBase)));
       if (material==4 && outfit.utilityCut && !doc.footwear)
         vertex.position = add(vertex.position,ClothingAxes::utilityBoot(entry.vertex.position));

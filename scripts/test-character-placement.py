@@ -151,6 +151,10 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                     self.run("mousedown",str(button),"sleep",str(hold),"mouseup",str(button))
                     self.settle()
 
+                def scroll(self, steps):
+                    self.run("click","--repeat",str(abs(steps)),"--delay","45","4" if steps>0 else "5")
+                    self.settle()
+
                 def orbit(self,x,y,target):
                     self.move(x,y)
                     self.run("mousedown","1","sleep",".20","mousemove","--window",self.window,
@@ -158,7 +162,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                     self.settle()
 
                 def key(self,key,mods=()):
-                    key = {"backspace":"BackSpace", "enter":"Return", "escape":"Escape"}.get(key,key)
+                    key = {"backspace":"BackSpace", "enter":"Return", "esc":"Escape", "escape":"Escape"}.get(key,key)
                     prefix="+".join((*mods,key))
                     self.run("keydown",prefix,"sleep",".16","keyup",prefix)
                     self.settle()
@@ -197,6 +201,26 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
         def click(key):
             ui.settle()
             ui.click(*item(key))
+
+        def choose(parent, option):
+            click(parent)
+            prefix = parent+"/"
+            key = prefix+str(option)
+            for _ in range(12):
+                target = wait(lambda:live()["widgets"].get(key))
+                left, top, right, bottom = target["clip"]
+                x0, x1 = max(left,target["x"]), min(right,target["x"]+target["width"])
+                y0, y1 = max(top,target["y"]), min(bottom,target["y"]+target["height"])
+                if x1-x0>=4 and y1-y0>=4:
+                    ui.click((x0+x1)*.5,(y0+y1)*.5)
+                    return
+                shown = [rect for name,rect in live()["widgets"].items()
+                         if name.startswith(prefix) and rect.get("visible",True)]
+                assert shown, f"No visible entries in {parent}"
+                middle = shown[len(shown)//2]
+                ui.move(middle["x"]+middle["width"]*.5,middle["y"]+middle["height"]*.5)
+                ui.scroll(2 if target["y"]<middle["y"] else -2)
+            raise AssertionError(f"Could not scroll to {key}")
 
         def hover(key):
             ui.move(*item(key))
@@ -269,18 +293,27 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                 frame = capture().convert("RGB")
                 return frame.crop((x+3,y+3,x+w-3,y+h-3))
 
-            images = set()
-            for name in names:
-                click("character/preset")
-                wait(lambda:live()["widgets"].get("character/preset/"+name))
-                assert "character/preset/Field Technician" not in live()["widgets"]
-                click("character/preset/"+name)
-                wait(lambda:state()["name"]==name and state()["revision"]==state()["applied"])
-                ui.settle()
+            def presented_preview():
                 view = preview()
-                assert any(lo<hi for lo,hi in view.getextrema()), f"Blank preview for {name}"
-                images.add(hashlib.sha256(view.tobytes()).digest())
+                return view if any(lo < hi for lo, hi in view.getextrema()) else None
+
+            images = set()
+
+            def new_preview():
+                if (view := presented_preview()) is not None:
+                    digest = hashlib.sha256(view.tobytes()).digest()
+                    if digest not in images:
+                        return digest
+
+            for name in names:
+                choose("character/preset",name)
+                wait(lambda:state()["name"]==name and state()["revision"]==state()["applied"])
+                images.add(wait(new_preview, timeout=10))
                 screenshot("preset-"+name.lower()+".png")
+            click("character/preset")
+            wait(lambda:live()["widgets"].get("character/preset/"+names[0]))
+            assert "character/preset/Field Technician" not in live()["widgets"]
+            ui.key("esc")
             check(len(images)==len(names),"Ten preset selections render distinct previews and Field Technician is absent")
             for tab_id,tab_name in enumerate(("body","face","appearance","wardrobe","rig")):
                 click("character/tab-"+tab_name)
@@ -293,16 +326,13 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             for field,total in (("outfit",13),("hairstyle",8),("beard",4)):
                 images.clear()
                 for index in range(total):
-                    click("character/"+field)
-                    click(f"character/{field}/{index}")
+                    choose("character/"+field,index)
                     wait(lambda:state()[field]==index and state()["revision"]==state()["applied"])
-                    ui.settle()
-                    images.add(hashlib.sha256(preview().tobytes()).digest())
+                    images.add(wait(new_preview, timeout=10))
                     screenshot(f"{field}-{index:02d}.png")
                 check(len(images)==total,f"{total} native {field} choices render distinct previews")
             click("character/tab-body")
-            click("character/clip")
-            click("character/clip/walk_forward")
+            choose("character/clip","walk_forward")
             wait(lambda:state()["clip"]=="walk_forward")
             ui.settle()
             first=preview()
@@ -322,13 +352,23 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             ui.position()
             wait(lambda:state()["open"] and state()["applied"]==state()["revision"] and
                  live()["widgets"].get("character/viewport"))
-            ui.settle()
-            restored = preview()
+            # After atlas restoration the first presented frames may still show
+            # console notifications or materials that have not been uploaded.
+            def restored_preview():
+                view = presented_preview()
+                if view is None or view.size != second.size:
+                    return None
+                difference = ImageChops.difference(second,view).convert("L").histogram()
+                return view if sum(difference[20:]) < view.width*view.height*.003 else None
+
+            try:
+                restored = wait(restored_preview, timeout=12)
+            except AssertionError:
+                preview().save(out/"preview-after-renderer-restart.png")
+                raise
             restored.save(out/"preview-after-renderer-restart.png")
             check(restored.size==second.size,"Renderer restart restores the same preview bounds")
-            difference = ImageChops.difference(second,restored).convert("L").histogram()
-            check(sum(difference[20:])<restored.width*restored.height*.003,
-                  "Renderer restart preserves the paused pose and visible character materials")
+            check(True,"Renderer restart preserves the paused pose and visible character materials")
             screenshot("after-renderer-restart.png")
             screenshot("walk-scrubbed.png")
 

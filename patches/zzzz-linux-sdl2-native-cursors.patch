@@ -1,0 +1,77 @@
+--- a/engine/gl/gl_vidsdl.c
++++ b/engine/gl/gl_vidsdl.c
+@@ -188,6 +188,53 @@
+ 	}
+ 	return curs;
+ }
++#if defined(__linux__) && SDL_MAJOR_VERSION == 2
++static SDL_Cursor *editor_system_cursors[SDL_NUM_SYSTEM_CURSORS];
++
++static qboolean SDLVID_SetCursorShape(int shape)
++{
++	SDL_SystemCursor cursor;
++	if (!shape)
++	{
++		SDL_SetCursor(SDL_GetDefaultCursor());
++		return true;
++	}
++	switch (shape)
++	{
++	case 1: cursor = SDL_SYSTEM_CURSOR_ARROW; break;
++	case 4: cursor = SDL_SYSTEM_CURSOR_HAND; break;
++	case 5: cursor = SDL_SYSTEM_CURSOR_WAITARROW; break;
++	case 6: cursor = SDL_SYSTEM_CURSOR_WAIT; break;
++	case 9: cursor = SDL_SYSTEM_CURSOR_IBEAM; break;
++	case 15: cursor = SDL_SYSTEM_CURSOR_NO; break;
++	case 26: cursor = SDL_SYSTEM_CURSOR_SIZEWE; break;
++	case 27: cursor = SDL_SYSTEM_CURSOR_SIZENS; break;
++	case 28: cursor = SDL_SYSTEM_CURSOR_SIZENESW; break;
++	case 29: cursor = SDL_SYSTEM_CURSOR_SIZENWSE; break;
++	case 32: cursor = SDL_SYSTEM_CURSOR_SIZEALL; break;
++	default: return false;
++	}
++	if (!editor_system_cursors[cursor])
++		editor_system_cursors[cursor] = SDL_CreateSystemCursor(cursor);
++	if (!editor_system_cursors[cursor])
++		return false;
++	SDL_SetCursor(editor_system_cursors[cursor]);
++	return true;
++}
++
++static void SDLVID_FreeCursorShapes(void)
++{
++	int i;
++	SDL_SetCursor(SDL_GetDefaultCursor());
++	for (i = 0; i < SDL_NUM_SYSTEM_CURSORS; i++)
++	{
++		if (editor_system_cursors[i])
++			SDL_FreeCursor(editor_system_cursors[i]);
++		editor_system_cursors[i] = NULL;
++	}
++}
++#endif
++
+ qboolean GLVID_SetCursor			(void *cursor)
+ {
+ 	SDL_SetCursor(cursor);
+@@ -801,6 +848,9 @@
+ 	rf->VID_CreateCursor = GLVID_CreateCursor;
+ 	rf->VID_DestroyCursor = GLVID_DestroyCursor;
+ 	rf->VID_SetCursor = GLVID_SetCursor;
++#if defined(__linux__) && SDL_MAJOR_VERSION == 2
++	rf->VID_SetCursorShape = SDLVID_SetCursorShape;
++#endif
+ #endif
+ 
+ 	return true;
+@@ -823,6 +873,10 @@
+ 
+ 	IN_DeactivateMouse();
+ 	INS_SetOSK(false);
++
++#if defined(__linux__) && SDL_MAJOR_VERSION == 2
++	SDLVID_FreeCursorShapes();
++#endif
+ 
+ #if SDL_VERSION_ATLEAST(2,0,0)
+ #if !SDL_VERSION_ATLEAST(3,0,0)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Explicit cursor images prevent game assets from supplying a tiny editor cursor.
+// The editor owns the fallback images and their scaled hotspots.
 static std::array<std::string,ImGuiMouseCursor_COUNT> uiCursorNames;
 static std::array<ImVec2,ImGuiMouseCursor_COUNT> uiCursorHotspots;
 static int uiCursorShape(int cursor)
@@ -57,8 +57,13 @@ static void uiCursorUpdate(bool look,float scale)
   const auto& fallback=uiCursorNames[cursor];
   const auto& hot=uiCursorHotspots[cursor];
   char name[160];
-  // Native theme shapes ignore the requested scale. Use the same resizable
-  // hardware image on each backend, with FTE's software fallback if necessary.
+#if defined(__linux__)
+  if(scale==1.f){
+    std::snprintf(name,sizeof name,"shape:%d:%s",uiCursorShape(cursor),fallback.c_str());
+    input->SetMenuFocus(qtrue,name,hot.x,hot.y,scale);
+    return;
+  }
+#endif
   std::snprintf(name,sizeof name,"%s",fallback.c_str());
   input->SetMenuFocus(qtrue,name,hot.x*scale,hot.y*scale,scale);
 }

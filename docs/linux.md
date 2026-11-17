@@ -69,11 +69,11 @@ Clipboard requests run asynchronously, with a 4-second timeout and a 16 MiB limi
 On X11 the editor uses FTE's native clipboard interface. On Wayland it uses the
 bundled helper, including when the editor itself runs through XWayland.
 
-The native engine owns the cursor. On Wayland it uses `wp_cursor_shape_v1` when
-the compositor advertises it; on X11 it loads the matching Xcursor theme shape.
-ImGui's cursor atlas is used only as an image-cursor fallback and is not drawn as
-a second pointer. Relative camera mode remains separate from ordinary absolute
-pointer movement.
+At 100% editor cursor size, the native engine uses the system cursor theme.
+On Wayland this uses `wp_cursor_shape_v1` when the compositor advertises it.
+On X11 it loads the matching Xcursor shape. The SDL2 build requests SDL system
+cursors. Other editor cursor sizes use the scalable ImGui cursor image, which
+also serves as the fallback when a system cursor shape is unavailable.
 
 On Arch, install the corresponding runtime libraries with your package manager:
 `mesa libx11 libxrandr libxcursor libxi alsa-lib libpulse libpng libjpeg-turbo zlib

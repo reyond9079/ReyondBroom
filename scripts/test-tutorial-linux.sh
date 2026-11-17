@@ -11,7 +11,7 @@ cp "$src/tests/tutorial132.cfg" "$test/ftebroom/"
 cd "$test"
 LIBGL_ALWAYS_SOFTWARE=1 timeout 55s ./fteqw-gl64 -nohome -noupdates -window -width 1280 -height 800 -condebug +vid_width 1280 +vid_height 800 +exec tutorial132.cfg > console.txt 2>&1
 if rg '_FAIL|CSQC_Abort|runaway loop error|mod by zero|Outgoing message overflow' console.txt; then exit 1; fi
-for name in outside_lesson_unchanged creation_demo_changes_scene creation_demo_removed_without_redo restore_is_idempotent modified_demo_restores_geometry_material_and_selection grid_stage_has_only_reference_brush tools_stage_starts_empty; do
+for name in outside_lesson_unchanged creation_demo_changes_scene creation_demo_removed_without_redo restore_is_idempotent modified_demo_restores_geometry_material_and_selection grid_stage_starts_empty grid_scroll_alone_does_not_finish grid_ignores_demo_creation grid_same_size_does_not_finish grid_distinct_brushes_finish_and_remain grid_undo_reopens_practice grid_redo_refreshes_practice tools_stage_starts_empty; do
   rg -q "FTEBROOM_TUTORIAL_PASS $name" console.txt
 done
 echo "PASS: $test"

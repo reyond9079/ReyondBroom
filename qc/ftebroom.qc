@@ -308,6 +308,8 @@ void fb_update(vector pixel, float alt, int view)
     }
 }
 void fb_tour_signal(int stage){if(cvar("ftebroom_tour_active")&&!cvar("ftebroom_tour_demo"))cvar_set("ftebroom_tour_result",itos(stage));}
+void fb_tutorial_grid_record(int previous);
+int fb_tutorial_can_undo();
 void fb_finish(vector pixel, float alt, int view)
 {
     if (!fb_active || view!=fb_gesture_view) return;
@@ -347,7 +349,12 @@ void fb_finish(vector pixel, float alt, int view)
             fb_transform_commit(fb_applied_offset);fb_tour_signal(tourStage);
         }
     } else {
-        if(!fb_primitive_create(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5,FALSE)) print("ReyondBroom: shape could not be created.\n");else fb_tour_signal(1);
+        int previous=history;
+        if(!fb_primitive_create(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5,FALSE))
+            print("ReyondBroom: shape could not be created.\n");
+        else if(cvar("ftebroom_tour_active")&&cvar("ftebroom_tour_step")==5)
+            fb_tutorial_grid_record(previous);
+        else fb_tour_signal(1);
     }
     int selectedPatch=!fb_dragged && fb_pick_kind==FB_HIT_PATCH && brush_isselected(fb_model,fb_brush);
     fb_cancel();
@@ -707,7 +714,7 @@ float() ftebroom_command =
     if(fb_tools_command()) return TRUE;
     if(argv(0)=="ftebroom_deselect") {fb_tool_refresh();brush_history_deselect();return TRUE;}
     if(argv(0)=="ftebroom_move") {fb_move_numeric([stof(argv(1)),stof(argv(2)),stof(argv(3))]);return TRUE;}
-    if(argv(0)=="ftebroom_undo") {fb_tool_refresh();brush_undo();return TRUE;}
+    if(argv(0)=="ftebroom_undo") {if(fb_tutorial_can_undo()){fb_tool_refresh();brush_undo();}return TRUE;}
     if(argv(0)=="ftebroom_redo") {fb_tool_refresh();brush_redo();return TRUE;}
     if(argv(0)=="ftebroom_delete" || argv(0)=="brushedit_delete") {
         if(fb_vertex_tool()) {fb_vertex_delete();return TRUE;}

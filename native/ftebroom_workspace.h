@@ -369,7 +369,11 @@ static void uiPreferences()
   if(ImGui::SliderInt("Cursor size",&uiCursorPercent,50,250,"%d%%",ImGuiSliderFlags_AlwaysClamp))uiSaveAppearance();
   ImGui::SameLine();
   if(ImGui::Button("Reset cursor size")){uiCursorPercent=uiDefaultCursorPercent;uiSaveAppearance();}
+#if defined(__linux__)
+  ImGui::TextWrapped("At 100%, use the system cursor theme where supported. Other sizes use the editor's scalable cursor.");
+#else
   ImGui::TextWrapped("Cursor size is independent of UI / font scale and applies immediately.");
+#endif
   ImGui::TextWrapped(
     "Dark panels use the TrenchBroom dark palette. Drag a panel tab to undock it or join "
     "another tab group. Drag dividers to resize.");

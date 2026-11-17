@@ -24,7 +24,7 @@ int fb_batch_apply(fb_batch_move_t *batch,int redo);
 int fb_batch_validate(fb_batch_move_t *batch);
 typedef struct {
     fb_batch_move_t *batch;
-    float timestamp;
+    float timestamp,tutorial_grid;
     int revision,kind,selectionop,selectioncount,aftercount;
     selbrush_t *selection,*afterselection;
     int entitybefore,entityafter;

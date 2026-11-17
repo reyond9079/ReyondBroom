@@ -30,6 +30,7 @@ int fb_bend_apply();
 void fb_sculpt_finish(int apply);
 void fb_sculpt_down(vector pixel);
 void fb_sculpt_move(vector pixel);
+void fb_sculpt_up(vector pixel);
 void fb_sculpt_draw();
 void fb_plant_brush_down(vector pixel,int view);
 void fb_plant_brush_move(vector pixel,int view);
@@ -243,7 +244,7 @@ void fb_tool_pointer_up(vector pixel,float alt,int view)
     if(cvar("ftebroom_tool")==FB_TOOL_SPIN)fb_spin_up(pixel,alt,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_POLYGONCUT||cvar("ftebroom_tool")==FB_TOOL_POLYGONSPAWN)fb_polygon_up(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_BEND)fb_bend_up(pixel,alt,view);
-    else if(cvar("ftebroom_tool")==FB_TOOL_SCULPT)fb_sculpt_finish(TRUE);
+    else if(cvar("ftebroom_tool")==FB_TOOL_SCULPT)fb_sculpt_up(pixel);
     else if(cvar("ftebroom_tool")==FB_TOOL_PLANTBRUSH)fb_plant_brush_up(pixel,view);
     else if(fb_moveface_active)fb_moveface_up(pixel,view);
     else if(cvar("ftebroom_tool")==FB_TOOL_CLIP) fb_clip_up(pixel,view);

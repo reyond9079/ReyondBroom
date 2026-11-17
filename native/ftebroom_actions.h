@@ -357,7 +357,7 @@ static void executeAction(const Action& a, bool down = true)
   if(traceAction(cmd))return;
   command((cmd + "\n").c_str());
 }
-static bool dispatchAction(int key, bool down, bool inScene, int targetView=-1)
+static bool dispatchAction(int key, bool down, bool inScene, int targetView=-1, bool lessonHistory=false)
 {
   initActions();
   for(int f=1;f<=12;f++){auto name="f"+std::to_string(f);if(key==input->GetKeyCode(name.c_str(),nullptr))return false;}
@@ -402,9 +402,11 @@ static bool dispatchAction(int key, bool down, bool inScene, int targetView=-1)
       }
     }
   }
-  if(tourActive)return false;
+  if(tourActive&&!lessonHistory)return false;
   for (auto& a : actions)
   {
+    if(lessonHistory&&std::string_view(a.id)!="Menu/Edit/Undo"&&std::string_view(a.id)!="Menu/Edit/Redo")
+      continue;
     if (!actionMatches(a.context, currentActionContext()))
       continue;
     if (a.enabled && !a.enabled())

@@ -1648,7 +1648,8 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()))) dispatchAction(key, down, inScene, hit);
+    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused())))
+      dispatchAction(key, down, inScene, hit, tourActive&&tourStep==tourGridStep);
   }
   return qtrue;
 }

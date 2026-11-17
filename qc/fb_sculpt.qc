@@ -8,6 +8,7 @@ var float autocvar_ftebroom_sculpt_prevent_collapse=1;
 int fb_sculpt_stroke,fb_sculpt_changed,fb_sculpt_hit;
 vector fb_sculpt_center,fb_sculpt_normal,fb_sculpt_pixel;
 float fb_sculpt_time;
+enum : int { FB_SCULPT_WRITE_FAILED=-1, FB_SCULPT_INVALID_SAMPLE=-2 };
 typedef struct {fb_poly_t source,result;int model,id,contents,offset,changed;} fb_sculpt_brush_t;
 typedef struct {vector point;float delta,limit;int fixed;} fb_sculpt_vertex_t;
 float fb_sculpt_falloff(float distance,float radius)
@@ -85,6 +86,7 @@ int fb_sculpt_at(vector center,vector normal)
         }
         memfree(points);
     }
+    int preflight_valid=valid;
     if(valid)for(int b=0;b<count;b++) {
         fb_sculpt_brush_t *item=&items[b];if(!item->changed)continue;
         for(int f=0;f<item->result.nf;f++)faces[f]=item->result.faces[f].attr;
@@ -92,7 +94,10 @@ int fb_sculpt_at(vector center,vector normal)
     }
     for(int b=0;b<count;b++){fb_poly_free(&items[b].source);fb_poly_free(&items[b].result);}
     memfree(items);memfree(vertices);memfree(mapping);memfree(faces);
-    if(!valid){cvar_set("ftebroom_selection_status",fb_geom_error);return -1;}
+    if(!valid){
+        cvar_set("ftebroom_selection_status",fb_geom_error);
+        return preflight_valid?FB_SCULPT_WRITE_FAILED:FB_SCULPT_INVALID_SAMPLE;
+    }
     return changed;
 }
 void fb_sculpt_finish(int apply)
@@ -108,27 +113,42 @@ void fb_sculpt_pick(vector pixel)
 void fb_sculpt_sample()
 {
     int result=fb_sculpt_at(fb_sculpt_center,fb_sculpt_normal);
-    if(result<0){fb_sculpt_finish(FALSE);return;}if(result>0)fb_sculpt_changed=TRUE;else cvar_set("ftebroom_selection_status","No vertices inside the sculpt brush: increase Radius or use subdivided brush terrain");
+    if(result==FB_SCULPT_WRITE_FAILED){fb_sculpt_finish(FALSE);return;}
+    // An invalid hull was rejected before touching any brushes in this sample.
+    if(result==FB_SCULPT_INVALID_SAMPLE)return;
+    if(result>0)fb_sculpt_changed=TRUE;
+    else cvar_set("ftebroom_selection_status","No vertices inside the sculpt brush: increase Radius or use subdivided brush terrain");
 }
 void fb_sculpt_down(vector pixel)
 {
     fb_sculpt_pick(pixel);if(!fb_sculpt_hit)return;
     fb_tx_begin("Sculpt brushes");fb_sculpt_stroke=TRUE;fb_sculpt_changed=FALSE;fb_active=TRUE;
-    fb_sculpt_pixel=pixel;fb_sculpt_time=time;fb_sculpt_sample();
+    fb_sculpt_pixel=pixel;fb_sculpt_time=gettime(1);fb_sculpt_sample();
 }
 void fb_sculpt_move(vector pixel)
 {
-    if(fb_sculpt_stroke&&time-fb_sculpt_time<.033)return;
+    float now=gettime(1);
+    if(fb_sculpt_stroke&&now-fb_sculpt_time<.033)return;
     fb_sculpt_pick(pixel);if(!fb_sculpt_stroke||!fb_sculpt_hit||vlen(pixel-fb_sculpt_pixel)<1)return;
-    fb_sculpt_time=time;fb_sculpt_pixel=pixel;fb_sculpt_sample();
+    fb_sculpt_time=now;fb_sculpt_pixel=pixel;fb_sculpt_sample();
+}
+void fb_sculpt_up(vector pixel)
+{
+    fb_sculpt_finish(TRUE);
+    fb_sculpt_pick(pixel);
 }
 void fb_sculpt_draw()
 {
-    if(cvar("ftebroom_tool")!=FB_TOOL_SCULPT||!fb_sculpt_hit)return;
+    if(cvar("ftebroom_tool")!=FB_TOOL_SCULPT||cvar("ca_brush_view")||!fb_sculpt_hit)return;
     vector helper='0 0 1';if(fabs(fb_sculpt_normal_z)>.75)helper='1 0 0';
     vector u=normalize(crossproduct(helper,fb_sculpt_normal)),v=crossproduct(fb_sculpt_normal,u);
     vector colour='0.35 1 .55';if(autocvar_ftebroom_sculpt_mode==1)colour='1 .35 .35';if(autocvar_ftebroom_sculpt_mode==2)colour='.35 .65 1';
-    shaderforname("ftebroom/sculpt","{\n{\nmap $whiteimage\nrgbgen vertex\nnodepthtest\n}\n}");
-    float radius=bound(1,autocvar_ftebroom_sculpt_radius,4096);R_BeginPolygon("ftebroom/sculpt");
-    for(int i=0;i<=64;i++){float a=i*2*M_PI/64;R_PolygonVertex(fb_sculpt_center+(u*cos(a)+v*sin(a))*radius,'0 0',colour,1);}R_EndPolygon();
+    float radius=bound(1,autocvar_ftebroom_sculpt_radius,4096);
+    vector center=fb_sculpt_center+fb_sculpt_normal*.5,previous=center+u*radius;
+    for(int i=1;i<=48;i++){
+        float angle=i*2*M_PI/48;
+        vector point=center+(u*cos(angle)+v*sin(angle))*radius;
+        fb_visual_line(previous,point,colour,1,1,TRUE);
+        previous=point;
+    }
 }

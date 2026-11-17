@@ -10,7 +10,7 @@ int fb_tutorial_brushes()
 }
 void fb_tutorial_stage_check()
 {
-    int step=cvar("ftebroom_tour_step"),expected=(step==1 || step==12)?0:1;
+    int step=cvar("ftebroom_tour_step"),expected=(step==1 || step==5 || step==12)?0:1;
     int actual=fb_tutorial_brushes(),selected=selectedbrushcount;
     print(sprintf("FTEBROOM_TUTORIAL_STATE step=%i brushes=%i selected=%i expected=%i view=%g\n",step,actual,selected,expected,cvar("ca_brush_view")));
     int clipFixture=TRUE;
@@ -59,8 +59,25 @@ float fb_tutorial_testcommand()
         for(int f=0;f<faces;f++)strunzone(before[f].shadername);
         fb_tutorial_expect(correct,"modified_demo_restores_geometry_material_and_selection");
     }else if(mode=="empty"){
-        cvar_set("ftebroom_tour_active","1");fb_tutorial_prepare(5);
-        fb_tutorial_expect(fb_tutorial_brushes()==1 && !selectedbrushcount,"grid_stage_has_only_reference_brush");
+        cvar_set("ftebroom_tour_active","1");cvar_set("ftebroom_tour_step","5");fb_tutorial_prepare(5);
+        fb_tutorial_expect(fb_tutorial_brushes()==0 && !selectedbrushcount,"grid_stage_starts_empty");
+        cvar_set("ca_grid","16");fb_tutorial_grid_progress();cvar_set("ca_grid","32");fb_tutorial_grid_progress();
+        fb_tutorial_expect(!cvar("ftebroom_tour_result")&&!cvar("ftebroom_tour_first_grid"),"grid_scroll_alone_does_not_finish");
+        int gridHistory=history;cvar_set("ftebroom_tour_demo","1");fb_createbox('0 0 16','64 64 32');
+        fb_tutorial_grid_record(gridHistory);fb_tutorial_grid_progress();cvar_set("ftebroom_tour_demo","0");
+        fb_tutorial_expect(!cvar("ftebroom_tour_first_grid"),"grid_ignores_demo_creation");
+        fb_tutorial_restore();
+        cvar_set("ca_grid","16");
+        gridHistory=history;fb_createbox('-128 0 8','64 64 16');fb_tutorial_grid_record(gridHistory);
+        gridHistory=history;fb_createbox('0 0 8','64 64 16');fb_tutorial_grid_record(gridHistory);fb_tutorial_grid_progress();
+        fb_tutorial_expect(!cvar("ftebroom_tour_result")&&cvar("ftebroom_tour_first_grid")==16,"grid_same_size_does_not_finish");
+        cvar_set("ca_grid","32");gridHistory=history;fb_createbox('128 0 16','64 64 32');
+        fb_tutorial_grid_record(gridHistory);fb_tutorial_grid_progress();
+        fb_tutorial_expect(cvar("ftebroom_tour_result")==5&&fb_tutorial_brushes()==3,"grid_distinct_brushes_finish_and_remain");
+        brush_undo();fb_tutorial_grid_progress();
+        fb_tutorial_expect(!cvar("ftebroom_tour_result")&&fb_tutorial_brushes()==2,"grid_undo_reopens_practice");
+        brush_redo();fb_tutorial_grid_progress();
+        fb_tutorial_expect(cvar("ftebroom_tour_result")==5&&fb_tutorial_brushes()==3,"grid_redo_refreshes_practice");
         fb_tutorial_prepare(12);fb_tutorial_expect(fb_tutorial_brushes()==0 && !selectedbrushcount,"tools_stage_starts_empty");
     }
     if(mode=="stage")fb_tutorial_stage_check();
@@ -73,7 +90,7 @@ float fb_tutorial_testcommand()
             fb_createbox('256 0 32','64 64 64');
             fb_createbox('512 0 32','64 64 64');
             fb_tutorial_prepare(step);
-            int count=(step==1 || step==12)?0:1;
+            int count=(step==1 || step==5 || step==12)?0:1;
             if(step>=7)fb_tutorial_expect(cvar("ca_grid")==16,strcat("stage_restores_demo_grid_",itos(step)));
             fb_tutorial_expect(fb_tutorial_brushes()==count,strcat("stage_clean_",itos(step)));
             fb_tutorial_expect(selectedbrushcount==((step>=2 && step<=4)||(step>=7 && step<=9)?1:0),strcat("stage_target_selection_",itos(step)));

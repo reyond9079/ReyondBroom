@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Lessons run in a disposable map and consume the normal editor input/tools.
-static constexpr int tourViewportStep=6,tourClipStep=7,tourVertexSelectStep=8,tourVertexStep=9,
+static constexpr int tourGridStep=5,tourViewportStep=6,tourClipStep=7,tourVertexSelectStep=8,tourVertexStep=9,
   tourMaterialStep=10,tourFaceStep=11,tourToolsStep=12,tourStepCount=13;
 static int tourStep=0,tourSavedLayout=1,tourSavedFocus=0,tourSavedMax=-1;
 static std::array<int,4> tourSavedViewTypes;
 static bool tourDemo=false,tourDemoPressed=false,tourDone=false,tourWaitingForMap=false;
 static bool tourChangedLayout=false,tourClipChosen=false;
 static int tourClipDemoAction=0;
-static float tourSavedGrid=16,tourSavedWheel=1,tourGrid=16,tourSavedClipKeep=0;
+static float tourSavedGrid=16,tourSavedWheel=1,tourSavedClipKeep=0;
 static float tourSavedSplitX=.5f,tourSavedSplitY=.5f;
 static double tourStepTime=0,tourInputReady=0;
 static float tourCameraStart[7]{};
@@ -43,7 +43,6 @@ static void tourPrepare(int step){
   // Every lesson owns a fresh disposable scene, including the grid/tools pages.
   // Practice brushes from the preceding lesson must never accumulate.
   tourWaitingForMap=true;tourInputReady=tourStepTime+30;command(gameClassic()?"mapedit maps/reyond-tutorial.map\n":"mapedit maps/reyond-tutorial-q3.map\n");
-  if(step==5)tourGrid=cvars->GetFloat("ca_grid");
 }
 static void tourMapReady(){
   if(!tourActive||!tourWaitingForMap)return;tourWaitingForMap=false;
@@ -158,6 +157,7 @@ static void tourQaPublish(float width,float height){
     {"demo",tourDemo},{"done",tourDone},{"chosen",tourClipChosen},{"tool",int(cvars->GetFloat("ftebroom_tool"))},
     {"clipPoints",int(cvars->GetFloat("ftebroom_clip_points"))},{"selected",int(cvars->GetFloat("ftebroom_selection_count"))},
     {"faces",int(cvars->GetFloat("ftebroom_face_count"))},{"result",int(cvars->GetFloat("ftebroom_tour_result"))},
+    {"grid",cvars->GetFloat("ca_grid")},{"firstGrid",cvars->GetFloat("ftebroom_tour_first_grid")},
     {"bspPreview",cvars->GetFloat("ftebroom_bsp_preview")!=0},{"targets",points},{"views",views},{"widgets",tourQaItems}};
   try{bb::atomicWrite(documentPath("onboarding-live.json"),state.dump());}catch(const std::exception&){}
 }
@@ -236,7 +236,8 @@ static void tourPanel(float w,float h){
     tourCameraLooked|=std::abs(v[3]-tourCameraStart[3])+std::abs(v[4]-tourCameraStart[4])>8;tourDone=tourCameraMoved&&tourCameraLooked;
   }}
   if(!tourDemo&&now>tourInputReady&&tourStep>=1&&tourStep<=4)tourDone|=cvars->GetFloat("ftebroom_tour_result")==tourStep;
-  if(tourStep==5&&cvars->GetFloat("ca_grid")!=tourGrid)tourDone=true;
+  const float firstGrid=cvars->GetFloat("ftebroom_tour_first_grid"),grid=cvars->GetFloat("ca_grid");
+  if(tourStep==tourGridStep)tourDone=tourFixtureReady()&&cvars->GetFloat("ftebroom_tour_result")==tourGridStep;
   if(tourStep==tourClipStep&&!tourDemo&&tourClipChosen)tourDone|=cvars->GetFloat("ftebroom_tour_result")==tourClipStep;
   if(tourStep==tourVertexSelectStep&&tourClipChosen)tourDone=cvars->GetFloat("ftebroom_tool")==7;
   if(tourStep>=tourVertexStep&&tourStep<=tourFaceStep&&!tourDemo&&now>tourInputReady)tourDone|=cvars->GetFloat("ftebroom_tour_result")==tourStep;
@@ -254,7 +255,15 @@ static void tourPanel(float w,float h){
   uiSectionHeading(titles[tourStep]);
   const char* task=tasks[tourStep];
   if(tourStep==tourClipStep&&tourClipChosen)task="Place two points on the top face with the left mouse button, then press Enter to cut the brush.";
-  ImGui::TextWrapped("%s",uiTr(task));
+  if(tourStep==tourGridStep){
+    if(tourDone)task="Compare the brush heights and how their edges line up with the grid.";
+    else if(firstGrid==0)task="Drag on empty ground to create a brush at the current grid size.";
+    else if(firstGrid==grid)task="Turn the mouse wheel to choose a different grid size.";
+    else task="Drag on an empty spot next to the first brush to compare the two sizes.";
+    ImGui::TextWrapped("%s",uiTr(task));
+    ImGui::Text(uiTr("Grid size: %g"),grid);
+    if(firstGrid!=0){ImGui::SameLine();ImGui::Text(uiTr("First brush: %g"),firstGrid);}
+  }else ImGui::TextWrapped("%s",uiTr(task));
   if(tourDemo)ImGui::TextUnformatted("Watch the demonstration...");else if(tourDone)ImGui::TextColored({.45f,.95f,.55f,1},"Done! Continue when you are ready.");else ImGui::TextUnformatted("Your turn");
   if(tourStep==tourViewportStep){
     const char* layouts[]={"1 view","2 views","3 views","4 views"};
@@ -309,7 +318,7 @@ static void tourPanel(float w,float h){
     tourDemoCursor(p,scale,held);
     if(tourStep>=3)ImGui::GetForegroundDrawList()->AddText({p.x+20*scale,p.y+50*scale},IM_COL32_WHITE,uiTr(tourStep==3?"Alt":"Left Shift"));
   }
-  if(tourStep==5&&!tourWaitingForMap)tourWheelIndicator(w,h,now,scale);
+  if(tourStep==tourGridStep&&!tourDone&&firstGrid!=0&&firstGrid==grid&&!tourWaitingForMap)tourWheelIndicator(w,h,now,scale);
   if(tourStep==tourClipStep||tourStep==tourVertexSelectStep||tourStep==tourVertexStep||tourStep==tourToolsStep){
     ImGui::SetNextWindowPos({16*scale,toolsY});ImGui::SetNextWindowSize({w-32*scale,0});
     ImGui::Begin("Tools##lesson",nullptr,ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse);

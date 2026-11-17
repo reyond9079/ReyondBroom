@@ -4,6 +4,10 @@
 // as well as geometry; creation demonstrations leave no brush behind.
 var int fb_tutorial_checkpoint=-1;
 void fb_tutorial_stage_check();
+int fb_tutorial_can_undo()
+{
+    return !cvar("ftebroom_tour_active") || cvar("ftebroom_tour_step")!=5 || history>fb_tutorial_checkpoint;
+}
 void fb_tutorial_prepare(int step)
 {
     if(!cvar("ftebroom_tour_active"))return;
@@ -28,17 +32,41 @@ void fb_tutorial_prepare(int step)
     fb_tx_commit();fb_selection_clear();
     // One isolated target; creation and the final tools page are empty.
     cvar_set("ca_newbrushtexture","ftebroom/qa_blue");
-    if(step==0 || (step>=2 && step<=11))fb_createbox('0 0 32','96 96 64');
-    if(step==0 || step==5 || step==6 || step==10 || step==11)fb_selection_clear();
+    if(step==0 || (step>=2 && step<=11 && step!=5))fb_createbox('0 0 32','96 96 64');
+    if(step==0 || step==6 || step==10 || step==11)fb_selection_clear();
+    cvar_set("ftebroom_tour_first_grid","0");
     if(step==9)fb_tool_activate(FB_TOOL_VERTEX);
     cvar_set("ftebroom_tour_fixture_ready",ftos(step+1));
     fb_tutorial_checkpoint=history;
     if(cvar("ftebroom_skip_setup") && cvar("ftebroom_followup133_qa"))fb_tutorial_stage_check();
 }
+void fb_tutorial_grid_record(int previous)
+{
+    if(cvar("ftebroom_tour_demo"))return;
+    for(int i=max(previous,history_min);i<history;i++){
+        history_t *entry=&historyring[i&(historyring_length-1)];
+        if(entry->kind==HIST_GEOMETRY&&!entry->wasdelete&&entry->brushdata)
+            entry->tutorial_grid=fb_grid();
+    }
+    fb_selection_clear();
+}
+void fb_tutorial_grid_progress()
+{
+    float first=0,second=0;
+    for(int i=max(fb_tutorial_checkpoint,history_min);i<history;i++){
+        history_t *entry=&historyring[i&(historyring_length-1)];
+        if(!entry->tutorial_grid || brush_get(entry->brushmodel,entry->id,__NULL__,0,__NULL__)<=0)continue;
+        if(!first)first=entry->tutorial_grid;
+        else if(first!=entry->tutorial_grid){second=entry->tutorial_grid;break;}
+    }
+    cvar_set("ftebroom_tour_first_grid",ftos(first));
+    cvar_set("ftebroom_tour_result",second?"5":"0");
+}
 void fb_tutorial_project()
 {
     int step=cvar("ftebroom_tour_step");
     vector a,b;
+    if(step==5)fb_tutorial_grid_progress();
     if(step==7){
         // Separate points across screen width, not along the foreshortened
         // depth axis: the second click must not grab the first point's handle.

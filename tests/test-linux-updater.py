@@ -37,6 +37,35 @@ def custom_game_settings(root):
             'ftebroom/compilation-profiles.json':(json.dumps(workspace,ensure_ascii=False,indent=2)+'\r\n').encode('utf-8')}
 
 class UpdateTests(unittest.TestCase):
+    def test_obsolete_shipped_files_are_removed_but_modified_files_survive(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'root';stage=Path(temp)/'stage';backup=Path(temp)/'backup'
+            for folder in (root,stage,backup):folder.mkdir()
+            old={'obsolete.dll':b'old program','modified.dll':b'original program','untracked.map':b'map'}
+            (root/'distribution-manifest.json').write_text(json.dumps({name:hashlib.sha256(data).hexdigest() for name,data in old.items() if name!='untracked.map'}))
+            for name,data in old.items():(root/name).write_bytes(data)
+            (root/'modified.dll').write_bytes(b'user override')
+            (stage/'new.dll').write_bytes(b'new program')
+            updater.install(root,stage,backup)
+            self.assertFalse((root/'obsolete.dll').exists())
+            self.assertEqual((backup/'obsolete.dll').read_bytes(),b'old program')
+            self.assertEqual((root/'modified.dll').read_bytes(),b'user override')
+            self.assertEqual((root/'untracked.map').read_bytes(),b'map')
+
+    def test_confirmed_installation_releases_only_completed_version_backup(self):
+        for stage, version, keep in [('ready','0.6.0-alpha.27',True),
+                                     ('error','0.6.0-alpha.27',True),
+                                     ('installed','0.6.0-alpha.26',True),
+                                     ('installed','0.6.0-alpha.27',False)]:
+            with self.subTest(stage=stage,version=version), tempfile.TemporaryDirectory() as temp:
+                updates=Path(temp);backup=updates/'backup-completed';backup.mkdir()
+                (backup/'engine').write_text('rollback')
+                (updates/'status.json').write_text(json.dumps({'stage':stage,'available_version':version}))
+                (updates/'notes.txt').write_text('user')
+                updater.cleanup_confirmed_installation(updates,'v0.6.0-alpha.27')
+                self.assertEqual(backup.exists(),keep)
+                self.assertEqual((updates/'notes.txt').read_text(),'user')
+
     def test_cleanup_keeps_latest_backup_and_user_files(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);updates=root/'updates';updates.mkdir()

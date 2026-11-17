@@ -57,6 +57,11 @@ for name, digest in manifest.items():
 sources = out / 'corresponding-sources'
 with zipfile.ZipFile(a.base_sources) as archive:
     archive.extractall(sources)
+runpy.run_path(str(src/'scripts/fetch-ericw.py'))['install'](
+    root/'tools/ericw', a.platform, sources/'tools/ericw')
+if windows:
+    for name in ('msvcp140.dll','vcruntime140.dll','vcruntime140_1.dll'):
+        assert (root/'tools/ericw'/name).is_file(), 'Missing portable compiler runtime: '+name
 if a.imgui_source:
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=a.imgui_source).decode().split('\0')
     with zipfile.ZipFile(sources / 'sources/imgui-source.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
@@ -131,7 +136,7 @@ compiler = subprocess.check_output(['g++', '--version'], text=True).splitlines()
 info = (f'ReyondBroom {a.version}\nPlatform: {a.platform}\nEditor revision: {revision}\n'
         f'Editor compiler: {compiler}\nModule SHA256: {sha(root / module_name)}\n'
         + ('Engine rebuilt from pinned FTE sources with the current editor patch stack.\n' if a.engine else 'Engine retained from the verified base runtime.\n')+
-        'Plugins and game compilers retained from the verified base runtime.\n'
+        'Quake compilers updated to the verified ericw-tools pin. Other game compilers and plugins retained from the verified base runtime.\n'
         + ('Windows audio helper rebuilt from pinned sources.\n' if windows else 'System FFmpeg is used through the bundled wrapper.\n'))
 (root / 'build-info.txt').write_text(info)
 (sources / 'RELEASE-BUILD.txt').write_text(info + 'Build/QA: sources/ftebroom/.github/workflows/release-linux-ui-update.yml\n')

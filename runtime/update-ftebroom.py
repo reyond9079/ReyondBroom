@@ -217,6 +217,9 @@ def install(root, stage, backup):
         old = json.loads((root/'distribution-manifest.json').read_text())
     except (OSError, ValueError):
         old = {}
+    if not isinstance(old, dict):
+        old = {}
+    staged_names = {file.relative_to(stage).as_posix() for file in stage.rglob('*') if file.is_file()}
     changed = []
     try:
         for source in sorted(stage.rglob('*')):
@@ -238,6 +241,15 @@ def install(root, stage, backup):
             shutil.copy2(source, temporary)
             changed.append((target, saved, existed))
             os.replace(temporary, target)
+        for name in sorted(set(old)-staged_names):
+            target = target_under(root, name)
+            if not target.is_file() or preserve(root, name, old) or file_hash(target) != old[name]:
+                continue
+            saved = target_under(backup, name)
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(target, saved)
+            changed.append((target, saved, True))
+            target.unlink()
     except Exception:
         for target, saved, existed in reversed(changed):
             if existed:
@@ -252,10 +264,10 @@ def process_identity(pid):
     except OSError:
         return None
 
-def cleanup_updates(updates, keep_backup):
+def cleanup_updates(updates, keep_backup=None):
     """Remove only updater-owned direct children, never following links."""
     updates = updates.resolve()
-    keep_backup = keep_backup.resolve()
+    keep_backup = keep_backup.resolve() if keep_backup is not None else None
     for path in updates.iterdir():
         if path.is_symlink() or path.resolve() == keep_backup:
             continue
@@ -265,6 +277,16 @@ def cleanup_updates(updates, keep_backup):
         elif path.is_file() and re.fullmatch(
                 r'(?:ReyondBroom|FTEBroom)-[0-9][a-zA-Z0-9.\-]*-(Windows-x64\.zip|Linux-(?:SDL2-)?x64\.tar\.gz)(\.part|\.sha256)?', path.name):
             path.unlink()
+
+
+def cleanup_confirmed_installation(updates, current_version):
+    try:
+        previous = json.loads((updates/'status.json').read_text(encoding='utf-8'))
+        if (previous.get('stage') == 'installed' and
+                previous.get('available_version') == current_version.removeprefix('v')):
+            cleanup_updates(updates)
+    except (OSError, ValueError):
+        pass
 
 def main():
     parser = argparse.ArgumentParser()
@@ -301,6 +323,9 @@ def main():
             return
         try:
             identity = process_identity(args.parent_id) if args.parent_id else None
+            # A running updated editor confirms that the previous install starts.
+            # Its rollback copy is no longer needed. The lock excludes installers.
+            cleanup_confirmed_installation(updates, args.current_version)
             archive = args.local_package
             if not archive:
                 status('Checking GitHub releases...')

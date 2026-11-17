@@ -1,18 +1,10 @@
 {
-  "version": "0.18.1",
-  "binary_url": "https://github.com/ericwa/ericw-tools/releases/download/v0.18.1/ericw-tools-v0.18.1-win64.zip",
-  "binary_sha256": "a0f39c6faeb29cd08b267880cdcebb310f9938fef4cbbff07d1f6843c36e9cd3",
-  "source_url": "https://github.com/ericwa/ericw-tools/archive/refs/tags/v0.18.1.zip",
-  "source_sha256": "5080afb2008676b290e8a01fac342bc0a987e7cde5679a3b2f6da093c98e4e8f",
-  "files": {
-    "bspinfo.exe": "d111890f6f6dc1e30ce5e8d8bb31503847f7054795f4d944eced7c90737ce547",
-    "bsputil.exe": "cf0163756f1266e127f7b6a17f077d097e9a4b159bb3c1250ed84f818c92fa66",
-    "embree.dll": "1d51f31692fc15f0fc92c4af528389cddbb67092b69dfc2b31d5cc49d3731fc4",
-    "freeglut.dll": "cf62555f14d64fac1d650e1a24c86465b70ca410c3d6942fce2e6f25672490c7",
-    "light.exe": "c541d910f5b0dd93b63192f9440017222190085101124cf09f133291131581e2",
-    "qbsp.exe": "cedc3c80942067e31fa4b383855a23f1cdf5b9ac89c67d9871dc258327d65ed2",
-    "tbb.dll": "1092adfeec98c23a5021b287fa35839ddd3f29741a4080c8ccaf8fd95d2e5c52",
-    "tbbmalloc.dll": "10db54f0d26ab6b85e17bae539ef70752a6f9ec21466630f2fc8ada6da7b06d7",
-    "vis.exe": "5c89a799edecf4a1a875ade080d32f3eae553bd57a53ecf8ca1786bb1a076297"
-  }
+  "version": "2.0.0-alpha11",
+  "commit": "c243aa348c9e5a1838bb69cf6c3ff20bebd94a8a",
+  "binary_url": "https://github.com/ericwa/ericw-tools/releases/download/2.0.0-alpha11/ericw-tools-2.0.0-alpha11-win64.zip",
+  "binary_sha256": "4e5ea11be2194a1c4acac6d6da9d5b5b9f65324fda2d67efa0731d1fd8e0745f",
+  "linux_url": "https://github.com/ericwa/ericw-tools/releases/download/2.0.0-alpha11/ericw-tools-2.0.0-alpha11-Linux.zip",
+  "linux_sha256": "166109ab47657d291142992070bcb661e3029708916e152c690473dfb0f74f15",
+  "source_url": "https://codeload.github.com/ericwa/ericw-tools/zip/c243aa348c9e5a1838bb69cf6c3ff20bebd94a8a",
+  "source_sha256": "7402c594b67a32d907ed33cab732fea37a22cb58b67cf3dadefd7712b22fef0d"
 }

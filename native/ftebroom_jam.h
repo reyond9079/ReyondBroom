@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include <future>
+#ifdef _WIN32
+#include <tlhelp32.h>
+#endif
 #include "ftebroom_jam_client.h"
 #include "ftebroom_jam_resource_process.h"
 
@@ -8,6 +11,51 @@ namespace jam = ftebroom::jam;
 namespace {
 using JamJson = jam::Json;
 namespace JamFs = std::filesystem;
+
+bool jamOtherEngineRunning()
+{
+#ifdef _WIN32
+  const auto snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
+  if(snapshot==INVALID_HANDLE_VALUE)return true;
+  PROCESSENTRY32W entry{};entry.dwSize=sizeof entry;
+  bool running=false;
+  if(Process32FirstW(snapshot,&entry))do {
+    if(entry.th32ProcessID==GetCurrentProcessId())continue;
+    std::wstring name(entry.szExeFile);
+    std::transform(name.begin(),name.end(),name.begin(),::towlower);
+    if(name.rfind(L"fteqw",0)==0 || name==L"fteglqw64.exe"){running=true;break;}
+  }while(Process32NextW(snapshot,&entry));
+  CloseHandle(snapshot);return running;
+#else
+  std::error_code error;
+  for(JamFs::directory_iterator it("/proc",error),end;!error && it!=end;it.increment(error)) {
+    const auto id=it->path().filename().string();
+    if(id.empty() || !std::all_of(id.begin(),id.end(),[](unsigned char c){return std::isdigit(c);}) || id==std::to_string(getpid()))continue;
+    std::ifstream input(it->path()/"comm");std::string name;std::getline(input,name);
+    if(name.rfind("fteqw",0)==0 || name.rfind("fteglqw",0)==0)return true;
+  }
+  return bool(error);
+#endif
+}
+
+void jamCleanupTemporaryArtifacts(const JamFs::path& root)
+{
+  if(jamOtherEngineRunning())return;
+  const auto expired=JamFs::file_time_type::clock::now()-std::chrono::hours(24);
+  for(const char* folder:{"play","snapshots"}) {
+    const auto parent=root/folder;
+    std::error_code error;
+    if(JamFs::is_symlink(parent,error) || error)continue;
+    for(JamFs::directory_iterator it(parent,error),end;!error && it!=end;it.increment(error)) {
+      const auto name=it->path().filename().string();
+      if(name.size()!=24 || !std::all_of(name.begin(),name.end(),[](unsigned char c){return std::isdigit(c) || (c>='a'&&c<='f');}))continue;
+      std::error_code check;
+      if(it->is_symlink(check) || check || !it->is_directory(check) || check)continue;
+      if(it->last_write_time(check)>=expired || check)continue;
+      JamFs::remove_all(it->path(),check);
+    }
+  }
+}
 
 #include "ftebroom_jam_start_map.inc"
 
@@ -73,7 +121,7 @@ struct JamLocal {
   int reportReason = 0, reportTarget = 0;
   int gift = 1;
   std::string error, status, selection, confirm, operation, draftPlot;
-  JamFs::path gameDraft;
+  JamFs::path gameDraft, gameRoot, cleanedCacheRoot;
   JamPublishedMap publishingMap, publishedMap;
   std::string retryKey, retryIntent;
   JamFs::path pack;
@@ -81,10 +129,9 @@ struct JamLocal {
 #ifndef _WIN32
   jam::ResourceProcess resourceProcess;
   bool resourceRetryFresh = false;
-#else
+#endif
   std::future<void> packCleanup;
   std::vector<JamFs::path> retiredPacks;
-#endif
   std::optional<JamUpload> snapshot;
   JamJson account, rules, board, wallet;
   JamJson players = JamJson::array();
@@ -1321,7 +1368,10 @@ void jamSendSnapshot(JamUpload upload)
   const auto map = upload.map;
   jamStart(jamText("Uploading the MAP snapshot…","Отправка снимка MAP…"),
     [upload=std::move(upload),rules](auto client) {
-      return jam::sendMap(client,upload.map.plot,rules,upload.baseRevision,upload.title,upload.path);
+      auto result=jam::sendMap(client,upload.map.plot,rules,upload.baseRevision,upload.title,upload.path);
+      std::error_code ignored;
+      JamFs::remove_all(upload.path.parent_path(),ignored);
+      return result;
     },
     [map](auto value) {
       jamLocal.operation = value.at("operationId");
@@ -1449,6 +1499,7 @@ void jamLaunchMap(const std::string& plot, bool hub, bool fromDraft, const std::
       jamLocal.child = runLaunchedEngines.back();
       runLaunchedEngines.pop_back();
       jamLocal.gameDraft = draft;
+      jamLocal.gameRoot = root;
       jamLocal.status = jamText("Playing in the Jam mod.","Запущена игра в моде Jam.");
     });
 }
@@ -1536,7 +1587,6 @@ void jamTick()
       jamBeginPublish(jamLocal.draftPlot,std::exchange(jamLocal.publishPlayAfterSave,false));
     }
   }
-#ifdef _WIN32
   if (jamLocal.packCleanup.valid() &&
       jamLocal.packCleanup.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     try { jamLocal.packCleanup.get(); } catch (const std::exception&) {}
@@ -1550,7 +1600,14 @@ void jamTick()
       jamLocal.retiredPacks.pop_back();
     } catch (const std::system_error&) {}
   }
-#endif
+  if(!jamLocal.packCleanup.valid() && !jamBusy() && !jamLocal.child && !runActive &&
+     !buildRunning && !savingDocument && !jamLocal.client.token.empty() && jamLocal.cleanedCacheRoot!=jamRoot()) {
+    const auto root=jamRoot();
+    try {
+      jamLocal.packCleanup=std::async(std::launch::async,[root]{jamCleanupTemporaryArtifacts(root);});
+      jamLocal.cleanedCacheRoot=root;
+    }catch(const std::system_error&){}
+  }
   if (jamLocal.work.valid() && jamLocal.work.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     auto done = std::move(jamLocal.ready);
     auto resourceTransfer = std::move(jamLocal.resourceTransfer);
@@ -1653,6 +1710,9 @@ void jamTick()
   if (waitpid(jamLocal.child, &exitCode, WNOHANG) == 0) return;
 #endif
   jamLocal.child = 0;
+  if(!jamLocal.gameRoot.empty()) {
+    jamLocal.retiredPacks.push_back(std::exchange(jamLocal.gameRoot,JamFs::path{}));
+  }
   const bool returnToDraft = !jamLocal.gameDraft.empty() && jamEditing() && documentFile==jamLocal.gameDraft;
   jamLocal.gameDraft.clear();
   if (returnToDraft) jamLocal.open = false;

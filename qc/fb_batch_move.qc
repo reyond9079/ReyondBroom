@@ -123,7 +123,7 @@ int fb_batch_document(int first,int last,int redo)
     if(pointsChanged && fb_point_group_bounds){
         static vector groupBounds[2];
         for(int i=0;i<fb_point_node_count;i++){
-            int group=i/64;fb_entity_bounds(fb_nodes[fb_point_nodes[i]].id,groupBounds);
+            int group=i/64;fb_entity_render_bounds(fb_nodes[fb_point_nodes[i]].id,groupBounds);
             if(!(i%64)){fb_point_group_bounds[group*2]=groupBounds[0];fb_point_group_bounds[group*2+1]=groupBounds[1];}
             else for(int a=0;a<3;a++){fb_point_group_bounds[group*2][a]=min(fb_point_group_bounds[group*2][a],groupBounds[0][a]);fb_point_group_bounds[group*2+1][a]=max(fb_point_group_bounds[group*2+1][a],groupBounds[1][a]);}
         }

@@ -6,6 +6,8 @@ root=Path(tempfile.mkdtemp(prefix='ReyondBroom-update-test-'))
 (root/'ftebroom').mkdir();(root/'fteqw64.exe').write_bytes(b'old engine');(root/'ftebroom/appearance.cfg').write_text('4 1 1');(root/'ftebroom/maps').mkdir();(root/'ftebroom/maps/mine.map').write_text('user map');(root/'ftebroom-game-profile.txt').write_text('my mod path')
 (root/'ftebroom/custom.wad').write_bytes(b'user-added texture')
 (root/'ftebroom/defaults.cfg').write_bytes(b'old defaults')
+(root/'obsolete.dll').write_bytes(b'old distributed library')
+(root/'customized.dll').write_bytes(b'user override')
 game_defaults={'reyondbroom-legacy-games.txt':b'"" "" "" "" "" 0\n',
  'ftebroom/reyondbroom-legacy-games.txt':b'"" "" "" "" "" 0\n',
  'ftebroom/reyondbroom-quake2-build-options.txt':b'1 1 1 "" "" ""\n',
@@ -26,6 +28,8 @@ games={'reyondbroom-legacy-games.txt':(' '.join(json.dumps(value,ensure_ascii=Fa
  'ftebroom/compilation-profiles.json':(json.dumps(workspace,ensure_ascii=False,indent=2)+'\r\n').encode('utf-8')}
 for name,value in games.items():(root/name).write_bytes(value)
 (root/'distribution-manifest.json').write_text(json.dumps({
+ 'obsolete.dll':hashlib.sha256(b'old distributed library').hexdigest(),
+ 'customized.dll':hashlib.sha256(b'original distributed library').hexdigest(),
  'ftebroom/custom.wad':hashlib.sha256(b'original wad').hexdigest(),
  'ftebroom/defaults.cfg':hashlib.sha256(b'old defaults').hexdigest(),
  **{name:hashlib.sha256(value).hexdigest() for name,value in games.items()}}))
@@ -65,6 +69,9 @@ assert not (updates/'stage-old').exists() and not (updates/'backup-old').exists(
 assert not (updates/'ReyondBroom-0.5.0-alpha.20-Windows-x64.zip.part').exists()
 assert (updates/'notes.txt').read_text()=='keep' and package.exists()
 assert len(list(updates.glob('backup-*')))==1 and not list(updates.glob('stage-*'))
+assert not (root/'obsolete.dll').exists()
+assert next(updates.glob('backup-*/obsolete.dll')).read_bytes()==b'old distributed library'
+assert (root/'customized.dll').read_bytes()==b'user override'
 assert (root/'fteqw64.exe').read_bytes()==b'new engine'
 assert plugin.read_bytes()==b'unchanged plugin'
 assert legacy_tmp.read_bytes()==b'old failed update residue'

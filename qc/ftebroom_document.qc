@@ -68,7 +68,7 @@ void fb_document_lists_prepare()
         int kind=fb_nodes[n].kind;
         if(kind==FB_NODE_ENTITY){if(substring(fb_nodes[n].fields["model"],0,1)!="*"){
             int group=fb_point_node_count/64;fb_point_nodes[fb_point_node_count++]=n;
-            if(fb_entity_bounds(fb_nodes[n].id,pointBounds)){
+            if(fb_entity_render_bounds(fb_nodes[n].id,pointBounds)){
                 if(!(fb_point_group_flags[group]&1)){fb_point_group_bounds[group*2]=pointBounds[0];fb_point_group_bounds[group*2+1]=pointBounds[1];fb_point_group_flags[group]|=1;}
                 else for(int a=0;a<3;a++){fb_point_group_bounds[group*2][a]=min(fb_point_group_bounds[group*2][a],pointBounds[0][a]);fb_point_group_bounds[group*2+1][a]=max(fb_point_group_bounds[group*2+1][a],pointBounds[1][a]);}
             }

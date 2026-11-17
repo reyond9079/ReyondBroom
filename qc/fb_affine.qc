@@ -42,15 +42,15 @@ vector fb_affine_center()
 void fb_affine_angles(int id,fb_affine_t *m)
 {
     vector bounds[2],origin=fb_entity_origin(id);
-    if(fb_entity_bounds(id,bounds)) {
-        vector offset=(bounds[0]+bounds[1])*0.5-origin;
-        if(fabs(offset_x)>0.001 || fabs(offset_y)>0.001) return;
-    }
     // Scaling and shearing change positions, not entity orientation properties.
     if(fabs(vlen(m->x)-1)>0.0001 || fabs(vlen(m->y)-1)>0.0001 || fabs(vlen(m->z)-1)>0.0001
         || fabs(m->x*m->y)>0.0001 || fabs(m->x*m->z)>0.0001 || fabs(m->y*m->z)>0.0001) return;
     hashtable fields=hash_createtab(32,EV_STRING);int count=fb_entity_tokenize(terrain_edit(TEREDIT_ENT_GET,id));
     for(int k=0;k<count;k+=2) fields[argv(k)]=argv(k+1);
+    if(substring(fields["model"],0,1)=="*" && fb_entity_bounds(id,bounds)) {
+        vector offset=(bounds[0]+bounds[1])*0.5-origin;
+        if(fabs(offset_x)>0.001 || fabs(offset_y)>0.001) {hash_destroytab(fields);return;}
+    }
     string key="angles";if(fields[key]=="") key="mangle";
     if(fields[key]!="") {
         int lightMangle=key=="mangle" && substring(fields["classname"],0,5)=="light";

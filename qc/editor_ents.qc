@@ -100,7 +100,7 @@ typedef struct
     string iconShader;
     vector iconSize;
     int pickMesh;
-    vector pickLocalMin,pickLocalMax;
+    vector pickLocalMin,pickLocalMax,pickWorldMin,pickWorldMax;
 	
 	trisoup_simple_vert_t *bboxverts;
     trisoup_simple_vert_t *solidverts;
@@ -326,6 +326,16 @@ int fb_entity_bounds(int index,vector *bounds)
     bounds[1]=editents[index].org+editents[index].maxs;
     return TRUE;
 }
+int fb_entity_render_bounds(int index,vector *bounds)
+{
+    if(!fb_entity_bounds(index,bounds))return FALSE;
+    entedit_t *item=&editents[index];
+    if(item->pickMesh)for(int axis=0;axis<3;axis++) {
+        bounds[0][axis]=min(bounds[0][axis],item->org[axis]+item->pickWorldMin[axis]);
+        bounds[1][axis]=max(bounds[1][axis],item->org[axis]+item->pickWorldMax[axis]);
+    }
+    return TRUE;
+}
 
 struct
 {	//FIXME: should probably parse quakeed comments or something.
@@ -547,8 +557,12 @@ void(entedit_t *nent) editor_ents_updated =
     if(nent->scale==0)nent->scale=1;
     nent->modelskin=stof(nent->fields["skin"]);nent->modelframe=stof(nent->fields["frame"]);
     nent->modelaxes='1 1 1';if(nent->fields["modelscale_vec"]!="")nent->modelaxes=stov(nent->fields["modelscale_vec"]);
-	nent->modelindex = modelindexforname(nent->fields["model"]);
-	nent->modelSpecified = nent->fields["model"]!="";
+    string modelPath=nent->fields["model"];
+    if(modelPath=="" && nent->fields["classname"]=="misc_model")modelPath=nent->fields["mdl"];
+    if(substring(modelPath,0,1)==":")modelPath=substring(modelPath,1,-1);
+    modelPath=strreplace("\\","/",modelPath);
+	nent->modelindex = modelindexforname(modelPath);
+	nent->modelSpecified = modelPath!="";
 	nent->mins = '-8 -8 -8';
 	nent->maxs = '8 8 8';
 	nent->org = stov(nent->fields["origin"]);
@@ -605,6 +619,7 @@ void(entedit_t *nent) editor_ents_updated =
                 string ruleScale=fb_fgd_value(rule->scale,nent->fields,def->classname);if(ruleScale!=""){if(strstrofs(ruleScale," ",0)>=0){nent->modelaxes=stov(ruleScale);nent->scale=1;}else nent->scale=stof(ruleScale);}break;
             }if(nent->scale==0)nent->scale=1;
 			if(nent->fields["model"]!="")model=nent->fields["model"];
+            if(model=="" && nent->fields["classname"]=="misc_model")model=nent->fields["mdl"];
             if(substring(model,0,1)==":")model=substring(model,1,-1);
             model=strreplace("\\","/",model);
             nent->modelSpecified=nent->modelSpecified || model!="";
@@ -634,7 +649,7 @@ void(entedit_t *nent) editor_ents_updated =
     // Cache geometric bounds outside the pointer/render loop. Sprites,
     // missing models and entity icons keep their ordinary selection box.
     nent->pickMesh=FALSE;
-    string modelPath=modelnameforindex(nent->modelindex);
+    modelPath=modelnameforindex(nent->modelindex);
     string suffix=strtolower(substring(modelPath,-4,4));
     int isSprite=suffix==".spr" || suffix==".sp2" || suffix=="pr32" || suffix=="spr2";
     if(!nent->isbsp && checkbuiltin(spriteframe) && (iconPath!="" || isSprite)){
@@ -669,12 +684,13 @@ void(entedit_t *nent) editor_ents_updated =
     if(nent->pickMesh){
         vector modelLow=nent->pickLocalMin,modelHigh=nent->pickLocalMax,modelAxes=fb_entity_model_scale(nent);
         fb_entity_model_vectors(nent);vector modelForward=v_forward,modelRight=v_right,modelUp=v_up;
-        nent->mins='100000000 100000000 100000000';nent->maxs='-100000000 -100000000 -100000000';
+        nent->pickWorldMin='100000000 100000000 100000000';nent->pickWorldMax='-100000000 -100000000 -100000000';
         for(int corner=0;corner<8;corner++){
             vector modelCorner=[(corner&1i)?modelHigh_x:modelLow_x,(corner&2i)?modelHigh_y:modelLow_y,(corner&4i)?modelHigh_z:modelLow_z];
             vector rotated=modelForward*modelCorner_x*modelAxes_x-modelRight*modelCorner_y*modelAxes_y+modelUp*modelCorner_z*modelAxes_z;
-            for(int axis=0;axis<3;axis++){nent->mins[axis]=min(nent->mins[axis],rotated[axis]);nent->maxs[axis]=max(nent->maxs[axis],rotated[axis]);}
+            for(int axis=0;axis<3;axis++){nent->pickWorldMin[axis]=min(nent->pickWorldMin[axis],rotated[axis]);nent->pickWorldMax[axis]=max(nent->pickWorldMax[axis],rotated[axis]);}
         }
+        if(definition<0 || !fb_entity_definitions[definition].hasBounds){nent->mins=nent->pickWorldMin;nent->maxs=nent->pickWorldMax;}
     }
 
     // Existing box pointers remain stable across entity-cache growth.

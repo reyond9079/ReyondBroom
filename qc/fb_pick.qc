@@ -197,7 +197,7 @@ void fb_pick_entity(int node,vector start,vector direction,float length,int flag
     fb_node_t item=fb_nodes[node];
     if(!item.fields || substring(item.fields["model"],0,1)=="*") return;
     static vector bounds[2];
-    if(!fb_entity_bounds(item.id,bounds)) return;
+    if(!(orthographic?fb_entity_bounds(item.id,bounds):fb_entity_render_bounds(item.id,bounds))) return;
     float distance=fb_pick_box(start,direction,bounds[0],bounds[1],length);
     if(distance<0) return;
     fb_hit_t hit={0};hit.kind=FB_HIT_ENTITY;hit.node=node;hit.id=item.id;
@@ -393,7 +393,7 @@ void fb_point_render_prepare()
     if(moved){
         static vector movedBounds[2];
         for(int i=0;i<fb_point_render_count;i++){
-            fb_point_render_t *item=&fb_point_render[i];fb_entity_bounds(item->id,movedBounds);
+            fb_point_render_t *item=&fb_point_render[i];fb_entity_render_bounds(item->id,movedBounds);
             item->center=(movedBounds[0]+movedBounds[1])*.5;item->label=item->center;item->label[2]=movedBounds[1][2]+12;
             item->color=fb_entity_color(item->id);
             if(!fb_render_allowed(item->node,0))item->color=stov(cvar_string("ftebroom_color_locked"));
@@ -419,8 +419,9 @@ void fb_point_render_prepare()
         if(!fb_entity_bounds(id,bounds))continue;
         fb_point_render_t *item=&fb_point_render[fb_point_render_count++];
         item->node=node;item->id=id;item->model=fb_entity_has_model(id);item->name=fb_nodes[node].name;
+        item->label=(bounds[0]+bounds[1])*.5;item->label[2]=bounds[1][2]+12;
+        fb_entity_render_bounds(id,bounds);
         item->center=(bounds[0]+bounds[1])*.5;item->radius=vlen(bounds[1]-bounds[0])*.5+12;
-        item->label=item->center;item->label[2]=bounds[1][2]+12;
         item->color=fb_entity_color(id);
         if(!fb_render_allowed(node,0))item->color=stov(cvar_string("ftebroom_color_locked"));
         if(fb_entity_selected(id))item->color=stov(cvar_string("ftebroom_color_selected"));
@@ -476,7 +477,7 @@ void fb_point_icon_2d(int id, string name, vector pixel, vector color, vector sp
 int fb_point_project_bounds(int id, vector viewportMin, vector viewportMax, vector *rectangle, float padding)
 {
     static vector bounds[2];
-    if(!fb_entity_bounds(id,bounds))return FALSE;
+    if(!fb_entity_render_bounds(id,bounds))return FALSE;
     vector a=project(bounds[0]),b=project(bounds[1]);
     rectangle[0]=[min(a_x,b_x),min(a_y,b_y),0];
     rectangle[1]=[max(a_x,b_x),max(a_y,b_y),0];

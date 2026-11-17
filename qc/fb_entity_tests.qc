@@ -6,6 +6,35 @@ string fb_entity_field(int id,string key)
 }
 float fb_entity_testcommand()
 {
+    if(argv(0)=="ftebroom_test_entities" && argv(1)=="rb36" && cvar("ftebroom_skip_setup")) {
+        fb_selection_clear();fb_entity_create("misc_model",FALSE,'400 0 64');
+        int model=fb_selected_entity();fb_entity_property("set","mdl","progs/qa-offset.mdl");fb_document_tick();
+        fb_entity_expect(fb_entity_model_name(model)=="progs/qa-offset.mdl" && fb_entity_model_ready(model),"rb36_misc_model_mdl_from_progs");
+        fb_selection_clear();fb_entity_create("info_player_start",FALSE,'0 0 64');
+        int player=fb_selected_entity();fb_entity_property("set","targetname","rb36-player");fb_document_tick();
+        vector bounds[2],render[2];fb_entity_bounds(player,bounds);fb_entity_render_bounds(player,render);
+        fb_entity_expect(bounds[0]=='-16 -16 40' && bounds[1]=='16 16 96',"rb36_explicit_player_bounds");
+        fb_entity_expect(render[1][0]>=96 && render[1][1]>=16,"rb36_mesh_keeps_full_culling_bounds");
+        fb_pick_query('80 8 164','80 8 -36','0 0 0',0,FB_HIT_ENTITY,FALSE);
+        fb_entity_expect(fb_hit_count && fb_hits[0].id==player,"rb36_pick_mesh_beyond_definition_box");
+        fb_entity_expect(fb_transform_capture(),"rb36_capture_asymmetric_player");
+        fb_affine_rotate('0 0 1',90,'0 0 64');fb_transform_clear();fb_document_tick();
+        fb_entity_expect(fabs(stof(fb_entity_field(player,"angle"))-90)<.001,"rb36_rotation_commits_angle");
+        brush_undo();fb_document_tick();
+        fb_entity_expect(fb_entity_field(player,"angle")=="","rb36_rotation_single_undo");
+        brush_redo();fb_document_tick();
+        fb_entity_expect(fabs(stof(fb_entity_field(player,"angle"))-90)<.001,"rb36_rotation_redo");
+        fb_entity_bounds(player,bounds);
+        fb_entity_expect(bounds[1]-bounds[0]=='32 32 56',"rb36_rotating_preserves_definition_box");
+        fb_entity_expect(autocvar_ftebroom_grid_color_2d_x>autocvar_ftebroom_grid_color_x,"rb36_default_2d_grid_brighter");
+        return TRUE;
+    }
+    if(argv(0)=="ftebroom_test_entities" && argv(1)=="rb36-reopened" && cvar("ftebroom_skip_setup")) {
+        fb_document_tick();int player=-1;
+        for(int n=2;n<fb_node_count;n++)if(fb_nodes[n].kind==FB_NODE_ENTITY && fb_entity_field(fb_nodes[n].id,"targetname")=="rb36-player")player=fb_nodes[n].id;
+        fb_entity_expect(player>0 && fabs(stof(fb_entity_field(player,"angle"))-90)<.001,"rb36_saved_rotation_reopens");
+        return TRUE;
+    }
     if(argv(0)=="ftebroom_test_entities"&&argv(1)=="player72"&&cvar("ftebroom_skip_setup")){
         fb_selection_clear();fb_entity_create("info_player_start",FALSE,'-40 -64 96');fb_document_tick();int player72=fb_selected_entity();
         fb_entity_expect(fb_entity_model_name(player72)=="progs/player.mdl"&&fb_entity_model_ready(player72),"player72_loaded_after_resource_mount");

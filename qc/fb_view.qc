@@ -145,7 +145,7 @@ void fb_view_background()
                 if(alpha<=0)continue;
                 float level=index*spacing;
                 vector center=(fb_view_right*nr+fb_view_up*nu)*((level-depth)/den)+fb_view_normal*(lo*fb_view_normal);
-                fb_view_stroke(fb_view_background_project(center-tangent),fb_view_background_project(center+tangent),1,autocvar_ftebroom_grid_color,alpha);
+                fb_view_stroke(fb_view_background_project(center-tangent),fb_view_background_project(center+tangent),1,autocvar_ftebroom_grid_color_2d,alpha);
             }
         }
         drawresetcliparea();

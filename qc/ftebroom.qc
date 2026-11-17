@@ -631,6 +631,12 @@ void ftebroom_frame()
         fb_primitive_preview(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5);
     }
     if(!cvar("ca_brush_view"))if(cvar("ftebroom_grid_visible") || cvar("ftebroom_show_edges"))fb_surfacegrid(FALSE);
+    if(!cvar("ca_brush_view")) {
+        float extent=max(65536,autocvar_ftebroom_world_bound);
+        fb_visual_line([-extent,0,0],[extent,0,0],'1 0.2 0.2',1,1,TRUE);
+        fb_visual_line([0,-extent,0],[0,extent,0],'0.2 1 0.2',1,1,TRUE);
+        fb_visual_line([0,0,-extent],[0,0,extent],'0.3 0.5 1',1,1,TRUE);
+    }
     fb_frame_profile[2]+=gettime(1)-profileTime;profileTime=gettime(1);
     if (autocvar_ftebroom_grid_plane && cvar("ftebroom_grid_visible") && !cvar("ca_brush_view")) {
         shaderforname("ftebroom/worldgrid","{\ncull none\nprogram ftebroom_grid\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");

@@ -41,6 +41,8 @@ def main():
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
     if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'character_ui', 'viewport', 'browser', 'onboarding', 'world_ui', 'world_legacy'}:
         run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
+    if 'entities' in suites:
+        run('entities', 'scripts/test-entity-rb36.py', root, out/'entities')
     if 'character_ui' in suites:
         motion = out.parent/'character-core/character.glb'
         run('character_ui', 'scripts/test-character-placement.py', root, out/'character-document',

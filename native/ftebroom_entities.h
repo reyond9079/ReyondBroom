@@ -172,7 +172,7 @@ static bool definitionsLoad(std::string selection, bool mapOverride)
           << std::quoted(vec(d.maxs)) << ' ' << std::quoted(vec(d.color)) << ' '
           << std::quoted(model) << ' ' << std::quoted(d.modelKey) << ' '
           << std::quoted(d.modelSkin) << ' ' << std::quoted(d.modelFrame) << ' '
-          << std::quoted(d.modelScale) << ' ' << std::quoted(d.iconSprite) << '\n';
+          << std::quoted(d.modelScale) << ' ' << std::quoted(d.iconSprite) << ' ' << d.hasBounds << '\n';
       out << "kind " << std::quoted(d.name) << ' ' << (d.brush ? 1 : 0) << '\n';
       for (const auto& prop : d.properties)
         out << "property " << std::quoted(d.name) << ' ' << std::quoted(prop.first) << ' '
@@ -698,9 +698,10 @@ static void entityPanel()
           return entityUsage[a->name] > entityUsage[b->name];
         return a->name < b->name;
       });
+      const float descriptionHeight=std::min(112.f*uiScale(),std::max(48.f,ImGui::GetContentRegionAvail().y*.24f));
       ImGui::BeginChild(
         "Classes",
-        {0, std::max(24.f,ImGui::GetContentRegionAvail().y-ImGui::GetFrameHeight()-ImGui::GetStyle().ItemSpacing.y*2)},
+        {0, std::max(24.f,ImGui::GetContentRegionAvail().y-descriptionHeight-ImGui::GetFrameHeight()-ImGui::GetStyle().ItemSpacing.y*3)},
         ImGuiChildFlags_Borders,ImGuiWindowFlags_None);
       browserQaWindow("entities/grid");browserHoverZoom(entityThumbnailSize,48,160);
       entityVisiblePreviewCount=0;entityPreviewMarginsValid=true;
@@ -777,11 +778,30 @@ static void entityPanel()
         drawList->PushClipRect({tile.x,tile.y+size+2},{tile.x+size,tile.y+cellHeight-2},true);
         ImVec2 label{tile.x+std::max(0.f,(size-ImGui::CalcTextSize(def->name.c_str()).x)*.5f),tile.y+size+2};
         ImGui::RenderTextEllipsis(drawList,label,{tile.x+size,tile.y+cellHeight-2},tile.x+size,tile.x+size,def->name.c_str(),nullptr,nullptr);drawList->PopClipRect();
-        if(ImGui::IsItemHovered())ImGui::SetTooltip("%s\n%s\n%s",def->name.c_str(),def->brush?"Brush entity: select brushes first":"Point entity",def->description.c_str());
+        if(ImGui::IsItemHovered()) {
+          std::string brief=def->description;
+          if(brief.size()>480) {
+            size_t end=480;
+            while(end && (static_cast<unsigned char>(brief[end])&0xc0)==0x80)--end;
+            brief.resize(end);brief+="...";
+          }
+          std::replace(brief.begin(),brief.end(),'\n',' ');
+          ImGui::BeginTooltip();ImGui::PushTextWrapPos(ImGui::GetFontSize()*28);
+          ImGui::TextUnformatted(def->name.c_str());
+          ImGui::TextUnformatted(def->brush?"Brush entity: select brushes first":"Point entity");
+          ImGui::TextUnformatted(brief.c_str());
+          ImGui::PopTextWrapPos();ImGui::EndTooltip();
+        }
         ImGui::PopID();
         if(++column==columns){column=0;rowTop+=cellHeight;}
       }
       ImGui::SetCursorPosY(rowTop+(column?cellHeight:0));ImGui::Dummy({0,0});
+      ImGui::EndChild();
+      ImGui::BeginChild("Entity description",{0,descriptionHeight},ImGuiChildFlags_Borders);
+      if(auto it=entityDefinitions.find(chosen);it!=entityDefinitions.end()) {
+        ImGui::TextUnformatted(it->second.name.c_str());
+        ImGui::PushTextWrapPos(0);ImGui::TextUnformatted(it->second.description.c_str());ImGui::PopTextWrapPos();
+      }
       ImGui::EndChild();
       entityFooterMin=ImGui::GetCursorScreenPos();
       const float footerWidth=ImGui::GetContentRegionAvail().x;

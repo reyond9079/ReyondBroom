@@ -175,6 +175,10 @@ try {
  $hash=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($Root.ToLowerInvariant()))).Replace('-','')
  $mutex=New-Object Threading.Mutex($false,('Local\FTEBroomUpdate'+$hash))
  if(!$mutex.WaitOne(0)){exit 0}
+ try{
+  $previous=Get-Content -LiteralPath (Join-Path $updates 'status.json') -Raw | ConvertFrom-Json
+  if($previous.stage -eq 'installed' -and $previous.available_version -eq $CurrentVersion.TrimStart('v')){CleanupUpdates ''}
+ }catch{} # Retain recovery data unless the installed version has started successfully.
  if($ParentId){try{$process=[Diagnostics.Process]::GetProcessById($ParentId)}catch [ArgumentException]{}} # Closing the editor before this line is allowed.
  Status 'Checking GitHub releases...'
  if(!$LocalPackage){
@@ -207,8 +211,10 @@ try {
  if($process){$process.WaitForExit()}
  Status 'Installing update...' 'installing'
  $backup=Join-Path $updates ('backup-'+[guid]::NewGuid());New-Item -ItemType Directory -Path $backup | Out-Null
+ $stagedNames=@{}
  foreach($file in Get-ChildItem -LiteralPath $stage -File -Recurse){
-  $relative=$file.FullName.Substring($stage.Length+1);if(Preserve $relative){continue};$target=Under $Root $relative;$saved=Under $backup $relative
+  $relative=$file.FullName.Substring($stage.Length+1);$stagedNames[$relative.Replace('\','/')]=$true
+  if(Preserve $relative){continue};$target=Under $Root $relative;$saved=Under $backup $relative
   try{
    $existed=[IO.File]::Exists($target)
    if($existed){
@@ -219,6 +225,22 @@ try {
    Install-File $file.FullName $target $saved
    $changed+=,@($target,$saved,$existed)
   }catch{throw "Cannot install ${relative}: $($_.Exception.GetBaseException().Message)"}
+ }
+ foreach($relative in $oldManifest.Keys){
+  if($stagedNames.ContainsKey($relative) -or (Preserve $relative)){continue}
+  $target=Under $Root $relative
+  if(![IO.File]::Exists($target) -or (FileHash $target) -ne $oldManifest[$relative]){continue}
+  $linked=$false;$ancestor=$target
+  while($ancestor -ne $Root){
+   if((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){$linked=$true;break}
+   $ancestor=[IO.Path]::GetDirectoryName($ancestor)
+  }
+  if($linked){continue}
+  $saved=Under $backup $relative
+  [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($saved)) | Out-Null
+  [IO.File]::Copy($target,$saved)
+  $changed+=,@($target,$saved,$true)
+  [IO.File]::Delete($target)
  }
  if((Test-Path "$stage/bin/fteqw64.exe") -and (Test-Path "$Root/fteqw64.exe")){
   $target=Under $Root 'fteqw64.exe';$saved=Under $backup 'fteqw64.exe'

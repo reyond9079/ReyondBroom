@@ -27,6 +27,19 @@ planner, cache, runner, smoke = [module(n) for n in ('plan', 'dependency', 'run-
 prepared = module('verify-prepared')
 
 
+class EditorScopeTests(unittest.TestCase):
+    def test_rb36_host_changes_keep_unrelated_edits_on_the_full_path(self):
+        for path,(groups,replacements) in planner.RB36_HOST_SCOPES.items():
+            before=''.join(old for old,new in replacements)
+            after=''.join(new for old,new in replacements)
+            self.assertEqual(planner.editor_host_scope(path,before,after,planner.RB36_HOST_SCOPES),groups,path)
+            self.assertIsNone(planner.editor_host_scope(path,before,after+'unrelated change\n',planner.RB36_HOST_SCOPES),path)
+
+    def test_entity_regressions_and_compiler_updates_select_their_consumers(self):
+        self.assertTrue({'entities','placement','viewport'} <= set(planner.plan(['qc/editor_ents.qc'])['suites']))
+        self.assertTrue({'compilation','profile_core','compilation_ui'} <= set(planner.plan(['tools/ericw/PIN.json'])['suites']))
+
+
 class ScopeTests(unittest.TestCase):
     def test_prepared_world_choice_has_a_nonempty_default_and_normal_mode(self):
         import yaml

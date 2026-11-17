@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -34,7 +35,24 @@ def run(bundle, state, port, resource_retry=False):
                     "REYONDBROOM_JAM_QA_RESOURCE_RETRY":"1"})
     with subprocess.Popen(launch, cwd=bundle, env=env) as editor:
         try:
-            editor.wait(timeout=155)
+            observations=state.resolve()/"qa-game-observations"
+            play=bundle/"mapping-jams-local"/str(port)/"play"
+            while editor.poll() is None:
+                if time.time()-started>155:
+                    raise subprocess.TimeoutExpired(launch,155)
+                # Finished game copies are disposable. Capture their test evidence
+                # while each game is running, before the editor retires its files.
+                for directory in play.glob("*"):
+                    for source in directory.rglob("*"):
+                        if source.is_file() and (source.name=="qconsole.log" or source.suffix==".bsp"):
+                            destination=observations/source.relative_to(play)
+                            try:
+                                destination.parent.mkdir(parents=True,exist_ok=True)
+                                shutil.copy2(source,destination)
+                            except OSError:
+                                pass
+                time.sleep(.15)
+            assert editor.returncode==0,editor.returncode
         except subprocess.TimeoutExpired:
             editor.terminate()
             editor.wait(timeout=10)
@@ -62,7 +80,8 @@ def run(bundle, state, port, resource_retry=False):
         "The Jam build did not save the portal backup and lighting output.")
     assert any(draft.glob("*/*/Editor's compiled Jam room.map")), (
         "The named source map is missing from the compiled plot's workspace.")
-    logs = [p for p in bundle.rglob("qconsole.log") if p.stat().st_mtime >= started-1 and "play" in p.parts]
+    logs = [p for p in observations.rglob("qconsole.log") if p.stat().st_mtime >= started-1]
+    assert not list(play.glob("*")),"Finished game resource copies were not cleaned up."
     direct_runs = hub_runs = returns_to_draft = 0
     errors = ("couldn't spawn server", "could not load maps/jam_map", "couldn't load maps/jam_map", "couldn't load progs.dat")
     for log in logs:

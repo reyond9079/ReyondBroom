@@ -596,6 +596,7 @@ void ftebroom_prepare()
     fb_commit_profile("ftebroom_prepare",profile81Time);
 }
 void fb_trace_draw();
+void fb_visual_shaders_prepare();
 void fb_issues_tick();
 float fb_frame_profile[4];
 void fb_generator_draw();
@@ -616,6 +617,9 @@ void fb_caption_update()
 void ftebroom_frame()
 {
     fb_caption_update();
+    // Axes and tool previews use these shaders before the selection pass.
+    // Registering them after first use leaves the engine's fallback shader cached.
+    fb_visual_shaders_prepare();
     float profileTime=gettime(1);
     fb_trace_draw();
     fb_issues_tick();

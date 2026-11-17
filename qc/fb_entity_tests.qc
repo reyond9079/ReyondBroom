@@ -6,6 +6,14 @@ string fb_entity_field(int id,string key)
 }
 float fb_entity_testcommand()
 {
+    if(argv(0)=="ftebroom_test_entities" && argv(1)=="link-colors-state" && cvar("ftebroom_skip_setup")) {
+        print(sprintf("FTEBROOM_LINK_STATE epoch=%i selected=%i key=%i normal=%v selectedColor=%v edges=%i\n",fb_selection_epoch,fb_selected_entity_count,fb_entity_selection_key(),autocvar_ftebroom_color_entity_links,autocvar_ftebroom_color_selected_entity_links,fb_entity_connection_count));
+        for(int i=0;i<min(8,fb_entity_connection_count);i++) {
+            fb_entity_link_t edge=fb_entity_connections[i];
+            print(sprintf("FTEBROOM_LINK_EDGE from=%i to=%i cached=%i,%i actual=%i,%i\n",edge.from,edge.to,fb_entity_link_selected[edge.from],fb_entity_link_selected[edge.to],fb_selection_selected(edge.from),fb_selection_selected(edge.to)));
+        }
+        return TRUE;
+    }
     if(argv(0)=="ftebroom_test_entities" && argv(1)=="rb36" && cvar("ftebroom_skip_setup")) {
         fb_selection_clear();fb_entity_create("misc_model",FALSE,'400 0 64');
         int model=fb_selected_entity();fb_entity_property("set","mdl","progs/qa-offset.mdl");fb_document_tick();

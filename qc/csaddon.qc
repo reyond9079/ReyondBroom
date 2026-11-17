@@ -102,6 +102,7 @@ string fb_view_cache_signature(int type,vector mn,vector sz)
     string key=sprintf("%i %v %v %v %v %g",type,mn,sz,vidsize,fb_view_centers[type],cvar("ca_brush_viewsize"));
     key=strcat(key,itos(fb_filter_epoch));
     key=strcat(key,cvar_string("ftebroom_color_entity_bounds"),"|",cvar_string("ftebroom_entity_bounds_class_colors"));
+    key=strcat(key,"|",cvar_string("ftebroom_color_entity_links"),"|",cvar_string("ftebroom_color_selected_entity_links"));
     key=strcat(key,"|",cvar_string("ftebroom_color_brush_edges"),"|",cvar_string("ftebroom_color_2d_background"));
     key=strcat(key,sprintf(" %g %g %g %i %i %i",cvar("ca_grid"),cvar("ftebroom_grid_visible"),cvar("ftebroom_grid_alpha"),fb_document_revision(),history,fb_selected_entity()),cvar_string("ftebroom_map_bounds"),cvar_string("ftebroom_grid_color_2d"));
     for(int i=0;i<selectedbrushcount;i++) key=strcat(key,sprintf(" %i %i",selectedbrushes[i].model,selectedbrushes[i].id));

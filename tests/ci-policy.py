@@ -41,6 +41,19 @@ class EditorScopeTests(unittest.TestCase):
 
 
 class ScopeTests(unittest.TestCase):
+    def test_entity_link_color_hosts_do_not_expand_to_unrelated_suites(self):
+        for path, (groups, replacements) in planner.ENTITY_LINK_COLOR_HOST_SCOPES.items():
+            before = '\n'.join(old for old, _ in replacements) + '\nordinary behavior stays unchanged\n'
+            after = before
+            for old, new in replacements:
+                after = after.replace(old, new)
+            self.assertEqual(planner.editor_host_scope(path, before, after, planner.ENTITY_LINK_COLOR_HOST_SCOPES), groups)
+            self.assertIsNone(planner.editor_host_scope(path, before, after.replace('ordinary behavior', 'other behavior'), planner.ENTITY_LINK_COLOR_HOST_SCOPES))
+            suites = planner.plan([path], semantic={path: groups})['suites']
+            self.assertIn('viewport', suites)
+            self.assertNotIn('character_ui', suites)
+            self.assertNotIn('compilation', suites)
+
     def test_prepared_world_choice_has_a_nonempty_default_and_normal_mode(self):
         import yaml
         workflow = yaml.safe_load((REPO/'.github/workflows/compilation-profile-checks.yml').read_text())

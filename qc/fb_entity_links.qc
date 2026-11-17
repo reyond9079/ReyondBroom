@@ -23,7 +23,7 @@ void fb_container_cache_prepare()
         if(!valid)continue;
         for(int parent=n,steps=0;parent>=0 && parent<fb_node_count && steps++<fb_node_count;parent=fb_nodes[parent].parent) {
             fb_container_bounds_t *item=&fb_container_cache[parent];
-            if(!item->valid){item->mins=bounds[0];item->maxs=bounds[1];item->valid=TRUE;}
+            if(!item->valid){item->mins=bounds[0];item->maxs=bounds[1];item->valid=TRUE;item->color='-1 -1 -1';}
             else for(int axis=0;axis<3;axis++){item->mins[axis]=min(item->mins[axis],bounds[0][axis]);item->maxs[axis]=max(item->maxs[axis],bounds[1][axis]);}
         }
     }
@@ -77,13 +77,16 @@ void fb_container_draw(int labels)
     int entries=visibleCount<0?fb_container_render_count:visibleCount;
     for(int entry=0;entry<entries;entry++) {
         int index=visibleCount<0?entry:fb_container_visible[entry];fb_point_render_t *item=&fb_container_render[index];int n=item->node,group=item->id;
-        if(!fb_container_display_allowed(group,labels))continue;
         bounds[0]=fb_container_cache[n].mins;bounds[1]=fb_container_cache[n].maxs;
+        int groupSelected=group && fb_selection_selected(n);
+        if(!labels && groupSelected && fb_visual_has_bounds && bounds[0]==fb_visual_min && bounds[1]==fb_visual_max)fb_visual_group_bounds=TRUE;
+        if(!fb_container_display_allowed(group,labels))continue;
         if(visibleCount<0 && !ortho){vector delta=item->center-camera;float radius=item->radius,depth=delta*forward;if(depth+radius<0||fabs(delta*right)>depth*tx+radius*(1+tx)||fabs(delta*up)>depth*ty+radius*(1+ty))continue;}
         if(labels){vector top=(bounds[0]+bounds[1])*0.5;top_z=bounds[1][2]+12;float labelAlpha=fb_label_alpha(top,fb_selection_selected(n),ortho);if(labelAlpha<=0)continue;if(!ortho && (top-camera)*forward<=0)continue;vector pixel=project(top);pixel_z=0;if(pixel_x<mn_x||pixel_y<mn_y||pixel_x>=mn_x+size_x||pixel_y>=mn_y+size_y)continue;if(!ortho && !fb_label_visible(camera,top,n))continue;fb_label_draw(pixel,fb_nodes[n].name,fb_selection_selected(n),group,labelAlpha);}
         else {
             vector color='0.2 0.45 1';if(group && fb_nodes[n].fields["_tb_linked_group_id"]!="")color='0.65 0.35 1';
-            if(!group&&!autocvar_ftebroom_entity_bounds_class_colors)color=autocvar_ftebroom_color_entity_bounds;
+            if(groupSelected)color='0.65 0.35 1';
+            else if(!group)color=fb_selection_selected(n)?autocvar_ftebroom_color_selected:fb_entity_color(fb_nodes[n].id);
             fb_container_bounds_t *box=&fb_container_cache[n];
             if(box->color!=color){box->color=color;for(int v=0;v<8;v++){
                 for(int a=0;a<3;a++)box->vertices[v].xyz[a]=(v&(1i<<a))?bounds[1][a]:bounds[0][a];
@@ -93,6 +96,8 @@ void fb_container_draw(int labels)
         }
     }
 }
+var vector autocvar_ftebroom_color_entity_links = '0.2 1 0.3';
+var vector autocvar_ftebroom_color_selected_entity_links = '1 0.2 0.2';
 typedef struct {int from,to;} fb_entity_link_t;
 fb_entity_link_t *fb_entity_connections;int fb_entity_connection_count;int *fb_entity_reachable;int *fb_entity_link_selected;vector *fb_entity_centers;
 var int fb_links_entities=-1;
@@ -225,7 +230,8 @@ void fb_entity_links_draw()
         vector from=fb_entity_centers[edge.from],to=fb_entity_centers[edge.to],direction=normalize(to-from);
         if(vlen(to-from)<0.01)continue;
         vector side=normalize(crossproduct(direction,'0 0 1'));if(vlen(side)<0.1)side='1 0 0';
-        vector color='0.2 1 0.3';if(fb_entity_link_selected[edge.from]||fb_entity_link_selected[edge.to])color='1 0.2 0.2';
+        vector color=autocvar_ftebroom_color_entity_links;
+        if(fb_entity_link_selected[edge.from]||fb_entity_link_selected[edge.to])color=autocvar_ftebroom_color_selected_entity_links;
         fb_visual_line(from,to,color,0.8,0.8,TRUE);
         vector tip=from+(to-from)*0.65;float arrow=min(12,vlen(to-from)*0.15);
         fb_visual_line(tip,tip-direction*arrow+side*arrow*0.5,color,1,1,TRUE);

@@ -34,6 +34,7 @@ SUITES = {'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation
           'model_ui', 'placement', 'viewport', 'grid', 'browser', 'onboarding',
           'updater', 'entities', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
 RULES = [
+    (['qc/fb_entity_links.qc', 'qc/fb_visual.qc', 'scripts/test-entity-link-colors.py'], {'render'}),
     (['native/ftebroom_entities.h', 'native/ftebroom_entity_defs.h',
       'qc/editor_ents.qc', 'qc/fb_entity_defs.qc', 'qc/fb_entity_tests.qc',
       'qc/fb_affine.qc', 'scripts/test-entity-rb36.py'], {'entities'}),
@@ -364,6 +365,32 @@ RB36_HOST_SCOPES = {
 }
 
 
+ENTITY_LINK_COLOR_HOST_SCOPES = {
+    'native/ftebroom.cpp': ({'viewport'}, [
+        ('      for(auto setting:{std::pair{"Brush edges","ftebroom_color_brush_edges"},std::pair{"2D viewport background","ftebroom_color_2d_background"},std::pair{"3D background without sky","ftebroom_color_3d_background"},std::pair{"2D grid","ftebroom_grid_color_2d"},std::pair{"3D grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})\n',
+         '      for(auto setting:{std::pair{"Brush edges","ftebroom_color_brush_edges"},std::pair{"2D viewport background","ftebroom_color_2d_background"},std::pair{"3D background without sky","ftebroom_color_3d_background"},std::pair{"2D grid","ftebroom_grid_color_2d"},std::pair{"3D grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Entity links","ftebroom_color_entity_links"},std::pair{"Selected entity links","ftebroom_color_selected_entity_links"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})\n'),
+    ]),
+    'native/ftebroom_preferences.h': ({'viewport'}, [
+        ('  "ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",\n',
+         '  "ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_color_entity_links","ftebroom_color_selected_entity_links","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",\n'),
+    ]),
+    'native/ftebroom_run_ui.h': ({'viewport'}, [
+        (' if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";nlohmann::json views=nlohmann::json::array(),colors=nlohmann::json::object();for(int i=0;i<viewLayout;i++){auto& v=viewRects[i];views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});}for(const char* name:{"ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_clear_sky","ftebroom_color_selected","ftebroom_color_locked"}){char text[128]{};cvars->GetString(name,text,sizeof text);colors[name]=text;}std::ofstream(temp)<<nlohmann::json{{"views",views},{"viewportColors",colors},{"log",runLog},{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError},{"inputTrace",runUiInputTrace}}.dump();\n',
+         ' if(runUiLive){static double last=0;if(ImGui::GetTime()-last>.1){last=ImGui::GetTime();auto path=documentPath("compilation-ui-live.json");auto temp=path;temp+=".tmp";nlohmann::json views=nlohmann::json::array(),colors=nlohmann::json::object();for(int i=0;i<viewLayout;i++){auto& v=viewRects[i];views.push_back({{"x",v.x},{"y",v.y},{"width",v.w},{"height",v.h},{"type",v.type}});}for(const char* name:{"ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_color_entity_links","ftebroom_color_selected_entity_links","ftebroom_clear_sky","ftebroom_color_selected","ftebroom_color_locked"}){char text[128]{};cvars->GetString(name,text,sizeof text);colors[name]=text;}std::ofstream(temp)<<nlohmann::json{{"views",views},{"viewportColors",colors},{"log",runLog},{"widgets",runUiRects},{"globalWidgets",runUiGlobalRects},{"display",{ImGui::GetIO().DisplaySize.x,ImGui::GetIO().DisplaySize.y}},{"running",runActive},{"compileOpen",runWindow},{"launchOpen",runLaunchWindow},{"engineOpen",runEngineWindow},{"selected",runSelected},{"game",runStoreGame},{"document",documentFile.u8string()},{"error",runError},{"inputTrace",runUiInputTrace}}.dump();\n'),
+    ]),
+    'qc/csaddon.qc': ({'render'}, [
+        ('    key=strcat(key,cvar_string("ftebroom_color_entity_bounds"),"|",cvar_string("ftebroom_entity_bounds_class_colors"));\n',
+         '    key=strcat(key,cvar_string("ftebroom_color_entity_bounds"),"|",cvar_string("ftebroom_entity_bounds_class_colors"));\n    key=strcat(key,"|",cvar_string("ftebroom_color_entity_links"),"|",cvar_string("ftebroom_color_selected_entity_links"));\n'),
+    ]),
+    'qc/ftebroom.qc': ({'render'}, [
+        ('void fb_trace_draw();\n',
+         'void fb_trace_draw();\nvoid fb_visual_shaders_prepare();\n'),
+        ('    fb_caption_update();\n',
+         "    fb_caption_update();\n    // Axes and tool previews use these shaders before the selection pass.\n    // Registering them after first use leaves the engine's fallback shader cached.\n    fb_visual_shaders_prepare();\n"),
+    ]),
+}
+
+
 def editor_host_scope(path, before, after, scopes=EDITOR_HOST_SCOPES):
     scope = scopes.get(path)
     if not scope or before == after:
@@ -381,14 +408,15 @@ def semantic_scopes(base, head, paths):
     result = {}
     for path in paths:
         if not any(path in entries for entries in (WORLD_HOST_ADDITIONS, ONBOARDING_HOST_REPLACEMENTS,
-                                                     LESSON_HOST_REPLACEMENTS, EDITOR_HOST_SCOPES, RB36_HOST_SCOPES)):
+                                                     LESSON_HOST_REPLACEMENTS, EDITOR_HOST_SCOPES, RB36_HOST_SCOPES, ENTITY_LINK_COLOR_HOST_SCOPES)):
             continue
         def read(ref):
             return subprocess.check_output(['git', 'show', ref+':'+path], stderr=subprocess.PIPE).decode()
         before, after = read(base), read(head)
         groups = (world_host_scope(path, before, after) or onboarding_host_scope(path, before, after)
                   or lesson_host_scope(path, before, after) or editor_host_scope(path, before, after)
-                  or editor_host_scope(path, before, after, RB36_HOST_SCOPES))
+                  or editor_host_scope(path, before, after, RB36_HOST_SCOPES)
+                  or editor_host_scope(path, before, after, ENTITY_LINK_COLOR_HOST_SCOPES))
         if groups:
             result[path] = groups
     return result

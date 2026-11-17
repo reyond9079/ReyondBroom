@@ -106,6 +106,7 @@ def main():
             run('placement', 'scripts/test-viewport-create.py', root, out/f'create-{theme}-{width}',
                 '--theme', theme, '--width', width, '--height', height)
     if 'viewport' in suites:
+        run('viewport', 'scripts/test-entity-link-colors.py', root, out/'entity-link-colors')
         run('viewport', 'scripts/test-bsp-preview-input.py', root, out/'bsp-preview-input')
         if selected['flags'].get('input') or selected['mode'] == 'full':
             run('viewport', 'scripts/test-engine-viewport.py', root, out/'engine-viewport', '--probe', a.probe.resolve())

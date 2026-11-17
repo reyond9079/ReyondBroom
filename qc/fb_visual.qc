@@ -12,7 +12,7 @@ var float autocvar_ftebroom_hover_highlight = 0;
 var float autocvar_ftebroom_selection_dimensions = 1;
 var float autocvar_ftebroom_coordinate_size=8;
 var float autocvar_ftebroom_selection_spikes = 1;
-int fb_visual_label_count,fb_visual_spike_count;
+int fb_visual_label_count,fb_visual_spike_count,fb_visual_group_bounds;
 int fb_visual_hover,fb_visual_has_bounds,fb_visual_spikes;
 vector fb_visual_min,fb_visual_max;
 string fb_visual_pick_key;
@@ -421,13 +421,17 @@ void fb_visual_candidates_prepare()
 }
 int(fb_point_render_t *points,fb_point_geometry_t *geometry,int count,int *access,int accessCount,int *selected,int selectedCount,vector *colors) ftebroom_selection_points=#0:ftebroom_selection_points;
 int(vector *boxes,int count) ftebroom_selection_boxes=#0:ftebroom_selection_boxes;
+void fb_visual_shaders_prepare()
+{
+    shaderforname("ftebroom/selectionoverlay","{\ncull none\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\nnodepthtest\n}\n}");
+    shaderforname("ftebroom/selectiondepth","{\ncull none\npolygonoffset\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
+    shaderforname("ftebroom/selectionfill","{\ncull none\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\nnodepthtest\n}\n}");
+}
 void fb_visual_draw()
 {
     float started=gettime(1),profile81Time=started;
     fb_visual_spike_count=0;fb_visual_surface_count=fb_visual_vertex_count=0;
-    shaderforname("ftebroom/selectionoverlay","{\ncull none\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\nnodepthtest\n}\n}");
-    shaderforname("ftebroom/selectiondepth","{\ncull none\npolygonoffset\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
-    shaderforname("ftebroom/selectionfill","{\ncull none\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\nnodepthtest\n}\n}");
+    fb_visual_shaders_prepare();
     static vector points[256],bounds[2];
     vector eye=getproperty(VF_ORIGIN),fov=getproperty(VF_FOV);makevectors(getproperty(VF_ANGLES));
     vector forward=v_forward,right=v_right,up=v_up;
@@ -539,11 +543,11 @@ void fb_visual_draw()
         fb_visual_cache_draw(ortho);
     }else fb_visual_flush();
     fb_visual_profile[1]+=gettime(1)-started;started=gettime(1);
-    fb_container_draw(FALSE);fb_entity_links_draw();
+    fb_visual_group_bounds=FALSE;fb_container_draw(FALSE);fb_entity_links_draw();
     fb_visual_profile[2]+=gettime(1)-started;started=gettime(1);
     fb_entity_drop_preview();
     fb_visual_profile[3]+=gettime(1)-started;
-    if(fb_visual_has_bounds) fb_visual_box(fb_visual_min,fb_visual_max,autocvar_ftebroom_color_selected,0.6,
+    if(fb_visual_has_bounds) fb_visual_box(fb_visual_min,fb_visual_max,fb_visual_group_bounds?'0.65 0.35 1':autocvar_ftebroom_color_selected,0.6,
         !cvar("ca_brush_view") && fb_visual_spikes && autocvar_ftebroom_selection_spikes);
     fb_commit_profile("fb_visual_draw",profile81Time);
 }

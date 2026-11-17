@@ -16,7 +16,7 @@ void fb_label_draw(vector anchor,string text,int selected,int group,float alpha)
     float previous=drawfont;fb_label_font_prepare();drawfont=fb_label_font;
     float size=bound(8,autocvar_ftebroom_label_size,40),scale=size/13;
     float width=stringwidth(text,TRUE,[size,size,0]);
-    vector pos=anchor-[width*.5,17*scale,0],bg=selected?'1 0 0':'0 0 0';
+    vector pos=anchor-[width*.5,17*scale,0],bg=selected?(group?'0.65 0.35 1':'1 0 0'):'0 0 0';
     pos_x=floor(pos_x);pos_y=floor(pos_y);
     // Three-pixel corners and four-pixel padding, like TrenchBroom overlays.
     drawfill(pos+'-1 -4 0'*scale,[width+2*scale,scale,0],bg,.6*alpha,0);

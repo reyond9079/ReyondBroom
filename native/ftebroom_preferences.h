@@ -10,7 +10,7 @@ static const char* preferenceVariables[] = {
   "ftebroom_look_speed","ftebroom_pan_speed","ftebroom_move_speed","ftebroom_fly_speed",
   "ftebroom_fov","ftebroom_invert_horizontal","ftebroom_invert_vertical",
   "ftebroom_move_to_cursor","ftebroom_alt_move","ftebroom_grid_alpha",
-  "ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
+  "ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_color_entity_links","ftebroom_color_selected_entity_links","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
   "ftebroom_show_entity_names","ftebroom_show_entity_names_2d","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
   "ftebroom_grid_plane","ftebroom_show_brushes","ftebroom_show_points","ftebroom_show_models","ftebroom_show_patches",

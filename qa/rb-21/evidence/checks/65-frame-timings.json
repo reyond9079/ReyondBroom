@@ -1,0 +1,7 @@
+{
+  "frames": 240,
+  "cpu_render_thread_mean_ms": 3.3203125,
+  "cpu_submit_p95_ms": 6.257864999999999,
+  "gpu_render_mean_ms": 1.234048,
+  "gpu_render_p95_ms": 1.7782272000000001
+}

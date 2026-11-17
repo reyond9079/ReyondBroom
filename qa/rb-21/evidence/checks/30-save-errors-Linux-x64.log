@@ -1,0 +1,4 @@
+PASS Writing to a read-only destination fails without modifying the saved character
+PASS Saving works after restoring destination permissions
+PASS A full destination reports the error and retains the previous character
+PASS Saving succeeds after freeing space in the destination

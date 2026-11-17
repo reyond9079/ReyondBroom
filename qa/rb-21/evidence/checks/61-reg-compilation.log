@@ -1,0 +1,108 @@
+RUN fixture: tests/make-linux-build-fixture.py
+RUN compilation: scripts/test-compilation-runtime.py
+run exit 0 passed 15 failed []
+trenchbroom-native exit 0 passed 3 failed []
+trenchbroom-restore exit 0 passed 3 failed []
+compilation-parity-native exit 0 passed 32 failed []
+PASS actual bundled compiler / deploy / cleanup
+RUN compilation: scripts/test-engine-cleanup.py
+PASS external_map_path_keeps_user_filename
+PASS customer_profile_copy_cleanup_deploys_bsp_lit
+PASS copy_cleanup_compile_launch_starts_process_probe
+PASS compile_launch_uses_engine_executable_directory
+PASS compile_launch_uses_real_map_and_active_mod
+PASS standalone_launch_starts_process_probe
+PASS standalone_launch_uses_engine_executable_directory
+PASS standalone_launch_uses_real_map_and_active_mod
+PASS deployed_lighting_survives_launch_without_build_output
+PASS existing_invalid_build_does_not_launch_stale_deployed_map
+PASS missing_build_and_deployed_map_prevent_launch
+PASS source_runtime_remains_byte_identical
+RUN compilation: scripts/test-compilation-paths.py
+PASS internal control: original document path is retained
+PASS internal control: OS window title uses the original map name
+PASS internal control: MAP variables describe the real source
+PASS internal control: selected profile controls actual process working directory
+PASS external Quake1 profile and per-map WAD mount: original document path is retained
+PASS external Quake1 profile and per-map WAD mount: OS window title uses the original map name
+PASS external Quake1 profile and per-map WAD mount: MAP variables describe the real source
+PASS external Quake1 profile and per-map WAD mount: selected profile controls actual process working directory
+PASS external Quake3 map: original document path is retained
+PASS external Quake3 map: OS window title uses the original map name
+PASS external Quake3 map: MAP variables describe the real source
+PASS external Quake3 map: selected profile controls actual process working directory
+PASS resource restart: original document path is retained
+PASS resource restart: OS window title uses the original map name
+PASS resource restart: MAP variables describe the real source
+PASS resource restart: selected profile controls actual process working directory
+PASS Save As to another directory and name: original document path is retained
+PASS Save As to another directory and name: OS window title uses the original map name
+PASS Save As to another directory and name: MAP variables describe the real source
+PASS Save As to another directory and name: selected profile controls actual process working directory
+PASS reload of the same staged alias: original document path is retained
+PASS reload of the same staged alias: OS window title uses the original map name
+PASS reload of the same staged alias: MAP variables describe the real source
+PASS reload of the same staged alias: selected profile controls actual process working directory
+PASS console mounted loose source: original document path is retained
+PASS console mounted loose source: OS window title uses the original map name
+PASS console mounted loose source: MAP variables describe the real source
+PASS console mounted loose source: selected profile controls actual process working directory
+PASS console mounted PAK source: original document path is retained
+PASS console mounted PAK source: OS window title uses the original map name
+PASS console mounted PAK source: MAP variables describe the real source
+PASS console mounted PAK source: selected profile controls actual process working directory
+PASS console mounted PK3 source: original document path is retained
+PASS console mounted PK3 source: OS window title uses the original map name
+PASS console mounted PK3 source: MAP variables describe the real source
+PASS console mounted PK3 source: selected profile controls actual process working directory
+PASS explicit absolute working directory: original document path is retained
+PASS explicit absolute working directory: OS window title uses the original map name
+PASS explicit absolute working directory: MAP variables describe the real source
+PASS explicit absolute working directory: selected profile controls actual process working directory
+PASS saved map with intentionally empty working directory: original document path is retained
+PASS saved map with intentionally empty working directory: OS window title uses the original map name
+PASS saved map with intentionally empty working directory: MAP variables describe the real source
+PASS saved map with intentionally empty working directory: selected profile controls actual process working directory
+PASS unsaved map cannot export or spawn a strict compilation profile
+PASS unsaved map cannot launch an engine process
+PASS compilation path acceptance 46
+RUN compilation: scripts/test-mod-profile-lighting.py
+/mnt/c/Games/RBJ-World-QA/rb21-fit-current/final-acceptance/linux/compilation/mod-profiles/Game resources
+PASS existing_vanilla_map_does_not_inherit_unrelated_global_AD_resource_selection
+PASS initial_actual_FTE_filesystem_lookup_uses_expected_resource_directory
+PASS actual_Mod_plus_updates_map_list_active_runtime_and_base_mod_resource_stack
+PASS inherited_id1_is_separate_from_editable_enabled_mods
+PASS selected_actual_FTE_filesystem_lookup_uses_expected_resource_directory
+PASS Quake1_skips_loose_and_packed_WAD3_and_reports_missing_WAD
+PASS Undo_restores_vanilla_map_and_its_actual_resource_stack
+PASS undone_actual_FTE_filesystem_lookup_uses_expected_resource_directory
+PASS Redo_restores_AD_map_and_its_actual_resource_stack
+PASS redone_actual_FTE_filesystem_lookup_uses_expected_resource_directory
+PASS actual_Mod_minus_restores_vanilla_active_runtime
+PASS Save_persists_selected_map_mod_and_external_WAD_reference
+PASS saved_map_reopens_with_the_same_AD_mod_and_resource_stack
+PASS reopened_actual_FTE_filesystem_lookup_uses_expected_resource_directory
+PASS actual_customer_qbsp_vis_light_chain_finishes_without_ignored_tool_errors
+PASS literal_bspw_and_full_lighting_arguments_reach_packaged_ericw
+PASS both_real_bsp_and_lit_deploy_to_selected_AD_mod_only
+PASS customer_bsp2_output_format_is_preserved
+PASS compiled_bsp_lump_ranges_are_valid
+PASS strict_export_preserves_light_entity_and_color_in_real_bsp
+PASS single_player_fixture_keeps_info_player_start_without_deathmatch_replacement
+PASS real_bsp_contains_nonuniform_baked_light_data
+PASS colored_lighting_sidecar_matches_real_bsp_light_samples
+PASS lit_sidecar_contains_actual_colored_samples
+PASS external_wad_pixels_are_embedded_in_compiled_map_without_missing_texture_checker
+PASS actual_VIS_writes_visibility_data_after_literal_bspw_argument
+PASS customer_cleanup_removes_every_explicit_target_and_preserves_original_map
+PASS literal_bsp_and_lit_cleanup_matches_nested_files_like_trenchbroom
+PASS imported_engine_uses_its_executable_working_directory
+PASS imported_engine_command_receives_same_selected_mod_and_real_map_name
+PASS imported_engine_launch_keeps_deployed_bsp_and_colored_lighting_unchanged
+PASS newly_authored_map_Save_resolves_indexed_WAD_into_saved_document
+PASS newly_authored_map_compiles_immediately_after_Save_without_reopen
+PASS Save_then_Compile_uses_resolved_WAD_even_when_live_world_had_no_wad_key
+PASS grayscale_build_respects_light_argv_and_missing_copy_matches
+PASS successful_light_tool_with_zero_samples_still_runs_copy_and_cleanup
+PASS func_detail_available_in_mod_brush_menu_and_created_with_expected_semantics
+PASS func_group_available_in_mod_brush_menu_and_created_with_expected_semantics

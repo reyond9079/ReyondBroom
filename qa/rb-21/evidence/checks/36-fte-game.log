@@ -1,0 +1,7 @@
+PASS The native FTE profile exports IQM
+PASS IQM export includes the FTE material script
+PASS The native FTE profile exports IQM
+PASS IQM export includes the FTE material script
+PASS The native FTE profile exports IQM
+PASS IQM export includes the FTE material script
+PASS three native IQMs play walk_forward in standalone FTE with matching bone names and parents.

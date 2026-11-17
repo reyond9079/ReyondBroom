@@ -1,0 +1,4 @@
+PASS Collected 240 animated frame intervals with VSync and FPS cap disabled
+PASS The live editor renders a 1920x1080 frame
+PASS The game window uses a hardware OpenGL renderer
+PASS Animated reduced preview averages 172.3 FPS

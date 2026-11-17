@@ -1,0 +1,68 @@
+{
+  "samplesPerToolPerBuild": 480,
+  "resolution": [
+    1920,
+    1080
+  ],
+  "runs": [
+    "before-after",
+    "after-before"
+  ],
+  "moduleSha256": {
+    "before": "e96780501d05071e0f4ed9a8dfe1b1977d7335a820643a7f9f8baca17b877871",
+    "after": "6f0da1db98396d6b023bc6faaeea454915a71692cf6713dff83c723af9f24de4"
+  },
+  "results": {
+    "map": {
+      "cpuSubmitMs": {
+        "before": 2.6163139583333335,
+        "after": 2.701654375,
+        "changePct": 3.2618568729049224
+      },
+      "cpuOnCoreMs": {
+        "before": 2.408854166666667,
+        "after": 2.05078125,
+        "changePct": -14.86486486486488
+      },
+      "gpuMs": {
+        "before": 0.6314965333333333,
+        "after": 0.5513130666666667,
+        "changePct": -12.697372421574649
+      }
+    },
+    "model": {
+      "cpuSubmitMs": {
+        "before": 10.268293333333332,
+        "after": 10.875742291666667,
+        "changePct": 5.91577332877129
+      },
+      "cpuOnCoreMs": {
+        "before": 9.5703125,
+        "after": 10.188802083333332,
+        "changePct": 6.4625850340136015
+      },
+      "gpuMs": {
+        "before": 3.6120512,
+        "after": 3.7697621333333333,
+        "changePct": 4.366243018186822
+      }
+    },
+    "plant": {
+      "cpuSubmitMs": {
+        "before": 5.435641875,
+        "after": 5.266065,
+        "changePct": -3.119721256470742
+      },
+      "cpuOnCoreMs": {
+        "before": 4.947916666666666,
+        "after": 4.850260416666666,
+        "changePct": -1.9736842105263164
+      },
+      "gpuMs": {
+        "before": 1.4695658666666667,
+        "after": 1.1797546666666667,
+        "changePct": -19.720871760403792
+      }
+    }
+  }
+}

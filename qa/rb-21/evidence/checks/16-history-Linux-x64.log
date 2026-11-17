@@ -1,0 +1,6 @@
+PASS All 100 rapid native editing gestures arrived once
+PASS Saved document and applied preview both match the last rapid edit
+PASS Preset, clothing and clip are captured by normal native Save
+PASS Undo reverses 103 native document edits individually
+PASS Undo restores the exact initial settings
+PASS Redo restores the edited character byte for byte and leaves the map open

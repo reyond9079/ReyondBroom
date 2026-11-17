@@ -1,0 +1,98 @@
+[
+  {
+    "case": "1280x720-dark-200",
+    "exit": 0
+  },
+  {
+    "case": "1280x720-dark-100",
+    "exit": 0
+  },
+  {
+    "case": "1280x720-dark-125",
+    "exit": 0
+  },
+  {
+    "case": "1280x720-dark-150",
+    "exit": 0
+  },
+  {
+    "case": "1280x720-light-200",
+    "exit": 0
+  },
+  {
+    "case": "1280x720-light-100",
+    "exit": 0
+  },
+  {
+    "case": "1280x720-light-125",
+    "exit": 0
+  },
+  {
+    "case": "1280x720-light-150",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-dark-200",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-dark-100",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-dark-125",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-dark-150",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-light-200",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-light-100",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-light-125",
+    "exit": 0
+  },
+  {
+    "case": "1600x900-light-150",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-dark-200",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-dark-100",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-dark-125",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-dark-150",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-light-200",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-light-100",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-light-125",
+    "exit": 0
+  },
+  {
+    "case": "1920x1080-light-150",
+    "exit": 0
+  }
+]

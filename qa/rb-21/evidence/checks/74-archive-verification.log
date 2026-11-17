@@ -1,0 +1,6 @@
+PASS private data scan for 2 release archives
+PASS Windows-x64 f53235f4343aafa1248930487ad188f4aea19be7 runtime, corresponding source and detached SHA-256
+PASS private data scan for 2 release archives
+PASS Linux-x64 f53235f4343aafa1248930487ad188f4aea19be7 runtime, corresponding source and detached SHA-256
+PASS private data scan for 2 release archives
+PASS Linux-SDL2-x64 f53235f4343aafa1248930487ad188f4aea19be7 runtime, corresponding source and detached SHA-256

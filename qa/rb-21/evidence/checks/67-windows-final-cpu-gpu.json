@@ -1,0 +1,26 @@
+{
+  "backend": [
+    "GL_RENDERER: NVIDIA GeForce RTX 4060 Laptop GPU/PCIe/SSE2",
+    "GL_VERSION: 4.6.0 NVIDIA 591.74"
+  ],
+  "window": [
+    1920.0,
+    1080.0
+  ],
+  "clip": "run_forward",
+  "triangles": 13618,
+  "frames": 240,
+  "sampleRange": [
+    1054,
+    1293
+  ],
+  "unmodifiedFps": 210.3900605423698,
+  "unmodifiedFrameP95Ms": 7.3257,
+  "instrumentedFps": 173.94794651187618,
+  "gpuAverageMs": 1.5549525333333334,
+  "gpuP95Ms": 2.05824,
+  "cpuRenderThreadOnCoreAverageMs": 3.6458333333333335,
+  "cpuSubmissionAverageMs": 3.829430416666667,
+  "cpuSubmissionP95Ms": 6.0288,
+  "traceSha256": "8b719c353beb602d6599c5a39bdcace9e6a25df043f23eeed40925fe0d94cf0d"
+}

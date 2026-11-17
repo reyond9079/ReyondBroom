@@ -1,0 +1,17 @@
+{
+  "frames": 240,
+  "measured": {
+    "cpu_submit_ms": {
+      "mean_ms": 4.710457083333333,
+      "p95_ms": 8.616885
+    },
+    "cpu_render_thread_100ns": {
+      "mean_ms": 3.9713541666666665,
+      "p95_ms": 15.625
+    },
+    "gpu_elapsed_ns": {
+      "mean_ms": 1.5862272,
+      "p95_ms": 2.240512
+    }
+  }
+}

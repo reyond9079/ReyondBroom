@@ -1,0 +1,14 @@
+PASS complete synthetic report is accepted locally
+PASS unapproved workflow is rejected
+PASS approval by another reviewer is rejected
+PASS missing report is rejected
+PASS wrong source revision is rejected
+PASS dirty source is rejected
+PASS stale report is rejected
+PASS FAIL gate is rejected
+PASS BLOCKED gate is rejected
+PASS SKIP gate is rejected
+PASS missing gate is rejected
+PASS missing evidence is rejected
+PASS evidence checksum mismatch is rejected
+PASS package checksum mismatch is rejected

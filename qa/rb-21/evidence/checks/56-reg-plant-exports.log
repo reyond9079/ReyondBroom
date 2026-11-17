@@ -1,0 +1,2 @@
+PASS independent GLB roundtrip ui-plant.glb 8276
+PASS independent OBJ material reimport ui-plant.obj

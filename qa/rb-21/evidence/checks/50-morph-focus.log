@@ -1,0 +1,5 @@
+PASS Ctrl-click numeric entry saves the typed value without changing the map
+PASS Escape cancels the numeric edit without closing the editor
+PASS After losing focus, external shortcuts do not edit or close the character or map
+PASS A slider drag across the viewport changes only the slider and undoes in one step
+PASS Orbit changes the real viewport without altering the map or the morph

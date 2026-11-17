@@ -1,0 +1,160 @@
+RUN fixture: tests/make-linux-build-fixture.py
+RUN plant_ui: scripts/test-plant-scale.py
+0 oak 12.4654 player heights
+0 apple 2.72212 player heights
+0 lawn-grass 0.0695568 player heights
+0 meadow-grass 0.197228 player heights
+0 amanita 0.0822388 player heights
+0 boxwood 0.333823 player heights
+0 dwarf-bamboo 0.309457 player heights
+0 saguaro 4.56035 player heights
+0 fantasy 1.47947 player heights
+1 oak 12.4654 player heights
+1 apple 2.72212 player heights
+1 lawn-grass 0.0695568 player heights
+1 meadow-grass 0.197228 player heights
+1 amanita 0.0822388 player heights
+1 boxwood 0.333823 player heights
+1 dwarf-bamboo 0.309412 player heights
+1 saguaro 4.56035 player heights
+1 fantasy 1.47947 player heights
+2 oak 12.4654 player heights
+2 apple 2.72212 player heights
+2 lawn-grass 0.0695568 player heights
+2 meadow-grass 0.197228 player heights
+2 amanita 0.0822388 player heights
+2 boxwood 0.333823 player heights
+2 dwarf-bamboo 0.309457 player heights
+2 saguaro 4.56035 player heights
+2 fantasy 1.47947 player heights
+3 oak 12.4654 player heights
+3 apple 2.72212 player heights
+3 lawn-grass 0.0695568 player heights
+3 meadow-grass 0.197228 player heights
+3 amanita 0.0822388 player heights
+3 boxwood 0.333823 player heights
+3 dwarf-bamboo 0.309457 player heights
+3 saguaro 4.56035 player heights
+3 fantasy 1.47947 player heights
+4 oak 12.4654 player heights
+4 apple 2.72212 player heights
+4 lawn-grass 0.0695568 player heights
+4 meadow-grass 0.197228 player heights
+4 amanita 0.0822388 player heights
+4 boxwood 0.333823 player heights
+4 dwarf-bamboo 0.309412 player heights
+4 saguaro 4.56035 player heights
+4 fantasy 1.47947 player heights
+953 plant scale checks passed
+RUN plant_ui: scripts/test-plant-export-unit.py
+PASS all implemented exporters have explicit choices
+PASS selected format determines the saved suffix
+PASS glTF binary (.glb)
+PASS selected format determines the saved suffix
+PASS Wavefront (.obj)
+PASS selected format determines the saved suffix
+PASS Quake MDL (.mdl)
+PASS Quake MDL production decoder roundtrip
+PASS selected format determines the saved suffix
+PASS Quake II MD2 (.md2)
+PASS MD2 decoder resolves its companion skin
+PASS selected format determines the saved suffix
+PASS Quake III MD3 (.md3)
+PASS MD3 production decoder roundtrip
+PASS selected format determines the saved suffix
+PASS Inter-Quake Model (.iqm)
+PASS IQM signature
+PASS selected format determines the saved suffix
+PASS Doom 3 MD5 mesh (.md5mesh)
+PASS MD5 static root joint
+PASS selected format determines the saved suffix
+PASS Half-Life / GoldSrc MDL (.mdl)
+PASS GoldSrc MDL production decoder roundtrip
+Plant export manager passed
+RUN plant_ui: scripts/test-plant-ui.py
+PASS native Plant Editor opens with three real LODs
+PASS live LOD statistics show real reduction
+PASS all eight available formats are visible before destination selection
+PASS Export opens the format picker before the file picker
+PASS destination defaults to the selected MD3 extension
+PASS selected format 0 writes its actual encoding
+PASS selected format 1 writes its actual encoding
+PASS selected format 2 writes its actual encoding
+PASS selected format 3 writes its actual encoding
+PASS selected format 4 writes its actual encoding
+PASS selected format 5 writes its actual encoding
+PASS selected format 6 writes its actual encoding
+PASS selected format 7 writes its actual encoding
+PASS MD2 exports its companion PCX
+PASS MD3, IQM and MD5 export their referenced atlas
+PASS OBJ exports its MTL and PNG companions
+PASS format selection determines the extension even when destination text has another suffix
+PASS companion conflict preserves prior data and produces no partial model
+Plant export UI: 18 checks passed
+RUN plant_ui: scripts/test-plant-ui.py
+PASS native Plant Editor opens with three real LODs
+PASS live LOD statistics show real reduction
+PASS initial oak defaults use the selected game player scale
+PASS Randomize changes the generated seed
+PASS saved seed variation persists in editable project
+PASS Save writes the complete editable project
+PASS Height control changes actual parameters
+PASS regeneration preserves camera orbit, zoom and target
+PASS Plant Undo restores the parameter edit
+PASS Plant Redo restores the generated change
+PASS New respects the unsaved-project confirmation
+PASS Open restores parameters, hierarchy, seed and saved variations
+PASS Export writes a real embedded GLB
+PASS OBJ export writes its real MTL and PNG dependencies
+PASS Save preset creates a versioned editable user preset
+PASS Favorite persists without model errors
+PASS native generation oak
+PASS native generation pine
+PASS native generation wild-shrub
+PASS native generation meadow-grass
+PASS native generation amanita
+PASS ordinary mushroom preset is scaled to 18 cm rather than a giant prop
+PASS native generation daisy
+PASS native generation bracken
+PASS texture inspector loads albedo, normal and ORM after deferred upload
+PASS Modern Light changes the UI without replacing the plant
+PASS Advanced mode exposes the editable structure
+PASS hiding Leaves removes actual geometry
+PASS hierarchy visibility participates in Undo
+PASS Add to Map writes a native asset for the active profile
+PASS placed asset retains its alpha-cutout shader dependency
+PASS FTE authoring source directory receives the exact generated model
+PASS FTE authoring source dependency textures/reyond-plugins/plant-3e17cce7b574a4c3-fte.dds
+PASS FTE authoring source dependency textures/reyond-plugins/plant-3e17cce7b574a4c3-fte.tga
+PASS FTE authoring source dependency scripts/plant-3e17cce7b574a4c3-fte.shader
+PASS FTE authoring source dependency models/reyond-plugins/plant-3e17cce7b574a4c3-fte.plant.json
+PASS map save retains the generated model reference and authoring marker
+PASS map Undo removes the inserted entity
+PASS map Redo restores the inserted entity
+PASS existing entity tools persist plant position, rotation and scale
+PASS map reopen preserves the installed model
+PASS Quake 1 build copy adapts the authoring entity to the FTE static-model fallback
+PASS build snapshot stages the exact model bytes
+PASS build snapshot dependency textures/reyond-plugins/plant-3e17cce7b574a4c3-fte.dds
+PASS build snapshot dependency textures/reyond-plugins/plant-3e17cce7b574a4c3-fte.tga
+PASS build snapshot dependency scripts/plant-3e17cce7b574a4c3-fte.shader
+PASS build snapshot dependency models/reyond-plugins/plant-3e17cce7b574a4c3-fte.plant.json
+PASS Quake III shader list includes the generated cutout material
+PASS placed model remains in the map after closing Plant Editor
+PASS placed plant visibly renders in the map after reopen
+Plant UI: 50 checks passed
+RUN plant_ui: scripts/test-plant-exports.py
+Traceback (most recent call last):
+  File "/tmp/rbj-rb21-final-source-APxeqb/scripts/test-plant-exports.py", line 6, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+Traceback (most recent call last):
+  File "/tmp/rbj-rb21-final-source-APxeqb/scripts/ci-run-checks.py", line 119, in <module>
+    main()
+  File "/tmp/rbj-rb21-final-source-APxeqb/scripts/ci-run-checks.py", line 92, in main
+    run('plant_ui', 'scripts/test-plant-exports.py', out/'plants/ui', gui=False)
+  File "/tmp/rbj-rb21-final-source-APxeqb/scripts/ci-run-checks.py", line 39, in run
+    subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/bin/python3', '/tmp/rbj-rb21-final-source-APxeqb/scripts/test-plant-exports.py', '/mnt/c/Games/RBJ-World-QA/rb21-fit-current/final-acceptance/linux/plant_ui/plants/ui']' returned non-zero exit status 1.

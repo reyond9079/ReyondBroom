@@ -1,0 +1,10 @@
+PASS provenance checks for 131 assets
+PASS preset preview triangle counts 24362-39267
+PASS 768 deterministic mutations across character, rig, wardrobe and GLB parsers
+PASS every fitted body, garment and hair vertex against independent skinning across 27 clips, max error 1.24427e-14 authoring units
+PASS canonical rig, skinning, 48 morphs, 1000 document round trips and 27 distinct animations in GLB and IQM
+PASS GLB expression targets, selected weight and matching mesh topology
+PASS independent GLB skinning of 135 source vertices across all clips, max error 0.00000017 m
+PASS independent GLB/IQM world poses, max bone displacement 0.001306 Quake units
+PASS independent GLB and IQM decoding with 27 named, moving clips
+PASS independent classic model decoders, 335 baked frames, 27 studio sequences

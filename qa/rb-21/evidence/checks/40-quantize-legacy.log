@@ -1,0 +1,7 @@
+PASS preset preview triangle counts 24362-39267
+PASS 768 deterministic mutations across character, rig, wardrobe and GLB parsers
+PASS every fitted body, garment and hair vertex against independent skinning across 27 clips, max error 1.24427e-14 authoring units
+PASS MDL: maximum axis loss 0.194435 Quake units; maximum vertex displacement 0.267147 Quake units.
+PASS MD2: maximum axis loss 0.195307 Quake units; maximum vertex displacement 0.268456 Quake units.
+PASS MD3: maximum axis loss 0.0078125 Quake units; maximum vertex displacement 0.0134517 Quake units.
+PASS canonical rig, skinning, 48 morphs, 1000 document round trips and 27 distinct animations in GLB and IQM

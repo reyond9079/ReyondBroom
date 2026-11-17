@@ -1,0 +1,13 @@
+{
+  "platform": "Windows-x64",
+  "version": "0.6.0-alpha.25",
+  "revision": "f53235f4343aafa1248930487ad188f4aea19be7",
+  "manifest_files": 840,
+  "components": {
+    "ftebroom/csaddon.dat": "a0a78209a8d84a80a14d0e721220fc75cac3a74c95479fc945a835dae1c6cf2e",
+    "ftebroom/ui/update-splash.png": "22eaf787b9cb9a823a46db8647bf951c15b1545cee489801a8a93964d1a854d3",
+    "bin/fteqw64.exe": "6aa78b36d20878fdae892cb5f6131944bb6f0d5ccd30474d366019c707b0b6a5",
+    "fteplug_ftebroom_x64.dll": "a361fdd569fa57dd257651e4c20fd178336b2f5f38afacec0db57913e46e6112"
+  },
+  "native_startup": true
+}

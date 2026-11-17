@@ -1,0 +1,24 @@
+PASS The native preview switches to a fitted mesh within 15,000 triangles
+PASS Cancel preserves changes on New
+PASS Cancelling Save As preserves edits, and saving a new document writes before resetting
+PASS Open can discard local changes and reopen the saved source
+PASS Quake MDL export is disabled while the Quake III map supplies no Quake palette
+PASS Reopened character uses its selected FTE export target without switching map profile
+PASS A loop clip can be stepped and played once in the native timeline
+PASS Cancelling a map change leaves both documents in place
+PASS Rejected garment import: Add a .rbw.license.json
+PASS Rejected garment import: Unsupported garment license
+PASS Rejected garment import: does not match the .rbw file
+PASS A cached garment still requires license metadata for a new import
+PASS Native import saves a fitted garment and a retargeted animation
+PASS Character document preserves the garment attribution
+PASS Saved .glb character dependency matches its source
+PASS Saved .rbw character dependency matches its source
+PASS Rejected save leaves the previous document and conflicting sidecar intact
+PASS Failed atomic backup retains the previous character
+PASS Removing the filesystem obstacle lets the edited character save
+PASS Saved character with imported assets reopens in the native editor
+PASS Editor GLB includes the imported motion and editable expressions
+PASS Legacy characters reopen with an existing garment and no license record
+PASS An existing Field Technician document opens and saves without losing its preset data
+PASS A guarded map change releases the closed character preview

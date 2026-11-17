@@ -1,0 +1,4 @@
+/mnt/c/Games/RBJ-World-QA/rb21-fit-current/final-acceptance/linux/model-legacy-rerun
+PASS rendered diffuse textures: 21611 red pixels and 32206 green pixels
+PASS actual editor: hierarchy, transforms, rendered modes, skeletal animation/bones, viewmodel camera, mouse-axis movement, five exports; source hashes unchanged
+PASS Quake 1 player model after process restart with saved mod resources

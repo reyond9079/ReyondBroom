@@ -1,0 +1,594 @@
+{
+  "cycles": 40,
+  "seconds": 958.7307718000011,
+  "outfits": 10,
+  "releaseDedicatedBytes": 0,
+  "phaseMedians": {
+    "1-empty": {
+      "dedicatedMiB": 194.594,
+      "sharedMiB": 31.684,
+      "privateMiB": 575.625,
+      "workingSetMiB": 343.547,
+      "samples": 5
+    },
+    "1-ten": {
+      "dedicatedMiB": 1712.719,
+      "sharedMiB": 35.168,
+      "privateMiB": 2274.172,
+      "workingSetMiB": 488.875,
+      "samples": 15
+    },
+    "2-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 35.168,
+      "privateMiB": 2128.164,
+      "workingSetMiB": 350.305,
+      "samples": 5
+    },
+    "2-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 35.168,
+      "privateMiB": 2217.508,
+      "workingSetMiB": 431.949,
+      "samples": 16
+    },
+    "3-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 35.168,
+      "privateMiB": 2125.43,
+      "workingSetMiB": 349.301,
+      "samples": 5
+    },
+    "3-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2219.547,
+      "workingSetMiB": 434.02,
+      "samples": 15
+    },
+    "4-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2130.914,
+      "workingSetMiB": 354.551,
+      "samples": 5
+    },
+    "4-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2219.73,
+      "workingSetMiB": 434.344,
+      "samples": 15
+    },
+    "5-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2128.188,
+      "workingSetMiB": 351.762,
+      "samples": 5
+    },
+    "5-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2219.086,
+      "workingSetMiB": 434.34,
+      "samples": 15
+    },
+    "6-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2131.773,
+      "workingSetMiB": 354.656,
+      "samples": 5
+    },
+    "6-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2218.391,
+      "workingSetMiB": 434.258,
+      "samples": 15
+    },
+    "7-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2129.801,
+      "workingSetMiB": 354.828,
+      "samples": 5
+    },
+    "7-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 37.168,
+      "privateMiB": 2219.922,
+      "workingSetMiB": 434.672,
+      "samples": 15
+    },
+    "8-empty": {
+      "dedicatedMiB": 1704.648,
+      "sharedMiB": 35.168,
+      "privateMiB": 2129.895,
+      "workingSetMiB": 350.219,
+      "samples": 5
+    },
+    "8-ten": {
+      "dedicatedMiB": 1712.648,
+      "sharedMiB": 35.168,
+      "privateMiB": 2217.898,
+      "workingSetMiB": 432.664,
+      "samples": 15
+    },
+    "9-empty": {
+      "dedicatedMiB": 1704.648,
+      "sharedMiB": 35.168,
+      "privateMiB": 2128.625,
+      "workingSetMiB": 353.207,
+      "samples": 5
+    },
+    "9-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2219.055,
+      "workingSetMiB": 434.879,
+      "samples": 15
+    },
+    "10-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2129.391,
+      "workingSetMiB": 352.539,
+      "samples": 5
+    },
+    "10-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2220.199,
+      "workingSetMiB": 434.914,
+      "samples": 15
+    },
+    "11-empty": {
+      "dedicatedMiB": 1696.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2125.055,
+      "workingSetMiB": 255.871,
+      "samples": 5
+    },
+    "11-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2221.059,
+      "workingSetMiB": 247.457,
+      "samples": 15
+    },
+    "12-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2134.703,
+      "workingSetMiB": 166.27,
+      "samples": 5
+    },
+    "12-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2219.367,
+      "workingSetMiB": 244.746,
+      "samples": 15
+    },
+    "13-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2129.652,
+      "workingSetMiB": 147.414,
+      "samples": 6
+    },
+    "13-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2219.426,
+      "workingSetMiB": 201.312,
+      "samples": 15
+    },
+    "14-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2128.852,
+      "workingSetMiB": 119.449,
+      "samples": 5
+    },
+    "14-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2221.074,
+      "workingSetMiB": 201.574,
+      "samples": 15
+    },
+    "15-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2132.406,
+      "workingSetMiB": 122.133,
+      "samples": 5
+    },
+    "15-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2223.598,
+      "workingSetMiB": 204.773,
+      "samples": 15
+    },
+    "16-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2132.18,
+      "workingSetMiB": 122.07,
+      "samples": 5
+    },
+    "16-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2223.105,
+      "workingSetMiB": 204.922,
+      "samples": 15
+    },
+    "17-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2132.711,
+      "workingSetMiB": 122.344,
+      "samples": 5
+    },
+    "17-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2224.168,
+      "workingSetMiB": 204.859,
+      "samples": 15
+    },
+    "18-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2136.836,
+      "workingSetMiB": 125.316,
+      "samples": 5
+    },
+    "18-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2224.402,
+      "workingSetMiB": 205.109,
+      "samples": 15
+    },
+    "19-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2137.98,
+      "workingSetMiB": 125.645,
+      "samples": 5
+    },
+    "19-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2223.777,
+      "workingSetMiB": 205.285,
+      "samples": 15
+    },
+    "20-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2136.094,
+      "workingSetMiB": 128.18,
+      "samples": 5
+    },
+    "20-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2223.43,
+      "workingSetMiB": 207.859,
+      "samples": 15
+    },
+    "21-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2134.84,
+      "workingSetMiB": 122.93,
+      "samples": 5
+    },
+    "21-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2224.219,
+      "workingSetMiB": 205.375,
+      "samples": 15
+    },
+    "22-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2132.012,
+      "workingSetMiB": 123.02,
+      "samples": 5
+    },
+    "22-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2225.18,
+      "workingSetMiB": 194.617,
+      "samples": 15
+    },
+    "23-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2145.051,
+      "workingSetMiB": 116.324,
+      "samples": 5
+    },
+    "23-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2225.18,
+      "workingSetMiB": 194.672,
+      "samples": 15
+    },
+    "24-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2134.402,
+      "workingSetMiB": 115.18,
+      "samples": 5
+    },
+    "24-ten": {
+      "dedicatedMiB": 1712.664,
+      "sharedMiB": 41.168,
+      "privateMiB": 2227.18,
+      "workingSetMiB": 189.371,
+      "samples": 15
+    },
+    "25-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2139.645,
+      "workingSetMiB": 104.719,
+      "samples": 5
+    },
+    "25-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2225.871,
+      "workingSetMiB": 183.137,
+      "samples": 15
+    },
+    "26-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2138.52,
+      "workingSetMiB": 105.07,
+      "samples": 5
+    },
+    "26-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2225.988,
+      "workingSetMiB": 184.391,
+      "samples": 15
+    },
+    "27-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2140.16,
+      "workingSetMiB": 103.844,
+      "samples": 5
+    },
+    "27-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2225.852,
+      "workingSetMiB": 180.785,
+      "samples": 15
+    },
+    "28-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2136.965,
+      "workingSetMiB": 100.379,
+      "samples": 5
+    },
+    "28-ten": {
+      "dedicatedMiB": 1712.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2226.121,
+      "workingSetMiB": 181.258,
+      "samples": 15
+    },
+    "29-empty": {
+      "dedicatedMiB": 1704.66,
+      "sharedMiB": 39.168,
+      "privateMiB": 2155.605,
+      "workingSetMiB": 121.012,
+      "samples": 5
+    },
+    "29-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2227.367,
+      "workingSetMiB": 183.492,
+      "samples": 15
+    },
+    "30-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2147.395,
+      "workingSetMiB": 105.293,
+      "samples": 5
+    },
+    "30-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2228.137,
+      "workingSetMiB": 181.066,
+      "samples": 15
+    },
+    "31-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2140.379,
+      "workingSetMiB": 101.621,
+      "samples": 5
+    },
+    "31-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2229.16,
+      "workingSetMiB": 182.164,
+      "samples": 15
+    },
+    "32-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2139.629,
+      "workingSetMiB": 101.34,
+      "samples": 5
+    },
+    "32-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2228.07,
+      "workingSetMiB": 182.707,
+      "samples": 15
+    },
+    "33-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2140.207,
+      "workingSetMiB": 103.203,
+      "samples": 5
+    },
+    "33-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2228.66,
+      "workingSetMiB": 183.258,
+      "samples": 15
+    },
+    "34-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2159.523,
+      "workingSetMiB": 122.934,
+      "samples": 5
+    },
+    "34-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2228.66,
+      "workingSetMiB": 183.645,
+      "samples": 15
+    },
+    "35-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2139.613,
+      "workingSetMiB": 104.012,
+      "samples": 5
+    },
+    "35-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2229.758,
+      "workingSetMiB": 183.539,
+      "samples": 14
+    },
+    "36-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2160.621,
+      "workingSetMiB": 123.238,
+      "samples": 5
+    },
+    "36-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2230.035,
+      "workingSetMiB": 183.949,
+      "samples": 15
+    },
+    "37-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2159.395,
+      "workingSetMiB": 123.566,
+      "samples": 5
+    },
+    "37-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2228.906,
+      "workingSetMiB": 184.336,
+      "samples": 15
+    },
+    "38-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2159.77,
+      "workingSetMiB": 123.957,
+      "samples": 5
+    },
+    "38-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2230.031,
+      "workingSetMiB": 184.316,
+      "samples": 15
+    },
+    "39-empty": {
+      "dedicatedMiB": 1704.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2160.52,
+      "workingSetMiB": 123.941,
+      "samples": 5
+    },
+    "39-ten": {
+      "dedicatedMiB": 1712.668,
+      "sharedMiB": 41.168,
+      "privateMiB": 2231.5,
+      "workingSetMiB": 185.758,
+      "samples": 15
+    },
+    "40-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2144.492,
+      "workingSetMiB": 105.285,
+      "samples": 5
+    },
+    "40-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2226.188,
+      "workingSetMiB": 183.062,
+      "samples": 15
+    }
+  },
+  "warmPopulated": {
+    "dedicatedMiB": {
+      "first": 1712.66,
+      "last": 1712.668,
+      "low": 1712.648,
+      "high": 1712.668
+    },
+    "sharedMiB": {
+      "first": 37.168,
+      "last": 41.168,
+      "low": 35.168,
+      "high": 41.168
+    },
+    "privateMiB": {
+      "first": 2219.055,
+      "last": 2230.031,
+      "low": 2217.898,
+      "high": 2231.5
+    },
+    "workingSetMiB": {
+      "first": 434.34,
+      "last": 184.316,
+      "low": 180.785,
+      "high": 434.914
+    }
+  }
+}

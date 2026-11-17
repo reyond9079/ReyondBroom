@@ -1,0 +1,11 @@
+PASS expected rejection for hierarchy: Incompatible animation joint order, parent or rest transform.
+PASS expected rejection for rig: Animation skeleton must match the RB_Humanoid_v1 joint inventory.
+PASS expected rejection for rest: A glTF rotation is not a unit quaternion.
+PASS expected rejection for duration: The imported clip is shorter than 0.05 seconds.
+PASS expected rejection for timestamp: An animation key is not finite.
+PASS preset preview triangle counts 24362-39267
+PASS 768 deterministic mutations across character, rig, wardrobe and GLB parsers
+PASS half-way crossfade idle_neutral to walk_forward on 46 joints
+PASS half-way crossfade walk_forward to run_forward on 45 joints
+PASS every fitted body, garment and hair vertex against independent skinning across 27 clips, max error 1.24427e-14 authoring units
+PASS canonical rig, skinning, 48 morphs, 1000 document round trips and 27 distinct animations in GLB and IQM

@@ -1,0 +1,11 @@
+PASS Viewport Create records the original surface hit
+PASS Save places a single Quake III misc_model at the captured surface
+PASS The model bundle includes source, textures and frame groups
+PASS Repeat Save updates the same entity and preserves its transform
+PASS Map Undo restores the previous immutable model
+PASS Map Redo restores the new model
+PASS The placed character entity can be deleted
+PASS Save cannot recreate a deleted character entity
+PASS Reopening the map retains the asset and clears the old document binding
+PASS Character preview survives switching between docked and integrated panes
+PASS Toolbar Compile stages the entire character bundle and opens the BSP

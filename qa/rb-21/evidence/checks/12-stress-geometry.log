@@ -1,0 +1,2 @@
+PASS 1000 fitted and skinned characters with the FTE profile. CPU fitting p95 35.537 ms
+PASS 1000 current mesh generations with finite normals, tangents, bounds, stable UV, topology and nonzero aggregate volume

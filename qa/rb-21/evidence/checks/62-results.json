@@ -1,0 +1,14 @@
+{
+  "platform": "Linux-x64",
+  "version": "0.6.0-alpha.25",
+  "revision": "6649fcdd137aaaf102b62b138094ec46095251f7",
+  "manifest_files": 618,
+  "components": {
+    "ftebroom/csaddon.dat": "1db1a5b936c1654543c1cd8b90eed911c96a888d753c541bd91985cbd62052dd",
+    "ftebroom/ui/update-splash.png": "22eaf787b9cb9a823a46db8647bf951c15b1545cee489801a8a93964d1a854d3",
+    "fteqw-gl64": "45b91d94376e0e2b0db35c9a36273f835527dce3cac31c85ba757c31f0b3f79e",
+    "fteplug_ftebroom_amd64.so": "2d2639878c70f3184df3ac7b0a125985524d4780da52a270a02a1e2cd0cf54a0",
+    "tools/mapping-jams/prepare-resources": "8fb69bcb98372f7c29908df313f0af07789baa9bcb77a16e58f15e31cfb6d479"
+  },
+  "native_startup": true
+}

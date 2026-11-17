@@ -1,0 +1,8 @@
+PASS The native preview switches to a fitted mesh within 15,000 triangles
+PASS Cancel preserves changes on New
+PASS Cancelling Save As preserves edits, and saving a new document writes before resetting
+PASS Open can discard local changes and reopen the saved source
+PASS Quake MDL export is disabled while the Quake III map supplies no Quake palette
+PASS Reopened character uses its selected FTE export target without switching map profile
+PASS An invalid export extension is rejected and the prior valid IQM remains byte-for-byte intact
+PASS Cancelling an export preserves existing assets and the selected map profile

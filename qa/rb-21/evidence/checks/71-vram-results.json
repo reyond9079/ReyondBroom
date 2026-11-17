@@ -1,0 +1,118 @@
+{
+  "cycles": 6,
+  "seconds": 107.74219260000245,
+  "outfits": 10,
+  "releaseDedicatedBytes": 0,
+  "phaseMedians": {
+    "1-empty": {
+      "dedicatedMiB": 194.586,
+      "sharedMiB": 27.684,
+      "privateMiB": 565.914,
+      "workingSetMiB": 337.285,
+      "samples": 5
+    },
+    "1-ten": {
+      "dedicatedMiB": 1712.719,
+      "sharedMiB": 37.168,
+      "privateMiB": 2306.934,
+      "workingSetMiB": 527.766,
+      "samples": 5
+    },
+    "2-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2175.062,
+      "workingSetMiB": 404.66,
+      "samples": 5
+    },
+    "2-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2268.184,
+      "workingSetMiB": 487.809,
+      "samples": 5
+    },
+    "3-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2180.422,
+      "workingSetMiB": 405.105,
+      "samples": 5
+    },
+    "3-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2268.18,
+      "workingSetMiB": 487.785,
+      "samples": 5
+    },
+    "4-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2175.098,
+      "workingSetMiB": 404.676,
+      "samples": 5
+    },
+    "4-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2267.625,
+      "workingSetMiB": 487.973,
+      "samples": 5
+    },
+    "5-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2178.934,
+      "workingSetMiB": 408.484,
+      "samples": 5
+    },
+    "5-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2268.266,
+      "workingSetMiB": 487.676,
+      "samples": 5
+    },
+    "6-empty": {
+      "dedicatedMiB": 1704.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2178.441,
+      "workingSetMiB": 405.641,
+      "samples": 6
+    },
+    "6-ten": {
+      "dedicatedMiB": 1712.656,
+      "sharedMiB": 37.168,
+      "privateMiB": 2268.289,
+      "workingSetMiB": 487.984,
+      "samples": 5
+    }
+  },
+  "warmPopulated": {
+    "dedicatedMiB": {
+      "first": 1712.656,
+      "last": 1712.656,
+      "low": 1712.656,
+      "high": 1712.656
+    },
+    "sharedMiB": {
+      "first": 37.168,
+      "last": 37.168,
+      "low": 37.168,
+      "high": 37.168
+    },
+    "privateMiB": {
+      "first": 2268.223,
+      "last": 2268.223,
+      "low": 2267.625,
+      "high": 2268.289
+    },
+    "workingSetMiB": {
+      "first": 487.879,
+      "last": 487.879,
+      "low": 487.676,
+      "high": 487.984
+    }
+  }
+}

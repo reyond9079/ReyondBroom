@@ -1,0 +1,4 @@
+<qa>\final-acceptance\windows-model-legacy
+PASS rendered diffuse textures: 14176 red pixels and 20920 green pixels
+PASS actual editor: hierarchy, transforms, rendered modes, skeletal animation/bones, viewmodel camera, mouse-axis movement, five exports; source hashes unchanged
+PASS Quake 1 player model after process restart with saved mod resources

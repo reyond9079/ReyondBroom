@@ -1,0 +1,18 @@
+PASS context opens a docked Plant Brush tab
+PASS world-space radius can be edited
+PASS paint places exactly one profile-native FTE plant at small radius
+PASS placed plant includes its reusable IQM and editable source
+PASS Plant Brush defaults use Half-Life player scale for FTE
+PASS painted IQM geometry has mushroom stature relative to a 72-unit player
+PASS different catalogue plants can share the same area
+PASS erase catalogue contains scene plants only
+PASS filtered erase removes only the chosen species
+PASS unfiltered erase removes remaining plants and preserves unrelated entities
+PASS erase is a single Undo step
+PASS filtered erase is a single Undo step
+PASS a single drag places plants along its path
+PASS one Undo removes the whole paint stroke
+PASS create new plant opens Plant Editor and releases scene input
+PASS Plant Editor reveals and selects the current draft in the brush catalogue
+PASS the transferred draft can be painted without saving it as a preset first
+PASS Create new plant and editor-to-brush transfer retain the FTE oak scale

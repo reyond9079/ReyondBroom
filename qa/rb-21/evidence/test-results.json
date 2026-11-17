@@ -1,0 +1,918 @@
+{
+  "commit": "f53235f4343aafa1248930487ad188f4aea19be7",
+  "clean": true,
+  "finishedAt": "2026-11-17T14:04:47.480527+00:00",
+  "candidateRun": 44094499508,
+  "coverage": "Prior evidence covers matching rig, assets and unchanged paths. Current clean source generated the new sanitizer, motion, morph, character document and exact package results.",
+  "packages": {
+    "Windows-x64": {
+      "ReyondBroom-0.6.0-alpha.25-Windows-x64-Sources.zip": "5b0f3b55a04383a7517dafd2ec0694b7092287b7076e57a9768050b3473ce404",
+      "ReyondBroom-0.6.0-alpha.25-Windows-x64-Sources.zip.sha256": "cee63551f9fcaf8986fb7b6f4385291cc05307b75f7a8ab9d7034a6ec5658298",
+      "ReyondBroom-0.6.0-alpha.25-Windows-x64.zip": "88006899a8b4771a34a925205246188b89833696ebce5f60fa0c2ccae5b23da5",
+      "ReyondBroom-0.6.0-alpha.25-Windows-x64.zip.sha256": "9b79457be09009f9d086b7349bd83ca9264a99071ed651abbb3199b5bf28931e"
+    },
+    "Linux-x64": {
+      "ReyondBroom-0.6.0-alpha.25-Linux-x64-Sources.zip": "859050e6a2a3738c4727dfb118e88f6d43ffeac85fecbb69c813c30e466cead5",
+      "ReyondBroom-0.6.0-alpha.25-Linux-x64-Sources.zip.sha256": "b6eac6043a5e45c93c386fce8ca4bf2d6a02a6c539457d560f684ccdf675b721",
+      "ReyondBroom-0.6.0-alpha.25-Linux-x64.tar.gz": "9f04874a1e26f2920c360fad062be9c9ca26bb451500a598e6505554af24fb49",
+      "ReyondBroom-0.6.0-alpha.25-Linux-x64.tar.gz.sha256": "7919652089a2a9d64c76ac397e12b7b5df1549eff22b7dd83c8614d323c41f52"
+    },
+    "Linux-SDL2-x64": {
+      "ReyondBroom-0.6.0-alpha.25-Linux-SDL2-x64-Sources.zip": "603c34a700fa64596fabd59476b09d213f929ef91744ff6152ff8c90f6a2de56",
+      "ReyondBroom-0.6.0-alpha.25-Linux-SDL2-x64-Sources.zip.sha256": "1247d6fbfd985ae23d336f74fa4e83e40674f8f84fe89bdf0ac40dbaaf9a9e62",
+      "ReyondBroom-0.6.0-alpha.25-Linux-SDL2-x64.tar.gz": "ac64c44a863d0183f678283ddbbe86c5591bb43f2582465f92c299952651d2f4",
+      "ReyondBroom-0.6.0-alpha.25-Linux-SDL2-x64.tar.gz.sha256": "430d6482a7747c46e52267a2cd5bcef7b46dfe69373dc358651e70469386b306"
+    }
+  },
+  "gates": [
+    {
+      "id": "T-RIG-001",
+      "requirement": "canonical RB_Humanoid_v1 has exact persisted names/indices/parents/order/hash on all platforms; no cycles, duplicates or invalid rest transforms.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-RIG-002",
+      "requirement": "rest/inverse-bind matrix multiplication approximates identity within 1e-4; authoring Y-up to target basis and unit scale are consistent.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-RIG-003",
+      "requirement": "every body/hair/garment LOD visible vertex has 1\u0432\u0402\u201c4 valid finite weights, all joint indices in range and sum equals 1 +/- 1e-4.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-RIG-004",
+      "requirement": "production CPU/GPU skinning compared to independent CPU reference on all limbs, fingers and clothes in neutral and strongly articulated poses; report max error.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-RIG-005",
+      "requirement": "3 visually different bodies (slim, heavy, muscular) AND a dressed version all use exact same joint hierarchy and shared 25+ clip bank; no avatar-specific manual rig adjustments.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-RIG-006",
+      "requirement": "at t=0, 25%, 50%, 75%, last and loop-wrap times for EVERY clip, pose finite, no accidental 180-degree quaternion flips or broken joints.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-RIG-007",
+      "requirement": "play, pause, frame-step, loop, hold, scrubbing, adjustable speed, end-of-clip handling and 0-duration invalid input.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/02-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161",
+        "checks/03-animation-controls.log": "c9184399eef23280027829ffa7d92ad3301faad71bb38ef3b77d4c09cff57907",
+        "checks/04-motion-acceptance.log": "c80ac1718c8eb43524ecbfce7fa49424dbe3bd9809bcf88bcc05dcf0b4bc812a",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e"
+      }
+    },
+    {
+      "id": "T-RIG-008",
+      "requirement": "crossfade idle->walk->run and upper-body masked blend with lower-body walk; blended weights/pose reference mathematically verified.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489",
+        "checks/04-motion-acceptance.log": "c80ac1718c8eb43524ecbfce7fa49424dbe3bd9809bcf88bcc05dcf0b4bc812a"
+      }
+    },
+    {
+      "id": "T-RIG-009",
+      "requirement": "foot planting and ground alignment in representative idle/walk/crouch/jump animations; record clip-specific foot sliding/penetration deviations and reject visible severe defects.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/06-ground.csv": "649eee63e490137a93eac4eba5e62e425b002eacd5c842b47f4c9110189156d7"
+      }
+    },
+    {
+      "id": "T-RIG-010",
+      "requirement": "retarget of valid imported glTF clip and explicit rejection of bone order mismatch, invalid rest pose, missing hierarchy, nonfinite keys and unsupported rig.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489",
+        "checks/04-motion-acceptance.log": "c80ac1718c8eb43524ecbfce7fa49424dbe3bd9809bcf88bcc05dcf0b4bc812a"
+      }
+    },
+    {
+      "id": "T-RIG-011",
+      "requirement": "every named animation MUST contain appropriate nontrivial and distinct joint motion, not 25 aliases of idle; automated clip signature & visual motion assertion.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489",
+        "checks/07-windows-timeline-all.log": "63ce8a1252be4245e669cb99fc71242467213d7a12842910aeca69e79221dbc8"
+      }
+    },
+    {
+      "id": "T-RIG-012",
+      "requirement": "named animation library is stored/referenced once, regenerated avatars share same clip identifier and import/export code preserves mapping.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-MORPH-001",
+      "requirement": "ALL >=40 sliders are wired. Move each individually from min to max; expected geometric subregion changes measurably in real scene, UI numeric value changes, no alias controls.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/08-endpoint-results.json": "7ef3546657ce86f52f65b14e51fc550f50e08ecd99c61c86e3edb871882a4b92",
+        "checks/09-endpoint-results.json": "7ef3546657ce86f52f65b14e51fc550f50e08ecd99c61c86e3edb871882a4b92"
+      }
+    },
+    {
+      "id": "T-MORPH-002",
+      "requirement": "exact base at all default/zero morphs, each target delta produces reference expected vertex positions at 0, 0.5 and 1; check correct signed ranges and normalization.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/10-morph-reference.log": "2d7f9d852b82f9f5bfb0ba69916d3b01e12093df2ae2b51661238eb676e4edcc"
+      }
+    },
+    {
+      "id": "T-MORPH-003",
+      "requirement": "1000 seeded random human generations with fixed assets; every result has valid finite positions, indices, triangle winding, normals, tangents, stable UV, nonzero volume and reasonable bounds.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/11-core-windows-export-local.log": "acc7495cf3fff68aa198675a2ba94c54e6a4fd96945ddf53f6c75a85bf502513",
+        "checks/12-stress-geometry.log": "ffb698733acb2b78628e0d7a92215b7bdd5d2df7e527b3803c7454997f5e736c",
+        "checks/13-final-sanitizer.log": "f3a3d59ed706ea3c25cc5d61ad79ca45b2fcaaae480e5ab7b56a1aa329efcdcf"
+      }
+    },
+    {
+      "id": "T-MORPH-004",
+      "requirement": "pairwise coverage across all morph controls (min/middle/max), including thin/obese/muscular plus wide shoulders, narrow jaw, extreme facial parameters; no invalid clipping/pole geometry.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/14-morph-pairwise-Linux-x64.log": "8cbb264b053294e95822bc80ab24ae9e22b0f96b8cd64d7d80215aecedd5fbf5"
+      }
+    },
+    {
+      "id": "T-MORPH-005",
+      "requirement": "10 individual face/body presets differ in shape signatures and silhouette beyond color-only changes; all remain compatible with exact canonical skeleton.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-MORPH-006",
+      "requirement": "face expression neutral/smile/frown/blink/surprise/anger visibly affects expected face area and does not destroy identity morphs.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-MORPH-007",
+      "requirement": "Randomize uses same stored seed+asset revision -> same settings/geometry on repeated runs. Different seeds produce varied results. Save/reopen/restart preserves seed.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-MORPH-008",
+      "requirement": "per-slider/reset-section/Reset All/randomization produces correct Undo/Redo; a dragged slider produces a single logical history transaction.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/15-morph.log": "d450cdb8f50f02661b077f9ec20a17bf14a71f84598f67ae9daaa0f25da1db1f",
+        "checks/16-history-Linux-x64.log": "ffb6fafb79989b9f25021efe213e00b99757dc3986e37448eb3cbd1a6a314053",
+        "checks/17-results.json": "0e669fda23194948d0ee2d4666e15cfc675e5409b6c35a170d4fe76b793b2afc"
+      }
+    },
+    {
+      "id": "T-MORPH-009",
+      "requirement": "normal/tangent/bounds rebuild and cloth-fit invalidation occurs only when necessary; material-only changes do NOT unnecessarily regenerate meshes.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/18-material-only.log": "99f692deed47e2ce1220d590ac5842903467df4a5f8b4a5537f739e9280b6aa8"
+      }
+    },
+    {
+      "id": "T-MORPH-010",
+      "requirement": "while morph worker is busy, run 100 rapid slider changes then Save; final geometry/hash is from LAST requested state, no stale asset publish or UI freeze.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/19-rapid-Linux-x64.log": "f4926256fb2af6b32989497a386a6f81ee53e6784722c9b11f8d62f3d8a98691"
+      }
+    },
+    {
+      "id": "T-CL-001",
+      "requirement": "for EVERY item verify valid wrap/reference triangles, barycentric weights, finite offsets, valid attachment, max-four interpolated bone weights and consistent rest pose.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/20-matrix-release.log": "60f857f6d591f36ee4ba4ce265683534591f27faf41b23797188eec46553ca7d"
+      }
+    },
+    {
+      "id": "T-CL-002",
+      "requirement": "10 outfit presets have complete slot coverage appropriate to preset, no missing mesh/material/texture and distinct visual/geometry signatures (not duplicate aliases or flat-color variants only).",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/21-ui-linux-export-local-catalog.log": "f30a3c27b94e9713f580a037cedb0e0537a7e68f7c1a3e06432e8b4e2c941ec5"
+      }
+    },
+    {
+      "id": "T-CL-003",
+      "requirement": "10 outfits x 5 representative body variants x 8 poses (idle, two walk phases, run, crouch, arms-up, jump, death) => at least 400 automated outfit/body/pose cases. Validate geometry intersections, sampled body visibility, depth and real rendered screenshots on representative failures.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/20-matrix-release.log": "60f857f6d591f36ee4ba4ce265683534591f27faf41b23797188eec46553ca7d"
+      }
+    },
+    {
+      "id": "T-CL-004",
+      "requirement": "shirts below jackets, coats/skirts/pants/boots, headgear vs hair, gloves vs sleeves, upper/lower layering obey rules; no visible z-fighting or uncovered holes at seams.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/20-matrix-release.log": "60f857f6d591f36ee4ba4ce265683534591f27faf41b23797188eec46553ca7d"
+      }
+    },
+    {
+      "id": "T-CL-005",
+      "requirement": "covered body polygons are hidden but source body geometry remains intact/non-destructive; removing clothing reliably restores body and Undo restores exact previous state.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/20-matrix-release.log": "60f857f6d591f36ee4ba4ce265683534591f27faf41b23797188eec46553ca7d"
+      }
+    },
+    {
+      "id": "T-CL-006",
+      "requirement": "each of 8 hair meshes and beard states remains attached through full-body animations, correct head scaling and compatibility with headwear; representative screenshots differ meaningfully.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/20-matrix-release.log": "60f857f6d591f36ee4ba4ce265683534591f27faf41b23797188eec46553ca7d"
+      }
+    },
+    {
+      "id": "T-CL-007",
+      "requirement": "outfit swap/individual garment swap, recoloring, save/reopen/export/scene placement and Undo/Redo preserve garments without displaced meshes.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/02-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161",
+        "checks/21-ui-linux-export-local-catalog.log": "f30a3c27b94e9713f580a037cedb0e0537a7e68f7c1a3e06432e8b4e2c941ec5"
+      }
+    },
+    {
+      "id": "T-CL-008",
+      "requirement": "reject corrupted .mhclo-like barycentric references, NaN weights, missing/incorrect textures, wrong rig version, unsupported garment LOD or unlicensed asset with actionable UI diagnostics.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489",
+        "checks/22-results.json": "0bfa188ee46bd5676cee657ea63e7fe23871456006371700469a640dfb41a160",
+        "checks/23-registry-texture.log": "40f91bd77d33b7cf3ac799160895a6a58aad0bf29aa8a8583c95a9c19f011303",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/24-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/25-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e"
+      }
+    },
+    {
+      "id": "T-CL-009",
+      "requirement": "no detached accessories, swapped left/right boots, detached sleeves or weapon/sockets drift in selected high-motion clips.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/20-matrix-release.log": "60f857f6d591f36ee4ba4ce265683534591f27faf41b23797188eec46553ca7d"
+      }
+    },
+    {
+      "id": "T-CL-010",
+      "requirement": "memory/cache resources for frequent outfit swaps are reclaimed; images/materials stable after renderer restart.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/27-reg-linux-final-catalog.log": "2be8be12b8df4cb6ded2a6176e27fe6af2d35cebe88cf06c317d7789985e81a9",
+        "checks/28-vram-results.json": "9db98c070cebaa7ab8f4c6382948725e664ca675adc46fb553519d90c2ea5bb5"
+      }
+    },
+    {
+      "id": "T-DOC-001",
+      "requirement": "create 100 characters by diverse seeds/presets/outfits, save .rbchar, quit, reopen in new process and compare ALL morphs, rig/asset hashes, colors, wardrobe, expressions, seed, animation pack and profile.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/11-core-windows-export-local.log": "acc7495cf3fff68aa198675a2ba94c54e6a4fd96945ddf53f6c75a85bf502513"
+      }
+    },
+    {
+      "id": "T-DOC-002",
+      "requirement": "save->reopen->save deterministic semantic roundtrip; v1 migration fixture; unknown future version opens read-only; preserve safe unknown fields where documented.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/11-core-windows-export-local.log": "acc7495cf3fff68aa198675a2ba94c54e6a4fd96945ddf53f6c75a85bf502513",
+        "checks/22-results.json": "0bfa188ee46bd5676cee657ea63e7fe23871456006371700469a640dfb41a160",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/29-native-Windows-x64.log": "f8389aae098241ece4ad032957a3076580463a8cb8a63aacb22bd2fcc329fd6c"
+      }
+    },
+    {
+      "id": "T-DOC-003",
+      "requirement": "simulate denied write, full disk, file exists, conflicting sidecar, bad path, invalid texture and cancelled Save As. Nothing is partially overwritten; previous assets still load.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/02-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161",
+        "checks/30-save-errors-Linux-x64.log": "ba2a05d28893e7d8e831630519d2c15392b052b4e5f7b5ef5590bf1ba73bb4cb",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e"
+      }
+    },
+    {
+      "id": "T-DOC-004",
+      "requirement": "mixed 100-step UI history (morphs/clothes/appearance/camera/pose/outfit/save) can Undo/Redo correct applicable user edits; map history remains independent.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/16-history-Linux-x64.log": "ffb6fafb79989b9f25021efe213e00b99757dc3986e37448eb3cbd1a6a314053"
+      }
+    },
+    {
+      "id": "T-DOC-005",
+      "requirement": "dirty-document guard for New/Open/Close/profile switch/map switch; Save, Discard and Cancel operate correctly under OS input.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/02-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e"
+      }
+    },
+    {
+      "id": "T-DOC-006",
+      "requirement": "content-addressed revision output and archived original assets: editing a preset cannot silently mutate previous map Undo state or unrelated character.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/31-compile-assets-Linux-x64.log": "85466c4f5c99184a4281309826cfc4cd57ad24480f64ec0e8850c8a9b74629d7"
+      }
+    },
+    {
+      "id": "T-DOC-007",
+      "requirement": "malformed JSON, deep nesting, huge numbers, -Inf/+Inf/NaN, Unicode edge cases, traversal ../ paths, absolute outside root, large textures, zip bombs and cyclic rigs fail closed without crash.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-DOC-008",
+      "requirement": "asynchronous generation cancelled by close, map/profile switch or deletion cannot insert into wrong map, resurrect deleted bound entity or overwrite future saved file.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/31-compile-assets-Linux-x64.log": "85466c4f5c99184a4281309826cfc4cd57ad24480f64ec0e8850c8a9b74629d7",
+        "checks/32-completion-lifecycle-summary.log": "eb7fb6c57b31c3222231cda5eb6a12efb37ee07cb7e7739fadaafd0a65dc955d"
+      }
+    },
+    {
+      "id": "T-DOC-009",
+      "requirement": "source meshes/materials and read-only PAK/PK3 remain unchanged; original user files SHA checks preserved.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/31-compile-assets-Linux-x64.log": "85466c4f5c99184a4281309826cfc4cd57ad24480f64ec0e8850c8a9b74629d7"
+      }
+    },
+    {
+      "id": "T-DOC-010",
+      "requirement": "asset registry errors expose remediation, do not silently substitute default nude model for missing clothing or mismatched rig.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/02-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161",
+        "checks/33-registry-missing.log": "6d2c4dd871d3e811c4057cf92226c253d6be4806f29debd23293526272d9845e",
+        "checks/34-registry-hash.log": "9b7a09a0bebaaba89b2540536ed98d114dfede83af73793f040a48e796fff842",
+        "checks/23-registry-texture.log": "40f91bd77d33b7cf3ac799160895a6a58aad0bf29aa8a8583c95a9c19f011303"
+      }
+    },
+    {
+      "id": "T-GLB-001",
+      "requirement": "Khronos glTF validator returns no errors for a fully dressed animated export, rig+skins+inverse bind+JOINTS/WEIGHTS and >=8 genuinely distinct clips.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/35-khronos-validator.json": "0553d40d6f6639c88eb6361a2a88a6ca641b7e9f71ac41fa0939b65c8b93cdb6"
+      }
+    },
+    {
+      "id": "T-GLB-002",
+      "requirement": "independent loader samples frame times and compares skinned vertex/world bone poses, animation names, material textures, bounds and axis transforms to source.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489",
+        "checks/13-final-sanitizer.log": "f3a3d59ed706ea3c25cc5d61ad79ca45b2fcaaae480e5ab7b56a1aa329efcdcf"
+      }
+    },
+    {
+      "id": "T-IQM-001",
+      "requirement": "independent IQM decoder finds correct bones, weights, animation framegroups/frames; NOT static-pose-only. Compare clip poses to oracle.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489",
+        "checks/13-final-sanitizer.log": "f3a3d59ed706ea3c25cc5d61ad79ca45b2fcaaae480e5ab7b56a1aa329efcdcf"
+      }
+    },
+    {
+      "id": "T-IQM-002",
+      "requirement": "load IQM in separate standalone FTE executable with editor plugin absent, use minimal mod QC: real changing limb poses over multiple frames, correct texture/material and floor contact.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/36-fte-game.log": "ea8eb5f94f3dd1a027a45567204b026982372a52b0b1f54502acb1daa3c8c7da"
+      }
+    },
+    {
+      "id": "T-IQM-003",
+      "requirement": "exercise FTE skel_create/skel_build shared animation among 3 differently shaped character models when engine supports; verify exact bone contract and dispose skeleton resources correctly.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/36-fte-game.log": "ea8eb5f94f3dd1a027a45567204b026982372a52b0b1f54502acb1daa3c8c7da"
+      }
+    },
+    {
+      "id": "T-MDL-001",
+      "requirement": "classic Quake1 MDL actually contains multiple changing named frame sequences, indexed skin palette correctness, UV/vertex limits and stock-compatible precision.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-MDL-002",
+      "requirement": "independent decode + launch in compatible classic Quake 1 runtime (not just FTE fallback) and exercise required stand/walk/death animation frames.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/37-rb21-acceptance-report.md": "96af2833184be2ffd1d34e6177522cdad4fdd0e315b3afa20980e7d5f875adab"
+      }
+    },
+    {
+      "id": "T-MD2-001",
+      "requirement": "Quake2 MD2 has correctly packed changing frames, PCX skin, normals, target caps and independent decode + Quake2-compatible runtime.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/37-rb21-acceptance-report.md": "96af2833184be2ffd1d34e6177522cdad4fdd0e315b3afa20980e7d5f875adab"
+      }
+    },
+    {
+      "id": "T-MD3-001",
+      "requirement": "Quake3 MD3 frames move, shader names correct, surfaces remain within original caps and valid relative tags; test in compatible runtime with mod/model sequence.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/37-rb21-acceptance-report.md": "96af2833184be2ffd1d34e6177522cdad4fdd0e315b3afa20980e7d5f875adab"
+      }
+    },
+    {
+      "id": "T-MD3-002",
+      "requirement": "label static compiled misc_model vs animated runtime entity accurately, do not treat a baked map prop as an animated NPC.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/37-rb21-acceptance-report.md": "96af2833184be2ffd1d34e6177522cdad4fdd0e315b3afa20980e7d5f875adab"
+      }
+    },
+    {
+      "id": "T-GS-001",
+      "requirement": "GoldSrc export generates valid SMD and QC/sequence table (or native equivalent) with real bones and multiple animation sequences; studio compile reports no error.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489"
+      }
+    },
+    {
+      "id": "T-GS-002",
+      "requirement": "independent MDL inspector and actual GoldSrc-compatible model viewer/runtime load an animated named walk/run/death sequence and compare representative poses.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/38-game.log": "c7989901cdce858ad268506aac0d3941b413ac537dd730a774b77548243e0e66"
+      }
+    },
+    {
+      "id": "T-EXP-FAIL-001",
+      "requirement": "incompatible geometry count, excessive frames, absent compiler, broken asset, missing shader/skin, unsupported feature or invalid binary fails with actionable UI error and without overwriting preexisting valid outputs.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/39-export-failure.log": "7d0e7a0ad18c26f7f68e106b34061ade01ce731cd73d97384a2a24109115eb40",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/23-registry-texture.log": "40f91bd77d33b7cf3ac799160895a6a58aad0bf29aa8a8583c95a9c19f011303",
+        "checks/34-registry-hash.log": "9b7a09a0bebaaba89b2540536ed98d114dfede83af73793f040a48e796fff842"
+      }
+    },
+    {
+      "id": "T-EXP-RT-001",
+      "requirement": "all advertised formats retain correct scale, origin, forward direction and floor placement; quantify expected classic quantization loss rather than silently altering shape.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/40-quantize-legacy.log": "b1fece4ed5f18da3db29652cd9274f39fb8cba695dd00f206ca5cae568d7b3b4",
+        "checks/37-rb21-acceptance-report.md": "96af2833184be2ffd1d34e6177522cdad4fdd0e315b3afa20980e7d5f875adab"
+      }
+    },
+    {
+      "id": "T-EXP-RT-002",
+      "requirement": "clean extracted app on supported OS can find and export core assets offline without developer's working directory or hidden dependencies.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/41-results.json": "cf73c4b6927fd6a34d066455b9a8097279b088ede7fe94ec610b049854291980",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/24-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/25-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/42-results.json": "78b1046b3e10c80ca9c432c787cc99dcedd786808dea407f4ff32615450e0b15",
+        "checks/43-results.json": "45df741bd33b01ef1394d36e705039dd374c3be37a0299b486b4c5b36741a6b8",
+        "checks/44-results.json": "cf5db8609094ca1782afe3ac8e7cd70a6c0c4eeec5450400a5abf1a200327ae0",
+        "checks/29-native-Windows-x64.log": "f8389aae098241ece4ad032957a3076580463a8cb8a63aacb22bd2fcc329fd6c"
+      }
+    },
+    {
+      "id": "T-EXP-RT-003",
+      "requirement": "direct output and map-placed model reload correctly with proper materials and no missing resource logs; screenshots of actual moving frames required.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/37-rb21-acceptance-report.md": "96af2833184be2ffd1d34e6177522cdad4fdd0e315b3afa20980e7d5f875adab"
+      }
+    },
+    {
+      "id": "T-EXP-RT-004",
+      "requirement": "profile capability UI blocks incompatible \"skeletal animation on vanilla MD3/MDL\" settings and informs mod code requirements. A green \"export succeeded\" cannot mean only the first pose exported.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/02-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161"
+      }
+    },
+    {
+      "id": "T-UI-001",
+      "requirement": "from File menu open Character Creator, choose a preset, verify fully rendered person and real face/clothes/hair in viewport (pixel/mesh assertions).",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/21-ui-linux-export-local-catalog.log": "f30a3c27b94e9713f580a037cedb0e0537a7e68f7c1a3e06432e8b4e2c941ec5"
+      }
+    },
+    {
+      "id": "T-UI-002",
+      "requirement": "navigate Body, Face, Appearance, Clothing, Rig, Export tabs; click, drag, type and reset representative (ideally all) sliders; compare actual mesh to expected.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/45-endpoint-results.json": "7ef3546657ce86f52f65b14e51fc550f50e08ecd99c61c86e3edb871882a4b92",
+        "checks/17-results.json": "0e669fda23194948d0ee2d4666e15cfc675e5409b6c35a170d4fe76b793b2afc"
+      }
+    },
+    {
+      "id": "T-UI-003",
+      "requirement": "pick 10 outfits, hair/beard states and color variations via mouse; verify geometric changes, none of controls inert.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/21-ui-linux-export-local-catalog.log": "f30a3c27b94e9713f580a037cedb0e0537a7e68f7c1a3e06432e8b4e2c941ec5"
+      }
+    },
+    {
+      "id": "T-UI-004",
+      "requirement": "test every animation button and at least 25 clip selections; Play/Pause/Step/Scrub/Speed; actual limb pixel changes AND independent joint pose difference, not UI play icon alone.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/46-all-clips-Linux-x64.log": "2f568951bceb541a3bab63703c3fb0f15472aa701f98a5f3b33b5d8c2d586547",
+        "checks/47-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161",
+        "checks/07-windows-timeline-all.log": "63ce8a1252be4245e669cb99fc71242467213d7a12842910aeca69e79221dbc8",
+        "checks/03-animation-controls.log": "c9184399eef23280027829ffa7d92ad3301faad71bb38ef3b77d4c09cff57907",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e"
+      }
+    },
+    {
+      "id": "T-UI-005",
+      "requirement": "orbit, pan, zoom, Frame, front view, bone overlay, skin weights, wireframe/normals/material modes; screenshot must show appropriate real renderer output.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/48-camera.log": "eb6eb7a2295b91ce42a633123d46be363675c28622465dfa00a1ba5d71a12d19",
+        "checks/21-ui-linux-export-local-catalog.log": "f30a3c27b94e9713f580a037cedb0e0537a7e68f7c1a3e06432e8b4e2c941ec5"
+      }
+    },
+    {
+      "id": "T-UI-006",
+      "requirement": "docking/floating/resizing panel layouts at 1280x720, 1600x900, 1920x1080 and UI 100/125/150/200%; no inaccessible controls/overlap, readable text.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/49-results.json": "e67923298042827f41b640a9da9515b4255a7d8e549b2a365774ca859c14cf97"
+      }
+    },
+    {
+      "id": "T-UI-007",
+      "requirement": "Modern Light and Dark theme semantic baseline screenshots; no low contrast, empty thumbnail, wrong color/highlight or broken modal.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/49-results.json": "e67923298042827f41b640a9da9515b4255a7d8e549b2a365774ca859c14cf97"
+      }
+    },
+    {
+      "id": "T-UI-008",
+      "requirement": "Save/Save As/Open/reopen/Undo/Redo/randomize/progress cancel through actual OS inputs; verify real files and visual state.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/02-document-Windows-x64.log": "3065c63e93e3c2166fc9479f613aa58b15403d22bbad0175df08576a9664a161",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/16-history-Linux-x64.log": "ffb6fafb79989b9f25021efe213e00b99757dc3986e37448eb3cbd1a6a314053"
+      }
+    },
+    {
+      "id": "T-UI-009",
+      "requirement": "viewport vs GUI input ownership, mouse drag across border, hotkeys while text input active, focus loss, Escape and popup cancellation.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/50-morph-focus.log": "15bec73669a440fa95b852e1a3c97c674e21b0fb39792c924107bf346842c677"
+      }
+    },
+    {
+      "id": "T-UI-010",
+      "requirement": "100 rapid changes while loading/rendering/exports; loading indicator, old/new generation state correctly managed.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/19-rapid-Linux-x64.log": "f4926256fb2af6b32989497a386a6f81ee53e6784722c9b11f8d62f3d8a98691"
+      }
+    },
+    {
+      "id": "T-UI-011",
+      "requirement": "no crashes when opening Model Editor or Plant Editor after Character Creator; renderer restart/persistent UI state/theme.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/21-ui-linux-export-local-catalog.log": "f30a3c27b94e9713f580a037cedb0e0537a7e68f7c1a3e06432e8b4e2c941ec5",
+        "checks/27-reg-linux-final-catalog.log": "2be8be12b8df4cb6ded2a6176e27fe6af2d35cebe88cf06c317d7789985e81a9",
+        "checks/51-reg-model-legacy-rerun.log": "ae1569461f07eceea58398b48b9b8e9382279933bc0e7a7ab02ab1871deacf70",
+        "checks/52-reg-plant_ui.log": "9d01b2f4d088605ab9ff319b97a2288f1931773d532746e9fee0bfaf9dc4c4f6"
+      }
+    },
+    {
+      "id": "T-UI-012",
+      "requirement": "every screenshot of animation proof is from real executable, not an external composited/mock/rendered image.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/36-fte-game.log": "ea8eb5f94f3dd1a027a45567204b026982372a52b0b1f54502acb1daa3c8c7da"
+      }
+    },
+    {
+      "id": "T-MAP-001",
+      "requirement": "click Create > Model > Character on real map, change camera, create+Save; EXACTLY one model entity appears at original hit, correct layer, floor alignment, transforms, and asset paths.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/31-compile-assets-Linux-x64.log": "85466c4f5c99184a4281309826cfc4cd57ad24480f64ec0e8850c8a9b74629d7"
+      }
+    },
+    {
+      "id": "T-MAP-002",
+      "requirement": "character Save updates bound entity while preserving scene transform; immutable revisions work with Undo/Redo and map Save/Reopen.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/31-compile-assets-Linux-x64.log": "85466c4f5c99184a4281309826cfc4cd57ad24480f64ec0e8850c8a9b74629d7"
+      }
+    },
+    {
+      "id": "T-MAP-003",
+      "requirement": "deleted/undone bound entity is NOT resurrected by later Save; map/profile change invalidates pending placement.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/31-compile-assets-Linux-x64.log": "85466c4f5c99184a4281309826cfc4cd57ad24480f64ec0e8850c8a9b74629d7"
+      }
+    },
+    {
+      "id": "T-MAP-004",
+      "requirement": "compile sealed BSP fixture and run standalone FTE without editor plugin. Show 3 distinct animated characters, no missing external dependencies. Where a vanilla game needs mod-side code, test corresponding compatible code path.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/36-fte-game.log": "ea8eb5f94f3dd1a027a45567204b026982372a52b0b1f54502acb1daa3c8c7da"
+      }
+    },
+    {
+      "id": "T-MAP-005",
+      "requirement": "compile and asset manifests stage all relevant MDL/IQM/textures/shaders into writable mod root only; game archives are unchanged.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/31-compile-assets-Linux-x64.log": "85466c4f5c99184a4281309826cfc4cd57ad24480f64ec0e8850c8a9b74629d7"
+      }
+    },
+    {
+      "id": "T-REG-001",
+      "requirement": "all previously passing Model Editor .bbmodel authoring, UV/paint, frame timeline, static exporters and animated MDL regression tests pass unchanged.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/53-windows-reg-legacy-model.log": "981b1825a55cd71893c971f33adc6d6b8ab361ebc61dde9146cd875f2e6f4144",
+        "checks/54-reg-model-bb.log": "1ee493f4d22ec23fd39941a73cc2a3796343c397f616bd1967abde5f4ebf343f",
+        "checks/51-reg-model-legacy-rerun.log": "ae1569461f07eceea58398b48b9b8e9382279933bc0e7a7ab02ab1871deacf70"
+      }
+    },
+    {
+      "id": "T-REG-002",
+      "requirement": "Plant Editor asset/preset generation, GUI, map create/save, model export and build dependency tests pass unchanged.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/52-reg-plant_ui.log": "9d01b2f4d088605ab9ff319b97a2288f1931773d532746e9fee0bfaf9dc4c4f6",
+        "checks/55-reg-plant-brush.log": "1385d24f33008743976c60cdcf52ee939492db9d73c23c62f8d947bca39df090",
+        "checks/56-reg-plant-exports.log": "709432d1b791625d908ac55079d30ffa5a7112d40132d8d39663a5017b7393ca",
+        "checks/57-reg-plant-map.log": "034208933b5dfcefadb6068366f411b70f61624878e810c26f1dbfa6bac6e282"
+      }
+    },
+    {
+      "id": "T-REG-003",
+      "requirement": "core map editing, selection, input, compile/launch, game profiles, file dialogs, user layouts and theme/renderer tests pass unchanged.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/58-windows-reg-editing-final.log": "fba7044d4dac25af91f119ef85e63d78691978d88fcb1186d6b1db682cce04cf",
+        "checks/59-windows-reg-map-roundtrip-verified.log": "9906f5c2cd9cd3349e8dc4037f62d0209c1bc0c0fb3e4753a9ab35f6daf97bde",
+        "checks/60-windows-reg-workspace-verified.log": "ba8fa7b6fadb34e186eade29354ac8d84852f6ed57682cf312590918cc6483d9",
+        "checks/61-reg-compilation.log": "b2a98f5110c3346c4cb574b1de46496725b60b47eb010e39d7f6a42201767aec"
+      }
+    },
+    {
+      "id": "T-REG-004",
+      "requirement": "package distribution smoke on fresh Windows/Linux: launch, open/save a character, no missing libraries/assets/patch source, correct notices.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/41-results.json": "cf73c4b6927fd6a34d066455b9a8097279b088ede7fe94ec610b049854291980",
+        "checks/62-results.json": "1b66825effabcd9334495854328e364d4b1f092fe3dcbc5991bdfd42535c1ec3",
+        "checks/63-results.json": "793ab52a33ed483ce23dd705b017070703d52c4bbaa336004e1d413231aefc75",
+        "checks/05-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/24-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/25-results.json": "cc63efbfe4218e95abbd31a2df818d276b3f74f45e866e38baa3f002401d931e",
+        "checks/42-results.json": "78b1046b3e10c80ca9c432c787cc99dcedd786808dea407f4ff32615450e0b15",
+        "checks/43-results.json": "45df741bd33b01ef1394d36e705039dd374c3be37a0299b486b4c5b36741a6b8",
+        "checks/44-results.json": "cf5db8609094ca1782afe3ac8e7cd70a6c0c4eeec5450400a5abf1a200327ae0",
+        "checks/29-native-Windows-x64.log": "f8389aae098241ece4ad032957a3076580463a8cb8a63aacb22bd2fcc329fd6c"
+      }
+    },
+    {
+      "id": "T-PERF-001",
+      "requirement": "1080p full dressed 15k-triangle avatar on real GPU meets >=60FPS in normal preview, uncapped/VSYNC OFF; report GPU, driver, FPS distribution, CPU+GPU time. Software rendering functional only, never substituted for real-GPU proof.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/64-separate-frame-timings.json": "e4989a7694f4097fb096d063568dc0ba35ec05950445aa133e1fd0d761e6d293",
+        "checks/65-frame-timings.json": "e238651ed528cc5f91a004b4635dfb1bd9be8ec2c78b0c32c6fac876d54d0a5d",
+        "checks/66-benchmark-package.log": "662d3694083aa01b43f6e735f6cc2f2f1f92bbac858aa967444192adecb05a99",
+        "checks/67-windows-final-cpu-gpu.json": "856ba7d929bfcc4e107fcef4a322cc254cc5d4c82cb6c343eb3c3957a65ba0f3"
+      }
+    },
+    {
+      "id": "T-PERF-002",
+      "requirement": "morph rebuild p95 <=50ms for typical <=20k triangle input, UI does not block on larger regenerations; compare baseline on same machine.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/68-completion-perf-windows.log": "8d40f42501719b9f4c4ddc2dcf810dcc602d7305cfc2570a8e43227144cfd0d2",
+        "checks/69-completion-perf-linux.log": "0eaaf91a768af52edc9066f4dbbb2992677bc79a30ad73d11eb9354f51ccd6d5"
+      }
+    },
+    {
+      "id": "T-PERF-003",
+      "requirement": "existing editor without Character Creator has <=10% regression target for comparable Model/Plant/map viewport fixture, unless expressly approved.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/70-windows-regression-timings.json": "81345b0a69deaed88fe730aaaebd30f1cc27121df29d01c1a072aab99590d475"
+      }
+    },
+    {
+      "id": "T-PERF-004",
+      "requirement": ">=1000 generated characters in sequence, >=100 saved/reopened, 10 concurrently visible; check memory growth, draw-call budget, texture resource life and no long-term leaks.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/11-core-windows-export-local.log": "acc7495cf3fff68aa198675a2ba94c54e6a4fd96945ddf53f6c75a85bf502513",
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/28-vram-results.json": "9db98c070cebaa7ab8f4c6382948725e664ca675adc46fb553519d90c2ea5bb5",
+        "checks/71-vram-results.json": "efd4fe56cc08aacf362991bd9d95b463051abbaf9fa613875fa2f5cae02e6ac6",
+        "checks/13-final-sanitizer.log": "f3a3d59ed706ea3c25cc5d61ad79ca45b2fcaaae480e5ab7b56a1aa329efcdcf"
+      }
+    },
+    {
+      "id": "T-PERF-005",
+      "requirement": "cancel/restart/close/profile change/renderer restart with worker active, GPU buffer disposal, no UAF/double-free/race; sanitizer run or equivalent available platform tool.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/26-rb21-final-review.md": "4b2a4815796ebc600faa8cf73636ed1f89ce55b4e2dd4092ab2d10fec2d83e26",
+        "checks/32-completion-lifecycle-summary.log": "eb7fb6c57b31c3222231cda5eb6a12efb37ee07cb7e7739fadaafd0a65dc955d",
+        "checks/72-completion-lifecycle-tsan-summary.log": "4aeb887662bca6d147af22b3f53da201cda5faf1d5957c4a4c9c23903645603c",
+        "checks/13-final-sanitizer.log": "f3a3d59ed706ea3c25cc5d61ad79ca45b2fcaaae480e5ab7b56a1aa329efcdcf"
+      }
+    },
+    {
+      "id": "T-SEC-001",
+      "requirement": "fuzz file parsers and asset loaders (document duration/corpus), reject file traversal, decompression bombs, too many bones/vertices, malformed offsets, nonfinite vertex values, cyclic rig and malicious format content.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/01-sanitize-release.log": "5a4fae9c7dbf25b64b4b3ccaab56e2da0db7501b08f855a814c285830c184489",
+        "checks/13-final-sanitizer.log": "f3a3d59ed706ea3c25cc5d61ad79ca45b2fcaaae480e5ab7b56a1aa329efcdcf",
+        "checks/04-motion-acceptance.log": "c80ac1718c8eb43524ecbfce7fa49424dbe3bd9809bcf88bcc05dcf0b4bc812a",
+        "checks/22-results.json": "0bfa188ee46bd5676cee657ea63e7fe23871456006371700469a640dfb41a160"
+      }
+    },
+    {
+      "id": "T-LIC-001",
+      "requirement": "full package files and runtime assets appear in provenance manifests with source, license and hash. No unverified MakeHuman community assets, AGPL source imported accidentally, copied game model/animation IP, or missing corresponding-source bundle.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/37-rb21-acceptance-report.md": "96af2833184be2ffd1d34e6177522cdad4fdd0e315b3afa20980e7d5f875adab",
+        "checks/41-results.json": "cf73c4b6927fd6a34d066455b9a8097279b088ede7fe94ec610b049854291980",
+        "checks/73-provenance.log": "7efa841199fea88c02174cc817eed7268c404d1c155d68c38d31097aca522e64",
+        "checks/13-final-sanitizer.log": "f3a3d59ed706ea3c25cc5d61ad79ca45b2fcaaae480e5ab7b56a1aa329efcdcf",
+        "checks/42-results.json": "78b1046b3e10c80ca9c432c787cc99dcedd786808dea407f4ff32615450e0b15",
+        "checks/43-results.json": "45df741bd33b01ef1394d36e705039dd374c3be37a0299b486b4c5b36741a6b8",
+        "checks/44-results.json": "cf5db8609094ca1782afe3ac8e7cd70a6c0c4eeec5450400a5abf1a200327ae0",
+        "checks/74-archive-verification.log": "4bf21a551efd8527bbbfacc54513102e86c4e7b806781f06fe58b59c70b3233f"
+      }
+    },
+    {
+      "id": "T-REL-001",
+      "requirement": "dry-run negative cases prove release workflow refuses unapproved, failed, blocked, missing-evidence and commit-SHA-mismatch inputs. NEVER push a real release to test this.",
+      "status": "PASS",
+      "exitCode": 0,
+      "evidence": {
+        "checks/75-release-lock.log": "a0ac952e71748797a9e38bcf458b3ab4c38d3606d289e6b5981b7675f2d400d1",
+        "checks/76-release-lock.log": "a0ac952e71748797a9e38bcf458b3ab4c38d3606d289e6b5981b7675f2d400d1"
+      }
+    }
+  ]
+}

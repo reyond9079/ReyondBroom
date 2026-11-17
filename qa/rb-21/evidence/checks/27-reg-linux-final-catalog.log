@@ -1,0 +1,8 @@
+PASS Ten preset selections render distinct previews and Field Technician is absent
+PASS Body, Face, Appearance, Wardrobe and Rig render after native tab changes
+PASS 13 native outfit choices render distinct previews
+PASS 8 native hairstyle choices render distinct previews
+PASS 4 native beard choices render distinct previews
+PASS Native timeline scrubbing changes the actual preview pixels
+PASS Renderer restart restores the same preview bounds
+PASS Renderer restart preserves the paused pose and visible character materials

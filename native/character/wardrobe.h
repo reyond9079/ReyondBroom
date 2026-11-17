@@ -802,9 +802,10 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
   const auto hat = doc.headwear==2 ? "fedora01" : !doc.headwear && doc.hat ? outfit.hat : "";
   const auto& hairstyle = hairstyles[doc.hairstyle];
   const auto scalpEdge = *hat ? 0. : scalpHairEdge(hairstyle);
+  const std::string_view garment=outfit.clothes;
   const bool openCollar = doc.customWardrobe.empty() && (doc.outfit==1 || doc.outfit==4 || doc.outfit==7 || doc.outfit==8);
-  const auto collarBase = std::string_view(outfit.clothes)=="male_casualsuit01" ? 12.85 : 13.25;
-  const bool closedCasualShoulders = outfit.utilityCut || std::string_view(outfit.clothes)=="male_casualsuit03";
+  const auto collarBase = garment=="male_casualsuit01" ? 12.85 : 13.25;
+  const bool closedCasualShoulders = outfit.utilityCut || garment=="male_casualsuit03";
   std::vector<int> eyeSide(points.size());
   for (const auto& face : rig.triangles) if (face.material==1)
     for (const auto id : face.indices) eyeSide[id] = rig.vertices[id].position[0]>0 ? 1 : -1;
@@ -832,8 +833,21 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
   }
   const ClothingAxes garmentAxes(rig);
   const auto* axes = outfit.utilityCut ? &garmentAxes : nullptr;
-  const double sleeveEase=std::string_view(outfit.clothes)=="male_casualsuit05" ? .085 : 0.;
-  const bool sportsTop=fitBodyRig && std::string_view(outfit.clothes)=="female_sportsuit01";
+  const double sleeveEase=garment=="male_casualsuit05" ? .085 : 0.;
+  const bool outdoorCuffs=fitBodyRig && sleeveEase>0;
+  const bool sportsTop=fitBodyRig && garment=="female_sportsuit01";
+  const bool survivorCollar=fitBodyRig && garment=="male_casualsuit01";
+  std::array<Vec3,2> forearmDirections{};
+  if (outdoorCuffs) {
+    const auto fittedPoint=[&](const Vec3& point) {
+      const auto shaped=morphPoint(doc,point);
+      return body ? add(shaped,mul(body->at(point),doc.bodyProfile)) : shaped;
+    };
+    for (unsigned side=0;side<forearmDirections.size();++side) {
+      const auto& arm=garmentAxes.arms[side];
+      forearmDirections[side]=unit(sub(fittedPoint(arm.end),fittedPoint(arm.middle)));
+    }
+  }
   const auto fitSkinSection = [&](const auto& contains) {
     FittingSurface surface;
     for (const auto& face : rig.triangles) {
@@ -924,12 +938,33 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
       if (material==3 && !axes)
         vertex.position = add(vertex.position,add(garmentAxes.sleeveClearance(entry.vertex.position,anchor,sleeveEase),
                                                   garmentAxes.collarClearance(entry.vertex.position,anchor,collarBase)));
-      if (material==3 && fitBodyRig && (axes || sleeveEase>0))
+      if (material==3 && (outdoorCuffs || (fitBodyRig && axes)))
         vertex.position = add(vertex.position,garmentAxes.cuffClearance(entry.vertex.position,axes ? .135 : .105));
+      if (material==3 && outdoorCuffs) {
+        // Pull the folded cuff away from the wrist hinge along the sleeve.
+        // Increasing its radius leaves the inner fold in the wrist's path.
+        const auto& base=entry.vertex.position;
+        const auto cuff=smoothBand(3.96,4.18,std::abs(base[0]))*smoothBand(10.32,10.56,base[1])*
+                        (1-smoothBand(10.94,11.35,base[1]));
+        vertex.position=add(vertex.position,mul(forearmDirections[base[0]>0 ? 1 : 0],-.20*cuff));
+      }
+      if (material==3 && survivorCollar) {
+        // Ease the side of the raised collar where it wraps the neck.
+        const auto& base=entry.vertex.position;
+        const auto x=std::abs(base[0]);
+        const auto collar=smoothBand(.17,.33,x)*(1-smoothBand(.57,.94,x))*
+                          smoothBand(13.52,14.02,base[1])*(1-smoothBand(.21,.70,std::abs(base[2])));
+        vertex.position[0]+=std::copysign(.12*collar,base[0]);
+      }
       if (material==3 && sportsTop) {
         const auto& base=entry.vertex.position;
+        const auto x=std::abs(base[0]);
+        const auto armhole=smoothBand(1.14,1.53,x)*(1-smoothBand(1.85,2.42,x))*
+                           smoothBand(11.55,12.05,base[1])*(1-smoothBand(12.52,13.12,base[1]));
+        const auto& arm=garmentAxes.arms[base[0]>0 ? 1 : 0];
+        vertex.position=add(vertex.position,ClothingAxes::ease(base,arm.root,arm.middle,.22*armhole));
         const auto back=smoothBand(10.85,11.60,base[1])*(1-smoothBand(12.30,13.55,base[1]))*
-                        (1-smoothBand(-.22,.12,base[2]))*(1-smoothBand(.88,1.82,std::abs(base[0])));
+                        (1-smoothBand(-.22,.12,base[2]))*(1-smoothBand(.88,1.82,x));
         if (back>0) {
           // A close-fitting panel can end up inside the back after a body
           // morph. Keep the hem and armholes on their authored lines.
@@ -1141,6 +1176,8 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
     joint.inverseBind = bb::translate(mul(joint.bindPosition,-1));
   }
   if (fitBodyRig) {
+    // Keep the upper arm clear of the extra fabric at Runner's underarm seam.
+    if (sportsTop) dressed.torso.upperArmPadding+=.18;
     if (outfit.utilityCut) {
       dressed.torso.upperArmPadding -= .012;
       dressed.torso.forearmPadding += .36;

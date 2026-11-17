@@ -837,8 +837,11 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
   const bool outdoorCuffs=fitBodyRig && sleeveEase>0;
   const bool sportsTop=fitBodyRig && garment=="female_sportsuit01";
   const bool survivorCollar=fitBodyRig && garment=="male_casualsuit01";
-  const bool lightSleeves=fitBodyRig && (garment=="female_casualsuit01" || garment=="male_casualsuit04");
+  const bool travelerTop=fitBodyRig && garment=="female_casualsuit01";
+  const bool lightSleeves=travelerTop || (fitBodyRig && garment=="male_casualsuit04");
   const bool weekendTop=fitBodyRig && garment=="female_casualsuit02";
+  const bool fittedUnderarm=lightSleeves || (fitBodyRig && garment=="male_casualsuit06");
+  const bool utilityBoots=fitBodyRig && outfit.utilityCut && !doc.footwear;
   std::array<Vec3,2> forearmDirections{};
   if (outdoorCuffs) {
     const auto fittedPoint=[&](const Vec3& point) {
@@ -1086,7 +1089,10 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
     const auto neckEdge = .42+.18*smoothBand(13.74,14.28,base[1]);
     const bool coveredCollar = outfit.utilityCut && shoulderWidth>neckEdge && shoulderWidth<1.52 &&
                                base[1]>13.34 && base[1]<14.30 && base[2]<.81;
-    return !collarSkin && (coveredShoulder || coveredCollar || hide[dressed.vertices[index].source]);
+    // The opaque trouser cuffs overlap the tall boots. Keep the coverage
+    // continuous above the boot rim where the two authored masks meet.
+    const bool coveredBoot = utilityBoots && base[1]<2.42;
+    return !collarSkin && (coveredShoulder || coveredCollar || coveredBoot || hide[dressed.vertices[index].source]);
   };
   if (fitBodyRig && !outfit.utilityCut && doc.customWardrobe.empty()) {
     // Leave each exposed corner in place and inset its covered neighbours.
@@ -1108,6 +1114,17 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
     for (unsigned i=0;i<rig.vertices.size();++i) {
       const auto source=rig.vertices[i].source;
       const auto& normal=coveredNormals[source];
+      if (fittedUnderarm) {
+        // Move only the skin tucked into the sleeve's inner fold. The
+        // adjustment tapers before the fabric edge and leaves the mesh joined.
+        const auto [x,y,z]=rig.vertices[i].position;
+        const auto width=std::abs(x);
+        const auto underarm=smoothBand(1.21,1.60,width)*(1-smoothBand(2.12,2.44,width))*
+                            smoothBand(11.90,12.22,y)*(1-smoothBand(12.68,13.02,y))*
+                            (1-smoothBand(.22,.58,std::abs(z)));
+        dressed.vertices[i].position[1]+=(travelerTop ? .40 : .11)*underarm;
+        if (travelerTop) dressed.vertices[i].position[2]-=.30*z*underarm;
+      }
       if (!mixedBoundary[source] || dot(normal,normal)<1e-10) continue;
       dressed.vertices[i].position=sub(dressed.vertices[i].position,mul(unit(normal),.10));
     }

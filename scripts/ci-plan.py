@@ -68,6 +68,8 @@ RULES = [
       'scripts/editor_os_input.py'], {'input'}),
     (['scripts/test-engine-viewport.py'], {'input'}),
     (['patches/*input*', 'patches/*mouse*', 'patches/*window*'], {'input'}),
+    (['native/ftebroom_cursor.h', 'patches/*cursor*'], {'viewport'}),
+    (['qc/fb_sculpt.qc'], {'viewport', 'placement'}),
     (['patches/*resource*', 'patches/*mapasset*'], {'resources'}),
     (['patches/*grid*', 'patches/*render*', 'patches/*shader*'], {'render'}),
     (['native/ftebroom_map_mod*', 'native/ftebroom_map_panel*',
@@ -278,15 +280,74 @@ def onboarding_host_scope(path, before, after):
     return {'onboarding'} if before == after else None
 
 
+
+# Guarded lesson dispatch and Sculpt's release hook leave the other shared
+# editor operations intact. Compare the remainder before narrowing validation.
+EDITOR_HOST_SCOPES = {
+    'native/ftebroom.cpp': ({'onboarding'}, [
+        ('    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()))) dispatchAction(key, down, inScene, hit);',
+         '    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused())))\n'
+         '      dispatchAction(key, down, inScene, hit, tourActive&&tourStep==tourGridStep);'),
+    ]),
+    'native/ftebroom_actions.h': ({'onboarding'}, [
+        ('int targetView=-1)\n{\n  initActions();', 'int targetView=-1, bool lessonHistory=false)\n{\n  initActions();'),
+        ('  if(tourActive)return false;\n  for (auto& a : actions)\n  {\n',
+         '  if(tourActive&&!lessonHistory)return false;\n  for (auto& a : actions)\n  {\n'
+         '    if(lessonHistory&&std::string_view(a.id)!="Menu/Edit/Undo"&&std::string_view(a.id)!="Menu/Edit/Redo")\n      continue;\n'),
+    ]),
+    'native/ftebroom_workspace.h': ({'viewport'}, [
+        ('  ImGui::TextWrapped("Cursor size is independent of UI / font scale and applies immediately.");',
+         '#if defined(__linux__)\n'
+         '  ImGui::TextWrapped("At 100%, use the system cursor theme where supported. Other sizes use the editor\'s scalable cursor.");\n'
+         '#else\n  ImGui::TextWrapped("Cursor size is independent of UI / font scale and applies immediately.");\n#endif'),
+    ]),
+    'qc/brush_history.qc': ({'onboarding'}, [
+        ('    float timestamp;\n    int revision,kind', '    float timestamp,tutorial_grid;\n    int revision,kind'),
+    ]),
+    'qc/ftebroom.qc': ({'onboarding', 'placement'}, [
+        ('void fb_finish(vector pixel, float alt, int view)\n{',
+         'void fb_tutorial_grid_record(int previous);\nint fb_tutorial_can_undo();\nvoid fb_finish(vector pixel, float alt, int view)\n{'),
+        ('        if(!fb_primitive_create(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5,FALSE)) print("ReyondBroom: shape could not be created.\\n");else fb_tour_signal(1);',
+         '        int previous=history;\n'
+         '        if(!fb_primitive_create(fb_boxcenter-fb_boxsize*0.5,fb_boxcenter+fb_boxsize*0.5,FALSE))\n'
+         '            print("ReyondBroom: shape could not be created.\\n");\n'
+         '        else if(cvar("ftebroom_tour_active")&&cvar("ftebroom_tour_step")==5)\n'
+         '            fb_tutorial_grid_record(previous);\n        else fb_tour_signal(1);'),
+        ('    if(argv(0)=="ftebroom_undo") {fb_tool_refresh();brush_undo();return TRUE;}',
+         '    if(argv(0)=="ftebroom_undo") {if(fb_tutorial_can_undo()){fb_tool_refresh();brush_undo();}return TRUE;}'),
+    ]),
+    'qc/ftebroom_tools.qc': ({'viewport', 'placement'}, [
+        ('void fb_sculpt_move(vector pixel);\n', 'void fb_sculpt_move(vector pixel);\nvoid fb_sculpt_up(vector pixel);\n'),
+        ('    else if(cvar("ftebroom_tool")==FB_TOOL_SCULPT)fb_sculpt_finish(TRUE);',
+         '    else if(cvar("ftebroom_tool")==FB_TOOL_SCULPT)fb_sculpt_up(pixel);'),
+    ]),
+}
+
+
+def editor_host_scope(path, before, after):
+    scope = EDITOR_HOST_SCOPES.get(path)
+    if not scope or before == after:
+        return None
+    groups, replacements = scope
+    for old, new in replacements:
+        if before.count(old) != 1:
+            return None
+        before = before.replace(old, new)
+    return groups if before == after else None
+
+
+
 def semantic_scopes(base, head, paths):
     result = {}
     for path in paths:
-        if path not in WORLD_HOST_ADDITIONS and path not in ONBOARDING_HOST_REPLACEMENTS and path not in LESSON_HOST_REPLACEMENTS:
+        if not any(path in entries for entries in (WORLD_HOST_ADDITIONS, ONBOARDING_HOST_REPLACEMENTS,
+                                                     LESSON_HOST_REPLACEMENTS, EDITOR_HOST_SCOPES)):
             continue
         def read(ref):
             return subprocess.check_output(['git', 'show', ref+':'+path], stderr=subprocess.PIPE).decode()
         before, after = read(base), read(head)
-        groups = world_host_scope(path, before, after) or onboarding_host_scope(path, before, after) or lesson_host_scope(path, before, after)
+        groups = (world_host_scope(path, before, after) or onboarding_host_scope(path, before, after)
+                  or lesson_host_scope(path, before, after) or editor_host_scope(path, before, after))
         if groups:
             result[path] = groups
     return result

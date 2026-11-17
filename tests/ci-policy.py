@@ -116,6 +116,20 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(planner.onboarding_host_scope(path, before, after), {'onboarding'})
         self.assertIsNone(planner.onboarding_host_scope(path, before, after.replace('drawExistingPoints', 'drawDifferentPoints')))
 
+    def test_scoped_editor_hosts_keep_unrelated_shared_changes_conservative(self):
+        scopes = {}
+        for path, (groups, replacements) in planner.EDITOR_HOST_SCOPES.items():
+            before = "\n".join(old for old, _ in replacements) + "\nordinary behavior stays unchanged\n"
+            after = before
+            for old, new in replacements:
+                after = after.replace(old, new)
+            self.assertEqual(planner.editor_host_scope(path, before, after), groups)
+            self.assertIsNone(planner.editor_host_scope(path, before, after.replace("ordinary behavior", "other behavior")))
+            scopes[path] = groups
+        paths = list(scopes) + ['qc/fb_sculpt.qc', 'native/ftebroom_cursor.h',
+                               'patches/zzzz-linux-sdl2-native-cursors.patch']
+        self.assertEqual(set(planner.plan(paths, semantic=scopes)['suites']), {'onboarding', 'placement', 'viewport'})
+
     def test_lesson_host_scopes_reject_unrelated_changes(self):
         for path, replacements in planner.LESSON_HOST_REPLACEMENTS.items():
             before='\n'.join(old for old,new in replacements)+'\nordinary dispatch stays unchanged\n'

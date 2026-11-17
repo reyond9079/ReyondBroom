@@ -837,6 +837,8 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
   const bool outdoorCuffs=fitBodyRig && sleeveEase>0;
   const bool sportsTop=fitBodyRig && garment=="female_sportsuit01";
   const bool survivorCollar=fitBodyRig && garment=="male_casualsuit01";
+  const bool lightSleeves=fitBodyRig && (garment=="female_casualsuit01" || garment=="male_casualsuit04");
+  const bool weekendTop=fitBodyRig && garment=="female_casualsuit02";
   std::array<Vec3,2> forearmDirections{};
   if (outdoorCuffs) {
     const auto fittedPoint=[&](const Vec3& point) {
@@ -880,6 +882,7 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
     std::uint32_t largestSource = 0;
     for (const auto& entry : item.vertices) {
       auto vertex = entry.vertex;
+      const auto& base=entry.vertex.position;
       largestSource = std::max(largestSource,vertex.source);
       vertex.source += sourceOffset;
       Vec3 anchor{}, delta{};
@@ -923,7 +926,6 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
       vertex.position = add(vertex.position,delta);
       if (material==3 && axes) {
         vertex.position = add(vertex.position,axes->utilityEase(entry.vertex.position));
-        const auto& base=entry.vertex.position;
         const auto nape=smoothBand(13.20,13.78,base[1])*(1-smoothBand(-.08,.40,base[2]))*
                         (1-smoothBand(.70,1.33,std::abs(base[0])));
         if (nape>0 && fitBodyRig) {
@@ -934,6 +936,14 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
           const auto depth=napeSurface.farthest(vertex.position,outward,-clearance,.47,.16);
           vertex.position=add(vertex.position,mul(outward,(depth+clearance)*nape));
         }
+        if (fitBodyRig) {
+          // Keep the inside of the folded sleeve off the forearm in flexion.
+          const auto width=std::abs(base[0]);
+          const auto fold=smoothBand(3.25,3.90,width)*(1-smoothBand(4.20,4.41,width))*
+                          smoothBand(10.31,10.56,base[1])*(1-smoothBand(11.,11.37,base[1]))*
+                          smoothBand(1.55,1.93,base[2]);
+          vertex.position[2]-=.08*fold;
+        }
       }
       if (material==3 && !axes)
         vertex.position = add(vertex.position,add(garmentAxes.sleeveClearance(entry.vertex.position,anchor,sleeveEase),
@@ -943,26 +953,44 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
       if (material==3 && outdoorCuffs) {
         // Pull the folded cuff away from the wrist hinge along the sleeve.
         // Increasing its radius leaves the inner fold in the wrist's path.
-        const auto& base=entry.vertex.position;
         const auto cuff=smoothBand(3.96,4.18,std::abs(base[0]))*smoothBand(10.32,10.56,base[1])*
                         (1-smoothBand(10.94,11.35,base[1]));
         vertex.position=add(vertex.position,mul(forearmDirections[base[0]>0 ? 1 : 0],-.20*cuff));
       }
       if (material==3 && survivorCollar) {
         // Ease the side of the raised collar where it wraps the neck.
-        const auto& base=entry.vertex.position;
         const auto x=std::abs(base[0]);
         const auto collar=smoothBand(.17,.33,x)*(1-smoothBand(.57,.94,x))*
                           smoothBand(13.52,14.02,base[1])*(1-smoothBand(.21,.70,std::abs(base[2])));
         vertex.position[0]+=std::copysign(.12*collar,base[0]);
       }
+      if (material==3 && (lightSleeves || weekendTop || sportsTop)) {
+        // The side of the neckline overlaps the clavicle after arm swing.
+        const auto width=std::abs(base[0]);
+        const auto collar=smoothBand(.45,.72,width)*(1-smoothBand(.92,1.22,width))*
+                          smoothBand(13.43,13.79,base[1])*(1-smoothBand(14.01,14.40,base[1]))*
+                          (1-smoothBand(.28,.73,std::abs(base[2])));
+        vertex.position[0]+=std::copysign(.11*collar,base[0]);
+      }
+      if (material==3 && lightSleeves) {
+        // Add ease below the sleeve opening so its inner edge follows the
+        // arm as it lowers, without lifting the shoulder cap.
+        const auto width=std::abs(base[0]);
+        const auto opening=smoothBand(1.39,1.61,width)*(1-smoothBand(1.85,2.43,width))*
+                           smoothBand(11.69,12.10,base[1])*(1-smoothBand(12.51,13.,base[1]))*
+                           (1-smoothBand(.30,.71,std::abs(base[2])));
+        vertex.position[1]-=.07*opening;
+      }
       if (material==3 && sportsTop) {
-        const auto& base=entry.vertex.position;
         const auto x=std::abs(base[0]);
         const auto armhole=smoothBand(1.14,1.53,x)*(1-smoothBand(1.85,2.42,x))*
                            smoothBand(11.55,12.05,base[1])*(1-smoothBand(12.52,13.12,base[1]));
         const auto& arm=garmentAxes.arms[base[0]>0 ? 1 : 0];
         vertex.position=add(vertex.position,ClothingAxes::ease(base,arm.root,arm.middle,.22*armhole));
+        // Give the front of the trouser waistband room for torso flexion.
+        const auto waistband=smoothBand(7.96,8.45,base[1])*(1-smoothBand(9.,9.45,base[1]))*
+                             smoothBand(.67,1.04,base[2]);
+        vertex.position[2]+=.13*waistband;
         const auto back=smoothBand(10.85,11.60,base[1])*(1-smoothBand(12.30,13.55,base[1]))*
                         (1-smoothBand(-.22,.12,base[2]))*(1-smoothBand(.88,1.82,x));
         if (back>0) {
@@ -980,6 +1008,15 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
         const double crown = smoothBand(15.34,16.05,vertex.position[1]);
         const auto clearance = .016 + .041*crown;
         vertex.position = clearScalp(scalp,vertex.position,clearance,followsNeck);
+        if (fitBodyRig && style && hairMesh=="long01") {
+          // The inner strands need side room beside the neck when it turns.
+          const auto [x,y,z]=vertex.position;
+          const auto width=std::abs(x);
+          const auto nape=smoothBand(.25,.44,width)*(1-smoothBand(.70,1.14,width))*
+                          smoothBand(13.73,13.98,y)*(1-smoothBand(14.36,14.65,y))*
+                          (1-smoothBand(.37,.65,z));
+          vertex.position[0]+=std::copysign(.16*nape,x);
+        }
       }
       dressed.vertices.push_back(vertex);
     }
@@ -1176,8 +1213,8 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
     joint.inverseBind = bb::translate(mul(joint.bindPosition,-1));
   }
   if (fitBodyRig) {
-    // Keep the upper arm clear of the extra fabric at Runner's underarm seam.
-    if (sportsTop) dressed.torso.upperArmPadding+=.18;
+    // Keep the upper arm clear of the fitted underarm seams in these tops.
+    if (sportsTop || weekendTop) dressed.torso.upperArmPadding+=.18;
     if (outfit.utilityCut) {
       dressed.torso.upperArmPadding -= .012;
       dressed.torso.forearmPadding += .36;

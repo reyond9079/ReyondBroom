@@ -649,8 +649,12 @@ public:
         groundedRest(useCapture);
         poseArm(pose,false,{-.115-.80*lift,-1+.74*lift,.42*lift},
                 {.03-.19*lift-swing*.28,-.95+1.92*lift,.31-.09*lift},0,useCapture,lift);
-        if (useCapture)
-          poseArm(pose,true,{.13,-1,-.08},{.045,-1,.17},6.,true);
+        if (useCapture) {
+          // As the body leans into the greeting, let the resting hand drift
+          // away from the trouser leg. Keep the motion tied to the lift.
+          const double outward = .12*lift;
+          poseArm(pose,true,{.13+outward,-1,-.08},{.045+outward,-1,.17},6.,true);
+        }
         pose.rotations[joints.at("wrist.R")] =
             pose.rotations[joints.at("wrist.R")]*bb::rotation({lift*8,swing*5,swing*11});
         poseFingers(pose,false,10-7*lift);

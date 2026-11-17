@@ -26,6 +26,60 @@ static void rejects(Function action, const char* message) {
   throw std::runtime_error(message);
 }
 
+static Vec3 skinReference(const Humanoid& rig, const AnimationPose& pose, const Vertex& vertex) {
+  Vec3 result{};
+  for (std::size_t i=0; i<vertex.weights.size(); ++i) {
+    if (vertex.weights[i] == 0) continue;
+    auto point = vertex.position;
+    // Apply each ancestor directly around its bind pivot. The production
+    // implementation instead composes joint and inverse-bind matrices first.
+    for (int joint=vertex.joints[i]; joint>=0; joint=rig.joints[joint].parent) {
+      const auto& pivot = rig.joints[joint].bindPosition;
+      const auto& rotation = pose.rotations[joint].m;
+      const auto input = sub(point,pivot);
+      for (int axis=0; axis<3; ++axis)
+        point[axis] = pivot[axis] + rotation[axis][0]*input[0] +
+            rotation[axis][1]*input[1] + rotation[axis][2]*input[2];
+    }
+    for (int axis=0; axis<3; ++axis)
+      result[axis] += (point[axis]+pose.root[axis])*vertex.weights[i];
+  }
+  return result;
+}
+
+static void exerciseSkinnedPoses(const Humanoid& fitted) {
+  const Animator animator(fitted);
+  double maxError = 0;
+  for (const auto& vertex : fitted.vertices) {
+    double sum = 0;
+    for (std::size_t i=0; i<vertex.weights.size(); ++i) {
+      const auto weight = vertex.weights[i];
+      check(std::isfinite(weight) && weight >= 0 &&
+            (weight == 0 || vertex.joints[i] < fitted.joints.size()),
+            "Fitted mesh has an invalid joint weight");
+      sum += weight;
+    }
+    check(std::abs(sum-1) <= 1e-4,"Fitted joint weights are not normalized");
+  }
+  for (const auto& clip : clips) {
+    for (const double phase : {0.,.25,.5,.75,1.}) {
+      const auto pose = animator.sample(clip,phase*clip.seconds);
+      const auto matrices = skinMatrices(fitted,pose.rotations,pose.root);
+      for (const auto& vertex : fitted.vertices) {
+        const auto actual = deform(vertex,vertex.position,matrices);
+        const auto expected = skinReference(fitted,pose,vertex);
+        const auto error = ftebroom::bb::length(sub(actual,expected));
+        if (!std::isfinite(error))
+          throw std::runtime_error("Nonfinite skinned vertex in "+std::string(clip.id));
+        maxError = std::max(maxError,error);
+      }
+    }
+  }
+  check(maxError < 1e-4,"Fitted positions differ from the independent skinning reference");
+  std::cout << "PASS every fitted body, garment and hair vertex against independent skinning across "
+            << std::size(clips) << " clips, max error " << maxError << " authoring units\n";
+}
+
 static std::string motionFixture(const Humanoid& rig,bool wrongOrder=false) {
   GlbBuffer buffer;
   Json nodes=Json::array(), joints=Json::array();
@@ -795,6 +849,7 @@ int main(int argc, char** argv) try {
     check(ftebroom::bb::length(sub(halfway,{-1,0,0}))<1e-8,"Quaternion blend took the long path");
   }
   const auto fitted = assemble(rig,doc,lookup);
+  exerciseSkinnedPoses(fitted);
   {
     auto layered = doc;
     layered.footwear = 1;

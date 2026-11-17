@@ -547,7 +547,7 @@ void fb_visual_draw()
     fb_visual_profile[2]+=gettime(1)-started;started=gettime(1);
     fb_entity_drop_preview();
     fb_visual_profile[3]+=gettime(1)-started;
-    if(fb_visual_has_bounds) fb_visual_box(fb_visual_min,fb_visual_max,fb_visual_group_bounds?'0.65 0.35 1':autocvar_ftebroom_color_selected,0.6,
+    if(fb_visual_has_bounds) fb_visual_box(fb_visual_min,fb_visual_max,fb_visual_group_bounds?'0.65 0.35 1':autocvar_ftebroom_color_selected,fb_visual_group_bounds?1:.6,
         !cvar("ca_brush_view") && fb_visual_spikes && autocvar_ftebroom_selection_spikes);
     fb_commit_profile("fb_visual_draw",profile81Time);
 }

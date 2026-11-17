@@ -60,8 +60,7 @@ red=lambda c:c[0]>c[1]+60 and c[0]>c[2]+60
 cyan=lambda c:c[1]>c[0]+60 and c[2]>c[0]+60 and abs(c[1]-c[2])<30
 magenta=lambda c:c[0]>c[1]+60 and c[2]>c[1]+60 and abs(c[0]-c[2])<30
 orange=lambda c:c[0]>c[1]+40 and c[1]>c[2]+40
-# The translucent group frame composites over the red selected brush frame.
-purple=lambda c:c[2]>c[0]+8 and c[0]>c[1]+25
+purple=lambda c:c[2]>c[0]+30 and c[0]>c[1]+30
 def link_delta(name,predicate):
  ui.console('set ftebroom_entity_links 0');off=shot(name+'-hidden')
  ui.console('set ftebroom_entity_links 3');on=shot(name)

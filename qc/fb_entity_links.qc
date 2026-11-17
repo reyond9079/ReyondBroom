@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-typedef struct {vector mins,maxs;int valid;vector color;trisoup_simple_vert_t vertices[8];} fb_container_bounds_t;
+typedef struct {vector mins,maxs;int valid;vector color;float alpha;trisoup_simple_vert_t vertices[8];} fb_container_bounds_t;
 fb_container_bounds_t *fb_container_cache;
 int fb_container_edit_epoch;
 var int fb_container_revision=-1,fb_container_geometry=-1,fb_container_filters=-1,fb_container_entityRevision=-1,fb_container_edits=-1;
@@ -87,10 +87,11 @@ void fb_container_draw(int labels)
             vector color='0.2 0.45 1';if(group && fb_nodes[n].fields["_tb_linked_group_id"]!="")color='0.65 0.35 1';
             if(groupSelected)color='0.65 0.35 1';
             else if(!group)color=fb_selection_selected(n)?autocvar_ftebroom_color_selected:fb_entity_color(fb_nodes[n].id);
+            float alpha=groupSelected?1:.75;
             fb_container_bounds_t *box=&fb_container_cache[n];
-            if(box->color!=color){box->color=color;for(int v=0;v<8;v++){
+            if(box->color!=color || box->alpha!=alpha){box->color=color;box->alpha=alpha;for(int v=0;v<8;v++){
                 for(int a=0;a<3;a++)box->vertices[v].xyz[a]=(v&(1i<<a))?bounds[1][a]:bounds[0][a];
-                box->vertices[v].st=(vec2){0,0};box->vertices[v].rgba=(vec4){color_x,color_y,color_z,.75};
+                box->vertices[v].st=(vec2){0,0};box->vertices[v].rgba=(vec4){color_x,color_y,color_z,alpha};
             }}
             addtrisoup_simple(ortho?"ftebroom/selectionoverlay":"ftebroom/selectiondepth",3|DRAWFLAG_LINES,box->vertices,bbox_line_idxs,bbox_line_idxs.length);
         }

@@ -363,6 +363,29 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             wait(lambda:len([k for k in live()["widgets"] if k.startswith("character/morph/")])==34)
             test_controls()
             check(len(results)==48 and set(results)==set(baseline),"All 48 native morph sliders passed")
+            panel = live()["widgets"]["character/morph/ear_depth"]["clip"]
+            ui.move((panel[0]+panel[2])*.5,(panel[1]+panel[3])*.5)
+            ui.scroll(50)
+            click("character/tab-body")
+            wait(lambda: state()["tab"]==0)
+            click("character/randomize")
+            wait(fitted)
+            click("character/save")
+            wait(lambda:not state()["dirty"])
+            randomized = json.loads(path.read_text(encoding="utf-8"))
+            assert any(randomized["morphs"].values())
+            click("character/reset-all-morphs")
+            wait(fitted)
+            click("character/save")
+            wait(lambda:not state()["dirty"])
+            neutral = json.loads(path.read_text(encoding="utf-8"))
+            assert set(neutral["morphs"].values())=={0} and neutral["seed"]==randomized["seed"]
+            click("character/undo")
+            wait(fitted)
+            click("character/save")
+            wait(lambda:not state()["dirty"])
+            assert json.loads(path.read_text(encoding="utf-8"))==randomized
+            check(True,"Reset all clears both sections and one Undo restores the previous document")
 
         def exercise_catalog():
             click("menu/file")
@@ -507,7 +530,7 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             click("character/tab-export")
             choose("character/export-target",3)
             click("character/export-selected")
-            check(not live()["widgets"].get("file-choose",{}).get("visible"),
+            check("file-choose" not in live()["widgets"],
                   "Quake MDL export is disabled while the Quake III map supplies no Quake palette")
             choose("character/export-target",2)
             click("character/save")

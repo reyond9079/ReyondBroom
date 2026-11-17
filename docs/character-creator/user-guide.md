@@ -9,6 +9,10 @@ in a second clip. Enable **Upper body** to retain the main clip's leg motion
 and root position. The blend controls affect the preview. Exports contain
 the named clips individually.
 
+Use the section reset to clear its proportions or choose **Reset all
+proportions** in Body to reset both body and face. Undo restores the previous
+proportions in one step.
+
 Drag the preview with the left button to orbit, the right or middle button
 to pan, or use the wheel to zoom. **Front**, **Side**, and **Frame** reset
 parts of the camera. The **Rig** tab shows the skeleton and lets you select

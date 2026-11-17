@@ -886,20 +886,31 @@ static bool characterViewport(const cc::Clip& clip) {
   return true;
 }
 
+static void characterResetMorphs(std::size_t first, std::size_t end) {
+  auto& s = characterEditor;
+  const bool resetBody = first==0 && (gameProfile==1 || end==cc::morphCount);
+  const bool resetFace = end==cc::morphCount;
+  const auto from = s.doc.values.begin()+first, to = s.doc.values.begin()+end;
+  if ((!resetBody || s.doc.bodyProfile==0.) &&
+      (!resetFace || (s.doc.faceProfile==0. && s.doc.faceAsymmetry==0.)) &&
+      std::all_of(from,to,[](double value) { return value==0.; })) return;
+  characterCheckpoint(s.doc);
+  std::fill(from,to,0.);
+  if (resetBody) s.doc.bodyProfile = 0.;
+  if (resetFace) s.doc.faceProfile = s.doc.faceAsymmetry = 0.;
+  ++s.revision;
+  s.uploaded = false;
+}
+
 static void characterMorphSliders(std::size_t first, std::size_t end) {
   auto& s = characterEditor;
-  const auto reset = [&] {
-    const bool body = first==0 && gameProfile==1;
-    if ((!body || s.doc.bodyProfile==0.) &&
-        std::all_of(s.doc.values.begin()+first,s.doc.values.begin()+end,
-                    [](double value) { return value==0.; })) return;
-    characterCheckpoint(s.doc);
-    if (body) s.doc.bodyProfile = 0.;
-    std::fill(s.doc.values.begin()+first,s.doc.values.begin()+end,0.);
-    ++s.revision;
-    s.uploaded = false;
-  };
-  if (ImGui::SmallButton(first==0 ? "Reset body proportions" : "Reset facial proportions")) reset();
+  if (ImGui::SmallButton(first==0 ? "Reset body proportions" : "Reset facial proportions"))
+    characterResetMorphs(first,end);
+  if (first==0) {
+    const bool resetAll = ImGui::SmallButton("Reset all proportions");
+    placementRect("character/reset-all-morphs");
+    if (resetAll) characterResetMorphs(0,cc::morphCount);
+  }
   for (auto i = first; i < end; ++i) {
     auto amount = float(s.doc.values[i]);
     auto before = s.doc;

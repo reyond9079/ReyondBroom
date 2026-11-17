@@ -18,6 +18,8 @@ assert (root / 'maps/workspace_before.map').read_bytes() == (root / 'maps/worksp
 for name in ('workspace-dark.png', 'workspace-large.png', 'workspace-floating.png'):
     image = Image.open(root / name).convert('RGB')
     colors = dict((rgb, count) for count, rgb in image.getcolors(image.width * image.height))
-    assert colors.get((50, 50, 50), 0) > 10000, f'Missing dark panels: {name}'
-    assert colors.get((35, 35, 35), 0) > 1000, f'Missing dark controls: {name}'
+    # Modern Dark paints both viewport-adjacent panels and the floating dock.
+    assert colors.get((57, 60, 64), 0) > 10000, f'Missing dark panels: {name}'
+    controls = colors.get((50, 52, 56), 0) + colors.get((51, 54, 58), 0)
+    assert controls > 1000, f'Missing dark controls: {name}'
 print(f'PASS: {len(checks)} workspace checks, persistence across restart, dark palette screenshots and unchanged MAP.')

@@ -13,11 +13,19 @@ foreach ($name in @('materials04.png','clip04.png','reload04.png','qconsole.log'
 }
 & $Python -X utf8 "$src/tests/prepare-project-fixture.py" $test
 if ($LASTEXITCODE -ne 0) { throw 'Fixture creation failed' }
-Copy-Item "$src/tests/editing.cfg" "$test/ftebroom/editing.cfg"
+Copy-Item "$src/tests/editing.cfg" "$test/ftebroom/editing-steps.cfg"
 $fixture = ($test + '/fixture assets/baseq3').Replace('\','/')
-Add-Content "$test/ftebroom/editing.cfg" ('in 8 ftebroom_project "' + $fixture + '"')
-$process = Start-Process "$test/fteqw64.exe" -ArgumentList @('-nohome','-basedir',('"'+$test+'"'),'-window','-width','1280','-height','800','-condebug','+exec','editing.cfg') -WorkingDirectory $test -WindowStyle Hidden -PassThru
-if (!$process.WaitForExit(90000)) {
+@"
+exec ftebroom.cfg
+set ftebroom_clip_keep 1
+set ftebroom_skip_setup 1
+in 12 ftebroom_project "$fixture"
+in 16 exec editing-steps.cfg
+"@ | Set-Content "$test/ftebroom/editing.cfg"
+$engine = Join-Path $test 'bin/fteqw64.exe'
+if (!(Test-Path -LiteralPath $engine)) { $engine = Join-Path $test 'fteqw64.exe' }
+$process = Start-Process $engine -ArgumentList @('-nohome','-noupdates','-basedir',('"'+$test+'"'),'-window','-width','1280','-height','800','-condebug','+exec','editing.cfg') -WorkingDirectory $test -WindowStyle Hidden -PassThru
+if (!$process.WaitForExit(115000)) {
     Stop-Process -Id $process.Id
     throw "Editing test timed out; logs: $test"
 }

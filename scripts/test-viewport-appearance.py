@@ -117,8 +117,17 @@ try:
   click('launch-close') if 'launch-close' in live()['widgets'] else None
   click('menu/View',True);click('menu-preferences',True);click('preferences-keyboard-tab',True)
   actions=[('func_detail','Menu/Edit/Create func_detail','j'),('FUNC_GROUP','Menu/Edit/Create func_group','k'),('WORLD TEXTURE ALIGNMENT','Menu/Textures/Reset to world aligned','l')]
+  def filtered_binding(action):
+   widgets=live()['globalWidgets']
+   bindings=[name for name in widgets if name.startswith('keyboard-binding/')]
+   return widgets.get('keyboard-binding/'+action) if bindings==['keyboard-binding/'+action] else None
+
   for query,action,key in actions:
-   edit_global('keyboard-search',query);click('keyboard-binding/'+action,True)
+   edit_global('keyboard-search',query)
+   # With OS input the action can briefly appear among the prefix matches.
+   # Wait for the full filter before clicking the row at its final position.
+   binding=wait(lambda:filtered_binding(action))
+   ui.click(binding['x']+binding['width']*.5,binding['y']+binding['height']*.5)
    wait(lambda:live()['globalWidgets'].get('keyboard-capture',{}).get('action')==action)
    ui.key(key,('ctrl','alt','shift'))
    wait(lambda:live()['globalWidgets'].get('keyboard-capture',{}).get('action')=='')

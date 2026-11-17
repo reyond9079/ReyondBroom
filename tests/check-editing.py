@@ -41,9 +41,19 @@ caps = [line for line in cut if all(abs(float(x)) < 1e-6 for x in re.findall(r"\
 assert len(caps) == 2, "Missing opposite cut caps"
 same("all", "side_undo")
 def bounds(lines):
-    points = [tuple(map(float, p)) for line in lines
-              for p in re.findall(r"\( ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+) \)", line)]
-    return tuple(min(p[a] for p in points) for a in range(3)), tuple(max(p[a] for p in points) for a in range(3))
+    # Valve 220 stores points on each infinite plane. In this axis-aligned
+    # fixture the constant coordinate gives the actual brush boundary.
+    coordinates = [[], [], []]
+    for line in lines:
+        points = [tuple(map(float, point)) for point in
+                  re.findall(r"\( ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+) \)", line)]
+        assert len(points) == 3, line
+        axes = [axis for axis in range(3) if points[0][axis] == points[1][axis] == points[2][axis]]
+        assert len(axes) == 1, line
+        axis, = axes
+        coordinates[axis].append(points[0][axis])
+    assert all(len(values) == 2 and values[0] != values[1] for values in coordinates), coordinates
+    return tuple(map(min, coordinates)), tuple(map(max, coordinates))
 assert bounds(cut[6:12]) == ((-64, -64, 0), (0, 64, 128))
 assert bounds(cut[12:18]) == ((0, -64, 0), (64, 64, 128))
 assert len(faces("front")) == len(faces("back")) == 12

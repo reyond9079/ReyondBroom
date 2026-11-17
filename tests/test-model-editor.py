@@ -25,6 +25,16 @@ editor=root/'editor';game=root/'id1';models=game/'models/qa';models.mkdir(parent
 if args.mod:
     for pak in game.glob('*.pak'):pak.unlink()
     for pak in Path(args.mod).glob('*.pak'):shutil.copy2(pak,game/pak.name)
+else:
+    # The player resource assertions must also run with a synthetic game.
+    progs=game/'progs'
+    progs.mkdir()
+    header=struct.pack('<4si3f3ff3f8if',b'IDPO',6,1,1,1,-20,-20,0,64,0,0,0,1,16,16,3,2,1,0,0,1)
+    skin=struct.pack('<i',0)+bytes(64 if (x//4+y//4)%2 else 200 for y in range(16) for x in range(16))
+    uv=b''.join(struct.pack('<3i',0,u,v) for u,v in [(0,0),(15,0),(0,15)])
+    triangles=struct.pack('<8i',1,0,1,2,1,2,1,0)
+    frame=struct.pack('<i',0)+bytes([0,0,0,0,40,0,60,0])+b'frame'+bytes(11)+bytes([0,0,0,0,40,0,0,0,0,0,60,0])
+    (progs/'player.mdl').write_bytes(header+skin+uv+triangles+frame)
 def tga(rgb):return bytes([0,0,2])+bytes(9)+struct.pack('<HHBB',2,2,24,32)+bytes(rgb[::-1])*4
 (models/'red.tga').write_bytes(tga((240,20,30)));(models/'green.tga').write_bytes(tga((20,240,50)))
 def md3(view=False):

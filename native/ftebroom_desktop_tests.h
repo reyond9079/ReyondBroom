@@ -971,7 +971,7 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     expect(example!=editorPlugins.end()&&example->api&&!pluginBusy(*example)&&cvars->GetFloat("ftebroom_settle_applied"),"plugin72_async_workflow_complete");
     if(example!=editorPlugins.end()){pluginUnload(*example);expect(!example->api&&!example->module,"plugin72_unload");pluginLoad(*example);expect(example->api!=nullptr,"plugin72_reload");}
   }
-  if(std::string(mode)=="medit72camera"){modelEditDirty=false;modelEditorShow("models/qa/test.md3");frame();}
+  if(std::string(mode)=="medit72camera"){modelEditDirty=false;modelNativeInspectorShow("models/qa/test.md3");frame();}
   if(std::string(mode)=="medit72cameraStart"){
     auto p=modelEditViewMin,s=modelEditViewSize;float x=p.x+s.x*.5f,y=p.y+s.y*.5f;
     event(0,0,0,x,y,1280,800);modelEditCameraCursor={x,y};event(1,mouseKeys[1],0,x,y,1280,800);event(3,0,0,40,20,1280,800);event(1,input->GetKeyCode("w",nullptr),0,x,y,1280,800);
@@ -996,7 +996,9 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     event(2,input->GetKeyCode("w",nullptr),0,0,0,1280,800);expect(!modelEditDirty,"medit72_camera_does_not_edit_model");
   }
   if(std::string(mode)=="medit71open"){
-    firstSetupStep=-1;setupNeeded=false;recentWindow=false;modelEditorShow("models/qa/test.md3");frame();
+    // This suite exercises the native inspector. The ordinary model open
+    // route now opens supported formats in the editable model workspace.
+    firstSetupStep=-1;setupNeeded=false;recentWindow=false;modelNativeInspectorShow("models/qa/test.md3");frame();
     if(auto window=ImGui::FindWindowByName("Model editor")){ImGui::SetWindowPos(window,{10,40},ImGuiCond_Always);ImGui::SetWindowSize(window,{1250,740},ImGuiCond_Always);}frame();
     expect(modelEditorActive&&!modelEditPlayer,"medit71_separate_editor");
   }
@@ -1021,21 +1023,23 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     auto source=ftebroom::modelExport::parse(q1Read(documentPath("data/model-convert.mesh")));
     for(int format:{1,2,3,4}){modelConverterFormat=format;std::snprintf(modelConverterDestination,sizeof modelConverterDestination,"%s/models/editor-out%d%s",root,format,modelConverterExtension());modelConverterSave(source);}
     expect(std::filesystem::exists(std::filesystem::u8path(root)/"models/editor-out2.mdl")&&std::filesystem::exists(std::filesystem::u8path(root)/"models/editor-out3.iqm")&&std::filesystem::exists(std::filesystem::u8path(root)/"models/editor-out4.md5mesh"),"medit71_all_export_files");modelConverterOpen=false;
-    modelEditDirty=false;modelEditorShow("models/qa/bones.iqm");modelViewerBones=true;modelViewerPlay=true;
+    modelEditDirty=false;modelNativeInspectorShow("models/qa/bones.iqm");modelViewerBones=true;modelViewerPlay=true;
   }
   if(std::string(mode)=="medit71bones"){
-    expect(cvars->GetFloat("ftebroom_modelviewer_bones")==2&&modelViewerBones,"medit71_bones_overlay");modelEditPlayer=false;modelEditDirty=false;modelEditorShow("models/qa/v_test.md3");
+    expect(cvars->GetFloat("ftebroom_modelviewer_bones")==2&&modelViewerBones,"medit71_bones_overlay");modelEditPlayer=false;modelEditDirty=false;modelNativeInspectorShow("models/qa/v_test.md3");
   }
   if(std::string(mode)=="medit71player"){
     expect(modelEditPlayer&&cvars->GetFloat("ftebroom_modeleditor_player"),"medit71_viewmodel_auto_camera");auto eye=modelEditRead("ftebroom_modeleditor_eye");expect(eye==ModelEditV{0,0,0},"medit71_player_camera_origin");modelEditPlayer=false;modelEditTool=0;frame();
   }
   if(std::string(mode)=="medit71drag"){
+    if(modelEditNodes.empty()){expect(false,"medit71_mouse_axis_move");return;}
     auto a=modelEditGizmoStart[0],b=modelEditGizmoEnd[0];float x=a.x+(b.x-a.x)*.7f,y=a.y+(b.y-a.y)*.7f;auto before=modelEditNodes[0].position;
     event(0,0,0,x,y,1280,800);event(1,mouseKeys[0],0,x,y,1280,800);event(0,0,0,x,y,1280,800);event(0,0,0,x+45,y+15,1280,800);event(2,mouseKeys[0],0,x+45,y+15,1280,800);frame();
     expect(modelEditNodes[0].position!=before,"medit71_mouse_axis_move");
   }
-  if(std::string(mode)=="medit71mdl"){modelEditDirty=false;modelEditorShow("models/editor-out2.mdl");frame();}
+  if(std::string(mode)=="medit71mdl"){modelEditDirty=false;modelNativeInspectorShow("models/editor-out2.mdl");frame();}
   if(std::string(mode)=="medit71mdlwrite"){
+    if(modelEditNodes.empty()){expect(false,"medit71_mdl_transform_ready");return;}
     modelEditNodes[0].position={3,-2,5};modelEditNodes[0].scale={.5f,1.2f,2};modelEditChanged=true;modelEditPublish();modelEditExport();
     modelConverterFormat=2;std::snprintf(modelConverterDestination,sizeof modelConverterDestination,"%s/models/editor-retained.mdl",root);
     cvars->SetString("ftebroom_convert_source",modelViewerPath.c_str());cvars->SetFloat("ftebroom_convert_sequence",-1);cvars->SetFloat("ftebroom_convert_frames",2);cvars->SetFloat("ftebroom_convert_fps",10);cvars->SetFloat("ftebroom_convert_status",0);modelConverterPending=true;command("ftebroom_model_extract\n");
@@ -1045,9 +1049,9 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     size_t count=4+ftebroom::quake1::word(before,52)*ftebroom::quake1::word(before,56)+ftebroom::quake1::word(before,60)*12+ftebroom::quake1::word(before,64)*16;
     expect(before.substr(84,count)==after.substr(84,count)&&before.size()==after.size()&&ftebroom::quake1::word(before,68)==ftebroom::quake1::word(after,68),"medit71_mdl_original_skins_uv_frames_retained");modelConverterOpen=false;
   }
-  if(std::string(mode)=="medit71reloadobj"){modelEditDirty=false;modelEditorShow("models/editor-out1.obj");}
-  if(std::string(mode)=="medit71reloadiqm"){modelEditDirty=false;modelEditorShow("models/editor-out3.iqm");}
-  if(std::string(mode)=="medit71reloadmd5"){modelEditDirty=false;modelEditorShow("models/editor-out4.md5mesh");}
+  if(std::string(mode)=="medit71reloadobj"){modelEditDirty=false;modelNativeInspectorShow("models/editor-out1.obj");}
+  if(std::string(mode)=="medit71reloadiqm"){modelEditDirty=false;modelNativeInspectorShow("models/editor-out3.iqm");}
+  if(std::string(mode)=="medit71reloadmd5"){modelEditDirty=false;modelNativeInspectorShow("models/editor-out4.md5mesh");}
   if(std::string(mode)=="medit71reloadcheck"){expect(modelEditLoaded&&modelEditNodes.size()==3&&cvars->GetFloat("ftebroom_modeleditor_drawn")==2,"medit71_export_reopened_in_fte");}
   if(std::string(mode)=="renderer65before") {
     cvars->SetFloat("ftebroom_test_restart_revision",cvars->GetFloat("ftebroom_revision"));

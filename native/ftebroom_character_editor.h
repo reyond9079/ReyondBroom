@@ -696,41 +696,48 @@ static bool characterViewport(const cc::Clip& clip) {
     return false;
   }
   const bool comparison = placementQa() && cvars->GetFloat("ftebroom_character_compare_pose")!=0;
-  ImGui::Checkbox("Grid",&s.grid); ImGui::SameLine();
-  ImGui::Checkbox("Wireframe",&s.wire); ImGui::SameLine();
-  ImGui::Checkbox("Orthographic",&s.ortho);
-  if (ImGui::GetContentRegionAvail().x>=470*uiScale()) ImGui::SameLine();
-  ImGui::SetNextItemWidth(128*uiScale());
-  const char* detailLevels[]{"Full detail","Balanced (15k)","Light (9k)"};
-  const bool choosingDetail=ImGui::BeginCombo("Preview detail",detailLevels[s.detailLevel]);
-  placementRect("character/preview-detail");
-  if (choosingDetail) {
-    for (unsigned index=0; index<IM_ARRAYSIZE(detailLevels); ++index) {
-      if (ImGui::Selectable(detailLevels[index],s.detailLevel==int(index)) && s.detailLevel!=int(index)) {
-        s.detailLevel=int(index);
-        s.reduced.reset();
-        s.uploaded=false;
-        ++s.revision;
+  // Keep the render target usable when scaled controls would take all its height.
+  const bool compact = ImGui::GetContentRegionAvail().y < 64 + 3*ImGui::GetFrameHeightWithSpacing();
+  if (compact && ImGui::Button("View options")) ImGui::OpenPopup("Character view options");
+  const bool optionsOpen = compact && ImGui::BeginPopup("Character view options");
+  if (!compact || optionsOpen) {
+    ImGui::Checkbox("Grid",&s.grid); ImGui::SameLine();
+    ImGui::Checkbox("Wireframe",&s.wire); ImGui::SameLine();
+    ImGui::Checkbox("Orthographic",&s.ortho);
+    if (ImGui::GetContentRegionAvail().x>=470*uiScale()) ImGui::SameLine();
+    ImGui::SetNextItemWidth(128*uiScale());
+    const char* detailLevels[]{"Full detail","Balanced (15k)","Light (9k)"};
+    const bool choosingDetail=ImGui::BeginCombo("Preview detail",detailLevels[s.detailLevel]);
+    placementRect("character/preview-detail");
+    if (choosingDetail) {
+      for (unsigned index=0; index<IM_ARRAYSIZE(detailLevels); ++index) {
+        if (ImGui::Selectable(detailLevels[index],s.detailLevel==int(index)) && s.detailLevel!=int(index)) {
+          s.detailLevel=int(index);
+          s.reduced.reset();
+          s.uploaded=false;
+          ++s.revision;
+        }
+        placementRect(("character/preview-detail/"+std::to_string(index)).c_str());
       }
-      placementRect(("character/preview-detail/"+std::to_string(index)).c_str());
+      ImGui::EndCombo();
     }
-    ImGui::EndCombo();
+    if (ImGui::Button("Front")) { s.yaw = s.pitch = 0; s.uploaded = false; }
+    ImGui::SameLine();
+    if (ImGui::Button("Side")) { s.yaw = 90; s.pitch = 0; s.uploaded = false; }
+    ImGui::SameLine();
+    const bool resetFrame = ImGui::Button("Frame");
+    placementRect("character/frame");
+    if (resetFrame) characterFrame(CharacterEditorState::Framing::Body);
+    ImGui::SameLine();
+    const bool portrait = ImGui::Button("Portrait");
+    placementRect("character/portrait");
+    if (portrait) characterFrame(CharacterEditorState::Framing::Portrait);
+    ImGui::SameLine();
+    const bool upperBody = ImGui::Button("Upper body");
+    placementRect("character/upper-body");
+    if (upperBody) characterFrame(CharacterEditorState::Framing::UpperBody);
   }
-  if (ImGui::Button("Front")) { s.yaw = s.pitch = 0; s.uploaded = false; }
-  ImGui::SameLine();
-  if (ImGui::Button("Side")) { s.yaw = 90; s.pitch = 0; s.uploaded = false; }
-  ImGui::SameLine();
-  const bool resetFrame = ImGui::Button("Frame");
-  placementRect("character/frame");
-  if (resetFrame) characterFrame(CharacterEditorState::Framing::Body);
-  ImGui::SameLine();
-  const bool portrait = ImGui::Button("Portrait");
-  placementRect("character/portrait");
-  if (portrait) characterFrame(CharacterEditorState::Framing::Portrait);
-  ImGui::SameLine();
-  const bool upperBody = ImGui::Button("Upper body");
-  placementRect("character/upper-body");
-  if (upperBody) characterFrame(CharacterEditorState::Framing::UpperBody);
+  if (optionsOpen) ImGui::EndPopup();
   if (s.framing==CharacterEditorState::Framing::Portrait ||
       s.framing==CharacterEditorState::Framing::UpperBody) {
     const bool head = s.framing == CharacterEditorState::Framing::Portrait;
@@ -1223,7 +1230,7 @@ static void characterProperties() {
   }
 }
 
-static void characterTimeline() {
+static void characterTimeline(bool compact = false) {
   auto& s = characterEditor;
   const auto imported=characterImportedMotion(s.doc);
   const auto available=cc::characterClips(imported.get());
@@ -1273,23 +1280,26 @@ static void characterTimeline() {
       std::max(45*scale,width-ImGui::CalcTextSize("Speed").x-ImGui::GetStyle().ItemInnerSpacing.x)));
   ImGui::SliderFloat("Speed",&s.speed,.25f,2.f,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
   placementRect("character/speed");
-  const char* playbackModes[]{"Clip default","Loop","Once"};
-  int playback = static_cast<int>(s.playback);
-  ImGui::SetNextItemWidth(std::min(116*scale,
-      std::max(45*scale,width-ImGui::CalcTextSize("Playback").x-ImGui::GetStyle().ItemInnerSpacing.x)));
-  const bool choosePlayback = ImGui::BeginCombo("Playback",playbackModes[playback]);
-  placementRect("character/playback");
-  if (choosePlayback) {
-    for (int i = 0; i < int(std::size(playbackModes)); ++i) {
-      const bool selected = ImGui::Selectable(playbackModes[i],i==playback);
-      placementRect((std::string("character/playback/")+playbackModes[i]).c_str());
-      if (selected) {
-        s.playback = static_cast<CharacterEditorState::Playback>(i);
-        s.uploaded = false;
+  const auto drawPlayback = [&] {
+    const char* playbackModes[]{"Clip default","Loop","Once"};
+    int playback = static_cast<int>(s.playback);
+    ImGui::SetNextItemWidth(std::min(116*scale,
+        std::max(45*scale,width-ImGui::CalcTextSize("Playback").x-ImGui::GetStyle().ItemInnerSpacing.x)));
+    const bool choosePlayback = ImGui::BeginCombo("Playback",playbackModes[playback]);
+    placementRect("character/playback");
+    if (choosePlayback) {
+      for (int i = 0; i < int(std::size(playbackModes)); ++i) {
+        const bool selected = ImGui::Selectable(playbackModes[i],i==playback);
+        placementRect((std::string("character/playback/")+playbackModes[i]).c_str());
+        if (selected) {
+          s.playback = static_cast<CharacterEditorState::Playback>(i);
+          s.uploaded = false;
+        }
       }
+      ImGui::EndCombo();
     }
-    ImGui::EndCombo();
-  }
+  };
+  if (!compact) drawPlayback();
   if (s.playing) {
     s.time += ImGui::GetIO().DeltaTime*s.speed;
     if (s.time >= duration) {
@@ -1307,6 +1317,8 @@ static void characterTimeline() {
     s.uploaded = false;
   }
   placementRect("character/scrub");
+  // In the short timeline, keep the scrubber in the first two visible rows.
+  if (compact) drawPlayback();
   if (placementButton("Import GLB animation...","character/import-motion")) characterChooseImport(true);
   if (imported) {
     if (!wrap) ImGui::SameLine();
@@ -1570,8 +1582,8 @@ static void characterPanel() {
       } else {
         const bool compactTimeline = room.y < 270*uiScale();
         if (!compactTimeline) characterTimeline();
-        const float timelineHeight = std::min(4*ImGui::GetFrameHeightWithSpacing(),
-                                              std::max(1.f,room.y*.32f));
+        const float timelineRow = ImGui::GetFrameHeightWithSpacing();
+        const float timelineHeight = std::clamp(room.y*.32f,2*timelineRow,4*timelineRow);
         // A compact window gives the preview and inspector their own region.
         // This leaves the timeline scrollable without moving the model.
         const bool showWorkspace = !compactTimeline ||
@@ -1593,7 +1605,7 @@ static void characterPanel() {
         if (compactTimeline) {
           ImGui::EndChild();
           if (ImGui::BeginChild("Character timeline region"))
-            characterTimeline();
+            characterTimeline(true);
           ImGui::EndChild();
         }
       }

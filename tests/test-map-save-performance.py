@@ -26,6 +26,7 @@ cpp = r'''
 #include <cassert>
 #include "ftebroom_map_index.h"
 #include "ftebroom_quake1.h"
+#include "ftebroom_shader_preview.h"
 ''' + token + legacy + r'''
 static void verify(const std::string& bytes){assert(oldIndex(bytes)==ftebroom::mapLineIndex(bytes));}
 int main(int argc,char** argv){

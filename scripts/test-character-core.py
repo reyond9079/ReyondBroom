@@ -100,7 +100,7 @@ def main():
             stress = out / ("character-stress.exe" if os.name == "nt" else "character-stress")
             subprocess.run([args.cxx,"-std=c++17",*flags,str(ROOT/"tests/test-character-stress.cpp"),
                             "-o",str(stress)],check=True)
-            subprocess.run([str(stress),str(ROOT/"runtime/characters")],check=True)
+            subprocess.run([str(stress),str(ROOT/"runtime/characters"),str(out/"stress-documents")],check=True)
 
 
 if __name__ == "__main__":

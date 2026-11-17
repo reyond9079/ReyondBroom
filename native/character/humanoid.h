@@ -87,8 +87,8 @@ struct BodyShapes {
 
 struct TorsoProfile {
   struct Section { double width = 0, back = 0, front = 0; };
-  static constexpr double low = 8.4, step = .44;
-  std::array<Section,13> sections{};
+  static constexpr double low = 6.64, step = .44, hipHeight = 8.4;
+  std::array<Section,17> sections{};
   double upperArmPadding = .34, forearmPadding = .30;
 
   double armClearance(const Vec3& point,double radius) const {

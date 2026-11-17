@@ -557,18 +557,21 @@ inline FittingSurface fittedScalp(const Humanoid& rig,const std::vector<Vec3>& p
 }
 
 inline Vec3 scalpOffsetDirection(const FittingSurface& surface,Vec3 point,bool followsNeck) {
-  // Long strands at the nape and face need depth clearance. Moving them
-  // radially here can push the tips down into the shoulders or cheeks.
-  if (followsNeck && point[1]<14.73 && point[2]<.73) return {0,0,-1};
+  // Keep long cards at the nape moving horizontally. The side cards need
+  // clearance from the flank of the neck as well as from its back.
+  if (followsNeck && point[1]<14.73 && point[2]<.73) {
+    const auto side = smoothBand(.25,.77,std::abs(point[0]));
+    return unit({std::copysign(side,point[0]),0,-1+.65*side});
+  }
   if (followsNeck && point[1]<15.46 && point[2]>1.03) return {0,0,1};
   return unit(sub(point,surface.center));
 }
 
 inline Vec3 clearScalp(const FittingSurface& surface,Vec3 point,double clearance,bool followsNeck=false) {
   if (followsNeck && point[1]>=13.39 && point[1]<14.73 && point[2]<.73 && std::abs(point[0])<1.30) {
-    const Vec3 back{0,0,-1};
-    const auto hit=surface.farthest(point,back,-clearance,.39,.23);
-    return add(point,mul(back,hit+clearance));
+    const auto outward=scalpOffsetDirection(surface,point,true);
+    const auto hit=surface.farthest(point,outward,-clearance,.39,.23);
+    return add(point,mul(outward,hit+clearance));
   }
   if (followsNeck && point[1]>=14.61 && point[1]<15.46 && point[2]>1.03) {
     const Vec3 front{0,0,1};
@@ -703,6 +706,16 @@ struct ClothingAxes {
     return mul(outward,weight*std::clamp(clearance,0.,.19+forearmEase));
   }
 
+  Vec3 cuffClearance(const Vec3& base,double easeAmount) const {
+    // Blend the added room into the sleeve so the bend does not widen the
+    // upper arm or introduce an abrupt ridge at the cuff.
+    const auto cuff=smoothBand(3.70,4.12,std::abs(base[0]))*smoothBand(10.31,10.64,base[1])*
+                    (1-smoothBand(10.95,11.22,base[1]));
+    if (cuff==0) return {};
+    const auto& arm=arms[base[0]>0 ? 1 : 0];
+    return ease(base,arm.middle,arm.end,easeAmount*cuff);
+  }
+
   Vec3 collarClearance(const Vec3& base,const Vec3& anchor,double collarBase) const {
     const auto width=std::abs(base[0]);
     const auto weight=smoothBand(collarBase,collarBase+.61,base[1])*(1-smoothBand(14.16,14.66,base[1]))*
@@ -820,18 +833,25 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
   const ClothingAxes garmentAxes(rig);
   const auto* axes = outfit.utilityCut ? &garmentAxes : nullptr;
   const double sleeveEase=std::string_view(outfit.clothes)=="male_casualsuit05" ? .085 : 0.;
-  FittingSurface napeSurface;
-  if (axes && fitBodyRig) {
+  const bool sportsTop=fitBodyRig && std::string_view(outfit.clothes)=="female_sportsuit01";
+  const auto fitSkinSection = [&](const auto& contains) {
+    FittingSurface surface;
     for (const auto& face : rig.triangles) {
       if (face.material!=0 || !std::all_of(face.indices.begin(),face.indices.end(),[&](unsigned id) {
-            const auto& point=rig.vertices[id].position;
-            return point[1]>13.20 && point[1]<14.75 && point[2]<.45 && std::abs(point[0])<1.55;
+            return contains(rig.vertices[id].position);
           })) continue;
       const auto [a,b,c]=face.indices;
-      napeSurface.addTriangle(points[a],points[b],points[c]);
+      surface.addTriangle(points[a],points[b],points[c]);
     }
-    if (!napeSurface.faces.empty()) napeSurface.subdivide(0,unsigned(napeSurface.faces.size()));
-  }
+    if (!surface.faces.empty()) surface.subdivide(0,unsigned(surface.faces.size()));
+    return surface;
+  };
+  const auto napeSurface=axes && fitBodyRig ? fitSkinSection([](const Vec3& point) {
+    return point[1]>13.20 && point[1]<14.75 && point[2]<.45 && std::abs(point[0])<1.55;
+  }) : FittingSurface{};
+  const auto backSurface=sportsTop ? fitSkinSection([](const Vec3& point) {
+    return point[1]>10.60 && point[1]<13.75 && point[2]<.24 && std::abs(point[0])<2.20;
+  }) : FittingSurface{};
   std::vector<bool> hide(65536);
   std::uint32_t sourceOffset = 65536;
   const std::string_view hairMesh=hairstyle.mesh;
@@ -904,6 +924,21 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
       if (material==3 && !axes)
         vertex.position = add(vertex.position,add(garmentAxes.sleeveClearance(entry.vertex.position,anchor,sleeveEase),
                                                   garmentAxes.collarClearance(entry.vertex.position,anchor,collarBase)));
+      if (material==3 && fitBodyRig && (axes || sleeveEase>0))
+        vertex.position = add(vertex.position,garmentAxes.cuffClearance(entry.vertex.position,axes ? .135 : .105));
+      if (material==3 && sportsTop) {
+        const auto& base=entry.vertex.position;
+        const auto back=smoothBand(10.85,11.60,base[1])*(1-smoothBand(12.30,13.55,base[1]))*
+                        (1-smoothBand(-.22,.12,base[2]))*(1-smoothBand(.88,1.82,std::abs(base[0])));
+        if (back>0) {
+          // A close-fitting panel can end up inside the back after a body
+          // morph. Keep the hem and armholes on their authored lines.
+          const Vec3 outward{0,0,-1};
+          constexpr double clearance=.073;
+          const auto depth=backSurface.farthest(vertex.position,outward,-clearance,.32,.32);
+          vertex.position=add(vertex.position,mul(outward,(depth+clearance)*back));
+        }
+      }
       if (material==4 && outfit.utilityCut && !doc.footwear)
         vertex.position = add(vertex.position,ClothingAxes::utilityBoot(entry.vertex.position));
       if (style || material==6) {
@@ -1110,19 +1145,24 @@ inline Humanoid assemble(const Humanoid& rig, const Document& doc, const Wardrob
       dressed.torso.upperArmPadding -= .012;
       dressed.torso.forearmPadding += .36;
     }
-    // Skin and clothes contribute to the torso, but sleeves must not widen it.
-    std::vector<bool> trunk;
+    // Hands pass below the waist in standing and walking poses. Include
+    // the seat and upper thighs, keeping sleeve weights out of the profile.
+    std::vector<bool> trunk, thighs;
     trunk.reserve(dressed.joints.size());
-    for (const auto& joint : dressed.joints)
+    thighs.reserve(dressed.joints.size());
+    for (const auto& joint : dressed.joints) {
       trunk.push_back(joint.name=="root" || joint.name.rfind("spine",0)==0 ||
                       joint.name.rfind("pelvis",0)==0);
+      thighs.push_back(joint.name.rfind("upperleg",0)==0);
+    }
     for (const auto& vertex : dressed.vertices) {
       const auto& point = vertex.position;
       const auto level = (point[1]-TorsoProfile::low)/TorsoProfile::step;
       if (level < -.75 || level > dressed.torso.sections.size()-.25) continue;
       double weight = 0;
       for (std::size_t i=0; i<vertex.joints.size(); ++i)
-        if (trunk[vertex.joints[i]]) weight += vertex.weights[i];
+        if (trunk[vertex.joints[i]] || (point[1]<TorsoProfile::hipHeight && thighs[vertex.joints[i]]))
+          weight += vertex.weights[i];
       if (weight<.64) continue;
       for (int i=int(std::floor(level)); i<=int(std::ceil(level)); ++i) {
         if (i<0 || i>=int(dressed.torso.sections.size())) continue;

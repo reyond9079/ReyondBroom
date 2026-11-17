@@ -275,6 +275,7 @@ class Animator {
     std::size_t wrist;
     std::array<std::array<std::size_t,3>,5> digits;
     Vec3 forward, across, palm;
+    double reach = 0.;
   };
   std::array<Hand,2> handRig;
 
@@ -348,8 +349,10 @@ class Animator {
       upperDirection = clearArm(shoulderPoint,upperDirection,upperLength,side,rig.torso.upperArmPadding,
                                 {.42,.56,.70,.85,1.});
       const auto elbowPoint = add(shoulderPoint,mul(upperDirection,upperLength));
-      const auto lengthToHand = bb::length(lowerBind)+.88;
-      lowerDirection = clearArm(elbowPoint,lowerDirection,lengthToHand,side,rig.torso.forearmPadding,
+      // Sweep to the end of the longest finger. Stopping at the wrist
+      // clears the forearm but lets the fingers enter the upper thigh.
+      const auto lengthToHand = bb::length(lowerBind)+hand.reach;
+      lowerDirection = clearArm(elbowPoint,lowerDirection,lengthToHand,side,rig.torso.forearmPadding+.15,
                                 {.14,.34,.56,.78,1.});
     }
     const auto upper = rotationBetween(upperBind,upperDirection);
@@ -383,6 +386,10 @@ public:
       const auto span = sub(index,little);
       hand.across = unit(sub(span,mul(hand.forward,dot(hand.forward,span))));
       hand.palm = mul(unit(cross(hand.forward,hand.across)),side ? 1. : -1.);
+      for (const auto& digit : hand.digits) {
+        const auto tip = add(bind(digit[2]),sub(bind(digit[2]),bind(digit[1])));
+        hand.reach = std::max(hand.reach,dot(sub(tip,bind(hand.wrist)),hand.forward));
+      }
     }
   }
   AnimationPose comparisonPose() const {

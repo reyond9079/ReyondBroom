@@ -58,8 +58,9 @@ Run `python scripts/test-character-core.py --output <test-directory>` with
 GCC 13 or MinGW available. The command checks the checksums of the base and
 wardrobe, compiles the C++ test, generates models, then decodes the results
 using a separate Python reader. The default run uses a temporary directory.
-Pass `--stress` to fit and skin 1,000 randomized dressed characters and
-measure CPU fitting time. This stress check does not measure GPU frame rate.
+Pass `--stress` to fit and skin 1,000 randomized dressed characters with the
+FTE profile and three body shapes. The reported fitting time measures the
+CPU work to assemble each character.
 
 The C++ fixture tests 79 rest joints, weighted transforms, 48 morph controls,
 six facial expressions, four facial-hair choices, twelve outfits, seed

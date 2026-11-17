@@ -305,6 +305,15 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(self.run_plan(['scripts/ci-plan.py']), [])
         self.assertEqual(len(self.run_plan(['native/ftebroom_run.h'], fail=True)), 1)
 
+    def test_character_document_changes_exercise_the_native_editor_and_export_fixtures(self):
+        paths = ['native/character/document.h', 'native/ftebroom_character_editor.h']
+        self.assertEqual(set(planner.plan(paths)['suites']), {'character_core', 'character_ui'})
+        commands = self.run_plan(paths)
+        checks = [cmd for cmd in commands if any(arg.endswith('test-character-placement.py') for arg in cmd)]
+        self.assertEqual(len(checks), 2)
+        self.assertTrue(any('--document-only' in cmd and '--motion-fixture' in cmd for cmd in checks))
+        self.assertTrue(any('--morph-sweep' in cmd for cmd in checks))
+
     def test_suites_cannot_inherit_each_others_runtime_settings(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); runtime = root/'runtime'; runtime.mkdir()

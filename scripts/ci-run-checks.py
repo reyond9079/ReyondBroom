@@ -39,8 +39,14 @@ def main():
             subprocess.run(command, check=True, cwd=repo, env={**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'})
         completed.append({'suite': suite, 'script': script})
         (out/'executed-suites.json').write_text(json.dumps(completed, indent=2))
-    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'viewport', 'browser', 'onboarding', 'world_ui', 'world_legacy'}:
+    if suites & {'compilation', 'compilation_ui', 'plant_ui', 'placement', 'model_ui', 'character_ui', 'viewport', 'browser', 'onboarding', 'world_ui', 'world_legacy'}:
         run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
+    if 'character_ui' in suites:
+        motion = out.parent/'character-core/character.glb'
+        run('character_ui', 'scripts/test-character-placement.py', root, out/'character-document',
+            '--document-only', '--motion-fixture', motion)
+        if a.platform == 'Linux-x64':
+            run('character_ui', 'scripts/test-character-placement.py', root, out/'character-morphs', '--morph-sweep')
     if 'world_legacy' in suites:
         run('world_legacy', 'scripts/test-world-legacy.py', out/'world/legacy-core', gui=False)
         run('world_legacy', 'scripts/test-world-architect-ui.py', root, out/'world/legacy-ui', '--legacy-only', '--legacy-fixtures', out/'world/legacy-core')

@@ -2,6 +2,7 @@
 #pragma once
 #include "animation.h"
 #include "../third_party/json.hpp"
+#include <optional>
 #include <random>
 
 namespace ftebroom::character {
@@ -73,6 +74,32 @@ inline constexpr const char* beards[]{"None","Moustache","Goatee","Full beard"};
 
 inline constexpr const char* exportProfileIds[]{"quake3","fte","quake1","quake2","halflife"};
 
+struct WardrobeLicense {
+  std::string license, author, source, sha256;
+};
+
+inline WardrobeLicense readWardrobeLicense(const nlohmann::json& value, std::string_view garmentHash) {
+  const auto text = [&](const char* field, std::size_t limit) {
+    const auto item = value.find(field);
+    if (item == value.end() || !item->is_string())
+      throw std::runtime_error(std::string("Garment license is missing the ")+field+" field.");
+    const auto& content = item->get_ref<const std::string&>();
+    if (content.empty() || content.size()>limit || content.find_first_not_of(' ')==content.npos ||
+        std::any_of(content.begin(),content.end(),[](unsigned char c) { return c<32 || c==127; }))
+      throw std::runtime_error(std::string("Invalid ")+field+" in garment license.");
+    return content;
+  };
+  auto license = text("license",64);
+  constexpr std::string_view supported[]{"CC0-1.0","CC-BY-4.0","CC-BY-SA-4.0",
+                                        "LicenseRef-OwnWork","LicenseRef-Permission"};
+  if (std::find(std::begin(supported),std::end(supported),license)==std::end(supported))
+    throw std::runtime_error("Unsupported garment license. Use CC0-1.0, CC-BY-4.0, CC-BY-SA-4.0, LicenseRef-OwnWork or LicenseRef-Permission.");
+  const auto hash = text("sha256",64);
+  if (garmentHash.size()!=64 || hash!=garmentHash)
+    throw std::runtime_error("Garment license SHA-256 does not match the .rbw file.");
+  return {std::move(license),text("author",160),text("source",512),hash};
+}
+
 struct Document {
   std::string name = "Human";
   std::array<double, morphCount> values{};
@@ -83,6 +110,7 @@ struct Document {
   std::string clip = "idle_neutral";
   std::string animationAsset;
   std::string customWardrobe;
+  std::optional<WardrobeLicense> wardrobeLicense;
   unsigned outfit = 0, hairstyle = 1;
   unsigned expression = 0, beard = 0;
   unsigned footwear = 0, headwear = 0, complexion = 0;
@@ -128,6 +156,11 @@ inline nlohmann::json writeDocument(const Document& doc, const Humanoid& rig) {
           {"faceAsymmetry",doc.faceAsymmetry}};
   if (!doc.animationAsset.empty()) output["animationAsset"]=doc.animationAsset;
   if (!doc.customWardrobe.empty()) output["customWardrobe"]=doc.customWardrobe;
+  if (doc.wardrobeLicense) {
+    const auto& license = *doc.wardrobeLicense;
+    output["wardrobeLicense"]={{"license",license.license},{"author",license.author},
+                               {"source",license.source},{"sha256",license.sha256}};
+  }
   if (doc.exportProfile>=0 && std::size_t(doc.exportProfile)<std::size(exportProfileIds))
     output["exportProfile"]=exportProfileIds[doc.exportProfile];
   return output;
@@ -171,6 +204,8 @@ inline Document decodeDocument(const nlohmann::json& value, const Humanoid& rig)
   };
   doc.animationAsset=readAsset("animationAsset");
   doc.customWardrobe=readAsset("customWardrobe");
+  if (value.contains("wardrobeLicense"))
+    doc.wardrobeLicense=readWardrobeLicense(value.at("wardrobeLicense"),doc.customWardrobe);
   if (value.contains("exportProfile")) {
     const auto profile = value.at("exportProfile").get<std::string>();
     const auto match = std::find(std::begin(exportProfileIds),std::end(exportProfileIds),profile);

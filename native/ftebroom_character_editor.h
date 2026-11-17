@@ -508,6 +508,19 @@ static void characterChooseImport(bool animation) {
           throw std::runtime_error(animation ? "Choose a GLB animation." : "Choose a rig-matched RBW garment.");
         auto bytes=ftebroom::jam::fileBytes(path,animation ? characterMotionLimit : characterWardrobeLimit);
         const auto id=ftebroom::jam::sha256(bytes);
+        std::optional<cc::WardrobeLicense> license;
+        if (!animation) {
+          auto licensePath=path;
+          licensePath += ".license.json";
+          std::error_code error;
+          if (!std::filesystem::is_regular_file(licensePath,error))
+            throw std::runtime_error("Add a .rbw.license.json file beside the garment before importing it.");
+          try {
+            license=cc::readWardrobeLicense(cc::parseDocument(ftebroom::jam::fileBytes(licensePath,4096)),id);
+          } catch (const std::exception& error) {
+            throw std::runtime_error(std::string("Check the .rbw.license.json file. ")+error.what());
+          }
+        }
         characterRegisterImport(id,std::move(bytes),animation);
         auto& s=characterEditor;
         characterCheckpoint(s.doc);
@@ -515,7 +528,10 @@ static void characterChooseImport(bool animation) {
           s.doc.animationAsset=id;
           s.doc.clip=cc::importedClipId;
           s.time=0;
-        } else s.doc.customWardrobe=id;
+        } else {
+          s.doc.customWardrobe=id;
+          s.doc.wardrobeLicense=std::move(license);
+        }
         s.uploaded=false;
         ++s.revision;
       },false);
@@ -1277,10 +1293,14 @@ static void characterProperties() {
     chooseLayer("Headwear",cc::headwearLabels,s.doc.headwear);
     if (placementButton("Import fitted garment...","character/import-garment")) characterChooseImport(false);
     if (!s.doc.customWardrobe.empty()) {
-      ImGui::TextDisabled("Imported garment is active");
+      if (s.doc.wardrobeLicense) {
+        const auto& license = *s.doc.wardrobeLicense;
+        ImGui::TextWrapped("Imported garment: %s (%s)",license.author.c_str(),license.license.c_str());
+      } else ImGui::TextDisabled("Legacy garment without license information");
       if (ImGui::Button("Restore outfit garment")) {
         characterCheckpoint(s.doc);
         s.doc.customWardrobe.clear();
+        s.doc.wardrobeLicense.reset();
         ++s.revision;
       }
     }

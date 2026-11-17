@@ -82,7 +82,15 @@ also vary in stature, build, facial hair, and hairstyles.
 The eye material includes a soft upper-lid shadow and small reflections.
 
 In the Wardrobe tab, use the garment import action to add a fitted `.rbw`
-with compatible rig data. Use the timeline's animation import action for a
+with compatible rig data. Place a JSON file named `garment.rbw.license.json`
+beside `garment.rbw`. Include the file's lowercase SHA-256 as `sha256`, its
+creator as `author`, a provenance or permission reference as `source`, and
+one of these values as `license`: `CC0-1.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`,
+`LicenseRef-OwnWork`, or `LicenseRef-Permission`. The editor checks the
+declaration and the file hash. It keeps the attribution in the saved
+character. Characters with garments imported in earlier versions still open.
+
+Use the timeline's animation import action for a
 `.glb` with the compatible humanoid skeleton. The editor validates the
 hierarchy and rest pose before retargeting. Saved characters store relative
 references to their imported assets in the adjoining `rbchar-assets`

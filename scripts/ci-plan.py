@@ -20,6 +20,7 @@ DEPENDENCIES = {
     'plants': {'plant_core', 'plant_ui', 'placement'},
     'plant_ui': {'placement'},
     'models': {'model_ui', 'placement'},
+    'character_ui': {'character_core'},
     'audio': {'audio_core', 'audio_ui', 'audio_archive'},
     'audio_ui': {'audio_archive'},
     'browser': {'audio_archive'},
@@ -28,7 +29,7 @@ DEPENDENCIES = {
     'build': {'smoke'}, 'ci': {'ci_unit'},
 }
 SUITES = {'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation', 'compilation_ui', 'resource_lookup',
-          'audio_core', 'audio_ui', 'audio_archive', 'plant_core', 'plant_ui',
+          'audio_core', 'audio_ui', 'audio_archive', 'plant_core', 'plant_ui', 'character_core', 'character_ui',
           'model_ui', 'placement', 'viewport', 'grid', 'browser', 'onboarding',
           'updater', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
 RULES = [
@@ -56,6 +57,10 @@ RULES = [
     (['native/ftebroom_plant*', 'qc/*plant*', 'scripts/*plant*'], {'plant_ui'}),
     (['native/*audio*', 'native/ftebroom_sound*', 'tests/audio*', 'scripts/*audio*'], {'audio'}),
     (['native/ftebroom_model*', 'native/ftebroom_bb*', 'tests/*model*'], {'models'}),
+    (['native/character/**', 'runtime/characters/**', 'native/ftebroom_character_editor.h',
+      'scripts/test-character-placement.py'], {'character_ui'}),
+    (['tests/test-character-*.cpp', 'scripts/test-character-core.py',
+      'scripts/test-character-fixtures.py'], {'character_core'}),
     (['native/*browser*', 'native/*file_view*', 'native/*disk_cache*',
       'scripts/test-rb10-browsers.py', 'tests/browser*'], {'browser'}),
     (['native/*input*', 'native/*shortcut*', 'native/ftebroom_actions*',

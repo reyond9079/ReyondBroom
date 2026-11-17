@@ -224,6 +224,12 @@ jobs:
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
     - name: Install OS input probes
       run: python -m pip install python-xlib Pillow
+    - name: Install Character Creator pointer probe
+      if: fromJSON(needs.plan.outputs.plan).flags.character_ui
+      run: command -v xdotool || sudo apt-get install -y xdotool
+    - name: Check Character Creator core and prepare motion fixture
+      if: fromJSON(needs.plan.outputs.plan).flags.character_core
+      run: python scripts/test-character-core.py --output qa/character-core
     - name: Run affected packaged checks
       shell: bash
       run: python scripts/ci-run-checks.py --plan ci-plan.json --runtime out/release/ReyondBroom-Linux-x64 --output qa/affected --probe
@@ -447,6 +453,10 @@ jobs:
     - name: Install selected plant import probes
       if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
       run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
+    - name: Check Character Creator core and prepare motion fixture
+      if: fromJSON(needs.plan.outputs.plan).flags.character_core
+      shell: msys2 {0}
+      run: python scripts/test-character-core.py --output qa/character-core
     - name: Run affected packaged checks
       shell: pwsh
       run: |-

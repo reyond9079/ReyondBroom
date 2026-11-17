@@ -735,6 +735,22 @@ int main(int argc, char** argv) try {
   json["exportProfile"] = "unknown";
   rejects([&] { readDocument(json.dump(),rig); },"Accepted unknown character export profile");
   json.erase("exportProfile");
+  {
+    auto imported = json;
+    const std::string garmentHash(64,'a');
+    imported["customWardrobe"] = garmentHash;
+    check(!readDocument(imported.dump(),rig).wardrobeLicense,"Legacy garment gained license metadata");
+    imported["wardrobeLicense"]={{"license","CC0-1.0"},{"author","Fixture"},{"source","Example source"},
+                                  {"sha256",garmentHash}};
+    auto restored=readDocument(imported.dump(),rig);
+    check(restored.wardrobeLicense && writeDocument(restored,rig)==imported,
+          "Garment attribution did not survive the document round trip");
+    imported["wardrobeLicense"]["sha256"]=std::string(64,'b');
+    rejects([&] { readDocument(imported.dump(),rig); },"Accepted attribution for a different garment");
+    imported["wardrobeLicense"]["sha256"]=garmentHash;
+    imported["wardrobeLicense"]["license"]="Unverified";
+    rejects([&] { readDocument(imported.dump(),rig); },"Accepted unverified garment license");
+  }
   json["rigSha256"] = "different";
   rejects([&] { readDocument(json.dump(), rig); }, "Accepted incompatible rig");
   json = writeDocument(doc, rig);

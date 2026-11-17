@@ -573,20 +573,47 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                     target = Path(wait(lambda: (p := live()["browsePath"]) and Path(p).name == expected_name and p))
                     shutil.copy2(file, target)
                     click("file-choose")
-                    wait(lambda: not live()["widgets"].get("file-choose",{}).get("visible"))
+                    wait(lambda:"file-choose" not in live()["widgets"])
                     wait(lambda:state()["revision"] == state()["applied"])
                     return hashlib.sha256(file.read_bytes()).hexdigest()
 
                 motion = import_fixture("character/import-motion","motion.glb",motion_fixture)
                 wait(lambda:state()["clip"]=="imported_motion")
                 click("character/tab-wardrobe")
-                garment = import_fixture("character/import-garment","garment.rbw",
-                                         data/"characters/wardrobe/male_casualsuit03.rbw")
+                click("character/import-garment")
+                target = Path(wait(lambda: (p := live()["browsePath"]) and Path(p).name=="garment.rbw" and p))
+                shutil.copy2(data/"characters/wardrobe/male_casualsuit03.rbw",target)
+                garment = hashlib.sha256(target.read_bytes()).hexdigest()
+                license_path = target.with_suffix(".rbw.license.json")
+                manifest = json.loads((data/"characters/wardrobe/provenance.json").read_text(encoding="utf-8"))
+                entry = next(item for item in manifest["assets"] if item["id"]=="male_casualsuit03")
+                license = {"sha256":garment,"license":entry["license"],"author":"MakeHuman community",
+                           "source":entry.get("source") or manifest["source"]}
+                previous_revision = state()["revision"]
+                for metadata,message in ((None,"Add a .rbw.license.json"),
+                                         (dict(license,license="Unverified"),"Unsupported garment license"),
+                                         (dict(license,sha256="0"*64),"does not match the .rbw file")):
+                    if metadata is not None:
+                        license_path.write_text(json.dumps(metadata),encoding="utf-8")
+                    click("file-choose")
+                    wait(lambda:message in live()["browseError"])
+                    check(state()["revision"]==previous_revision,f"Rejected garment import: {message}")
+                license_path.write_text(json.dumps(license),encoding="utf-8")
+                click("file-choose")
+                wait(lambda:"file-choose" not in live()["widgets"] and state()["revision"]>previous_revision and
+                     state()["applied"]==state()["revision"])
+                license_path.unlink()
+                click("character/import-garment")
+                click("file-choose")
+                wait(lambda:"Add a .rbw.license.json" in live()["browseError"])
+                click("file-cancel")
+                check(True,"A cached garment still requires license metadata for a new import")
                 click("character/save")
                 wait(lambda:not state()["dirty"])
                 saved = json.loads(path.read_text(encoding="utf-8"))
                 check(saved["animationAsset"]==motion and saved["customWardrobe"]==garment,
                       "Native import saves a fitted garment and a retargeted animation")
+                check(saved["wardrobeLicense"]==license,"Character document preserves the garment attribution")
                 for digest, extension in ((motion,".glb"),(garment,".rbw")):
                     dependency = path.parent/"rbchar-assets"/(digest+extension)
                     check(hashlib.sha256(dependency.read_bytes()).hexdigest()==digest,
@@ -635,6 +662,15 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                 check("imported_motion" in {clip["name"] for clip in gltf["animations"]} and
                       len(gltf["meshes"][0]["extras"]["targetNames"])==5,
                       "Editor GLB includes the imported motion and editable expressions")
+                legacy_import = path.with_name("legacy-import.rbchar")
+                legacy_document = json.loads(path.read_text(encoding="utf-8"))
+                del legacy_document["wardrobeLicense"]
+                legacy_import.write_text(json.dumps(legacy_document),encoding="utf-8")
+                click("character/open")
+                click("file-entry/"+legacy_import.name)
+                click("file-choose")
+                wait(lambda:Path(state()["path"])==legacy_import and state()["applied"]==state()["revision"])
+                check(not state()["error"],"Legacy characters reopen with an existing garment and no license record")
             if legacy_fixture:
                 existing = path.parent/"legacy-field-technician.rbchar"
                 shutil.copy2(legacy_fixture,existing)

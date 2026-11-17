@@ -86,7 +86,7 @@ RULES = [
 ]
 
 HARNESS = {'scripts/test-compilation-runtime.py', 'scripts/test-audio-archive-windows.ps1',
-           'scripts/setup-ci-renderer.ps1'}
+           'scripts/setup-ci-renderer.ps1', 'scripts/collect-release-qa.py'}
 
 
 def infrastructure(path):

@@ -1,0 +1,54 @@
+{
+  "animation": {"fps": 10, "frames": 16, "loop": true},
+  "assetReferences": [],
+  "colorManagement": {"display": "srgb", "working": "linear-srgb"},
+  "documentId": "cli-liquids-water",
+  "exportProfiles": [],
+  "exposedParameters": [
+    {"key": "period", "label": "Pattern frequency", "max": 32, "min": 1, "node": "pattern", "step": 1},
+    {"key": "period", "label": "Detail frequency", "max": 64, "min": 1, "node": "detail", "step": 1},
+    {"key": "weight", "label": "Detail influence", "max": 1, "min": 0, "node": "surface", "step": 0},
+    {"key": "strength", "label": "Bump strength", "max": 8, "min": 0, "node": "normal", "step": 0},
+    {"key": "value", "label": "Roughness", "max": 1, "min": 0, "node": "roughness", "step": 0}
+  ],
+  "generatorVersion": "1.0.0",
+  "graph": {
+    "edges": [
+      {"fromNode": "time", "fromPort": "value", "toNode": "pattern", "toPort": "phase"},
+      {"fromNode": "pattern", "fromPort": "value", "toNode": "composite", "toPort": "a"},
+      {"fromNode": "detail", "fromPort": "value", "toNode": "composite", "toPort": "b"},
+      {"fromNode": "pattern", "fromPort": "value", "toNode": "surface", "toPort": "a"},
+      {"fromNode": "composite", "fromPort": "value", "toNode": "surface", "toPort": "b"},
+      {"fromNode": "surface", "fromPort": "value", "toNode": "pigment", "toPort": "value"},
+      {"fromNode": "surface", "fromPort": "value", "toNode": "normal", "toPort": "height"},
+      {"fromNode": "surface", "fromPort": "value", "toNode": "ao", "toPort": "height"}
+    ],
+    "nodes": [
+      {"id": "time", "parameters": {}, "position": [12, 137], "type": "Time", "version": 1},
+      {"id": "pattern", "parameters": {"amplitude": 0.75, "cycles": 1, "period": 4, "style": 0}, "position": [242, 12], "type": "Flow", "version": 1},
+      {"id": "detail", "parameters": {"distortion": 0.44, "period": 9, "width": 0.055}, "position": [242, 137], "type": "Veins", "version": 1},
+      {"id": "composite", "parameters": {"weight": 0.35}, "position": [472, 137], "type": "ScalarMix", "version": 1},
+      {"id": "surface", "parameters": {"weight": 0.64}, "position": [702, 12], "type": "ScalarMix", "version": 1},
+      {"id": "pigment", "parameters": {
+        "high": [0.07618539035320282, 0.3277781307697296, 0.4620770514011383, 1.0],
+        "low": [0.00856812484562397, 0.04373502731323242, 0.11953843384981155, 1.0]
+      }, "position": [932, 12], "type": "ColorRamp", "version": 1},
+      {"id": "normal", "parameters": {"invertY": false, "strength": 0.85}, "position": [932, 137], "type": "HeightToNormal", "version": 1},
+      {"id": "ao", "parameters": {"strength": 1.8}, "position": [932, 262], "type": "HeightToAO", "version": 1},
+      {"id": "roughness", "parameters": {"value": 0.25}, "position": [932, 387], "type": "Constant", "version": 1}
+    ]
+  },
+  "layerBindings": [],
+  "name": "Woven Water Ripples",
+  "outputs": {
+    "ao": {"node": "ao", "port": "value"},
+    "baseColor": {"node": "pigment", "port": "color"},
+    "height": {"node": "surface", "port": "value"},
+    "normal": {"node": "normal", "port": "normal"},
+    "roughness": {"node": "roughness", "port": "value"}
+  },
+  "provenance": {"assets": [], "author": "ReyondBroom", "catalogVersion": 1, "license": "GPL-3.0-or-later", "preset": "liquids-water"},
+  "resolution": {"height": 256, "width": 256},
+  "rootSeed": 42,
+  "schemaVersion": 1
+}

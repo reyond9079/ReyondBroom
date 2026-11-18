@@ -14,7 +14,11 @@ enum class Kernel { unknown, constant, color, image, noise, bricks, tiles, check
                     diamond, hex, polygon, fibers, spots, levels, transform, tile, mirror,
                     rotate90, directionalBlur, hsv, posterize, pixelate, dither, normalBlend,
                     uv, uvSample, warp, directionalWarp, histogram, channelPack, channelUnpack, retroShade,
-                    panels, distance, slopeBlur, colorize, palette, quantize };
+                    panels, distance, slopeBlur, colorize, palette, quantize, materialGrain, surfaceWear, boardJoints,
+                    stonework, archBand };
+
+enum class GrainKind { mineral, stone, wood, brushed, sand, fibers, polished, endGrain, bedded, marble, count };
+enum class WearKind { pits, chips, runoff, scratches, deposits, count };
 
 struct Pin { const char* name; Port type; };
 struct Contract {
@@ -44,6 +48,11 @@ inline const std::vector<Contract>& contracts() {
     {"Fibers", Kernel::fibers, {"value", Port::scalar}, {}},
     {"Spots", Kernel::spots, {"value", Port::scalar}, {}},
     {"Veins", Kernel::veins, {"value", Port::scalar}, {}},
+    {"MaterialGrain", Kernel::materialGrain, {"value", Port::scalar}, {}},
+    {"SurfaceWear", Kernel::surfaceWear, {"value", Port::scalar}, {}},
+    {"BoardJoints", Kernel::boardJoints, {"value", Port::scalar}, {}},
+    {"Stonework", Kernel::stonework, {"value", Port::scalar}, {}},
+    {"ArchBand", Kernel::archBand, {"value", Port::scalar}, {}},
     {"Bricks", Kernel::bricks, {"value", Port::scalar}, {{"variation", Port::scalar}}},
     {"FlemishBricks", Kernel::flemish, {"value", Port::scalar}, {{"variation", Port::scalar}}},
     {"Tiles", Kernel::tiles, {"value", Port::scalar}, {}},
@@ -129,6 +138,11 @@ inline Json defaultParameters(Kernel kernel) {
     case Kernel::flow: return {{"period", 4}, {"cycles", 1}, {"amplitude", .75}, {"style", 0}};
     case Kernel::cracks: return {{"period", 8}, {"jitter", .8}, {"width", .035}};
     case Kernel::streaks: return {{"columns", 32}, {"rows", 4}, {"contrast", 2}};
+    case Kernel::materialGrain: return {{"kind", 0}, {"period", 24}};
+    case Kernel::surfaceWear: return {{"kind", 0}, {"period", 16}, {"density", .4}};
+    case Kernel::boardJoints: return {{"columns", 6}, {"seams", 1}, {"width", .025}};
+    case Kernel::stonework: return {{"period", 9}, {"mortar", .08}, {"roundness", .5}};
+    case Kernel::archBand: return {{"period", 11}, {"width", .115}};
     case Kernel::fibers: return {{"columns", 45}, {"rows", 5}, {"contrast", 2}};
     case Kernel::spots: return {{"period", 12}, {"radius", .2}, {"jitter", .6}};
     case Kernel::veins: return {{"period", 8}, {"width", .055}, {"distortion", .44}};
@@ -266,6 +280,29 @@ inline void parameters(Node& node, const Json& params) {
     node.p[1] = count("rows", 1, 128);
     node.p[2] = range("contrast", .1f, 5);
     break;
+  case Kernel::materialGrain:
+    node.p[0] = count("kind", 0, unsigned(GrainKind::count) - 1);
+    node.p[1] = count("period", 2, 64);
+    break;
+  case Kernel::surfaceWear:
+    node.p[0] = count("kind", 0, unsigned(WearKind::count) - 1);
+    node.p[1] = count("period", 2, 64);
+    node.p[2] = range("density", 0, 1);
+    break;
+  case Kernel::boardJoints:
+    node.p[0] = count("columns", 1, 64);
+    node.p[1] = count("seams", 0, 4);
+    node.p[2] = range("width", .005f, .12f);
+    break;
+  case Kernel::stonework:
+    node.p[0] = count("period", 1, 64);
+    node.p[1] = range("mortar", .02f, .25f);
+    node.p[2] = range("roundness", 0, 1);
+    break;
+  case Kernel::archBand:
+    node.p[0] = count("period", 1, 64);
+    node.p[1] = range("width", .04f, .24f);
+    break;
   case Kernel::spots:
     node.p[0] = count("period", 1, 64);
     node.p[1] = range("radius", .045f, .6f);
@@ -389,7 +426,7 @@ inline void parameters(Node& node, const Json& params) {
     node.p[0] = count("period", 1, 32);
     node.p[1] = count("cycles", 1, 8);
     node.p[2] = range("amplitude", 0, 1);
-    if (params.contains("style")) node.p[3] = count("style", 0, 3);
+    if (params.contains("style")) node.p[3] = count("style", 0, 4);
     break;
   case Kernel::clamp:
     node.p[0] = range("low", 0, 1);

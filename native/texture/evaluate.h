@@ -155,6 +155,116 @@ inline float cellularDistance(uint64_t seed, int period, float jitter, float u, 
   return unit(cellularDistances(seed, period, jitter, u, v)[0]);
 }
 
+inline float softThreshold(float low, float high, float value) {
+  const float t = unit((value - low) / (high - low));
+  return t * t * (3.f - 2.f * t);
+}
+
+inline float materialGrain(GrainKind kind, int frequency, uint64_t seed, float u, float v) {
+  u = frac(u);
+  v = frac(v);
+  const float broad = gradientNoise(seed, 5, u, v);
+  const float grain = valueNoise(seed + 1, frequency * 3, u, v);
+  switch (kind) {
+  case GrainKind::mineral:
+    return .46f + .42f * (broad - .5f) + .36f * (grain - .5f) +
+      .18f * (valueNoise(seed + 2, frequency, u, v) - .5f);
+  case GrainKind::stone: {
+    const float coarse = valueNoise(seed + 2, frequency, u, v);
+    const float chips = softThreshold(.56f, .79f, coarse * .74f + grain * .26f);
+    const float inclusions = softThreshold(.66f, .86f, valueNoise(seed + 3, frequency * 2, u, v));
+    return .34f + .22f * broad + .30f * chips - .16f * inclusions + .16f * (grain - .5f);
+  }
+  case GrainKind::wood: {
+    // Growth lines bend around the knots and remain continuous across the tile boundary.
+    const float bend = (valueNoise(seed + 2, 5, 3, u, v) - .5f) * .085f;
+    const float knot = valueNoise(seed + 3, 9, 4, u, v);
+    const float drift = (knot - .5f) * .036f + bend;
+    const float growth = valueNoise(seed + 4, frequency, 3, u + drift, v);
+    const float fine = valueNoise(seed + 5, frequency * 3, 11, u + drift, v);
+    const float latewood = softThreshold(.58f, .87f, growth * .80f + fine * .20f);
+    return .35f + .28f * broad + .25f * growth - .38f * latewood + .25f * (fine - .5f)
+      - .19f * softThreshold(.80f, .94f, knot);
+  }
+  case GrainKind::brushed:
+    return .50f + .20f * (broad - .5f) + .22f * (grain - .5f) +
+      .38f * (valueNoise(seed + 6, 4, frequency * 3, u, v) - .5f);
+  case GrainKind::sand: {
+    const float ridge = cycleSine(v * frequency + .78f * broad + .4f * valueNoise(seed + 2, 4, u, v));
+    return .48f + .14f * ridge + .26f * (grain - .5f) + .28f * (broad - .5f);
+  }
+  case GrainKind::fibers: {
+    const float bend = (broad - .5f) * .065f;
+    const float strand = valueNoise(seed + 2, frequency * 3, std::max(3, frequency / 5), u + bend, v);
+    return .39f + .17f * broad + .28f * (strand - .5f) + .20f * (grain - .5f);
+  }
+  case GrainKind::polished:
+    return .50f + .25f * (broad - .5f) + .13f * (grain - .5f);
+  case GrainKind::endGrain: {
+    const float x = cycleSine(frac(u - .17f) * .5f);
+    const float y = .78f * cycleSine(frac(v - .86f) * .5f);
+    const float radius = std::sqrt(x * x + y * y);
+    const float growth = cycleSine(radius * frequency * .54f + 1.9f * broad +
+      .65f * valueNoise(seed + 2, 7, u, v));
+    const float latewood = softThreshold(.25f, .91f, growth);
+    return .45f + .17f * broad - .21f * latewood + .19f * (grain - .5f);
+  }
+  case GrainKind::bedded: {
+    const float bedding = v + .03f * cycleSine(u + .2f) + .14f * (broad - .5f);
+    const float layers = valueNoise(seed + 2, 3, frequency, u, bedding);
+    const float loose = valueNoise(seed + 3, std::max(2, frequency / 4), frequency * 3, u, bedding);
+    return .32f + .30f * layers + .16f * loose + .25f * (grain - .5f);
+  }
+  case GrainKind::marble: {
+    const float fault = u + .42f * (valueNoise(seed + 2, 3, u, v) - .5f) +
+      .07f * (valueNoise(seed + 3, 12, u, v) - .5f);
+    const auto fold = valueNoise(seed + 4, std::max(2, frequency / 4), 3, fault, v);
+    const float streak = 1.f - softThreshold(.015f, .095f, std::abs(fold - .47f));
+    const float hairline = 1.f - softThreshold(.007f, .03f, std::abs(fold - .34f));
+    return .74f - .45f * streak - .14f * hairline + .14f * (grain - .5f);
+  }
+  case GrainKind::count: break;
+  }
+  return .5f;
+}
+
+inline float surfaceWear(WearKind kind, int frequency, float density, uint64_t seed, float u, float v) {
+  u = frac(u);
+  v = frac(v);
+  const float field = valueNoise(seed, 4, u, v);
+  if (kind == WearKind::pits || kind == WearKind::chips || kind == WearKind::deposits) {
+    const float detail = valueNoise(seed + 1, frequency, u, v);
+    const float edge = valueNoise(seed + 2, frequency * 3, u, v);
+    const float threshold = 1.f - density * .39f;
+    if (kind == WearKind::pits)
+      return softThreshold(threshold, threshold + .15f, .15f * field + .71f * detail + .14f * edge);
+    if (kind == WearKind::chips)
+      return softThreshold(threshold, threshold + .11f, .50f * field + .34f * detail + .16f * edge);
+    return softThreshold(threshold, threshold + .25f, .61f * field + .29f * detail + .10f * edge);
+  }
+
+  // Periodic cells contain sparse marks with tapered edges and independent position and length.
+  const bool runoff = kind == WearKind::runoff;
+  const int columns = runoff ? frequency : std::max(2, frequency / 2);
+  const int rows = runoff ? std::max(2, frequency / 7) : columns;
+  const float x = frac(u) * columns, y = frac(v) * rows;
+  const int ix = int(x), iy = int(y);
+  const float pick = lattice(seed + 3, ix, iy);
+  if (pick >= density * (.22f + .78f * field)) return 0.f;
+  const float dx = frac(x) - mix(.37f, .63f, lattice(seed + 4, ix, iy));
+  const float dy = frac(y) - mix(.36f, .64f, lattice(seed + 5, ix, iy));
+  const float angle = lattice(seed + 6, ix, iy) - .5f;
+  const float along = runoff ? dy : dx + dy * angle;
+  const float across = runoff ? dx + .065f * cycleSine(dy + angle)
+                              : dy - dx * angle;
+  const float length = mix(.13f, .32f, lattice(seed + 7, ix, iy));
+  const float taper = runoff ? unit((length - along) / (2.f * length)) : 1.f;
+  const float width = runoff ? .12f : .028f;
+  const float footprint = 1.f - softThreshold(length * .48f, length, std::abs(along));
+  return footprint * taper * (1.f - softThreshold(width * .21f, width, std::abs(across))) *
+    (.46f + .54f * valueNoise(seed + 8, frequency * 2, u, v));
+}
+
 inline Pixel rasterPixel(const Raster& image, int x, int y) {
   const size_t offset = (size_t(wrap(y, int(image.size.height))) * image.size.width
     + size_t(wrap(x, int(image.size.width)))) * 4;
@@ -305,6 +415,45 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   case Kernel::noise: return scalar(.5f + node.p[1] * (valueNoise(seed, int(node.p[0]), u, v) - .5f));
   case Kernel::gradient: return scalar(.5f + node.p[1] * (gradientNoise(seed, int(node.p[0]), u, v) - .5f));
   case Kernel::worley: return scalar(cellularDistance(seed, int(node.p[0]), node.p[1], u, v));
+  case Kernel::materialGrain: return scalar(materialGrain(GrainKind(int(node.p[0])), int(node.p[1]), seed, u, v));
+  case Kernel::surfaceWear:
+    return scalar(surfaceWear(WearKind(int(node.p[0])), int(node.p[1]), node.p[2], seed, u, v));
+  case Kernel::boardJoints: {
+    const float column = u * node.p[0];
+    const unsigned board = unsigned(wrap(int(column), int(node.p[0])));
+    const float edge = std::min(frac(column), 1.f - frac(column));
+    const float width = node.p[2] * mix(.74f, 1.34f, valueNoise(seed + 1, 11, u, v));
+    float height = softThreshold(width * .32f, width, edge);
+    if (node.p[1] > 0) {
+      const float seam = std::abs(frac(v * node.p[1] + lattice(seed, board, 0)) - .5f);
+      height *= softThreshold(width * .10f, width * .23f, seam);
+    }
+    return scalar(height * mix(.65f, 1.f, lattice(seed + 2, board, 0)));
+  }
+  case Kernel::stonework: {
+    const int period = int(node.p[0]);
+    const float drift = .28f / period;
+    const float x = u + drift * (valueNoise(seed + 1, period * 3, u, v) - .5f);
+    const float y = v + drift * (valueNoise(seed + 2, period * 3, u, v) - .5f);
+    const auto distances = cellularDistances(seed, period, .71f, x, y);
+    const float gap = distances[1] - distances[0];
+    // A rounded cap spreads the bevel into the stone. Rubble retains more angular edges.
+    const float bevel = mix(.10f, .25f, node.p[2]);
+    const float body = softThreshold(node.p[1] * .4f, node.p[1] + bevel, gap);
+    const float dome = 1.f - .38f * node.p[2] * unit(distances[0]);
+    return scalar(.06f + body * dome * .94f);
+  }
+  case Kernel::archBand: {
+    const float vx = u - .5f, vy = .79f - v;
+    const float arch = std::abs(std::sqrt(vx * vx + vy * vy) - .306f);
+    const float profile = 1.f - softThreshold(node.p[1] * .28f, node.p[1] * .54f, arch);
+    const float angle = std::atan2(vy, vx) * .318309886f;
+    const float stone = angle * node.p[0];
+    const float joint = softThreshold(.015f, .085f, std::min(frac(stone), 1.f - frac(stone)));
+    const float cut = softThreshold(-.005f, .025f, vy);
+    const float material = mix(.64f, .95f, lattice(seed, unsigned(std::max(0.f, std::floor(stone))), 0));
+    return scalar(.09f + .91f * profile * cut * joint * material);
+  }
   case Kernel::cracks: {
     const auto distances = cellularDistances(seed, int(node.p[0]), node.p[1], u, v);
     return scalar((distances[1] - distances[0]) / node.p[2]);
@@ -343,6 +492,13 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   case Kernel::flow: {
     const float phase = input[0]->sample(x, y)[0] * node.p[1];
     const int patch = int(node.p[0]);
+    if (node.p[3] == 4) {
+      const float drift = gradientNoise(seed, 4, u, v) * node.p[2];
+      const float longWave = cycleSine(u * patch + v * 3.f - phase + drift);
+      const float crossWave = cycleSine(u * 2.f - v * (patch + 2.f) + phase * 2.f - drift);
+      const float ripples = cycleSine(u * (patch * 3.f) + v * 5.f + phase * 3.f + .34f * (longWave + crossWave));
+      return scalar(.5f + .18f * longWave + .11f * crossWave + .084f * ripples);
+    }
     if (node.p[3] == 1) {
       const float position = frac(u - phase);
       const float large = gradientNoise(seed, patch, position, v);

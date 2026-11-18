@@ -160,15 +160,23 @@ def run(executable, root):
     assert len(list((sequence / "frames").iterdir())) == 16
     catalog_animation = root / "catalog-ripples.rbtex.json"
     assert invoke("new", catalog_animation, "--preset", "liquids-water", "--seed", 42)[0] == 0
-    # This 16-bit channel exposed one-bit libm differences between Linux and Windows.
+    assert json.loads(catalog_animation.read_text(encoding="utf-8"))["provenance"]["catalogVersion"] == 2
+    # Keep the exact cross-platform goldens for a saved version 1 graph after the catalog upgrade.
+    legacy = Path(__file__).resolve().parent / "fixtures/texture-studio/catalog-v1-water.rbtex.json"
     for frame, expected in (
         (0, "a41074ca899fd864ee12b97a2c01d23f13a9906d027096115010be3297b84aa4"),
         (3, "2b1cd50ed5a2c7931f69e35f5a88f686a600f8e74aeab9c8b3ba24779db75321"),
         (11, "8ab8213ae14995d8bca2cf47f0334e63f25d8d2df1ae759f3c6fcb466d7e71f6"),
     ):
         frame_output = root / f"catalog-ripples-frame-{frame}"
-        assert invoke("render", catalog_animation, "--frame", frame, "--threads", 4, "--out", frame_output)[0] == 0
+        assert invoke("render", legacy, "--frame", frame, "--threads", 4, "--out", frame_output)[0] == 0
         assert hashlib.sha256((frame_output / "height.png").read_bytes()).hexdigest() == expected
+    for frame, threads in ((0, 1), (5, 1), (16, 4)):
+        assert invoke("render", catalog_animation, "--frame", frame, "--threads", threads,
+                      "--out", root / f"catalog-v2-{frame}")[0] == 0
+    current = [(root / f"catalog-v2-{frame}/height.png").read_bytes() for frame in (0, 5, 16)]
+    assert current[0] != current[1] and current[0] == current[2]
+    assert current[0] != (root / "catalog-ripples-frame-0/height.png").read_bytes()
     common = ("export", catalog_animation, "--all-frames")
     for profile, frame_count, fps, wants_rate_change in (
         ("q1-baseline", 8, 5, False), ("goldsrc-baseline", 8, 10, True),

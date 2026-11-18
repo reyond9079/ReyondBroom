@@ -146,6 +146,64 @@ void checkCatalog(const fs::path& previews) {
   }
 }
 
+void checkMaterialFinishes() {
+  using namespace ts;
+  constexpr auto seed = 24058u;
+  for (unsigned kind = 0; kind < unsigned(GrainKind::count); ++kind) {
+    for (unsigned n = 0; n < 10000; ++n) {
+      const float u = float(n % 127) / 256, v = float(n / 127) / 256;
+      const float sample = materialGrain(GrainKind(kind), 29, seed, u, v);
+      check(sample == materialGrain(GrainKind(kind), 29, seed, u + 1, v) &&
+        sample == materialGrain(GrainKind(kind), 29, seed, u, v + 1), "Periodic material grain");
+    }
+  }
+  for (unsigned kind = 0; kind < unsigned(WearKind::count); ++kind) {
+    bool marked = false, intact = false;
+    for (unsigned n = 0; n < 10000; ++n) {
+      const float u = float(n % 127) / 256, v = float(n / 127) / 256;
+      const auto profile = WearKind(kind);
+      const float sample = surfaceWear(profile, 19, 1, seed, u, v);
+      check(sample == surfaceWear(profile, 19, 1, seed, u + 1, v) &&
+        sample == surfaceWear(profile, 19, 1, seed, u, v + 1), "Periodic surface wear");
+      check(surfaceWear(profile, 19, 0, seed, u, v) == 0, "Zero density leaves the finish intact");
+      marked |= sample > .1f;
+      intact |= sample == 0;
+    }
+    check(marked && intact, "Wear stays local to part of the material");
+  }
+
+  auto steel = catalogPreset(3, 2, "painted-steel");
+  steel.source["outputs"]["opacity"] = {{"node", "damage"}, {"port", "value"}};
+  const auto finish = evaluate(compile(steel), {128,128});
+  unsigned bare = 0, painted = 0;
+  for (size_t pixel = 0; pixel < finish.outputs.at("opacity")->pixels.size(); ++pixel) {
+    const float damage = finish.outputs.at("opacity")->pixels[pixel][0];
+    const float metalness = finish.outputs.at("metalness")->pixels[pixel][0];
+    if (damage > .5f) {
+      check(metalness > .4f, "Paint loss exposes metal");
+      ++bare;
+    }
+    if (damage == 0) {
+      check(metalness < .06f, "Intact paint is dielectric");
+      ++painted;
+    }
+  }
+  check(bare > 0 && painted > bare, "Chipped steel contains both coatings");
+  auto invalid = steel;
+  findNode(invalid, "damage")["parameters"]["kind"] = unsigned(WearKind::count);
+  reject([&]{compile(invalid);}, "Integer is outside its supported range");
+  invalid = steel;
+  findNode(invalid, "grain")["parameters"]["period"] = 1;
+  reject([&]{compile(invalid);}, "Integer is outside its supported range");
+
+  auto boards = catalogPreset(5, 0, "timber");
+  auto stone = catalogPreset(1, 5, "cobblestone");
+  findNode(boards, "pattern")["parameters"]["seams"] = 5;
+  findNode(stone, "pattern")["parameters"]["mortar"] = .5;
+  reject([&]{compile(boards);}, "Integer is outside its supported range");
+  reject([&]{compile(stone);}, "Number is outside its supported range");
+}
+
 int main(int argc, char** argv) try {
   if (argc == 3 && std::string_view(argv[1]) == "--catalog-matrix") {
     checkCatalog(fs::u8path(argv[2]));
@@ -153,6 +211,7 @@ int main(int argc, char** argv) try {
   }
   if (argc != 2) return 2;
   using namespace ts;
+  checkMaterialFinishes();
   Pcg32 pcg(42, 54);
   for (uint32_t expected : {0xa15c02b7u, 0x7b47f409u, 0xba1d3330u, 0x83d2f293u, 0xbfa4784bu, 0xcbed606eu})
     check(pcg.next() == expected, "PCG32 reference vector");

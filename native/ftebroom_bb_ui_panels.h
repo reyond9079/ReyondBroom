@@ -532,7 +532,8 @@ static void bbTexturePanel() {
     bbTemplateOpen = true;
   ImGui::SameLine();
   if (ImGui::Button("Texture Studio…"))
-    textureStudioShow();
+    textureStudioShowModelTexture();
+  runUiRecordGlobal("texture-studio/model/source");
   if (ImGui::BeginCombo("Materials", "Import from material browser")) {
     static char filter[128] = {};
     ImGui::InputText("Filter", filter, sizeof filter);

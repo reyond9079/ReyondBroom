@@ -784,7 +784,9 @@ static void fileMenu()
 }
 static void assetsMenu()
 {
-  if(!ImGui::BeginMenu("Assets"))return;
+  const bool opened = ImGui::BeginMenu("Assets");
+  runUiRecordGlobal("menu/Assets");
+  if(!opened)return;
   actionMenuEntry("Menu/File/New model...","New Model...");
   if(ImGui::MenuItem("Texture Studio..."))textureStudioShow();
   runUiRecordGlobal("Menu/Assets/Texture Studio...");

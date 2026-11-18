@@ -90,6 +90,7 @@ static void bbMenus();
 static void bbDialogs();
 static void bbTexturePanel();
 static void textureStudioShow();
+static void textureStudioShowModelTexture();
 static void bbUVPanel(bool paint = false);
 static bool bbDirty() {
   return bbActive && bbHistory.state() != bbSavedStamp;

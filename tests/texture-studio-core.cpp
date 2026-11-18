@@ -36,7 +36,7 @@ void checkCatalog(const fs::path& previews) {
   const bool thorough = !previews.empty();
   if (thorough) fs::create_directories(previews);
   std::set<std::string> recipeIds, recipeShapes, images;
-  unsigned animations = 0;
+  unsigned animations = 0, curated = 0, familyCount = 0;
   for (size_t category = 0; category < std::size(catalogRecipes); ++category) {
     for (size_t index = 0; index < std::size(catalogRecipes[category]); ++index) {
       const auto id = recipeId(category, index);
@@ -88,10 +88,62 @@ void checkCatalog(const fs::path& previews) {
             throw std::runtime_error(id + " animation does not wrap.");
         }
       }
+      if (thorough) {
+        doc.source["rootSeed"] = 24058;
+        const Resolution previewSize{64,64};
+        const auto base = evaluate(compile(doc), previewSize);
+        const auto different = [&](const Evaluation& variant) {
+          for (const auto& [channel, image] : base.outputs)
+            if (image->pixels != variant.outputs.at(channel)->pixels) return true;
+          return false;
+        };
+        auto variantFolder = previews / "variants" / id;
+        fs::create_directories(variantFolder);
+        for (size_t i = 0; i < std::size(curatedVariations); ++i) {
+          auto variant = doc;
+          applyCuratedVariation(variant, curatedVariations[i]);
+          const auto result = evaluate(compile(variant), previewSize);
+          if (!different(result)) throw std::runtime_error(id + " has a no-op curated variation.");
+          write(variantFolder / (std::to_string(i + 1) + ".png"), png(*result.outputs.at("baseColor")));
+          ++curated;
+        }
+        unsigned workingControls = 0;
+        for (const auto& binding : doc.source["exposedParameters"]) {
+          bool changed = false;
+          for (const char* endpoint : {"min", "max"}) {
+            auto variant = doc;
+            auto& params = findNode(variant, binding["node"].get<std::string>())["parameters"];
+            auto& value = params[binding["key"].get<std::string>()];
+            const auto bound = binding[endpoint].get<float>();
+            if (value.is_number_integer()) value = unsigned(bound);
+            else value = bound;
+            changed |= different(evaluate(compile(variant), previewSize));
+          }
+          if (changed) ++workingControls;
+        }
+        if (workingControls < 3) throw std::runtime_error(id + " has fewer than three effective controls.");
+      }
     }
   }
   check(recipeIds.size() == 120 && animations >= 6, "Catalog size and animation coverage");
   std::cout << "PASS 120 distinct catalog recipes at five seeds, including " << animations << " looping recipes\n";
+  if (thorough) {
+    for (size_t family = 0; family < std::size(textureFamilies); ++family) {
+      const auto folder = previews / "families" / textureFamilies[family].id;
+      fs::create_directories(folder);
+      std::set<std::string> frames;
+      for (size_t role = 0; role < std::size(familyRoles); ++role) {
+        const auto document = familyMaterial(family, role, 42);
+        const auto result = evaluate(compile(document), {128,128});
+        const auto pngBytes = png(*result.outputs.at("baseColor"));
+        check(frames.emplace(ftebroom::sha256(pngBytes)).second, "Family members have independent patterns");
+        write(folder / (std::string(familyRoles[role]) + ".png"), pngBytes);
+        ++familyCount;
+      }
+    }
+    std::cout << "PASS " << curated << " curated recipe variations, parameter sweeps and " <<
+      familyCount << " rendered texture family members\n";
+  }
 }
 
 int main(int argc, char** argv) try {

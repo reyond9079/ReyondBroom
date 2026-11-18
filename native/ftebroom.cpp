@@ -422,7 +422,7 @@ static void panel(float w, float h)
   io.MouseDrawCursor = false;
 #endif
   const bool startupCheck=recentWindow&&recentStage==WelcomeStage::Updates&&welcomeCheckingAutomatically();
-  if(runUiNavigation()||plantFocused()||worldArchitectFocused()||jamModeActive()||startupCheck)io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
+  if(runUiNavigation()||plantFocused()||worldArchitectFocused()||textureStudioFocused()||jamModeActive()||startupCheck)io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard;else io.ConfigFlags&=~ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::NewFrame();
   jamTick();
   jamWorldTick();
@@ -1407,7 +1407,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     }
   }
   if(!inJam && type==1 && key==input->GetKeyCode("escape",nullptr)
-     && cvars->GetFloat("ftebroom_bsp_preview") && !popupOpen && !io.WantTextInput && captureShortcut.empty()) {
+     && cvars->GetFloat("ftebroom_bsp_preview") && !textureStudioFocused() && !popupOpen && !io.WantTextInput && captureShortcut.empty()) {
     cameraEnd();buildEdit();return qtrue;
   }
   if(!inJam && modEmbedded && (type==1 || type==2)) {
@@ -1655,7 +1655,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
         io.AddKeyEvent(k.code, down);
     if (down && unicode >= 32 && unicode <= 0x10ffff && !(unicode >= 0xd800 && unicode <= 0xdfff) && !sceneLook)
       io.AddInputCharacter((unsigned int)unicode);
-    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused())))
+    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()&&!textureStudioFocused())))
       dispatchAction(key, down, inScene, hit, tourActive&&tourStep==tourGridStep);
   }
   return qtrue;

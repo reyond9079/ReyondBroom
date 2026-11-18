@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <thread>
 #ifndef _WIN32
 #include <sys/resource.h>
 #endif
@@ -28,7 +29,42 @@ ts::Plan representative(unsigned count) {
   return plan;
 }
 
+int cancellationBenchmark() {
+  using Clock = std::chrono::steady_clock;
+  const auto plan = representative(100);
+  std::vector<double> elapsed;
+  for (int run = -5; run < 30; ++run) {
+    std::atomic<bool> stop{false};
+    std::promise<void> ready;
+    auto begun = ready.get_future();
+    auto task = std::async(std::launch::async, [&] {
+      ready.set_value();
+      try {
+        ts::evaluate(plan, {2048, 2048}, &stop, ts::memoryBudget, 4);
+      } catch (const ts::Error& e) {
+        return std::string_view(e.what()).find("cancelled") != std::string_view::npos;
+      }
+      return false;
+    });
+    begun.wait();
+    std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    const auto start = Clock::now();
+    stop.store(true, std::memory_order_relaxed);
+    ts::require(task.get(), "cancel", "A cancelled render did not terminate with cancellation.");
+    if (run >= 0)
+      elapsed.push_back(std::chrono::duration<double, std::milli>(Clock::now() - start).count());
+  }
+  auto sorted = elapsed;
+  std::sort(sorted.begin(), sorted.end());
+  std::cout << ts::Json{{"backend", "cpu"}, {"phase", "cancel signal to completed worker"},
+    {"nodes", 100}, {"size", 2048}, {"threads", 4}, {"warmupsDiscarded", 5},
+    {"measurementsMs", elapsed}, {"medianMs", (sorted[14] + sorted[15]) * .5},
+    {"p95Ms", sorted[28]}, {"maximumMs", sorted.back()}}.dump(2) << '\n';
+  return sorted.back() <= 500 ? 0 : 1;
+}
+
 int main(int argc, char** argv) try {
+  if (argc == 2 && std::string_view(argv[1]) == "--cancel") return cancellationBenchmark();
   if (argc != 4) return 2;
   const unsigned nodes = std::stoul(argv[1]), edge = std::stoul(argv[2]), threads = std::stoul(argv[3]);
   if ((nodes != 40 && nodes != 100) || (edge != 256 && edge != 512 && edge != 2048)) return 2;

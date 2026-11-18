@@ -28,6 +28,7 @@ p.add_argument('--texture-cli', type=Path)
 p.add_argument('--csprogs', type=Path, required=True)
 p.add_argument('--version', required=True)
 p.add_argument('--output', type=Path, required=True)
+p.add_argument('--test-only', action='store_true')
 a = p.parse_args()
 windows = a.platform == 'Windows-x64'
 if bool(a.engine) != bool(a.engine_source):
@@ -144,11 +145,17 @@ info = (f'ReyondBroom {a.version}\nPlatform: {a.platform}\nEditor revision: {rev
         f'Editor compiler: {compiler}\nModule SHA256: {sha(root / module_name)}\n'
         + ('Engine rebuilt from pinned FTE sources with the current editor patch stack.\n' if a.engine else 'Engine retained from the verified base runtime.\n')+
         'Quake compilers updated to the verified ericw-tools pin. Other game compilers and plugins retained from the verified base runtime.\n'
-        + ('Windows audio helper rebuilt from pinned sources.\n' if windows else 'System FFmpeg is used through the bundled wrapper.\n'))
+        + ('Windows audio helper and its sources from the verified base archive.\n' if windows and a.test_only
+           else 'Windows audio helper rebuilt from pinned sources.\n' if windows
+           else 'System FFmpeg is used through the bundled wrapper.\n'))
+if a.test_only:
+    info += 'TEST ONLY. Local acceptance build.\n'
+    (root / 'TEST-ONLY.txt').write_text('Local acceptance build. Do not distribute.\n', encoding='ascii')
 (root / 'build-info.txt').write_text(info)
 (sources / 'RELEASE-BUILD.txt').write_text(info + 'Build/QA: sources/ftebroom/.github/workflows/release-linux-ui-update.yml\n')
 source_name = f'ReyondBroom-{a.version}-{a.platform}-Sources.zip'
-(root / 'SOURCE-CODE.txt').write_text(f'Complete corresponding sources: {source_name}, in the same GitHub release.\nhttps://github.com/reyond9079/ReyondBroom/releases\nPreserve all licenses.\n')
+source_location = 'beside this local test package.' if a.test_only else 'in the same GitHub release.\nhttps://github.com/reyond9079/ReyondBroom/releases'
+(root / 'SOURCE-CODE.txt').write_text(f'Complete corresponding sources: {source_name}, {source_location}\nPreserve all licenses.\n')
 with zipfile.ZipFile(out / source_name, 'w', zipfile.ZIP_DEFLATED) as archive:
     for f in sorted(sources.rglob('*')):
         if f.is_file():

@@ -159,7 +159,16 @@ def run(executable, root):
     assert sequence_manifest["frames"] == 16
     assert len(list((sequence / "frames").iterdir())) == 16
     catalog_animation = root / "catalog-ripples.rbtex.json"
-    assert invoke("new", catalog_animation, "--preset", "liquids-water")[0] == 0
+    assert invoke("new", catalog_animation, "--preset", "liquids-water", "--seed", 42)[0] == 0
+    # This 16-bit channel exposed one-bit libm differences between Linux and Windows.
+    for frame, expected in (
+        (0, "a41074ca899fd864ee12b97a2c01d23f13a9906d027096115010be3297b84aa4"),
+        (3, "2b1cd50ed5a2c7931f69e35f5a88f686a600f8e74aeab9c8b3ba24779db75321"),
+        (11, "8ab8213ae14995d8bca2cf47f0334e63f25d8d2df1ae759f3c6fcb466d7e71f6"),
+    ):
+        frame_output = root / f"catalog-ripples-frame-{frame}"
+        assert invoke("render", catalog_animation, "--frame", frame, "--threads", 4, "--out", frame_output)[0] == 0
+        assert hashlib.sha256((frame_output / "height.png").read_bytes()).hexdigest() == expected
     common = ("export", catalog_animation, "--all-frames")
     for profile, frame_count, fps, wants_rate_change in (
         ("q1-baseline", 8, 5, False), ("goldsrc-baseline", 8, 10, True),

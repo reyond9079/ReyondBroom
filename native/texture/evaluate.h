@@ -46,6 +46,21 @@ inline uint64_t stableSeed(uint32_t seed, std::string_view id, uint32_t salt = 0
 inline float unit(float n) { return std::clamp(n, 0.f, 1.f); }
 inline float frac(float n) { return n - std::floor(n); }
 
+// Fold the cycle into a quarter turn before evaluating the sine polynomial.
+// Keeping this calculation in double avoids platform-specific sinf rounding
+// differences in 16-bit height maps.
+inline float cycleSine(float turns) {
+  const double cycle = frac(turns);
+  const double centered = cycle > .5 ? cycle - 1 : cycle;
+  const double folded = std::copysign(std::min(std::abs(centered), .5 - std::abs(centered)), centered);
+  const double angle = folded * 6.283185307179586;
+  const double squared = angle * angle;
+  const double polynomial = 1 + squared * (-1.0 / 6 + squared * (1.0 / 120 +
+    squared * (-1.0 / 5040 + squared * (1.0 / 362880 + squared *
+    (-1.0 / 39916800 + squared / 6227020800.0)))));
+  return float(angle * polynomial);
+}
+
 inline float fromSrgb(float v) {
   v = unit(v);
   return v <= .04045f ? v / 12.92f : std::pow((v + .055f) / 1.055f, 2.4f);
@@ -322,10 +337,8 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   }
   case Kernel::white: return scalar(lattice(seed, unsigned(wrappedX), unsigned(wrappedY)));
   case Kernel::flow: {
-    constexpr float turn = 6.28318530718f;
     const float phase = input[0]->sample(x, y)[0] * node.p[1];
     const int patch = int(node.p[0]);
-    const float cycle = turn * frac(phase);
     if (node.p[3] == 1) {
       const float position = frac(u - phase);
       const float large = gradientNoise(seed, patch, position, v);
@@ -333,18 +346,18 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
       return scalar(1.f - std::abs(large * 2 - 1.f + (fine - .5f) * node.p[2]));
     }
     if (node.p[3] == 2) {
-      const float sway = .11f * node.p[2] * std::sin(turn * v + cycle);
+      const float sway = .11f * node.p[2] * cycleSine(v + frac(phase));
       const auto cells = cellularDistances(seed, patch, .78f, frac(u + sway), frac(v - phase));
       return scalar((cells[1] - cells[0]) * 2.1f);
     }
     if (node.p[3] == 3) {
       const float drift = gradientNoise(seed, 4, u, v) * node.p[2];
-      const float signal = std::sin(turn * frac(u * patch + drift + phase));
-      const float pulse = .72f + .28f * std::sin(cycle);
+      const float signal = cycleSine(u * patch + drift + phase);
+      const float pulse = .72f + .28f * cycleSine(phase);
       return scalar(pulse * (.53f + .47f * signal));
     }
-    const float perturbation = node.p[2] * std::sin(turn * frac(v * node.p[0] - phase));
-    return scalar(.5f + .5f * std::sin(turn * frac(u * node.p[0] + phase + perturbation)));
+    const float perturbation = node.p[2] * cycleSine(v * node.p[0] - phase);
+    return scalar(.5f + .5f * cycleSine(u * node.p[0] + phase + perturbation));
   }
   case Kernel::bricks:
   case Kernel::flemish: {

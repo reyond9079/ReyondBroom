@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Test map and model texture Apply in a disposable copy of the native editor."""
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -28,6 +29,10 @@ def main():
     cli.add_argument("runtime", type=Path)
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--profile", default="fte", choices=("fte", "quake1", "quake2", "quake3", "halflife"))
+    cli.add_argument("--layout-only", action="store_true")
+    cli.add_argument("--theme", choices=("light", "dark"), default="dark")
+    cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
+    cli.add_argument("--size", choices=("1280x720", "1440x900", "1920x1080"), default="1440x900")
     args = cli.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True)
@@ -76,10 +81,12 @@ def main():
                       f'set ftebroom_test_import_root "{output.as_posix()}"\n'
                       "in 7 mapedit maps/texture-studio-qa.map\n"
                       "in 9 ftebroom_select all\n"
-                      "in 9 ftebroom_test_desktop reyon8qa\n"
-                      "in 11 ftebroom_texture_studio\n", encoding="ascii")
+                      f"in 9 ftebroom_test_desktop reyon8qa {args.theme}\n"
+                      f"in 9.1 ftebroom_test_run {60 + (args.scale - 100) // 25}\n",
+                      encoding="ascii")
     engine = runtime / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
-    flags = ["-nohome", "-noupdates", "-nosound", "-window", "-width", "1440", "-height", "900"]
+    width, height = args.size.split("x")
+    flags = ["-nohome", "-noupdates", "-nosound", "-window", "-width", width, "-height", height]
     with (output / "engine.log").open("wb") as log:
         game = subprocess.Popen([str(engine), *flags, "+exec", config.name], cwd=runtime,
                                 stdout=log, stderr=subprocess.STDOUT)
@@ -117,6 +124,59 @@ def main():
                 ui.key("a", ("ctrl",))
                 ui.text(path.as_posix())
                 click("choose-file/file-choose")
+
+            click("menu/Assets")
+            click("Menu/Assets/Texture Studio...")
+
+            if args.layout_only:
+                widgets = wait(lambda: (items if (items := live()["globalWidgets"]).get(
+                    "texture-studio/render-state", {}).get("previewReady") else None))
+                state = widgets["texture-studio/render-state"]
+                assert state["scale"] == args.scale / 100 and state["theme"] == (3 if args.theme == "light" else 0)
+                assert live()["display"] == [int(width), int(height)]
+                controls = ("new", "import", "save", "save-package", "export", "apply",
+                            "preview-mode", "quick-tab", "layers-tab", "graph-tab")
+                controls = [widgets[f"texture-studio/{name}"] for name in controls]
+                for rect in controls:
+                    assert 0 <= rect["x"] < rect["x"] + rect["width"] <= int(width), rect
+                    assert 0 <= rect["y"] < rect["y"] + rect["height"] <= int(height), rect
+                for i, a in enumerate(controls):
+                    for b in controls[i + 1:]:
+                        assert a["x"] + a["width"] <= b["x"] or b["x"] + b["width"] <= a["x"] or \
+                            a["y"] + a["height"] <= b["y"] or b["y"] + b["height"] <= a["y"], (a, b)
+                if os.name != "nt":
+                    from PIL import ImageGrab
+                    ImageGrab.grab().save(output / "quick.png")
+                click("texture-studio/layers-tab")
+                wait(lambda: live()["globalWidgets"].get("texture-studio/layer-add"))
+                click("texture-studio/graph-tab")
+                wait(lambda: live()["globalWidgets"].get("texture-studio/graph-add"))
+                click("texture-studio/quick-tab")
+                (output / "layout.json").write_text(json.dumps(widgets, indent=2), encoding="utf-8")
+                print(f"PASS layout {args.theme} {args.size} at {args.scale}%, all three modes reachable")
+                return
+
+            if args.profile == "fte":
+                click("texture-studio/preview-mode")
+                click("texture-studio/preview-mode/5")
+                def surface_ready():
+                    state = live()["globalWidgets"]["texture-studio/render-state"]
+                    if state["error"]:
+                        raise RuntimeError(state["error"])
+                    return state["previewMode"] == 5 and state["hasSurface"] and state["previewReady"]
+                wait(surface_ready)
+                if os.name != "nt":
+                    from PIL import ImageGrab
+                    ImageGrab.grab().save(output / "selected-surface.png")
+                click("texture-studio/preview-mode")
+                click("texture-studio/preview-mode/4")
+                wait(lambda: (state := live()["globalWidgets"]["texture-studio/render-state"])[
+                    "previewMode"] == 4 and state["previewReady"])
+                if os.name != "nt":
+                    ImageGrab.grab().save(output / "target-preview.png")
+                click("texture-studio/preview-mode")
+                click("texture-studio/preview-mode/0")
+                print("PASS selected brush surface preview used the actual map geometry and UV projection")
 
             click("texture-studio/apply")
             folder = project / ("texture-wads" if wad else "textures/reyond-studio")
@@ -168,11 +228,12 @@ def main():
             if args.profile != "fte":
                 return
 
+            click("texture-studio/close")
             ui.console("ftebroom_test_desktop bb121open")
             ui.console("ftebroom_test_desktop bb121save")
             model_file = output / "monster.bbmodel"
             original = wait(lambda: json.loads(model_file.read_text(encoding="utf-8")))
-            ui.console("ftebroom_texture_studio")
+            click("texture-studio/model/source")
             before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
             click("texture-studio/apply-model")
 
@@ -208,7 +269,7 @@ def main():
             assert save_model_when(generated)["textures"][0] == slot
             print("PASS Model Editor Apply, save, Undo and Redo preserve the selected slot, UVs and graph")
 
-            ui.console("ftebroom_texture_studio")
+            click("texture-studio/model/source")
             click("texture-studio/import")
             click("texture-studio/import-license")
             ui.text("CC0-1.0")
@@ -239,6 +300,29 @@ def main():
             assert png.stat().st_size == dry_run["bytes"]
             assert hashlib.sha256(png.read_bytes()).hexdigest() == dry_run["sha256"]
             print("PASS native Texture Studio PNG matches the exact bytes and SHA-256 shown by Dry run")
+
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            click("texture-studio/apply-model")
+            wait(model_ready)
+            click("texture-studio/close")
+            asset_slot = save_model_when(lambda model: bool(model["textures"][0].get("reyond_texture_studio_originals")))["textures"][0]
+            digest = imported["assetReferences"][0]["sha256"]
+            assert base64.b64decode(asset_slot["reyond_texture_studio_originals"][digest], validate=True) == runtime_texture.read_bytes()
+            assert asset_slot["reyond_texture_studio"]["assetReferences"] == imported["assetReferences"]
+            click("texture-studio/model/edit-menu")
+            click("texture-studio/model/Undo")
+            assert save_model_when(lambda model: not model["textures"][0].get("reyond_texture_studio_originals"))["textures"][0] == slot
+            click("texture-studio/model/edit-menu")
+            click("texture-studio/model/Redo")
+            assert save_model_when(lambda model: bool(model["textures"][0].get("reyond_texture_studio_originals")))["textures"][0] == asset_slot
+            click("texture-studio/model/source")
+            click("texture-studio/save-package")
+            restored_package = output / "model-restored.rbtexpkg"
+            choose(restored_package)
+            wait(restored_package.is_file)
+            with zipfile.ZipFile(restored_package) as archive:
+                assert archive.read(imported["assetReferences"][0]["path"]) == runtime_texture.read_bytes()
+            print("PASS Model Editor opens the saved graph and preserves original bytes through Undo and Redo")
 
             click("texture-studio/new")
             click("texture-studio/preset-search")

@@ -7,12 +7,13 @@
 #include "texture/layers.h"
 #include "texture/package.h"
 #include "texture/preview.h"
+#include <thread>
 
 namespace rbTexture = ftebroom::textureStudio;
 
 struct TextureStudioState {
   enum class Apply { none, capture, baking, verify, commit, model };
-  enum Preview { flat, tiled, sphere, cube, target };
+  enum Preview { flat, tiled, sphere, cube, target, surface };
   struct ModelTarget {
     uint64_t epoch = 0, revision = 0, textureRevision = 0;
     size_t index = 0;
@@ -26,16 +27,18 @@ struct TextureStudioState {
     std::vector<unsigned char> modelPixels;
   };
 
-  bool open = false, focus = false, scheduled = false, fullSize = false;
+  bool open = false, focus = false, focused = false, scheduled = false, fullSize = false;
   bool playing = false;
   Preview previewMode = flat;
   unsigned revision = 0, imageRevision = 0, frame = 0;
   double deadline = 0, nextRender = 0, nextAutosave = 0;
   double playStarted = 0;
+  double nextSurfaceQuery = 0;
   uint32_t variationBase = 0;
   int handle = 0, slot = 0, ticket = 0, epoch = 0, profile = 0, selectedNode = 0;
   std::string channel = "baseColor", message, error, material, wadReference;
   std::string savedSource, recoveredSource;
+  std::string surfaceData;
   std::string movingNode, wireStart;
   std::set<std::string> groupSelection;
   std::array<char, 96> presetSearch{};
@@ -60,6 +63,11 @@ struct TextureStudioState {
 };
 
 static TextureStudioState textureStudio;
+
+static bool textureStudioFocused() {
+  const auto& s = textureStudio;
+  return s.open && (s.focused || s.focus) && !jamEditing();
+}
 
 static const rbTexture::Document& textureStudioDoc() {
   return textureStudio.drag ? *textureStudio.drag : textureStudio.document->get();
@@ -139,6 +147,7 @@ static void studioEdit(rbTexture::Document document) {
   textureStudio.document->replace(std::move(document));
   textureStudio.drag.reset();
   studioSchedule();
+  textureStudio.nextRender = ImGui::GetTime();
 }
 
 static void studioNewDocument(rbTexture::Document document) {
@@ -268,6 +277,8 @@ static bool studioModelSlotAvailable() {
   return bbActive && bbTexture >= 0 && size_t(bbTexture) < bbProject.textures.size() && !bbHistory.active();
 }
 
+static constexpr size_t studioModelAssetLimit = 16 * 1024 * 1024;
+
 static void studioBeginModelApply() {
   if (!studioModelSlotAvailable()) throw std::runtime_error("Select a texture in the Model Editor.");
   auto& s = textureStudio;
@@ -294,8 +305,15 @@ static void studioApplyModel() {
   auto& result = *s.result;
   auto& slot = bbProject.textures[target.index];
   const auto& graph = textureStudioDoc();
-  rbTexture::require(graph.source.at("assetReferences").empty(), "assets",
-    "Model slots currently support self-contained procedural sources.");
+  auto originals = rbTexture::Json::object();
+  size_t retainedBytes = 0;
+  for (const auto& reference : graph.source.at("assetReferences")) {
+    const auto bytes = rbTexture::readOriginal(s.assetFolder, reference);
+    rbTexture::require(bytes.size() <= studioModelAssetLimit - retainedBytes, "assets",
+      "A model material can retain up to 16 MiB of original images. Reduce the source size before applying it.");
+    retainedBytes += bytes.size();
+    originals[rbTexture::idField(reference, "sha256", "assets")] = ftebroom::bb::base64(bytes);
+  }
   size_t imageBytes = result.modelPixels.size();
   for (size_t i = 0; i < bbProject.textures.size(); ++i)
     if (i != target.index) imageBytes += bbProject.textures[i].rgba.size();
@@ -303,8 +321,11 @@ static void studioApplyModel() {
   const auto& image = *result.image.outputs.at("baseColor");
   bbHistory.begin(bbProject, bbSelection, {target.index});
   try {
-    bbProject.root["textures"][target.index]["reyond_texture_studio"] = graph.source;
-    bbProject.root["textures"][target.index]["reyond_texture_studio_frame"] = s.frame;
+    auto& meta = bbProject.root["textures"][target.index];
+    meta["reyond_texture_studio"] = graph.source;
+    meta["reyond_texture_studio_frame"] = s.frame;
+    if (originals.empty()) meta.erase("reyond_texture_studio_originals");
+    else meta["reyond_texture_studio_originals"] = std::move(originals);
     slot.width = int(image.size.width);
     slot.height = int(image.size.height);
     slot.rgba = std::move(result.modelPixels);
@@ -344,6 +365,65 @@ static rbTexture::Image studioTargetPreview(const rbTexture::Image& image, int p
   for (unsigned y = 0; y < result.size.height; ++y)
     for (unsigned x = 0; x < result.size.width; ++x)
       result.pixels.push_back(rbTexture::rasterPixel(*raster, int(x), int(y)));
+  return result;
+}
+
+static rbTexture::Image studioSurfacePreview(const rbTexture::Image& color, rbTexture::Resolution textureSize,
+                                               const std::string& data) {
+  struct Corner { float x, y, s, t; };
+  std::istringstream stream(data);
+  stream.imbue(std::locale::classic());
+  std::vector<Corner> face;
+  size_t count = 0;
+  rbTexture::require(bool(stream >> count) && count >= 3 && count <= 48, "preview", "Select a brush face to preview its texture projections.");
+  for (size_t index = 0; index < count; ++index) {
+    Corner corner{};
+    rbTexture::require(bool(stream >> corner.x >> corner.y >> corner.s >> corner.t) &&
+      std::isfinite(corner.x) && std::isfinite(corner.y) &&
+      std::isfinite(corner.s) && std::isfinite(corner.t), "preview", "The selected face has invalid geometry.");
+    face.push_back(corner);
+  }
+  auto low = face.front(), high = face.front();
+  for (const auto& corner : face) {
+    low.x = std::min(low.x, corner.x); low.y = std::min(low.y, corner.y);
+    high.x = std::max(high.x, corner.x); high.y = std::max(high.y, corner.y);
+  }
+  const auto cross = [](float ax, float ay, float bx, float by) { return ax * by - ay * bx; };
+  const auto a = face[0], b = face[1];
+  size_t third = 2;
+  float determinant = 0;
+  for (; third < face.size(); ++third) {
+    determinant = cross(b.x - a.x, b.y - a.y, face[third].x - a.x, face[third].y - a.y);
+    if (std::abs(determinant) > .0001f) break;
+  }
+  rbTexture::require(third < face.size(), "preview", "The selected face has no area.");
+  const auto c = face[third];
+  constexpr unsigned edge = 256;
+  const float scale = std::max(high.x - low.x, high.y - low.y) * 1.12f;
+  rbTexture::require(std::isfinite(scale) && scale > 0 && scale <= 1e8f, "preview", "The selected face extent is unsupported.");
+  rbTexture::Image result{{edge, edge}, rbTexture::Port::color, std::vector<rbTexture::Pixel>(edge * edge)};
+  for (unsigned y = 0; y < edge; ++y) {
+    const float py = (low.y + high.y) * .5f + (.5f - (float(y) + .5f) / edge) * scale;
+    for (unsigned x = 0; x < edge; ++x) {
+      const float px = (low.x + high.x) * .5f + ((float(x) + .5f) / edge - .5f) * scale;
+      bool inside = true;
+      for (size_t i = 0; i < face.size(); ++i) {
+        const auto& p = face[i];
+        const auto& q = face[(i + 1) % face.size()];
+        if (cross(q.x - p.x, q.y - p.y, px - p.x, py - p.y) * determinant < 0) {
+          inside = false;
+          break;
+        }
+      }
+      if (!inside) continue;
+      const float wb = cross(px - a.x, py - a.y, c.x - a.x, c.y - a.y) / determinant;
+      const float wc = cross(b.x - a.x, b.y - a.y, px - a.x, py - a.y) / determinant;
+      const float s = (a.s + (b.s - a.s) * wb + (c.s - a.s) * wc) / textureSize.width;
+      const float t = (a.t + (b.t - a.t) * wb + (c.t - a.t) * wc) / textureSize.height;
+      rbTexture::require(std::isfinite(s) && std::isfinite(t), "preview", "The selected face has invalid texture coordinates.");
+      result.pixels[y * edge + x] = rbTexture::sampleColor(color, s, t);
+    }
+  }
   return result;
 }
 
@@ -484,7 +564,7 @@ static void studioTick() {
       }
       s.cancel = std::make_shared<std::atomic<bool>>(false);
       s.job = std::async(std::launch::async, [doc = std::move(doc), assets = s.assets, revision, full, model, frame, mode,
-          targetProfile, palette = std::move(targetPalette),
+          targetProfile, palette = std::move(targetPalette), surfaceData = s.surfaceData,
           stop = s.cancel, cache = s.previewCache]() {
         const auto size = doc.resolution();
         auto previewSize = size;
@@ -503,9 +583,13 @@ static void studioTick() {
           else if (mode == TextureStudioState::target)
             pngs.emplace("material-preview", rbTexture::png(studioTargetPreview(
               *preview.outputs.at("baseColor"), targetProfile, palette)));
+          else if (mode == TextureStudioState::surface && !surfaceData.empty())
+            pngs.emplace("material-preview", rbTexture::png(studioSurfacePreview(
+              *preview.outputs.at("baseColor"), size, surfaceData)));
         }
+        const unsigned workers = std::clamp(std::thread::hardware_concurrency(), 1u, 4u);
         auto result = full && longest > 256
-          ? rbTexture::evaluate(plan, size, stop.get(), rbTexture::memoryBudget, 1, frame) : std::move(preview);
+          ? rbTexture::evaluate(plan, size, stop.get(), rbTexture::memoryBudget, workers, frame) : std::move(preview);
         std::vector<unsigned char> modelPixels;
         if (model) modelPixels = rbTexture::rgba8(*result.outputs.at("baseColor"));
         return TextureStudioState::Result{revision, full, std::move(result), std::move(pngs), std::move(modelPixels)};
@@ -549,6 +633,46 @@ static void studioAction(const std::function<void()>& action) {
   } catch (const std::exception& e) {
     s.error = e.what();
   }
+}
+
+static void textureStudioShowModelTexture() {
+  textureStudioShow();
+  if (jamEditing() || !bbActive || bbTexture < 0 || size_t(bbTexture) >= bbProject.textures.size()) return;
+  const auto entries = bbProject.root.find("textures");
+  if (entries == bbProject.root.end() || !entries->is_array() || size_t(bbTexture) >= entries->size()) return;
+  const auto& metadata = (*entries)[bbTexture];
+  if (!metadata.contains("reyond_texture_studio")) return;
+  studioAction([&] {
+    auto doc = rbTexture::open(metadata.at("reyond_texture_studio").dump());
+    rbTexture::require(!doc.readOnly, "source", "This model material needs a newer Texture Studio.");
+    const auto& refs = doc.source.at("assetReferences");
+    const auto& embedded = metadata.value("reyond_texture_studio_originals", rbTexture::Json::object());
+    rbTexture::require(embedded.is_object() && refs.size() <= 64 && embedded.size() == refs.size(),
+      "assets", "A model material is missing its original images.");
+    const auto folder = studioRecoveryRoot();
+    std::filesystem::create_directories(folder);
+    size_t retainedBytes = 0;
+    for (const auto& record : refs) {
+      const auto hash = rbTexture::idField(record, "sha256", "assets");
+      const auto& original = rbTexture::member(embedded, hash.c_str(), "assets");
+      rbTexture::require(original.is_string() && original.get_ref<const std::string&>().size() <=
+        ((studioModelAssetLimit - retainedBytes + 2) / 3) * 4,
+        "assets", "The model's encoded source exceeds its 16 MiB budget.");
+      const auto bytes = ftebroom::bb::unbase64(original.get_ref<const std::string&>());
+      rbTexture::require(bytes.size() <= studioModelAssetLimit - retainedBytes && ftebroom::sha256(bytes) == hash,
+        "assets", "The model's original image checksum is invalid.");
+      retainedBytes += bytes.size();
+      studioWriteOriginal(folder, rbTexture::imageRelativePath(hash), bytes);
+    }
+    auto assets = rbTexture::loadAssets(doc, folder);
+    const auto plan = rbTexture::compile(doc, {}, assets);
+    const auto frame = std::min(metadata.value("reyond_texture_studio_frame", 0u), plan.frames - 1u);
+    studioAutosave();
+    studioNewDocument(std::move(doc));
+    textureStudio.assetFolder = folder;
+    textureStudio.assets = std::move(assets);
+    textureStudio.frame = frame;
+  });
 }
 
 static std::filesystem::path studioLibraryFile() {
@@ -1028,6 +1152,7 @@ static void studioNodes() {
   static float zoom = .70f;
   static ImVec2 pan{12,12};
   if (ImGui::Button("Add node")) ImGui::OpenPopup("Add texture node");
+  runUiRecordGlobal("texture-studio/graph-add");
   if (ImGui::BeginPopup("Add texture node")) {
     for (const auto& spec : rbTexture::contracts()) {
       if (spec.kernel == rbTexture::Kernel::image) continue;
@@ -1203,13 +1328,25 @@ static void studioNodes() {
   if (ImGui::BeginCombo("Node", selected.c_str())) {
     for (size_t i = 0; i < nodes.size(); ++i) {
       const auto id = nodes[i].at("id").get<std::string>();
-      if (ImGui::Selectable(id.c_str(), int(i) == s.selectedNode)) s.selectedNode = int(i);
+      if (ImGui::Selectable(id.c_str(), int(i) == s.selectedNode)) {
+        s.selectedNode = int(i);
+        const auto position = positions.at(id);
+        pan = {pan.x + origin.x + (area.x - card.x) * .5f - position.x,
+               pan.y + origin.y + (area.y - card.y) * .5f - position.y};
+      }
     }
     ImGui::EndCombo();
   }
   const auto& n = nodes[size_t(s.selectedNode)];
   const auto id = n.at("id").get<std::string>();
   const auto type = n.at("type").get<std::string>();
+  if (type != "Subgraph") {
+    bool included = s.groupSelection.count(id) != 0;
+    if (ImGui::Checkbox("Include selected node in group", &included)) {
+      if (included) s.groupSelection.insert(id);
+      else s.groupSelection.erase(id);
+    }
+  }
   if (type == "Subgraph") {
     const auto group = n.at("parameters").at("group").get<std::string>();
     auto& definition = graph.at("groups").at(group);
@@ -1323,10 +1460,19 @@ static void studioNodes() {
 static void studioPreview() {
   auto& s = textureStudio;
   using Preview = TextureStudioState::Preview;
-  static const char* subjects = "Flat\0Tiled 3 × 3\0Sphere\0Cube\0Game profile\0";
+  static constexpr const char* subjects[]{"Flat", "Tiled 3 × 3", "Sphere", "Cube", "Game profile", "Selected surface"};
   int mode = s.previewMode;
   ImGui::BeginDisabled(s.apply != TextureStudioState::Apply::none);
-  if (ImGui::Combo("Preview", &mode, subjects)) {
+  const bool choice = ImGui::BeginCombo("Preview", subjects[mode]);
+  runUiRecordGlobal("texture-studio/preview-mode");
+  if (choice) {
+    for (size_t i = 0; i < std::size(subjects); ++i) {
+      if (ImGui::Selectable(subjects[i], int(i) == mode)) mode = int(i);
+      runUiRecordGlobal("texture-studio/preview-mode/" + std::to_string(i));
+    }
+    ImGui::EndCombo();
+  }
+  if (mode != s.previewMode) {
     s.previewMode = Preview(mode);
     if (mode >= Preview::sphere) {
       studioReleaseImage();
@@ -1348,8 +1494,10 @@ static void studioPreview() {
     ImGui::TextWrapped("Connect Base Color to preview the material.");
   if (s.previewMode == Preview::target)
     ImGui::TextUnformatted(gameProfileName());
+  if (s.previewMode == Preview::surface && s.surfaceData.empty())
+    ImGui::TextUnformatted("Select a brush face in the map.");
   if (!s.handle || !s.result) return;
-  const bool mesh = s.previewMode == Preview::sphere || s.previewMode == Preview::cube;
+  const bool mesh = s.previewMode == Preview::sphere || s.previewMode == Preview::cube || s.previewMode == Preview::surface;
   const auto size = mesh ? rbTexture::Resolution{256, 256} : s.result->image.size;
   const float scale = std::min(std::max(1.f, ImGui::GetContentRegionAvail().x) / size.width,
     std::max(1.f, ImGui::GetContentRegionAvail().y - 32 * uiScale()) / size.height);
@@ -1367,10 +1515,41 @@ static void studioPreview() {
   ImGui::Text("%u × %u%s", size.width, size.height, s.imageRevision != s.revision ? " · Previous result" : "");
 }
 
+static void studioModeTabs(bool applying) {
+  ImGui::BeginDisabled(applying);
+  if (ImGui::BeginTabBar("Editor modes")) {
+    const bool quick = ImGui::BeginTabItem("Quick");
+    runUiRecordGlobal("texture-studio/quick-tab");
+    if (quick) { studioAction(studioQuick); ImGui::EndTabItem(); }
+    const bool layers = ImGui::BeginTabItem("Layers");
+    runUiRecordGlobal("texture-studio/layers-tab");
+    if (layers) { studioAction(studioLayers); ImGui::EndTabItem(); }
+    const bool graph = ImGui::BeginTabItem("Node Graph");
+    runUiRecordGlobal("texture-studio/graph-tab");
+    if (graph) { studioAction(studioNodes); ImGui::EndTabItem(); }
+    ImGui::EndTabBar();
+  }
+  ImGui::EndDisabled();
+}
+
 static void textureStudioPanel() {
   auto& s = textureStudio;
   studioTick();
   if (!s.open) return;
+  if (s.previewMode == TextureStudioState::surface && s.apply == TextureStudioState::Apply::none &&
+      !(s.scheduled && s.fullSize)) {
+    if (ImGui::GetTime() >= s.nextSurfaceQuery) {
+      command("ftebroom_texture_apply surface\n");
+      s.nextSurfaceQuery = ImGui::GetTime() + .20;
+    }
+    char data[8192]{};
+    cvars->GetString("ftebroom_texture_surface", data, sizeof(data));
+    if (s.surfaceData != data) {
+      s.surfaceData = data;
+      if (s.surfaceData.empty()) studioReleaseImage();
+      studioSchedule();
+    }
+  }
   if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsMouseReleased(ImGuiMouseButton_Left)) s.wireStart.clear();
   if (!s.movingNode.empty() && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
     if (s.drag) s.document->replace(std::move(*s.drag));
@@ -1392,11 +1571,27 @@ static void textureStudioPanel() {
   }
   if (!s.drag && ImGui::GetTime() >= s.nextAutosave) studioAction(studioAutosave);
   if (std::exchange(s.focus, false)) ImGui::SetNextWindowFocus();
-  ImGui::SetNextWindowSize({1030 * uiScale(), 650 * uiScale()}, ImGuiCond_FirstUseEver);
-  if (ImGui::Begin("Texture Studio", &s.open)) {
+  const auto* viewport = ImGui::GetMainViewport();
+  const auto screen = viewport->WorkSize;
+  const ImVec2 maximum{std::max(160.f, screen.x - 16), std::max(160.f, screen.y - 16)};
+  ImGui::SetNextWindowSizeConstraints({std::min(360.f, maximum.x), std::min(250.f, maximum.y)}, maximum);
+  ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_FirstUseEver, {.5f, .5f});
+  ImGui::SetNextWindowSize({std::min(1030 * uiScale(), maximum.x), std::min(650 * uiScale(), maximum.y)},
+    ImGuiCond_FirstUseEver);
+  const bool contentVisible = ImGui::Begin("Texture Studio", &s.open);
+  s.focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+  if (contentVisible) {
+    const auto nextButton = [](const char* label) {
+      const auto& style = ImGui::GetStyle();
+      const float nextRight = ImGui::GetItemRectMax().x + style.ItemSpacing.x +
+        ImGui::CalcTextSize(label).x + 2 * style.FramePadding.x;
+      if (nextRight <= ImGui::GetCurrentWindowRead()->WorkRect.Max.x) ImGui::SameLine();
+    };
     if (runUiLive) {
       runUiGlobalRects["texture-studio/render-state"] = {
         {"revision", s.revision}, {"previewReady", s.handle != 0 && s.imageRevision == s.revision},
+        {"theme", uiEffectiveTheme()}, {"scale", uiScale()},
+        {"previewMode", int(s.previewMode)}, {"hasSurface", !s.surfaceData.empty()},
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
         {"busy", s.job.valid() || s.apply != TextureStudioState::Apply::none}, {"error", s.error}
       };
@@ -1413,6 +1608,14 @@ static void textureStudioPanel() {
     }
     const bool applying = s.apply != TextureStudioState::Apply::none;
     const bool writable = !textureStudioDoc().readOnly;
+    const auto& io = ImGui::GetIO();
+    const bool shortcuts = s.focused && !io.WantTextInput &&
+      !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+    if (shortcuts && s.apply != TextureStudioState::Apply::commit && ImGui::IsKeyPressed(ImGuiKey_Escape) &&
+        (applying || s.job.valid() || s.scheduled || s.drag || !s.wireStart.empty())) {
+      studioCancel();
+      s.drag.reset();
+    }
     ImGui::BeginDisabled(applying);
     if (ImGui::Button("New")) {
       s.presetSearch.fill(0);
@@ -1421,9 +1624,9 @@ static void textureStudioPanel() {
       ImGui::OpenPopup("New source?");
     }
     runUiRecordGlobal("texture-studio/new");
-    ImGui::SameLine();
+    nextButton("Open…");
     if (ImGui::Button("Open…")) ImGui::OpenPopup("Open source?");
-    ImGui::SameLine();
+    nextButton("Import Image…");
     if (ImGui::Button("Import Image…")) ImGui::OpenPopup("Import original image");
     runUiRecordGlobal("texture-studio/import");
     if (ImGui::BeginPopupModal("Import original image", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -1444,7 +1647,7 @@ static void textureStudioPanel() {
       if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
       ImGui::EndPopup();
     }
-    ImGui::SameLine();
+    nextButton("Recover…");
     if (ImGui::Button("Recover…")) studioAction([&] {
       studioRecoverableFiles();
       ImGui::OpenPopup("Recover source");
@@ -1600,16 +1803,16 @@ static void textureStudioPanel() {
       if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
       ImGui::EndPopup();
     }
-    ImGui::SameLine();
+    nextButton("Save");
     if (ImGui::Button("Save")) {
       if (s.file.empty() || !writable) studioSaveAs();
       else studioAction([&] { studioSave(s.file); });
     }
     runUiRecordGlobal("texture-studio/save");
-    ImGui::SameLine();
+    nextButton("Save As…");
     if (ImGui::Button("Save As…")) studioSaveAs();
     if (writable) {
-      ImGui::SameLine();
+      nextButton("Save preset…");
       if (ImGui::Button("Save preset…")) ImGui::OpenPopup("Save user preset");
       if (ImGui::BeginPopupModal("Save user preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         static char label[81]{};
@@ -1626,16 +1829,20 @@ static void textureStudioPanel() {
         ImGui::EndPopup();
       }
     }
-    ImGui::SameLine();
+    nextButton("Save Package…");
     ImGui::BeginDisabled(!writable);
     if (ImGui::Button("Save Package…")) studioSavePackage();
     runUiRecordGlobal("texture-studio/save-package");
     ImGui::EndDisabled();
-    ImGui::SameLine();
+    nextButton("Undo");
     ImGui::BeginDisabled(!writable);
-    if (ImGui::Button("Undo") && s.document->undo()) { s.drag.reset(); studioSchedule(); }
-    ImGui::SameLine();
-    if (ImGui::Button("Redo") && s.document->redo()) { s.drag.reset(); studioSchedule(); }
+    const bool keyboardUndo = shortcuts && !applying && writable && !io.KeyShift &&
+      ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
+    if ((ImGui::Button("Undo") || keyboardUndo) && s.document->undo()) { s.drag.reset(); studioSchedule(); }
+    nextButton("Redo");
+    const bool keyboardRedo = shortcuts && !applying && writable &&
+      (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z));
+    if ((ImGui::Button("Redo") || keyboardRedo) && s.document->redo()) { s.drag.reset(); studioSchedule(); }
     ImGui::EndDisabled();
     ImGui::EndDisabled();
 
@@ -1644,20 +1851,20 @@ static void textureStudioPanel() {
     ImGui::BeginDisabled(!writable || applying);
     if (ImGui::Button("Generate")) studioAction([&] { s.playing = false; studioAutosave(); studioSchedule(true); });
     runUiRecordGlobal("texture-studio/generate");
-    ImGui::SameLine();
+    nextButton("Export…");
     ImGui::BeginDisabled(!s.result || s.result->revision != s.revision || !s.result->fullSize);
     if (ImGui::Button("Export…")) { s.playing = false; ImGui::OpenPopup("Export texture"); }
     runUiRecordGlobal("texture-studio/export");
     ImGui::EndDisabled();
     studioExportDialog();
-    ImGui::SameLine();
+    nextButton("Generate & Apply");
     const auto faces = cvars->GetFloat("ftebroom_face_count");
     ImGui::BeginDisabled(!studioProfileAllowsApply() || faces <= 0);
     if (ImGui::Button("Generate & Apply")) studioAction(studioBeginApply);
     runUiRecordGlobal("texture-studio/apply");
     ImGui::EndDisabled();
     if (bbActive) {
-      ImGui::SameLine();
+      nextButton("Apply to model texture");
       ImGui::BeginDisabled(!studioModelSlotAvailable());
       if (ImGui::Button("Apply to model texture")) studioAction(studioBeginModelApply);
       runUiRecordGlobal("texture-studio/apply-model");
@@ -1665,33 +1872,30 @@ static void textureStudioPanel() {
     }
     ImGui::EndDisabled();
     if (s.job.valid() || applying) {
-      ImGui::SameLine();
+      nextButton("Cancel");
       ImGui::BeginDisabled(s.apply == TextureStudioState::Apply::commit);
       if (ImGui::Button("Cancel")) studioCancel();
+      runUiRecordGlobal("texture-studio/cancel");
       ImGui::EndDisabled();
       ImGui::TextUnformatted("Generating…");
     }
     if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
     else if (!s.message.empty()) ImGui::TextWrapped("%s", s.message.c_str());
     if (!writable) ImGui::TextWrapped("This source uses a newer format. Save As preserves its original bytes.");
-    if (writable && ImGui::BeginTable("Texture Studio Workspace", 2, ImGuiTableFlags_Resizable)) {
+    const bool stacked = ImGui::GetContentRegionAvail().x < 660 * uiScale();
+    if (writable && stacked) {
+      const float height = std::clamp(ImGui::GetContentRegionAvail().y * .45f, 130.f, std::max(130.f, 310 * uiScale()));
+      ImGui::BeginChild("Texture Preview", {-1, height}, ImGuiChildFlags_Borders);
+      studioAction(studioPreview);
+      ImGui::EndChild();
+      studioModeTabs(applying);
+    } else if (writable && ImGui::BeginTable("Texture Studio Workspace", 2, ImGuiTableFlags_Resizable)) {
       ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthStretch, 1.1f);
       ImGui::TableSetupColumn("Properties", ImGuiTableColumnFlags_WidthStretch, 1.f);
       ImGui::TableNextColumn();
       studioAction(studioPreview);
       ImGui::TableNextColumn();
-      ImGui::BeginDisabled(applying);
-      studioAction([&] {
-        if (ImGui::BeginTabBar("Editor modes")) {
-          if (ImGui::BeginTabItem("Quick")) { studioAction(studioQuick); ImGui::EndTabItem(); }
-          const bool layerTab = ImGui::BeginTabItem("Layers");
-          runUiRecordGlobal("texture-studio/layers-tab");
-          if (layerTab) { studioAction(studioLayers); ImGui::EndTabItem(); }
-          if (ImGui::BeginTabItem("Node Graph")) { studioAction(studioNodes); ImGui::EndTabItem(); }
-          ImGui::EndTabBar();
-        }
-      });
-      ImGui::EndDisabled();
+      studioModeTabs(applying);
       ImGui::EndTable();
     }
   }

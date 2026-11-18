@@ -173,11 +173,19 @@ void jamViewportToolbar()
     if(jamTrackedButton("browse_jam",browse,{browseWidth,0}))jamLocal.open=true;
     rememberButton(jamQaBrowseButton);
     const auto extent=jam::worldHalfSize(jamLocal.rules);
-    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(.64f,.87f,.88f,1));
-    ImGui::TextWrapped(jamText("Plot height: %.0f units | Top +%.0f / Bottom -%.0f",
-                              "Высота участка: %.0f ед. | Верх +%.0f / Низ -%.0f"),
-                       extent[2]*2,extent[2],extent[2]);
-    ImGui::PopStyleColor();
+    char limits[192]{};
+    std::snprintf(limits,sizeof limits,jamText("Plot height: %.0f units | Top +%.0f / Bottom -%.0f",
+                                              "Высота участка: %.0f ед. | Верх +%.0f / Низ -%.0f"),
+                  extent[2]*2,extent[2],extent[2]);
+    const auto limitPosition=ImGui::GetCursorScreenPos();
+    const auto limitFont=ImGui::GetFontSize(), limitWrap=panelWidth-16*u;
+    const auto limitSize=ImGui::GetFont()->CalcTextSizeA(limitFont,FLT_MAX,limitWrap,limits);
+    auto* limitDraw=ImGui::GetWindowDrawList();
+    limitDraw->AddRectFilled(limitPosition,{limitPosition.x+panelWidth,limitPosition.y+limitSize.y+10*u},
+                            IM_COL32(13,24,41,238),5*u);
+    limitDraw->AddText(ImGui::GetFont(),limitFont,{limitPosition.x+8*u,limitPosition.y+5*u},
+                      IM_COL32(192,243,244,255),limits,nullptr,limitWrap);
+    ImGui::Dummy({panelWidth,limitSize.y+10*u});
     if (showStatus) {
       const bool error = !jamLocal.error.empty();
       const auto message = jamDisplayMessage(error ? jamLocal.error : jamLocal.status);

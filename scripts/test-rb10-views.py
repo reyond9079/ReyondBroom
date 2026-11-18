@@ -99,6 +99,12 @@ try:
  check(widgets()['tools-layout']['y']<min(v['y'] for v in live()['views']),'new workspace docks horizontal Tools above the scene')
  click('tools-extra-toggle');expanded=wait(tools_fits)['height']
  check(expanded>=collapsed,'extra tools wrap without clipping or reducing the required height')
+ tool_buttons=('tools/default-move','tools/Brush','tools/Clip','tools/Vertex','tools/Edge',
+               'tools/Face','tools/Rotate','tools/Sweep','tools/Scale','tools/Shear',
+               'tools/Sculpt','tools/Bezier Bend','tools/Polygon Cut','tools/Polygon Spawn',
+               'tools/Spin','tools/Rotate Grid','tools/Flip horizontal','tools/Flip vertical')
+ check(all(abs(widgets()[key]['width']-widgets()[key]['height'])<1 for key in tool_buttons),
+       'brush tool buttons remain square when the toolbar wraps')
  click('tools-shape-toggle');wait(lambda:widgets().get('tools/shape-choice'))
  shape=wait(lambda:(t if (t:=tools_fits()) and t['height']>collapsed else None))
  metrics['tools_expanded_height']=shape['height'];shot('tools-expanded')

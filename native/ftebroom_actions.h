@@ -466,10 +466,8 @@ static void actionToolButton(ToolbarEditAction tool,ImVec2 size)
         const ImVec2 body[]={point(.30f,.34f),point(.36f,.76f),point(.64f,.76f),point(.70f,.34f)};
         draw->AddPolyline(body,IM_ARRAYSIZE(body),color,0,stroke);
       }else if(tool==ToolbarEditAction::FlipHorizontal||tool==ToolbarEditAction::FlipVertical){
-        draw->AddTriangle(point(.17f,.24f),point(.37f,.73f),point(.17f,.73f),color,stroke);
-        draw->AddTriangle(point(.83f,.24f),point(.63f,.73f),point(.83f,.73f),color,stroke);
-        for(float y:{.22f,.45f,.68f})
-          draw->AddLine(point(.50f,y),point(.50f,y+.10f),color,stroke);
+        if(ImGui::IsItemVisible())
+          BrushIcons::drawTool(tool==ToolbarEditAction::FlipHorizontal?BrushIcons::Tool::FlipHorizontal:BrushIcons::Tool::FlipVertical,origin,size);
       }else{
         draw->PathLineTo(point(.25f,.42f));
         draw->PathBezierCubicCurveTo(point(.56f,.32f),point(.75f,.39f),point(.75f,.71f));
@@ -547,7 +545,7 @@ static void symmetryPanel(){
 }
 // Menu placement is independent of action IDs: saved shortcuts, command dispatch
 // and UI automation retain the existing catalogue identifiers.
-static void actionMenuEntry(const std::string& id,const char* label=nullptr)
+static void actionMenuEntry(const std::string& id,const char* label=nullptr,bool enabled=true)
 {
   for(const auto& a:actions)if(id==a.id){
     if(!jamActionAllowed(a)||(gameClassic()&&id=="Menu/Tools/Control Point"))return;
@@ -555,7 +553,7 @@ static void actionMenuEntry(const std::string& id,const char* label=nullptr)
     bool checked=false;
     if(id=="Menu/Edit/Texture Lock")checked=cvars->GetFloat("ftebroom_texture_lock")!=0;
     if(id=="Menu/Edit/UV Lock")checked=cvars->GetFloat("ftebroom_uv_lock")!=0;
-    if(ImGui::MenuItem(label?label:historyActionLabel(a).c_str(),a.shortcutText.c_str(),checked,actionAvailable(a)&&!held))executeAction(a);
+    if(ImGui::MenuItem(label?label:historyActionLabel(a).c_str(),a.shortcutText.c_str(),checked,enabled&&actionAvailable(a)&&!held))executeAction(a);
     runUiRecordGlobal(a.id);
     return;
   }
@@ -728,6 +726,21 @@ static void viewMenu()
     actionMenuEntries("View",{"Issues"});
     ImGui::Separator();
     actionMenuEntries("View",{"Next Point","Previous Point"});
+    if(!jamEditing()){
+      ImGui::Separator();
+      if(ImGui::BeginMenu("Point File")){
+        actionMenuEntry("Menu/File/Load Point File...","Load...");
+        actionMenuEntry("Menu/File/Reload Point File","Reload",!tracePaths[0].empty());
+        actionMenuEntry("Menu/File/Unload Point File","Unload");
+        ImGui::EndMenu();
+      }
+      if(ImGui::BeginMenu("Portal File")){
+        actionMenuEntry("Menu/File/Load Portal File...","Load...");
+        actionMenuEntry("Menu/File/Reload Portal File","Reload",!tracePaths[1].empty());
+        actionMenuEntry("Menu/File/Unload Portal File","Unload");
+        ImGui::EndMenu();
+      }
+    }
     ImGui::EndMenu();
   }
   if(viewSubmenu("Appearance")){
@@ -750,6 +763,44 @@ static void viewMenu()
   runUiRecordGlobal("Menu/View/Fullscreen");
   if(!uiFullscreenError.empty())ImGui::TextWrapped("%s",uiFullscreenError.c_str());
 }
+static void fileMenu()
+{
+  actionMenuEntry("Menu/File/New","New Map");
+  actionMenuEntry("Menu/File/Open...","Open Map...");
+  ImGui::Separator();
+  actionMenuEntry("Menu/File/Save");
+  actionMenuEntry("Menu/File/Save as...","Save As...");
+  ImGui::Separator();
+  if(!jamEditing()&&ImGui::BeginMenu("Export")){
+    actionMenuEntries("File",{"Export Map...","Export TrenchBroom MAP...","Export OBJ..."});
+    actionMenuEntry("Menu/File/Export selected BSP model...",nullptr,cvars->GetFloat("ftebroom_selection_count")>0);
+    ImGui::EndMenu();
+  }
+  actionMenuEntry("Menu/File/Revert","Revert to Saved...",
+    !documentUntitled&&!documentFile.empty()&&!savingDocument&&cvars->GetFloat("ftebroom_dirty")!=0);
+  ImGui::Separator();
+  actionMenuEntry("Menu/File/Close","Close Map");
+  actionMenuEntry("Menu/File/Exit");
+}
+static void assetsMenu()
+{
+  if(!ImGui::BeginMenu("Assets"))return;
+  actionMenuEntry("Menu/File/New model...","New Model...");
+  if(ImGui::MenuItem("Plant Editor..."))plantShow();
+  runUiRecordGlobal("Menu/Assets/Plant Editor...");
+  if(ImGui::MenuItem("Prefab collections"))prefabShow();
+  runUiRecordGlobal("Menu/Assets/Prefab collections");
+  ImGui::Separator();
+  if(ImGui::BeginMenu("Reload Resources")){
+    actionMenuEntries("File",{"Reload Material Collections","Reload Entity Definitions"});
+    ImGui::EndMenu();
+  }
+  if(gameProfile==1&&ImGui::BeginMenu("Shaders")){
+    if(ImGui::MenuItem("Reyond's GLSL Shader Pack..."))shaderPackOpen=true;
+    ImGui::EndMenu();
+  }
+  ImGui::EndMenu();
+}
 static void actionMenus()
 {
   initActions();
@@ -759,14 +810,10 @@ static void actionMenus()
     if (std::string_view(group) == "File") placementRect("menu/file");
     if (opened)
     {
-      if(std::string_view(group)=="Edit")editMenu();
+      if(std::string_view(group)=="File")fileMenu();
+      else if(std::string_view(group)=="Edit")editMenu();
       else if(std::string_view(group)=="View")viewMenu();
       else actionMenuGroup(group);
-      if (std::string_view(group) == "File" && characterAvailable()) {
-        if (ImGui::MenuItem("Character Creator...")) command("ftebroom_character\n");
-        runUiRecordGlobal("Menu/File/Character Creator...");
-        placementRect("menu/file/character");
-      }
       if(!jamEditing()&&std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
       if(std::string_view(group)=="Help"){
         if(ImGui::MenuItem("Updates..."))recentOpenUpdates();

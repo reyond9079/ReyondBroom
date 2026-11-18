@@ -293,8 +293,8 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             return capture().convert("RGB").crop((x+3,y+3,x+w-3,y+h-3))
 
         def exercise_morphs():
-            click("menu/file")
-            click("menu/file/character")
+            click("menu/plugins")
+            click("menu/plugins/character")
             wait(lambda:state()["open"] and state()["applied"])
             click("character/save")
             path = Path(wait(lambda:(p := live()["browsePath"]) and p.endswith(".rbchar") and p))
@@ -394,8 +394,8 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
             check(True,"Reset all clears both sections and one Undo restores the previous document")
 
         def exercise_catalog():
-            click("menu/file")
-            click("menu/file/character")
+            click("menu/plugins")
+            click("menu/plugins/character")
             wait(lambda:state()["open"] and state()["applied"])
             names = ("Casey", "Morgan", "Riley", "Sam", "Devin", "Jordan", "Jamie", "Drew", "Taylor", "Robin")
 

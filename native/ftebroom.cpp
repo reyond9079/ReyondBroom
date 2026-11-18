@@ -33,6 +33,7 @@ enum fs_relative : int;
 #include <string_view>
 #include <vector>
 #include "ftebroom_tool_icons.h"
+#include "ftebroom_brush_icons.h"
 
 static plugcorefuncs_t* core;
 static plugcmdfuncs_t* commands;
@@ -579,7 +580,7 @@ static void panel(float w, float h)
   if (mainMenuVisible)
   {
     actionMenus();
-    if (!jamEditing()) {pluginsMenu();shaderPackMenu();}
+    if (!jamEditing()) {pluginsMenu();assetsMenu();}
     if (jamEditing()) jamEditorMenu();
     else if(jamEnabled() && ImGui::MenuItem("Mapping Jams")) {jamRecordTelemetry("button","open_mapping_jams");jamLocal.open=true;}
     if (ImGui::BeginMenu("Workspace"))
@@ -608,13 +609,8 @@ static void panel(float w, float h)
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{4*uiScale(),ImGui::GetStyle().ItemSpacing.y});
   const float toolsRight=ImGui::GetCursorScreenPos().x+toolsArea.x;
   const float toolsLeft=ImGui::GetCursorPosX();
-  // A full default row fits beside the inspector at both desktop scales.
-  constexpr int defaultToolCount=28;
-  const float toolHeight=std::round((compactRail||horizontalTools?30.f:34.f)*uiScale());
-  const float singleRowWidth=(toolsArea.x-(defaultToolCount-1)*ImGui::GetStyle().ItemSpacing.x)/defaultToolCount;
-  const float toolWidth=horizontalTools
-    ? std::floor(std::clamp(singleRowWidth,36*uiScale(),48*uiScale()))
-    : toolHeight;
+  const float toolHeight=std::round((compactRail?30.f:34.f)*uiScale());
+  const float toolWidth=toolHeight;
   const ImVec2 toolSize{toolWidth,toolHeight};
   const ImVec2 toolPadding{ImGui::GetStyle().FramePadding.x,std::max(0.f,(toolHeight-ImGui::GetFontSize())*.5f)};
   bool toolsFirst=true;
@@ -670,7 +666,7 @@ static void panel(float w, float h)
       ImGui::PushStyleColor(ImGuiCol_Button, uiActiveToolColor());
     ImGui::PushID(i);
     toolFlow(toolWidth);
-    if (FteIcons::button("##tool",i>=15?7:i>=11?i+2:i,toolSize))
+    if (BrushIcons::button("##tool",static_cast<BrushIcons::Tool>(tool),toolSize))
     {
       sceneDrag = sceneLook = false;
       if (entry)

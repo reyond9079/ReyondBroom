@@ -119,16 +119,6 @@ static void shaderPackTick(){
 #endif
  if(done){try{if(failed||!shaderPackReady()){std::ifstream in(shaderPackRoot()/"error.txt");std::getline(in,shaderPackError);if(shaderPackError.empty())shaderPackError="Shader download failed. Retry when connected.";}else shaderPackActivate(true);}catch(const std::exception& e){shaderPackError=e.what();}}
 }
-static void shaderPackMenu(){
- if(ImGui::BeginMenu("Assets")){
-  if(ImGui::MenuItem("Plant Editor..."))command("ftebroom_plant\n");
-  runUiRecordGlobal("Menu/Assets/Plant Editor...");
-  if(ImGui::MenuItem("Prefab collections"))command("ftebroom_ui prefabs\n");
-  runUiRecordGlobal("Menu/Assets/Prefab collections");
-  if(gameProfile==1&&ImGui::BeginMenu("Shaders")){if(ImGui::MenuItem("Reyond's GLSL Shader Pack..."))shaderPackOpen=true;ImGui::EndMenu();}
-  ImGui::EndMenu();
- }
-}
 static void shaderPackPanel(){
  if(!shaderPackOpen)return;
  ImGui::SetNextWindowSize({650*uiScale(),670*uiScale()},ImGuiCond_FirstUseEver);

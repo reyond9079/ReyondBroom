@@ -449,11 +449,15 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
     const float vx = u - .5f, vy = .79f - v;
     const float arch = std::abs(std::sqrt(vx * vx + vy * vy) - .306f);
     const float profile = 1.f - softThreshold(node.p[1] * .28f, node.p[1] * .54f, arch);
-    const float angle = std::atan2(vy, vx) * .318309886f;
-    const float stone = angle * node.p[0];
+    // Approximate arc length in each octant without platform-dependent atan2 rounding.
+    const float x = std::abs(vx), y = std::max(0.f, vy);
+    const float ratio = std::min(x, y) / std::max(.00001f, std::max(x, y));
+    const float octant = ratio * (.25f + .087f * (1.f - ratio));
+    const float quadrant = x >= y ? octant : .5f - octant;
+    const float stone = (vx < 0 ? 1.f - quadrant : quadrant) * node.p[0];
     const float joint = softThreshold(.015f, .085f, std::min(frac(stone), 1.f - frac(stone)));
     const float cut = softThreshold(-.005f, .025f, vy);
-    const float material = mix(.64f, .95f, lattice(seed, unsigned(std::max(0.f, std::floor(stone))), 0));
+    const float material = mix(.64f, .95f, lattice(seed, unsigned(stone), 0));
     return scalar(.09f + .91f * profile * cut * joint * material);
   }
   case Kernel::cracks: {

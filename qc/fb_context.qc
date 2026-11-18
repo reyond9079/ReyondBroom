@@ -32,7 +32,9 @@ void fb_context_query(vector pixel)
         point=hit.point;if(vlen(hit.normal)>.1)normal=normalize(hit.normal);
         if(hit.node>=0){
             int layer=fb_nodes[hit.node].layer;
-            cvar_set("ftebroom_context_layer",itos(layer>=2?fb_nodes[layer].id:0));
+            int layerId=0;
+            if(layer>=2)layerId=fb_nodes[layer].id;
+            cvar_set("ftebroom_context_layer",itos(layerId));
         }
         if(hit.kind==FB_HIT_BRUSH && hit.face>0 && hit.face<=64){
             static brushface_t faces[64];

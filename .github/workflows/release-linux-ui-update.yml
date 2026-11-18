@@ -1,5 +1,5 @@
 name: Stage validated alpha.31 packages
-run-name: Stage alpha.31 from run 44305873105
+run-name: Stage alpha.31 from run 44315951212
 'on':
   workflow_dispatch:
 permissions:
@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE: d5a903476880d69074e79789135502c28beca72f
-      BUILD_HEAD: d5a903476880d69074e79789135502c28beca72f
-      CANDIDATE: '44305873105'
+      SOURCE: 71cc3785ef9445a2c7591fdc43b9e4e59a1117f4
+      BUILD_HEAD: 86f8fdd38d994b9c6a41affd2b762bdb8dd14354
+      CANDIDATE: '44315951212'
       TAG: v0.6.0-alpha.31
     steps:
       - name: Verify successful candidate and draft target
@@ -29,7 +29,7 @@ jobs:
         with:
           pattern: release-packages-*
           github-token: ${{ github.token }}
-          run-id: '44305873105'
+          run-id: '44315951212'
           path: release-packages
       - name: Validate and upload the exact artifacts to the draft
         run: |

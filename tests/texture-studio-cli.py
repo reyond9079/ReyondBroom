@@ -7,7 +7,49 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
+
+
+def check_windows_publish_retry(executable, animation, destination):
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.argtypes = (
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+    )
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel.CloseHandle.restype = wintypes.BOOL
+    invalid = ctypes.c_void_p(-1).value
+    staging = destination.with_name(destination.name + ".incoming")
+    with subprocess.Popen([str(executable), "render", str(animation), "--all-frames", "--out", str(destination)],
+                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        def wait_for(check):
+            deadline = time.monotonic() + 25
+            while not check():
+                assert process.poll() is None and time.monotonic() < deadline
+                time.sleep(.005)
+
+        try:
+            wait_for(staging.is_dir)
+            # An open directory handle with no FILE_SHARE_DELETE blocks moving the complete output.
+            handle = kernel.CreateFileW(str(staging), 0x80000000, 3, None, 3, 0x02000000, None)
+            assert handle != invalid, ctypes.get_last_error()
+            try:
+                wait_for(lambda: (staging / "manifest.json").is_file())
+                time.sleep(.15)
+                assert process.poll() is None and not destination.exists()
+            finally:
+                assert kernel.CloseHandle(handle)
+            stdout, stderr = process.communicate(timeout=30)
+            assert process.returncode == 0 and json.loads(stdout)["state"] == "written", stderr
+            assert (destination / "manifest.json").is_file() and not staging.exists()
+        finally:
+            if process.poll() is None:
+                process.kill()
 
 
 def run(executable, root):
@@ -176,6 +218,8 @@ def run(executable, root):
     sequence_manifest = json.loads((sequence / "manifest.json").read_text(encoding="utf-8"))
     assert sequence_manifest["frames"] == 16
     assert len(list((sequence / "frames").iterdir())) == 16
+    if sys.platform == "win32":
+        check_windows_publish_retry(executable, animation, root / "locked-output")
     catalog_animation = root / "catalog-ripples.rbtex.json"
     assert invoke("new", catalog_animation, "--preset", "liquids-water", "--seed", 42)[0] == 0
     assert json.loads(catalog_animation.read_text(encoding="utf-8"))["provenance"]["catalogVersion"] == 2

@@ -20,7 +20,9 @@
 #include <locale>
 #include <sstream>
 #ifdef _WIN32
+#include <chrono>
 #include <shellapi.h>
+#include <thread>
 #endif
 
 namespace ts = ftebroom::textureStudio;
@@ -96,7 +98,20 @@ public:
   }
   void commit() {
     ts::require(!fs::exists(fs::symlink_status(target)), "output", "The destination appeared during the export.");
+#ifdef _WIN32
+    for (unsigned attempt = 0;; ++attempt) {
+      ts::require(fs::weakly_canonical(staging) == staging, "output", "The staging directory changed during export.");
+      if (MoveFileExW(staging.c_str(), target.c_str(), 0)) break;
+      const auto error = GetLastError();
+      const bool canRetry = error == ERROR_SHARING_VIOLATION || error == ERROR_LOCK_VIOLATION || error == ERROR_ACCESS_DENIED;
+      if (!canRetry || attempt == 8 || fs::exists(fs::symlink_status(target)))
+        throw fs::filesystem_error("Cannot publish the Texture Studio output", staging, target,
+          std::error_code(int(error), std::system_category()));
+      std::this_thread::sleep_for(std::chrono::milliseconds(25 * (attempt + 1)));
+    }
+#else
     fs::rename(staging, target);
+#endif
     committed = true;
   }
 };

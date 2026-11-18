@@ -6,6 +6,12 @@ vector *fb_jam_vertices;
 vector *fb_jam_uv;
 int fb_jam_faces_count,fb_jam_vertices_count;
 .entity fb_jam_next;
+.entity fb_jam_pending_next;
+.float fb_jam_keep,fb_jam_new;
+fb_jam_face_t *fb_jam_pending_faces;
+vector *fb_jam_pending_vertices;
+vector *fb_jam_pending_uv;
+var vector autocvar_ftebroom_jam_plot_half_size='1024 1024 512';
 entity fb_jam_models;
 entity fb_jam_players[25];
 int fb_jam_scene_seen;
@@ -15,11 +21,13 @@ void fb_jam_scene_clear()
     for(int i=0;i<fb_jam_faces_count;i++)strunzone(fb_jam_faces[i].material);
     fb_jam_faces_count=0;fb_jam_vertices_count=0;
     while(fb_jam_models){entity item=fb_jam_models;fb_jam_models=item.fb_jam_next;remove(item);}
+    cvar_set("ftebroom_jam_render_faces","0");cvar_set("ftebroom_jam_render_models","0");
 }
 
 int fb_jam_point_inside(vector p)
 {
-    return fabs(p_x)<=1024.002 && fabs(p_y)<=1024.002 && fabs(p_z)<=512.002;
+    vector halfSize=autocvar_ftebroom_jam_plot_half_size;
+    return fabs(p_x)<=halfSize_x+.002 && fabs(p_y)<=halfSize_y+.002 && fabs(p_z)<=halfSize_z+.002;
 }
 
 int fb_jam_brush_inside(int model,int id)
@@ -97,51 +105,80 @@ void fb_jam_capture()
     fclose(file);
 }
 
+// Stage a complete replacement before releasing anything currently visible.
+// Existing BSP entities retain their identity across edits to a different plot.
 void fb_jam_scene_load()
 {
     int current=cvar("ftebroom_jam_scene");
     if(current==fb_jam_scene_seen)return;
-    fb_jam_scene_seen=current;
-    fb_jam_scene_clear();
-    if(!current)return;
+    if(!current){fb_jam_scene_clear();fb_jam_scene_seen=0;return;}
     filestream file=fopen("jam-world-scene.txt",FILE_READ);
     if((float)file<0)return;
-    if(!fb_jam_faces)fb_jam_faces=memalloc(sizeof(fb_jam_face_t)*32768);
-    if(!fb_jam_vertices){
-        fb_jam_vertices=memalloc(sizeof(vector)*96000);
-        fb_jam_uv=memalloc(sizeof(vector)*96000);
+    string line=fgets(file);
+    if(tokenize(line)!=3 || argv(0)!="RBJAMSCENE" || argv(1)!="1" || stoi(argv(2))!=current){fclose(file);return;}
+    if(!fb_jam_pending_faces)fb_jam_pending_faces=memalloc(sizeof(fb_jam_face_t)*32768);
+    if(!fb_jam_pending_vertices){
+        fb_jam_pending_vertices=memalloc(sizeof(vector)*96000);
+        fb_jam_pending_uv=memalloc(sizeof(vector)*96000);
     }
-    string line;
+    int faceCount=0,vertexCount=0,modelCount=0,complete=FALSE;
+    entity pending=world;
     while((line=fgets(file))){
         int argc=tokenize(line);
-        if(argc<2)continue;
-        if(argv(0)=="model" && argc==6){
-            entity item=spawn();
-            string model=argv(1);
+        if(argc==2 && argv(0)=="RBJAMSCENE-END" && stoi(argv(1))==current){complete=TRUE;break;}
+        if(argc==6 && argv(0)=="model"){
+            if(++modelCount>64)break;
+            string modelPath=argv(1);
             vector position=[stof(argv(2)),stof(argv(3)),stof(argv(4))];
             float yaw=stof(argv(5));
-            setmodel(item,model);
-            if(!item.modelindex){remove(item);continue;}
-            item.solid=SOLID_NOT;
-            item.origin=position;item.angles_y=yaw;
-            item.fb_jam_next=fb_jam_models;fb_jam_models=item;
-        }
-        if(argv(0)=="face" && argc==3 && fb_jam_faces_count<32768){
+            entity item=world;
+            for(entity old=fb_jam_models;old;old=old.fb_jam_next)
+                if(!old.fb_jam_keep && old.model==modelPath && old.origin==position && old.angles_y==yaw){item=old;break;}
+            if(!item){
+                item=spawn();setmodel(item,modelPath);
+                if(!item.modelindex){remove(item);break;}
+                item.fb_jam_new=TRUE;item.solid=SOLID_NOT;
+                item.origin=position;item.angles_y=yaw;
+            }
+            item.fb_jam_keep=TRUE;
+            item.fb_jam_pending_next=pending;pending=item;
+        }else if(argc==3 && argv(0)=="face" && faceCount<32768){
             int count=stoi(argv(2));
-            if(count<3 || count>64 || fb_jam_vertices_count+count>96000)break;
-            fb_jam_face_t *face=&fb_jam_faces[fb_jam_faces_count];
-            face->material=strzone(argv(1));face->first=fb_jam_vertices_count;face->count=count;
+            if(count<3 || count>64 || vertexCount+count>96000)break;
+            fb_jam_face_t *face=&fb_jam_pending_faces[faceCount];
+            face->material=strzone(argv(1));face->first=vertexCount;face->count=count;
             int valid=TRUE;
             for(int j=0;j<count;j++){
                 if(!(line=fgets(file)) || tokenize(line)!=5){valid=FALSE;break;}
-                fb_jam_vertices[fb_jam_vertices_count]=[stof(argv(0)),stof(argv(1)),stof(argv(2))];
-                fb_jam_uv[fb_jam_vertices_count++]=[stof(argv(3)),stof(argv(4)),0];
+                fb_jam_pending_vertices[vertexCount]=[stof(argv(0)),stof(argv(1)),stof(argv(2))];
+                fb_jam_pending_uv[vertexCount++]=[stof(argv(3)),stof(argv(4)),0];
             }
-            if(!valid){strunzone(face->material);fb_jam_vertices_count=face->first;break;}
-            fb_jam_faces_count++;
-        }
+            if(!valid){strunzone(face->material);break;}
+            faceCount++;
+        }else break;
     }
     fclose(file);
+    if(!complete){
+        for(int i=0;i<faceCount;i++)strunzone(fb_jam_pending_faces[i].material);
+        while(pending){entity item=pending;pending=item.fb_jam_pending_next;item.fb_jam_keep=FALSE;if(item.fb_jam_new)remove(item);}
+        return;
+    }
+    for(int i=0;i<fb_jam_faces_count;i++)strunzone(fb_jam_faces[i].material);
+    fb_jam_face_t *previousFaces=fb_jam_faces;
+    vector *previousVertices=fb_jam_vertices;
+    vector *previousUv=fb_jam_uv;
+    fb_jam_faces=fb_jam_pending_faces;fb_jam_pending_faces=previousFaces;
+    fb_jam_vertices=fb_jam_pending_vertices;fb_jam_pending_vertices=previousVertices;
+    fb_jam_uv=fb_jam_pending_uv;fb_jam_pending_uv=previousUv;
+    fb_jam_faces_count=faceCount;fb_jam_vertices_count=vertexCount;
+    while(fb_jam_models){entity item=fb_jam_models;fb_jam_models=item.fb_jam_next;if(!item.fb_jam_keep)remove(item);}
+    fb_jam_models=pending;
+    for(entity item=fb_jam_models;item;item=item.fb_jam_next){
+        item.fb_jam_next=item.fb_jam_pending_next;item.fb_jam_keep=FALSE;item.fb_jam_new=FALSE;
+    }
+    fb_jam_scene_seen=current;
+    cvar_set("ftebroom_jam_render_faces",itos(faceCount));
+    cvar_set("ftebroom_jam_render_models",itos(modelCount));
 }
 
 void fb_jam_draw_players()
@@ -169,18 +206,15 @@ void fb_jam_draw_players()
     }
 }
 
-void fb_jam_border(vector center, float halfSize,vector colour)
+void fb_jam_border(vector center,vector halfSize,vector colour)
 {
-    vector ring[4];
-    ring[0]=center+[-halfSize,-halfSize,0];ring[1]=center+[halfSize,-halfSize,0];
-    ring[2]=center+[halfSize,halfSize,0];ring[3]=center+[-halfSize,halfSize,0];
-    for(int i=0;i<4;i++){
+    vector corner[8];
+    for(int i=0;i<8;i++)
+        corner[i]=center+[(i&1)?halfSize_x:-halfSize_x,(i&2)?halfSize_y:-halfSize_y,(i&4)?halfSize_z:-halfSize_z];
+    for(int i=0;i<8;i++)for(int axis=0;axis<3;axis++)if(!(i&(1i<<axis))){
         R_BeginPolygon("ftebroom/jamborder");
-        R_PolygonVertex(ring[i],'0 0',colour,1);
-        R_PolygonVertex(ring[(i+1)&3],'0 0',colour,1);R_EndPolygon();
-        R_BeginPolygon("ftebroom/jamborder");
-        R_PolygonVertex(ring[i],'0 0',colour,.85);
-        R_PolygonVertex(ring[i]+'0 0 512','0 0',colour,.6);R_EndPolygon();
+        R_PolygonVertex(corner[i],'0 0',colour,.85);
+        R_PolygonVertex(corner[i|(1i<<axis)],'0 0',colour,.85);R_EndPolygon();
     }
 }
 
@@ -193,9 +227,9 @@ void fb_jam_world_draw()
     for(int y=0;y<5;y++)for(int x=0;x<5;x++){
         if(x>=1 && x<=3 && y>=1 && y<=3)continue;
         vector center=[x*2048,-y*2048,0]-own;
-        fb_jam_border(center,1024,center=='0 0 0'?'.20 1 .76':'.15 .62 1');
+        fb_jam_border(center,autocvar_ftebroom_jam_plot_half_size,center=='0 0 0'?'.20 1 .76':'.15 .62 1');
     }
-    fb_jam_border('4096 -4096 0'-own,3072,'.7 .45 .99');
+    fb_jam_border('4096 -4096 0'-own,[3072,3072,autocvar_ftebroom_jam_plot_half_size_z],'.7 .45 .99');
     if(cvar("ca_brush_view"))return;
     fb_jam_draw_players();
     for(entity item=fb_jam_models;item;item=item.fb_jam_next)addentity(item);

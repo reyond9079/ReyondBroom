@@ -10,6 +10,7 @@ import subprocess
 # Edges are consumers/integration checks, not just matching file names. Shared
 # resource/input/render changes exercise authoring integration, not all botany.
 DEPENDENCIES = {
+    'jam_world': {'render', 'entities'},
     'world_architect': {'world_core', 'world_ui', 'world_legacy'},
     'world_core': {'world_ui'},
     'world_ui': {'placement', 'world_legacy'},
@@ -29,11 +30,14 @@ DEPENDENCIES = {
     'updater': set(), 'onboarding': set(), 'ui': {'viewport', 'compilation_ui'},
     'build': {'smoke'}, 'ci': {'ci_unit'},
 }
-SUITES = {'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation', 'compilation_ui', 'resource_lookup',
+SUITES = {'jam_world', 'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation', 'compilation_ui', 'resource_lookup',
           'audio_core', 'audio_ui', 'audio_archive', 'plant_core', 'plant_ui', 'character_core', 'character_ui',
           'model_ui', 'placement', 'viewport', 'grid', 'browser', 'onboarding',
           'updater', 'entities', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
 RULES = [
+    (['native/ftebroom_jam_world.h', 'native/ftebroom_jam_scene.h', 'native/ftebroom_jam_ui.h',
+      'native/ftebroom_jam_qa.h', 'qc/fb_jam_world*.qc', 'scripts/test-jam-world.py',
+      'tests/mapping-jam-world.cpp'], {'jam_world'}),
     (['qc/fb_entity_links.qc', 'qc/fb_visual.qc', 'scripts/test-entity-link-colors.py'], {'render'}),
     (['native/ftebroom_entities.h', 'native/ftebroom_entity_defs.h',
       'qc/editor_ents.qc', 'qc/fb_entity_defs.qc', 'qc/fb_entity_tests.qc',

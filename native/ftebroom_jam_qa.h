@@ -18,7 +18,7 @@ bool jamQaWorldTransitions()
   const auto* authorPlot=std::getenv("REYONDBROOM_JAM_QA_AUTHOR");
   if (!authorPlot) authorPlot="A1";
   using namespace std::chrono;
-  static const auto deadline=steady_clock::now()+seconds(110);
+  static const auto deadline=steady_clock::now()+seconds(std::getenv("REYONDBROOM_JAM_QA_CONTINUITY")?180:110);
   static int step=0;
   static std::size_t initialFaces=0;
   static std::string initialRevision, initialHubModel, initialHubVersion;
@@ -26,6 +26,7 @@ bool jamQaWorldTransitions()
   const bool testHub=std::getenv("REYONDBROOM_JAM_QA_HUB")!=nullptr;
   const bool testChat=std::getenv("REYONDBROOM_JAM_QA_CHAT")!=nullptr;
   const bool testPose=std::getenv("REYONDBROOM_JAM_QA_POSE")!=nullptr;
+  const bool testContinuity=std::getenv("REYONDBROOM_JAM_QA_CONTINUITY")!=nullptr;
   if (step<0) return true;
   const auto signals=JamFs::u8path(directory);
   const auto received=[&](const char* signal) { return JamFs::is_regular_file(signals/signal); };
@@ -43,6 +44,28 @@ bool jamQaWorldTransitions()
         step=2;
       }
     } else if (step>=2 && jamWorld.active) {
+      if(testContinuity && std::string_view(ownPlot)!=authorPlot) {
+        static bool armed=false;
+        static unsigned frames=0;
+        const bool rendered=cvars->GetFloat("ftebroom_jam_render_faces")>0 ||
+          cvars->GetFloat("ftebroom_jam_render_models")>(jamWorld.hub.model.empty()?0:1);
+        if(rendered)armed=true;
+        if(armed && step>=3) {
+          ++frames;
+          if(!rendered || (jamWorld.lastScene.find("face ")==std::string::npos &&
+             jamWorld.lastScene.find("model maps/ftebroom-build/world-")==std::string::npos))
+            throw std::runtime_error("A remote edit discarded the visible geometry.");
+          if(received("burst-finished") && !received("burst-visible")) {
+            const auto preview=jamWorld.previews.find(authorPlot);
+            if(preview!=jamWorld.previews.end() && preview->second.model.empty() &&
+               preview->second.faces.size()>=initialFaces+48) {
+              core->Print(("FTEBROOM_JAM_CONTINUITY_PASS frames="+std::to_string(frames)+" missing=0 tall_brushes=8\n").c_str());
+              command("ftebroom_camera_restore -2300 -2600 2100 38 85 0 90\nin 0.2 screenshot jam-world-continuity.png\n");
+              send("burst-visible");
+            }
+          }
+        }
+      }
       if (testChat && step==2) {
         static int chatStep=0;
         static auto screenshotAt=steady_clock::time_point{};
@@ -140,6 +163,16 @@ bool jamQaWorldTransitions()
         return steady_clock::now()>=captureAt;
       };
       if (std::string_view(ownPlot)==authorPlot) {
+        if(testContinuity && step==2 && received("initial-map") && !received("burst-visible")) {
+          static unsigned edits=0;
+          static auto next=steady_clock::time_point{};
+          if(edits<8 && steady_clock::now()>=next) {
+            command(("ftebroom_box "+std::to_string(320+48*edits)+" 320 960 32 32 32\n").c_str());
+            ++edits;next=steady_clock::now()+milliseconds(550);
+          }
+          if(edits==8 && !received("burst-finished"))send("burst-finished");
+          return true;
+        }
         if (step==2 && received("initial-map") && !jamBusy() && !assetsLoading &&
             pendingDocumentFile.empty() && !savingDocument) {
           jamRequestUpload();
@@ -176,12 +209,13 @@ bool jamQaWorldTransitions()
         } else if (step==3 && inScene) {
           if (!JamFs::is_regular_file(ftebroom::filesystemPath(documentPath(view.model))))
             throw std::runtime_error("The remote BSP did not reach the local scene.");
-          if (testChat) {
+          if (testChat || testContinuity) {
             auto lit=documentPath(view.model);lit.replace_extension(".lit");
             if (cvars->GetFloat("ftebroom_bsp_preview") || cvars->GetFloat("r_fullbright") ||
                 !JamFs::is_regular_file(ftebroom::filesystemPath(lit)))
               throw std::runtime_error("Remote BSP lighting was unavailable in a local MAP viewport.");
-            core->Print("FTEBROOM_JAM_CHAT_PASS remote_lit_bsp_in_map_view\n");
+            core->Print(testChat?"FTEBROOM_JAM_CHAT_PASS remote_lit_bsp_in_map_view\n":
+                               "FTEBROOM_JAM_LIGHT_PASS remote_lit_bsp_in_map_view\n");
           }
           send("published-bsp");
           step=4;

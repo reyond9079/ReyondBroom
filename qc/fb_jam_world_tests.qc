@@ -8,6 +8,8 @@ void fb_jam_expect_rejection(int marker,int count,string operation)
 void fb_jam_tool_test()
 {
     if(!cvar("ftebroom_skip_setup"))return;
+    vector savedHalfSize=autocvar_ftebroom_jam_plot_half_size;
+    cvar_set("ftebroom_jam_plot_half_size","1024 1024 512");
     fb_cancel();
     cvar_set("ftebroom_jam_world","1");
     cvar_set("ca_grid","16");
@@ -160,6 +162,49 @@ void fb_jam_tool_test()
     fb_grid_default();
     fb_tool_deactivate();
 
+    cvar_set("ftebroom_jam_plot_half_size","1024 1024 1024");
+    fb_transform_expect(fb_jam_point_inside('1024 1024 1024') && fb_jam_point_inside('-1024 -1024 -1024') &&
+        !fb_jam_point_inside('0 0 1024.01') && !fb_jam_point_inside('0 0 -1024.01'),"jam_cubic_height_matches_horizontal_limits");
+    int tall=fb_createbox('0 0 992','64 64 64');
+    fb_transform_expect(tall!=0,"jam_cubic_accepts_top_at_1024");
+    marker=history;rejected=cvar("ftebroom_jam_bounds_rejected");
+    fb_move_numeric('0 0 16');fb_jam_expect_rejection(marker,rejected,"move_above_new_ceiling");
+    fb_transform_expect(fb_createbox('0 0 -992','64 64 64')!=0,"jam_cubic_accepts_bottom_at_minus_1024");
+    marker=history;rejected=cvar("ftebroom_jam_bounds_rejected");
+    fb_move_numeric('0 0 -16');fb_jam_expect_rejection(marker,rejected,"move_below_new_floor");
+    cvar_set("ftebroom_jam_plot_half_size",vtos(savedHalfSize));
+    // A scene file may be missing or incomplete while a replacement is prepared.
+    // Neither condition may discard the visible snapshot or rebuild its BSPs.
+    string sceneModel="model maps/ftebroom-build/jam-scene-qa.bsp 2048 0 0 0\n";
+    string sceneFace="face wall_pink_b 3\n1472 -64 64 0 0\n1472 64 64 1 0\n1472 0 128 0 1\n";
+    filestream sceneFile=fopen("jam-world-scene.txt",FILE_WRITE);
+    fputs(sceneFile,strcat("RBJAMSCENE 1 1001\n",sceneModel,sceneFace,"RBJAMSCENE-END 1001\n"));fclose(sceneFile);
+    cvar_set("ftebroom_jam_scene","1001");fb_jam_scene_load();
+    entity stableModel=fb_jam_models;
+    fb_transform_expect(fb_jam_scene_seen==1001 && fb_jam_faces_count==1 && stableModel && stableModel.modelindex,
+                        "jam_scene_complete_snapshot_loaded");
+    cvar_set("ftebroom_jam_scene","1002");fb_jam_scene_load();
+    fb_transform_expect(fb_jam_scene_seen==1001 && fb_jam_faces_count==1 && fb_jam_models==stableModel,
+                        "jam_scene_stale_file_generation_keeps_geometry");
+    sceneFile=fopen("jam-world-scene.txt",FILE_WRITE);
+    fputs(sceneFile,strcat("RBJAMSCENE 1 1002\n",sceneModel,"face wall_pink_b 3\n1472 -64 64 0 0\n"));fclose(sceneFile);
+    cvar_set("ftebroom_jam_scene","1002");fb_jam_scene_load();
+    fb_transform_expect(fb_jam_scene_seen==1001 && fb_jam_faces_count==1 && fb_jam_models==stableModel,
+                        "jam_scene_incomplete_replacement_keeps_geometry_and_bsp");
+    fremove("jam-world-scene.txt");fb_jam_scene_load();
+    fb_transform_expect(fb_jam_scene_seen==1001 && fb_jam_faces_count==1 && fb_jam_models==stableModel,
+                        "jam_scene_missing_replacement_keeps_geometry_and_bsp");
+    sceneFile=fopen("jam-world-scene.txt",FILE_WRITE);
+    fputs(sceneFile,strcat("RBJAMSCENE 1 1002\n",sceneModel,sceneFace,sceneFace,"RBJAMSCENE-END 1002\n"));fclose(sceneFile);
+    fb_jam_scene_load();
+    fb_transform_expect(fb_jam_scene_seen==1002 && fb_jam_faces_count==2 && fb_jam_models==stableModel,
+                        "jam_scene_complete_replacement_reuses_unchanged_bsp");
+    sceneFile=fopen("jam-world-scene.txt",FILE_WRITE);
+    fputs(sceneFile,"RBJAMSCENE 1 1003\nRBJAMSCENE-END 1003\n");fclose(sceneFile);
+    cvar_set("ftebroom_jam_scene","1003");fb_jam_scene_load();
+    fb_transform_expect(fb_jam_scene_seen==1003 && !fb_jam_faces_count && !fb_jam_models,
+                        "jam_scene_explicit_empty_snapshot_removes_geometry");
+    cvar_set("ftebroom_jam_scene","0");fb_jam_scene_load();
     cvar_set("ftebroom_jam_world","0");
 }
 
@@ -180,7 +225,7 @@ int fb_jam_foreign_pick_test(int requireNetworkScene)
     if(!requireNetworkScene) {
         filestream file=fopen("jam-world-scene.txt",FILE_WRITE);
         if((float)file<0)return FALSE;
-        fputs(file,"face wall_pink_b 4\n1472 -64 64 0 0\n1472 64 64 1 0\n1472 64 192 1 1\n1472 -64 192 0 1\n");
+        fputs(file,"RBJAMSCENE 1 129\nface wall_pink_b 4\n1472 -64 64 0 0\n1472 64 64 1 0\n1472 64 192 1 1\n1472 -64 192 0 1\nRBJAMSCENE-END 129\n");
         fclose(file);
         cvar_set("ftebroom_jam_scene","129");
         fb_jam_scene_load();

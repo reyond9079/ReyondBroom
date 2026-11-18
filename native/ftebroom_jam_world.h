@@ -4,12 +4,10 @@
 #include <locale>
 #include "ftebroom_jam_chat.h"
 #include "ftebroom_jam_pose.h"
+#include "ftebroom_jam_scene.h"
 
 namespace {
-struct JamWorldPreview {
-  std::string revision, model;
-  JamJson faces=JamJson::array();
-};
+using JamWorldPreview=jam::WorldPreview;
 struct JamWorldHub {
   std::string version, model;
 };
@@ -22,7 +20,7 @@ struct JamWorldState {
   JamJson state, draft;
   std::map<std::string,JamWorldPreview> previews;
   std::map<std::string,std::string> online;
-  std::string outgoingMode, activePlot, document, lastScene, sceneKey, session, draftDocument;
+  std::string outgoingMode, activePlot, document, lastScene, sceneKey, session, draftDocument, halfSize;
   std::string syncSession, syncDocument, readyDocument, contentSession, hubSession, requestedPlot, requestedMode, requestedRevision;
   std::optional<std::string> savedFullbright;
   JamWorldHub hub;
@@ -49,7 +47,7 @@ bool jamWorldPlot(const std::string& plot)
 
 std::array<float,3> jamWorldCenter(const std::string& plot)
 {
-  return {float(plot[1]-'1')*2048.f,-float(plot[0]-'A')*2048.f,0.f};
+  return jam::worldPlotCenter(plot);
 }
 
 void jamWorldRefreshHub()
@@ -104,8 +102,7 @@ void jamWorldRefreshHub()
 
 bool jamWorldMaterial(const std::string& name)
 {
-  return !name.empty() && name.size()<=64 && name.find("..")==name.npos &&
-    name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+*/_.{}!-")==name.npos;
+  return jam::worldMaterial(name);
 }
 
 JamJson jamReadWorldCapture(int marker)
@@ -118,6 +115,7 @@ JamJson jamReadWorldCapture(int marker)
   int found=0;
   if (!(input>>header>>found) || header!="RBJAM1" || found!=marker) return nullptr;
   JamJson faces=JamJson::array();
+  const auto halfSize=jam::worldHalfSize(jamLocal.rules);
   std::string line;
   std::getline(input,line);
   bool complete=false;
@@ -138,7 +136,7 @@ JamJson jamReadWorldCapture(int marker)
       const auto quantize=[](float v,float limit) {
         return std::round((std::abs(v)<=limit+.002f ? std::clamp(v,-limit,limit) : v)*100.0)/100.0;
       };
-      points.push_back({quantize(pos[0],1024),quantize(pos[1],1024),quantize(pos[2],512),
+      points.push_back({quantize(pos[0],halfSize[0]),quantize(pos[1],halfSize[1]),quantize(pos[2],halfSize[2]),
         std::round(pos[3]*10000.0)/10000.0,std::round(pos[4]*10000.0)/10000.0});
     }
     if (points.size()==std::size_t(count)) faces.push_back({material,std::move(points)});
@@ -171,46 +169,12 @@ void jamWorldPresence(const JamJson& state)
 
 void jamWriteWorldScene(const std::string& local)
 {
-  std::string key=local+"|"+jamWorld.hub.model;
-  for(const auto& other:jamWorld.state.at("plots")) {
-    const auto plot=jamField(other,"plot"),revision=jamField(other,"revision");
-    const auto cached=jamWorld.previews.find(plot);
-    if(plot!=local && cached!=jamWorld.previews.end() && cached->second.revision==revision)
-      key+="|"+plot+":"+revision+":"+cached->second.model;
-  }
+  auto key=jam::worldSceneKey(jamWorld.state,local,jamWorld.hub.model,jamWorld.previews);
   if(key==jamWorld.sceneKey)return;
-  std::ostringstream scene;
-  scene.imbue(std::locale::classic());
-  scene<<std::setprecision(7);
-  const auto own=jamWorldCenter(local);
-  if (!jamWorld.hub.model.empty()) {
-    const auto center=jamWorldCenter("C3");
-    scene<<"model "<<jamWorld.hub.model<<' '<<center[0]-own[0]<<' '<<center[1]-own[1]<<" 0 0\n";
-  }
-  for (const auto& other:jamWorld.state.at("plots")) {
-    const auto plot=jamField(other,"plot");
-    if (plot==local || !jamWorldPlot(plot)) continue;
-    auto offset=jamWorldCenter(plot);
-    for (int axis=0;axis<3;axis++) offset[axis]-=own[axis];
-    const auto cached=jamWorld.previews.find(plot);
-    if (cached==jamWorld.previews.end() || cached->second.revision!=jamField(other,"revision")) continue;
-    if (!cached->second.model.empty()) {
-      scene<<"model "<<cached->second.model<<' '<<offset[0]<<' '<<offset[1]<<" 0 0\n";
-      continue;
-    }
-    for (const auto& face:cached->second.faces) {
-      const auto material=face.at(0).get<std::string>();
-      if (!jamWorldMaterial(material)) continue;
-      scene<<"face "<<material<<' '<<face.at(1).size()<<'\n';
-      for (const auto& position:face.at(1))
-        scene<<position.at(0).get<float>()+offset[0]<<' '<<position.at(1).get<float>()+offset[1]
-          <<' '<<position.at(2).get<float>()<<' '<<(position.size()==5?position[3].get<float>():position[0].get<float>()/64)
-          <<' '<<(position.size()==5?position[4].get<float>():position[2].get<float>()/64)<<'\n';
-    }
-  }
-  auto result=scene.str();
+  auto result=jam::worldScene(jamWorld.state,local,jamWorld.hub.model,jamWorld.previews);
   if(result!=jamWorld.lastScene) {
-    jam::writeBytes(documentPath("data/jam-world-scene.txt"),result);
+    jam::writeBytes(documentPath("data/jam-world-scene.txt"),
+      jam::worldScene(jamWorld.state,local,jamWorld.hub.model,jamWorld.previews,jamWorld.scene+1));
     jamWorld.lastScene=std::move(result);
     cvars->SetFloat("ftebroom_jam_scene",++jamWorld.scene);
   }
@@ -300,6 +264,8 @@ void jamWorldTick()
     jamWorld.session=session;
     jamWorld.state=nullptr;
     jamWorld.previews.clear();
+    jamWorld.lastScene.clear();
+    cvars->SetFloat("ftebroom_jam_scene",0);
     jamWorld.hub={};
     jamWorld.sceneKey.clear();
     jamWorld.readyDocument.clear();
@@ -321,6 +287,14 @@ void jamWorldTick()
       cvars->SetFloat("ftebroom_jam_scene",0);
       jamWorld.lastScene.clear();
       jamWorld.sceneKey.clear();
+    }
+  }
+  if (editing) {
+    const auto size=jam::worldHalfSize(jamLocal.rules);
+    const auto text=std::to_string(size[0])+" "+std::to_string(size[1])+" "+std::to_string(size[2]);
+    if (text!=jamWorld.halfSize) {
+      cvars->SetString("ftebroom_jam_plot_half_size",text.c_str());
+      jamWorld.halfSize=text;
     }
   }
   const bool ownPreview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
@@ -499,11 +473,9 @@ void jamWorldTick()
   if (editing && jamWorld.state.contains("plots") && now-jamWorld.lastSync<seconds(15)) {
     try {jamWorldFetchContent(local);jamWorldRefreshHub();jamWriteWorldScene(local);}
     catch (const std::exception& error) {jamWorldIssue("scene",&error);}
-  } else if (editing && !jamWorld.lastScene.empty()) {
-    jamWorld.lastScene.clear();
-    jamWorld.sceneKey.clear();
-    cvars->SetFloat("ftebroom_jam_scene",0);
   }
+  // A heartbeat timeout does not invalidate already downloaded read-only maps.
+  // Explicit leave/account changes clear them; fresh metadata handles removals.
 }
 
 void jamWorldNotifications()

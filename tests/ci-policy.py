@@ -28,6 +28,15 @@ prepared = module('verify-prepared')
 
 
 class EditorScopeTests(unittest.TestCase):
+    def test_jam_world_changes_select_real_preview_and_boundary_consumers(self):
+        for path in ('native/ftebroom_jam_world.h','native/ftebroom_jam_scene.h',
+                     'native/ftebroom_jam_ui.h','native/ftebroom_jam_qa.h',
+                     'qc/fb_jam_world.qc','qc/fb_jam_world_tests.qc',
+                     'tests/mapping-jam-world.cpp','scripts/test-jam-world.py'):
+            selected=planner.plan([path])
+            self.assertTrue({'jam_world','entities','viewport','placement','grid'}<=set(selected['suites']),path)
+            self.assertFalse(set(selected['suites']) & {'character_core','world_core','plant_core','updater','compilation'},path)
+
     def test_rb36_host_changes_keep_unrelated_edits_on_the_full_path(self):
         for path,(groups,replacements) in planner.RB36_HOST_SCOPES.items():
             before=''.join(old for old,new in replacements)
@@ -228,7 +237,10 @@ class ScopeTests(unittest.TestCase):
         self.assertTrue(planner.plan(files+['native/ftebroom_run.h'])['flags']['compilation'])
 
     def test_real_git_rename_crosses_subsystems_and_invalid_base_is_not_empty(self):
-        with tempfile.TemporaryDirectory() as folder:
+        # A caller's cross-worktree Git variables must never redirect these
+        # deliberately mutating fixture commands into the caller's repository.
+        git_environment={k:v for k,v in os.environ.items() if not k.startswith('GIT_')}
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ,git_environment,clear=True):
             root = Path(folder)
             def git(*args): return subprocess.check_output(['git', '-C', folder, *args], stderr=subprocess.DEVNULL).decode().strip()
             git('init', '-q'); git('config', 'user.email', 'ci@example.invalid'); git('config', 'user.name', 'CI')

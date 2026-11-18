@@ -1580,15 +1580,21 @@ static void studioNodes() {
     const auto dx = center.x - mouse.x, dy = center.y - mouse.y;
     return dx * dx + dy * dy <= 81.f;
   };
+  const auto pinVisible = [&](ImVec2 center) {
+    constexpr float margin = 9.f;
+    return center.x >= origin.x - margin && center.x <= origin.x + area.x + margin &&
+           center.y >= origin.y - margin && center.y <= origin.y + area.y + margin;
+  };
   for (size_t index = 0; index < nodes.size(); ++index) {
     const auto& n = nodes[index];
-    auto point = n.value("position", rbTexture::Json::array());
     float x = float(index % 4) * 232, y = float(index / 4) * 112;
-    if (point.is_array() && point.size() == 2 && point[0].is_number() && point[1].is_number()) {
-      x = std::clamp(point[0].get<float>(), -30000.f, 30000.f);
-      y = std::clamp(point[1].get<float>(), -30000.f, 30000.f);
+    const auto point = n.find("position");
+    if (point != n.end() && point->is_array() && point->size() == 2 &&
+        (*point)[0].is_number() && (*point)[1].is_number()) {
+      x = std::clamp((*point)[0].get<float>(), -30000.f, 30000.f);
+      y = std::clamp((*point)[1].get<float>(), -30000.f, 30000.f);
     }
-    const auto id = n.at("id").get<std::string>();
+    const auto& id = n.at("id").get_ref<const std::string&>();
     const auto position = ImVec2{origin.x + pan.x + x * zoom, origin.y + pan.y + y * zoom};
     positions[id] = position;
     const auto& ports = nodePins.at(id);
@@ -1606,8 +1612,8 @@ static void studioNodes() {
     place(ports.inputs, position.x, receivePins);
   }
   for (const auto& e : edges) {
-    auto start = positions.find(e.at("fromNode").get<std::string>());
-    auto end = positions.find(e.at("toNode").get<std::string>());
+    const auto start = positions.find(e.at("fromNode").get_ref<const std::string&>());
+    const auto end = positions.find(e.at("toNode").get_ref<const std::string&>());
     if (start == positions.end() || end == positions.end()) continue;
     const auto from = sendPins.find({start->first, e.at("fromPort").get<std::string>()});
     const auto to = receivePins.find({end->first, e.at("toPort").get<std::string>()});
@@ -1619,15 +1625,14 @@ static void studioNodes() {
   }
   for (size_t index = 0; index < nodes.size(); ++index) {
     const auto& n = nodes[index];
-    auto id = n.at("id").get<std::string>();
-    auto type = n.at("type").get<std::string>();
+    const auto& id = n.at("id").get_ref<const std::string&>();
     const auto a = positions.at(id);
     const ImVec2 b{a.x + card.x, a.y + heights.at(id)};
     if (b.x < origin.x || b.y < origin.y || a.x > origin.x + area.x || a.y > origin.y + area.y) continue;
     const bool selected = int(index) == s.selectedNode || s.groupSelection.count(id);
     painter->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_FrameBg), 4);
     painter->AddRect(a, b, selected ? accent : color, 4, 0, selected ? 2.f : 1.f);
-    const auto label = n.value("label", type);
+    const auto label = n.value("label", n.at("type").get_ref<const std::string&>());
     painter->AddText(ImGui::GetFont(), std::clamp(zoom * 20.f, 10.f, 22.f),
       {a.x + 6, a.y + 5}, ImGui::GetColorU32(ImGuiCol_Text), label.c_str());
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
@@ -1652,6 +1657,7 @@ static void studioNodes() {
     return color;
   };
   for (const auto& [key, pin] : sendPins) {
+    if (!pinVisible(pin.center)) continue;
     const bool over = hovered && nearPin(pin.center);
     painter->AddCircleFilled(pin.center, over ? 5.f : 3.5f, pinColor(pin.type));
     if (over) {
@@ -1667,6 +1673,7 @@ static void studioNodes() {
   if (sending != sendPins.end())
     painter->AddLine(sending->second.center, mouse, pinColor(sending->second.type), 2.f);
   for (const auto& [key, pin] : receivePins) {
+    if (!pinVisible(pin.center)) continue;
     const bool over = hovered && nearPin(pin.center);
     painter->AddCircleFilled(pin.center, over ? 5.f : 3.5f, pinColor(pin.type));
     if (!over) continue;

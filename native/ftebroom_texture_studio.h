@@ -875,22 +875,67 @@ static float studioPresetThumbnail(const std::string& id, Recipe recipe) {
     2 * style.FramePadding.x - 2 * style.ItemSpacing.x);
 }
 
-static void studioSaveUserPreset(const std::string& label) {
+static std::filesystem::path studioUserPresetFolder() {
+  return documentPath("data/texture-studio/user-presets");
+}
+
+static void studioSaveUserPreset(rbTexture::Document doc, const rbTexture::Assets& assets,
+                                 const std::filesystem::path& originalFolder, const std::string& label) {
   studioLoadLibrary();
   auto& s = textureStudio;
+  rbTexture::require(!label.empty() && label.size() <= 80, "library", "Enter a name up to 80 bytes.");
   rbTexture::require(s.userPresets.size() < 64, "library", "The user preset library holds up to 64 presets.");
-  auto doc = textureStudioDoc();
   const auto id = ftebroom::bb::uuid();
   doc.source["name"] = label;
   doc.source["documentId"] = id;
-  const auto folder = documentPath("data/texture-studio/user-presets");
+  const auto folder = studioUserPresetFolder();
+  rbTexture::compile(doc, {}, assets);
   std::filesystem::create_directories(folder);
-  rbTexture::compile(doc, {}, textureStudio.assets);
-  studioCopyOriginals(folder);
-  ftebroom::bb::atomicWrite(folder / (id + ".rbtex.json"), doc.save());
+  for (const auto& reference : doc.source.at("assetReferences")) {
+    const auto relative = rbTexture::imageRelativePath(rbTexture::idField(reference, "sha256", "assets"));
+    studioWriteOriginal(folder, relative, rbTexture::readOriginal(originalFolder, reference));
+  }
+  const auto file = folder / (id + ".rbtex.json");
+  ftebroom::bb::atomicWrite(file, doc.save());
   s.userPresets.emplace_back(id, label);
-  studioSaveLibrary();
+  try {
+    studioSaveLibrary();
+  } catch (...) {
+    s.userPresets.pop_back();
+    std::error_code cleanup;
+    std::filesystem::remove(file, cleanup);
+    throw;
+  }
   s.message = "Saved to your preset library.";
+}
+
+static rbTexture::Document studioReadUserPreset(const std::string& id) {
+  return rbTexture::open(ftebroom::bb::readFile(studioUserPresetFolder() / (id + ".rbtex.json"),
+    rbTexture::maxSourceBytes));
+}
+
+static void studioRemoveUserPreset(const std::string& id) {
+  auto& s = textureStudio;
+  auto presets = s.userPresets;
+  auto favorites = s.favorites;
+  auto recent = s.recentPresets;
+  s.userPresets.erase(std::remove_if(s.userPresets.begin(), s.userPresets.end(),
+    [&](const auto& preset) { return preset.first == id; }), s.userPresets.end());
+  s.favorites.erase(id);
+  s.recentPresets.erase(std::remove(s.recentPresets.begin(), s.recentPresets.end(), id), s.recentPresets.end());
+  try {
+    studioSaveLibrary();
+  } catch (...) {
+    s.userPresets = std::move(presets);
+    s.favorites = std::move(favorites);
+    s.recentPresets = std::move(recent);
+    throw;
+  }
+  // Saved sources have their own graphs. Other presets and open sources may share the originals.
+  std::error_code cleanup;
+  std::filesystem::remove(studioUserPresetFolder() / (id + ".rbtex.json"), cleanup);
+  s.message = cleanup ? "Removed from the library. The local preset file could not be deleted."
+    : "Removed from your preset library.";
 }
 
 static void studioOpenFile() {
@@ -2169,6 +2214,9 @@ static void textureStudioPanel() {
       ImGui::EndPopup();
     }
     if (ImGui::BeginPopupModal("New source?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      static std::string presetActionId, presetActionLabel;
+      static std::array<char, 81> duplicateName{};
+      const char* presetDialog = nullptr;
       const float listWidth = std::min(490 * uiScale(), screen.x - 60);
       const float listHeight = std::clamp(screen.y - 195 * uiScale(), 110.f, 345 * uiScale());
       ImGui::TextUnformatted("Choose a preset. Save your current source before replacing it.");
@@ -2257,8 +2305,8 @@ static void textureStudioPanel() {
             matched = true;
             ImGui::PushID(id.c_str());
             if (ImGui::Selectable(label.c_str(), false, 0, {320, 0})) studioAction([&] {
-              const auto folder = documentPath("data/texture-studio/user-presets");
-              auto doc = rbTexture::open(ftebroom::bb::readFile(folder / (id + ".rbtex.json"), rbTexture::maxSourceBytes));
+              const auto folder = studioUserPresetFolder();
+              auto doc = studioReadUserPreset(id);
               auto assets = rbTexture::loadAssets(doc, folder);
               rbTexture::compile(doc, {}, assets);
               doc.source["documentId"] = ftebroom::bb::uuid();
@@ -2267,6 +2315,22 @@ static void textureStudioPanel() {
               selectedAssetRoot = folder;
               selectedId = id;
             });
+            runUiRecordGlobal("texture-studio/user-preset/" + id);
+            if (ImGui::BeginPopupContextItem()) {
+              ImGui::BeginDisabled(s.userPresets.size() >= 64);
+              const bool duplicate = ImGui::MenuItem("Duplicate preset…");
+              runUiRecordGlobal("texture-studio/user-preset/duplicate");
+              ImGui::EndDisabled();
+              const bool remove = ImGui::MenuItem("Remove preset…");
+              runUiRecordGlobal("texture-studio/user-preset/remove");
+              if (duplicate || remove) {
+                presetActionId = id;
+                presetActionLabel = label;
+                duplicateName.fill(0);
+                presetDialog = duplicate ? "Duplicate user preset" : "Remove user preset";
+              }
+              ImGui::EndPopup();
+            }
             favorite(id);
             ImGui::PopID();
           }
@@ -2274,6 +2338,37 @@ static void textureStudioPanel() {
         if (!matched) ImGui::TextDisabled("No presets match this view.");
       }
       ImGui::EndChild();
+      if (presetDialog) ImGui::OpenPopup(presetDialog);
+      if (ImGui::BeginPopupModal("Duplicate user preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::InputTextWithHint("Name", presetActionLabel.c_str(), duplicateName.data(), duplicateName.size());
+        runUiRecordGlobal("texture-studio/user-preset/duplicate-name");
+        ImGui::BeginDisabled(!duplicateName[0]);
+        if (ImGui::Button("Duplicate")) studioAction([&] {
+          auto doc = studioReadUserPreset(presetActionId);
+          const auto folder = studioUserPresetFolder();
+          auto assets = rbTexture::loadAssets(doc, folder);
+          studioSaveUserPreset(std::move(doc), assets, folder, duplicateName.data());
+          ImGui::CloseCurrentPopup();
+        });
+        runUiRecordGlobal("texture-studio/user-preset/duplicate-confirm");
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
+        ImGui::EndPopup();
+      }
+      if (ImGui::BeginPopupModal("Remove user preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("Remove %s from your library?", presetActionLabel.c_str());
+        if (ImGui::Button("Remove")) studioAction([&] {
+          studioRemoveUserPreset(presetActionId);
+          ImGui::CloseCurrentPopup();
+        });
+        runUiRecordGlobal("texture-studio/user-preset/remove-confirm");
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
+        ImGui::EndPopup();
+      }
       if (selected) {
         studioAction([&] {
           studioAutosave();
@@ -2306,14 +2401,17 @@ static void textureStudioPanel() {
     if (writable) {
       nextButton("Save preset…");
       if (ImGui::Button("Save preset…")) ImGui::OpenPopup("Save user preset");
+      runUiRecordGlobal("texture-studio/save-preset");
       if (ImGui::BeginPopupModal("Save user preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         static char label[81]{};
         ImGui::InputText("Name", label, sizeof(label));
+        runUiRecordGlobal("texture-studio/save-preset-name");
         ImGui::BeginDisabled(!label[0]);
         if (ImGui::Button("Save preset")) studioAction([&] {
-          studioSaveUserPreset(label);
+          studioSaveUserPreset(textureStudioDoc(), s.assets, s.assetFolder, label);
           ImGui::CloseCurrentPopup();
         });
+        runUiRecordGlobal("texture-studio/save-preset-confirm");
         ImGui::EndDisabled();
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();

@@ -31,6 +31,7 @@ def main():
     cli.add_argument("--profile", default="fte", choices=("fte", "quake1", "quake2", "quake3", "halflife"))
     cli.add_argument("--three-faces", action="store_true")
     cli.add_argument("--layout-only", action="store_true")
+    cli.add_argument("--preset-library", action="store_true")
     cli.add_argument("--theme", choices=("light", "dark"), default="dark")
     cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
     cli.add_argument("--size", choices=("1280x720", "1440x900", "1920x1080"), default="1440x900")
@@ -137,6 +138,50 @@ def main():
                 ui.console(f"ftebroom_test_run {60 + (args.scale - 100) // 25}")
             click("menu/Assets")
             click("Menu/Assets/Texture Studio...")
+
+            if args.preset_library:
+                original_source = output / "saved-before-library-edit.rbtex.json"
+                click("texture-studio/save")
+                choose(original_source)
+                wait(original_source.is_file)
+                original_hash = hashlib.sha256(original_source.read_bytes()).hexdigest()
+                click("texture-studio/save-preset")
+                click("texture-studio/save-preset-name")
+                ui.text("User Bricks")
+                click("texture-studio/save-preset-confirm")
+                library = data / "data/texture-studio/library.json"
+                folder = library.parent / "user-presets"
+
+                def presets(count):
+                    saved = json.loads(library.read_text(encoding="utf-8")).get("userPresets", [])
+                    return saved if len(saved) == count else None
+
+                (first, _), = wait(lambda: presets(1))
+                expected = json.loads((folder / (first + ".rbtex.json")).read_text(encoding="utf-8"))
+                click("texture-studio/new")
+                click("texture-studio/preset-search")
+                ui.text("User Bricks")
+                rect = wait(lambda: live()["globalWidgets"].get("texture-studio/user-preset/" + first))
+                ui.click(rect["x"] + 20, rect["y"] + rect["height"] * .5, button=3)
+                click("texture-studio/user-preset/duplicate")
+                click("texture-studio/user-preset/duplicate-name")
+                ui.text("User Bricks Copy")
+                click("texture-studio/user-preset/duplicate-confirm")
+                (first_again, _), (second, name) = wait(lambda: presets(2))
+                assert first == first_again and first != second and name == "User Bricks Copy"
+                duplicate = folder / (second + ".rbtex.json")
+                copy = json.loads(duplicate.read_text(encoding="utf-8"))
+                assert copy == {**expected, "name": name, "documentId": second}
+                rect = wait(lambda: live()["globalWidgets"].get("texture-studio/user-preset/" + first))
+                ui.click(rect["x"] + 20, rect["y"] + rect["height"] * .5, button=3)
+                click("texture-studio/user-preset/remove")
+                click("texture-studio/user-preset/remove-confirm")
+                assert wait(lambda: presets(1)) == [[second, name]]
+                assert not (folder / (first + ".rbtex.json")).exists()
+                assert json.loads(duplicate.read_text(encoding="utf-8")) == copy
+                assert hashlib.sha256(original_source.read_bytes()).hexdigest() == original_hash
+                print("PASS duplicate and remove user presets preserve other entries and the saved source")
+                return
 
             if args.layout_only:
                 widgets = wait(lambda: (items if (items := live()["globalWidgets"]).get(

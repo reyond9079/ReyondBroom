@@ -1,5 +1,5 @@
-name: Validate native export and package alpha.31
-run-name: Validate native export and package alpha.31 @ d5a9034
+name: Validate and package alpha.31 Linux SDL2
+run-name: Validate and package alpha.31 Linux SDL2 @ d5a9034
 'on':
   workflow_dispatch:
     inputs:
@@ -68,7 +68,6 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-        - Linux-x64
         - Linux-SDL2-x64
     env:
       GH_TOKEN: ${{ github.token }}
@@ -86,6 +85,7 @@ jobs:
       run: |
         if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! command -v xclip || ! pkg-config --exists libcurl || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h || ! test -f /usr/include/alsa/asoundlib.h || ! test -f /usr/include/X11/extensions/Xrandr.h || ! test -f /usr/include/X11/extensions/scrnsaver.h || ! test -f /usr/include/X11/Xcursor/Xcursor.h; then
           apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          apt_options+=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
           install_tools() {
             sudo timeout 120s apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update &&
               sudo timeout 180s apt-get "${apt_options[@]}" install -y build-essential cmake libcurl4-openssl-dev libgl-dev libegl1 libgl1-mesa-dri libasound2-dev libx11-dev libxss-dev libxrandr-dev libxcursor-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip ffmpeg libsdl2-dev ripgrep
@@ -280,217 +280,6 @@ jobs:
       with:
         name: qa-${{ matrix.platform }}
         path: qa-artifact/
-        if-no-files-found: error
-        retention-days: 7
-    needs: plan
-  windows:
-    runs-on: windows-2022
-    env:
-      GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ inputs.version }}
-      BASE_TAG: ${{ inputs.base_tag }}
-      RB_QA_RENDERER: gl rb_qa_opengl.dll
-      GALLIUM_DRIVER: llvmpipe
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: d5a903476880d69074e79789135502c28beca72f
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    - uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        path-type: inherit
-        update: false
-        install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make mingw-w64-x86_64-zlib mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libpng
-          mingw-w64-x86_64-libjpeg-turbo git curl diffutils tar make
-    - name: Fetch and verify runtime, converter source and native dependencies
-      shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Force base, sdk, deps, audio-deps | Out-Null
-        gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY --dir base --pattern '*-Windows-x64.zip' --pattern '*-Windows-x64.zip.sha256' --pattern '*-Windows-x64-Sources.zip' --pattern '*-Windows-x64-Sources.zip.sha256'
-        if ($LASTEXITCODE -ne 0) { throw 'Base runtime download failed' }
-        gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY --dir sdk --pattern '*-Linux-x64-Sources.zip' --pattern '*-Linux-x64-Sources.zip.sha256'
-        if ($LASTEXITCODE -ne 0) { throw 'SDK download failed' }
-        foreach ($checksum in Get-ChildItem base/*.sha256,sdk/*.sha256) {
-          $parts = (Get-Content $checksum.FullName) -split '\s+'
-          $file = Join-Path $checksum.DirectoryName $parts[1]
-          if ((Get-FileHash $file -Algorithm SHA256).Hash.ToLower() -ne $parts[0]) { throw "Checksum mismatch: $file" }
-        }
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $archive = (Get-ChildItem base/*-Sources.zip).FullName
-        $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
-        try { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($zip.GetEntry('tools/audio/ffmpeg-8.0.1-source.tar.xz'), "$PWD/audio-deps/ffmpeg-8.0.1.tar.xz", $true) } finally { $zip.Dispose() }
-        Expand-Archive (Get-ChildItem sdk/*-Sources.zip).FullName deps/base
-        foreach ($name in @('bullet','fteqw','imgui')) { Expand-Archive "deps/base/sources/$name-source.zip" "deps/$name" }
-    - name: Cache/build audio
-      uses: ./.github/actions/build-dependency
-      with:
-        component: audio
-        source: audio-deps
-        destination: .ci-deps/audio
-        platform: Windows-x64
-        shell: msys2 {0}
-    - name: Rebuild and test the complete audio helper
-      shell: msys2 {0}
-      run: |
-        scripts/test-audio-core.sh "$PWD/audio-qa" "$(cygpath -m "$PWD/tools/audio/ffmpeg.exe")"
-      if: fromJSON(needs.plan.outputs.plan).flags.audio_core
-    - name: Cache/build bullet
-      uses: ./.github/actions/build-dependency
-      with:
-        component: bullet
-        source: deps/bullet
-        destination: deps/bullet-build
-        platform: Windows-x64
-        shell: msys2 {0}
-    - name: Cache/build profile
-      uses: ./.github/actions/build-dependency
-      with:
-        component: profile
-        source: native/profile
-        destination: deps/profile-core
-        platform: Windows-x64
-        shell: msys2 {0}
-    - name: Run current profile core tests
-      if: fromJSON(needs.plan.outputs.plan).flags.profile_core
-      shell: msys2 {0}
-      run: ctest --test-dir deps/profile-core -C Release --output-on-failure
-    - name: Configure the public Mapping Jams endpoint
-      shell: pwsh
-      env:
-        REYONDBROOM_JAM_DEFAULT_URL: ${{ secrets.REYONDBROOM_JAM_DEFAULT_URL }}
-      run: python scripts/prepare-jam-release.py deps/jam-release-endpoint.h
-    - name: Build native editor and test the profile importer
-      shell: msys2 {0}
-      run: |
-        mkdir -p audio-qa
-        make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
-        deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
-        g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
-    - name: Check selected plant_core unit 1
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.plant_core
-      run: |
-        mkdir -p qa/rb10/units
-        g++ -std=c++17 -O2 tests/plant-runtime-targets.cpp -lz -o deps/plant-runtime-targets.exe
-        deps/plant-runtime-targets.exe qa/rb10/units/plant-targets
-      shell: msys2 {0}
-    - name: Check selected browser unit 2
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.browser
-      run: |
-        mkdir -p qa/rb10/units
-        g++ -std=c++17 -O2 tests/browser132-unit.cpp -o deps/browser132-unit.exe
-        deps/browser132-unit.exe > qa/rb10/units/browser.log
-      shell: msys2 {0}
-    - name: Check selected model_ui unit 3
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.model_ui
-      run: |
-        mkdir -p qa/rb10/units
-        g++ -std=c++17 -O2 -pthread -Ideps/imgui tests/entity-preview132-ui.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/entity-preview132-ui.exe
-        deps/entity-preview132-ui.exe > qa/rb10/units/preview.log
-        g++ -std=c++17 -O2 tests/model-native-export.cpp -o deps/model-native-export.exe -lz
-        deps/model-native-export.exe qa/rb10/units/native-model > qa/rb10/units/native-model.log
-      shell: msys2 {0}
-    - name: Check selected input unit 4
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.input
-      run: |
-        mkdir -p qa/rb10/units
-        g++ -std=c++17 -O2 -Ideps/imgui tests/tools-layout.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/tools-layout.exe
-        deps/tools-layout.exe > qa/rb10/units/tools-layout.log
-      shell: msys2 {0}
-    - name: Check selected input unit 5
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.input
-      run: |
-        mkdir -p qa/rb10/units
-        python tests/check-default-shortcuts.py deps/fteqw > qa/rb10/units/shortcuts.log
-      shell: msys2 {0}
-    - name: Check selected compilation unit 6
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.compilation
-      run: |
-        mkdir -p qa/rb10/units
-        python tests/check-run-workspace-selection.py > qa/rb10/units/workspace-selection.log
-      shell: msys2 {0}
-    - name: Check selected resource_lookup unit 7
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.resource_lookup
-      run: |
-        mkdir -p qa/rb10/units
-        g++ -std=c++17 -O2 tests/pak-resource-names.cpp -lz -o deps/pak-resource-names.exe
-        deps/pak-resource-names.exe > qa/rb10/units/q2-pak.log
-      shell: msys2 {0}
-    - name: Check selected resource_lookup unit 8
-      if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.resource_lookup
-      run: |
-        mkdir -p qa/rb10/units
-        g++ -std=c++17 -O2 tests/quake2-roots.cpp -o deps/quake2-roots.exe
-        deps/quake2-roots.exe > qa/rb10/units/q2-roots.log
-      shell: msys2 {0}
-    - name: Rebuild the editor engine with ordered read-only mod resources
-      shell: msys2 {0}
-      run: |
-        bash scripts/build-editor-engine.sh Windows-x64 deps/editor-engine
-        mkdir -p qa/mod-profiles
-        g++ -std=c++17 -O2 tests/map-mod-state.cpp -o deps/map-mod-state.exe
-        deps/map-mod-state.exe > qa/mod-profiles/map-mod-state.log
-        python tests/check-editor-resource-stack.py deps/editor-engine > qa/mod-profiles/resource-stack.log
-        python tests/check-windows-mouse-activation.py deps/editor-engine > qa/mod-profiles/mouse-activation-policy.log
-    - name: Package runtime and complete corresponding sources
-      shell: msys2 {0}
-      run: |
-        python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --engine deps/editor-engine/engine/release-editor/fteglqw64.exe --engine-source deps/editor-engine --audio-dir tools/audio --version "$VERSION" --output out/release
-        (cd out/release && sha256sum -c ./*.sha256)
-    - name: Materialize selected validation scope
-      shell: pwsh
-      env:
-        CI_PLAN: ${{ needs.plan.outputs.plan }}
-        FORCE_VIEWPORT: ${{ inputs.viewport_checks }}
-        FORCE_RB10: ${{ inputs.rb10_checks }}
-      run: python -c "import os,json,pathlib; p=json.loads(os.environ['CI_PLAN']); extra=(['viewport','matrix_ui'] if os.environ['FORCE_VIEWPORT']=='true'
-        else [])+(['browser','onboarding','updater','placement','plant_ui'] if os.environ['FORCE_RB10']=='true' else []); p['suites']=sorted(set(p['suites'])|set(extra));
-        pathlib.Path('ci-plan.json').write_text(json.dumps(p))"
-    - name: Set up test-machine renderer
-      shell: pwsh
-      run: |-
-        . ./scripts/setup-ci-renderer.ps1 -Runtime out/release/ReyondBroom-Windows-x64
-        "RB_QA_RENDERER=$env:RB_QA_RENDERER" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        python -m pip install Pillow pywinauto
-        if ($LASTEXITCODE) { throw 'Probe dependency install failed' }
-    - name: Validate every packaged release (short smoke)
-      shell: pwsh
-      run: |-
-        python scripts/ci-release-smoke.py out/release --platform Windows-x64 --version $env:VERSION --output qa/smoke --require-jam
-        if ($LASTEXITCODE) { throw 'Packaged smoke failed' }
-    - name: Install selected plant import probes
-      if: fromJSON(needs.plan.outputs.plan).flags.plant_ui || inputs.rb10_checks
-      run: python -m pip install trimesh==4.8.3 numpy==2.3.4 Pillow==12.0.0
-    - name: Check Character Creator core and prepare motion fixture
-      if: fromJSON(needs.plan.outputs.plan).flags.character_core
-      shell: msys2 {0}
-      run: python scripts/test-character-core.py --output qa/character-core
-    - name: Run affected packaged checks
-      shell: pwsh
-      run: |-
-        python scripts/ci-run-checks.py --plan ci-plan.json --runtime out/release/ReyondBroom-Windows-x64 --output qa/affected --probe deps/profile-core/compilation-profile-probe.exe --platform Windows-x64
-        if ($LASTEXITCODE) { throw 'Affected release acceptance failed' }
-    - name: Collect compact release evidence
-      if: always()
-      shell: pwsh
-      run: |
-        python scripts/collect-release-qa.py --qa qa --release out/release --output qa-artifact
-        if ($LASTEXITCODE) { throw 'Collecting release evidence failed' }
-    - uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: qa-Windows-x64
-        path: qa-artifact/
-        if-no-files-found: error
-        retention-days: 7
-    - uses: actions/upload-artifact@v4
-      with:
-        name: release-packages-Windows-x64
-        path: |
-          out/release/*.zip
-          out/release/*.sha256
         if-no-files-found: error
         retention-days: 7
     needs: plan

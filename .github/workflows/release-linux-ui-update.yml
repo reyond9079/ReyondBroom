@@ -170,6 +170,8 @@ jobs:
       run: |
         g++ -std=c++17 -O2 -ffp-contract=off -pthread tests/texture-studio-core.cpp -lz -o deps/texture-studio-core
         deps/texture-studio-core qa/texture-studio/fixtures
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread tests/texture-studio-properties.cpp -lz -o deps/texture-studio-properties
+        deps/texture-studio-properties
         g++ -std=c++17 -O2 -ffp-contract=off -pthread native/texture/cli.cpp -lz -ldl -o deps/texture-studio
         python3 tests/check-texture-studio-formats.py qa/texture-studio/fixtures
         python3 tests/texture-studio-cli.py deps/texture-studio
@@ -386,10 +388,12 @@ jobs:
       shell: msys2 {0}
       run: |
         g++ -std=c++17 -O2 -ffp-contract=off -pthread -static tests/texture-studio-core.cpp -lz -o deps/texture-studio-core.exe
-        g++ -std=c++17 -O2 -ffp-contract=off -pthread -static native/texture/cli.cpp -lz -o deps/texture-studio.exe
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread -static tests/texture-studio-properties.cpp -lz -o deps/texture-studio-properties.exe
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread -static native/texture/cli.cpp -lz -lshell32 -o deps/texture-studio.exe
     - name: Verify Texture Studio graph, formats and release guard
       run: |
         & ./deps/texture-studio-core.exe qa/texture-studio/fixtures
+        & ./deps/texture-studio-properties.exe
         python tests/check-texture-studio-formats.py qa/texture-studio/fixtures
         python tests/texture-studio-cli.py deps/texture-studio.exe
         python tests/texture-studio-release-gate.py

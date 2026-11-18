@@ -29,6 +29,7 @@ def main():
     cli.add_argument("runtime", type=Path)
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--profile", default="fte", choices=("fte", "quake1", "quake2", "quake3", "halflife"))
+    cli.add_argument("--three-faces", action="store_true")
     cli.add_argument("--layout-only", action="store_true")
     cli.add_argument("--theme", choices=("light", "dark"), default="dark")
     cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
@@ -65,7 +66,14 @@ def main():
         magic = b"WAD2" if profile == 2 else b"WAD3"
         (project / "prior.wad").write_bytes(magic + struct.pack("<II", 0, 12))
         source = source.replace('"classname" "worldspawn"\n', '"classname" "worldspawn"\n"wad" "prior.wad"\n', 1)
+    selected_texture = "qa_selected" if wad else "ftebroom/qa_selected"
+    if args.three_faces:
+        substitutions = iter((7, 19, 37))
+        source = re.sub(re.escape(original_texture) + r" 7 -3",
+                        lambda _: f"{selected_texture} {next(substitutions)} -3", source, count=3)
     map_file.write_text(f"// ReyondBroom profile={key} format={style}\n" + source, encoding="ascii")
+    if args.three_faces:
+        assert sum(material == selected_texture for _, material, _ in faces(map_file)) == 3
     for directory in (runtime, data):
         (directory / "ftebroom-project.txt").write_text(project.as_posix(), encoding="ascii")
         settings = f'{profile} 0 "{project.as_posix()}" "" "" "" 1 5 "" 1 1\n'
@@ -209,23 +217,41 @@ def main():
             elif profile == 3:
                 assert struct.unpack_from("<II", runtime_texture.read_bytes(), 32) == (256, 256)
 
-            def uses_asset(rows):
-                return bool(rows) and all(row[1].endswith(asset_name.removeprefix("textures/")) for row in rows)
+            def expected_textures(rows, applied):
+                if len(rows) < 3:
+                    return False
+                generated = asset_name.removeprefix("textures/")
+                if not args.three_faces:
+                    return all(row[1].endswith(generated if applied else original_texture) for row in rows)
+                changed = generated if applied else selected_texture
+                return sum(row[1].endswith(changed) for row in rows) == 3 and all(
+                    row[1].endswith((changed, original_texture)) for row in rows)
 
-            save_when(lambda rows: bool(rows) and all(row[1].endswith(original_texture) for row in rows))
+            unchanged = save_when(lambda rows: expected_textures(rows, False))
+            shutil.copy2(map_file, output / "before-apply.map")
             if wad:
                 assert re.search(r'"wad"\s+"prior\.wad"', map_file.read_text(encoding="ascii"))
             print("PASS Generate Asset creates the game texture without changing the map")
-            ui.console("ftebroom_select all")
-            wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["faceCount"] > 0)
+            if args.three_faces:
+                ui.console(f"set ftebroom_material_query {selected_texture}")
+                ui.console("ftebroom_material_select faces")
+            else:
+                ui.console("ftebroom_select all")
+            wait(lambda: (count := live()["globalWidgets"]["texture-studio/render-state"]["faceCount"]) > 0 and
+                 (not args.three_faces or count == 3))
             click("texture-studio/apply")
-            applied = save_when(uses_asset)
+            applied = save_when(lambda rows: expected_textures(rows, True))
+            if args.three_faces:
+                def untouched(rows):
+                    return sorted((prefix.strip(), uv.strip()) for prefix, material, uv in rows if material.endswith(original_texture))
+                assert len(unchanged) == len(applied)
+                assert untouched(unchanged) == untouched(applied), "Unselected faces changed"
             if wad:
                 text = map_file.read_text(encoding="ascii")
                 assert re.search(r'"wad"\s+"prior\.wad;[^"]*' + re.escape(runtime_texture.name), text), text[:300]
             shutil.copy2(map_file, output / "applied.map")
             ui.console("ftebroom_undo")
-            restored = save_when(lambda rows: bool(rows) and all(row[1].endswith(original_texture) for row in rows))
+            restored = save_when(lambda rows: expected_textures(rows, False))
             if wad:
                 text = map_file.read_text(encoding="ascii")
                 assert re.search(r'"wad"\s+"prior\.wad"', text), text[:300]
@@ -235,10 +261,11 @@ def main():
             )
             assert runtime_texture.is_file(), "Undo must retain a potentially shared asset"
             ui.console("ftebroom_redo")
-            assert save_when(uses_asset) == applied
+            assert save_when(lambda rows: expected_textures(rows, True)) == applied
             if wad:
                 assert map_file.read_bytes() == (output / "applied.map").read_bytes()
-            print(f"PASS {args.profile} Apply, save, Undo and Redo preserve all {len(applied)} face projections")
+            scope = "three selected faces" if args.three_faces else "the entire selection"
+            print(f"PASS {args.profile} Apply, save, Undo and Redo update {scope} and preserve all {len(applied)} face projections")
             click("texture-studio/close")
             click("menu/Assets")
             click("Menu/Assets/Edit Texture Studio source...")
@@ -249,7 +276,7 @@ def main():
             assert json.loads(saved_copy.read_text(encoding="utf-8")) == json.loads(source.read_text(encoding="utf-8"))
             assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest["sourceHash"]
             print("PASS Edit Texture Studio source opens the map material's graph and preserves the original")
-            if args.profile != "fte":
+            if args.profile != "fte" or args.three_faces:
                 return
 
             click("texture-studio/close")

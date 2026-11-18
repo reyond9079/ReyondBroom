@@ -11,6 +11,8 @@
 
 namespace rbTexture = ftebroom::textureStudio;
 
+static constexpr size_t studioPreviewCacheBudget = 12 * 1024 * 1024;
+
 struct TextureStudioState {
   enum class Apply { none, asset, capture, baking, verify, commit, model };
   enum Preview { flat, tiled, sphere, cube, target, surface };
@@ -62,7 +64,7 @@ struct TextureStudioState {
   std::optional<rbTexture::Document> drag;
   rbTexture::Assets assets;
   std::shared_ptr<std::atomic<bool>> cancel;
-  std::shared_ptr<rbTexture::NodeCache> previewCache = std::make_shared<rbTexture::NodeCache>(32 * 1024 * 1024);
+  std::shared_ptr<rbTexture::NodeCache> previewCache = std::make_shared<rbTexture::NodeCache>(studioPreviewCacheBudget);
   std::future<Result> job;
   std::optional<Result> result;
   std::vector<std::filesystem::path> created;
@@ -2357,7 +2359,7 @@ static void textureStudioPanel() {
     studioReleaseImage();
     studioReleaseThumbnails();
     s.result.reset();
-    s.previewCache = std::make_shared<rbTexture::NodeCache>(32 * 1024 * 1024);
+    s.previewCache = std::make_shared<rbTexture::NodeCache>(studioPreviewCacheBudget);
   }
 }
 

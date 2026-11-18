@@ -19,6 +19,9 @@
 #include <iostream>
 #include <locale>
 #include <sstream>
+#ifdef _WIN32
+#include <shellapi.h>
+#endif
 
 namespace ts = ftebroom::textureStudio;
 namespace fs = std::filesystem;
@@ -332,6 +335,17 @@ void renderSequence(const Options& args, const ts::Document& doc, const ts::Plan
 }
 
 int main(int argc, char** argv) try {
+#ifdef _WIN32
+  std::unique_ptr<wchar_t*, decltype(&LocalFree)> wide(CommandLineToArgvW(GetCommandLineW(), &argc), &LocalFree);
+  ts::require(bool(wide), "command", "Cannot read the Windows command line.");
+  std::vector<std::string> utf8;
+  utf8.reserve(size_t(argc));
+  for (int index = 0; index < argc; ++index) utf8.push_back(fs::path(wide.get()[index]).u8string());
+  std::vector<char*> arguments;
+  arguments.reserve(utf8.size());
+  for (auto& value : utf8) arguments.push_back(value.data());
+  argv = arguments.data();
+#endif
   const auto args = options(argc, argv);
   if (args.command == "family") {
     generateFamily(args);
@@ -499,7 +513,8 @@ int main(int argc, char** argv) try {
   std::cout << ts::Json{{"state", "written"}, {"files", names}}.dump() << '\n';
   return 0;
 } catch (const std::exception& e) {
-  std::cout << ts::Json{{"state", "error"}, {"message", e.what()}}.dump() << '\n';
+  std::cout << ts::Json{{"state", "error"}, {"message", e.what()}}.dump(-1, ' ', true,
+    ts::Json::error_handler_t::replace) << '\n';
   std::cerr << e.what() << '\n';
   return 1;
 }

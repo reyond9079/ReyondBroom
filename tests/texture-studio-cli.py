@@ -15,7 +15,7 @@ def run(executable, root):
         proc = subprocess.run([str(executable), *map(str, args)], text=True, capture_output=True)
         return proc.returncode, json.loads(proc.stdout)
 
-    source = root / "brick.rbtex.json"
+    source = root / "Кирпич 日本.rbtex.json"
     assert invoke("new", source)[0] == 0
     assert invoke("new", source)[0] != 0
     assert invoke("validate", source)[1]["state"] == "valid"
@@ -252,6 +252,6 @@ def run(executable, root):
 
 
 if __name__ == "__main__":
-    with tempfile.TemporaryDirectory(prefix="rb-texture-cli-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="RB Texture Studio 日本-") as tmp:
         run(Path(sys.argv[1]).resolve(), Path(tmp))
     print("PASS profile routes, deterministic PK3, import preservation, safe paths, and refusal to overwrite")

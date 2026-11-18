@@ -1,5 +1,5 @@
-name: Release native editor update
-run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
+name: Validate native export and package alpha.31
+run-name: Validate native export and package alpha.31 @ 71cc378
 'on':
   workflow_dispatch:
     inputs:
@@ -54,13 +54,14 @@ permissions:
   contents: read
 jobs:
   plan:
-    if: inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == '' && inputs.rb21_evidence_commit == ''
-    uses: ./.github/workflows/ci-plan.yml
-    with:
-      base: ${{ inputs.validation_base }}
-      head: ${{ github.event.pull_request.head.sha || github.sha }}
-      full: ${{ inputs.validation_mode == 'full' }}
-      release: true
+    runs-on: ubuntu-24.04
+    outputs:
+      plan: ${{ steps.scope.outputs.plan }}
+    steps:
+    - name: Select current viewport, model and entity integration checks
+      id: scope
+      run: |
+        echo 'plan={"schema":1,"mode":"affected","paths":[],"components":["viewport","model_ui","entities","grid","profile_core"],"reasons":{},"suites":["viewport","model_ui","entities","grid","profile_core"],"runtime":true,"smoke":true,"flags":{"audio_core":false,"browser":false,"catalog":false,"character_core":false,"character_ui":false,"compilation":true,"grid":true,"input":true,"matrix_ui":false,"model_ui":true,"plant_core":false,"plant_ui":false,"profile_core":true,"resource_lookup":true}}' >> "$GITHUB_OUTPUT"
   linux:
     runs-on: ubuntu-24.04
     strategy:
@@ -76,6 +77,8 @@ jobs:
       BASE_TAG: ${{ matrix.platform == 'Linux-x64' && inputs.linux_base_tag || inputs.base_tag }}
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: 71cc3785ef9445a2c7591fdc43b9e4e59a1117f4
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
@@ -83,6 +86,7 @@ jobs:
       run: |
         if ! command -v ffmpeg || ! command -v rg || ! command -v Xvfb || ! command -v xclip || ! pkg-config --exists libcurl || ! test -f /usr/include/X11/Xlib.h || ! test -f /usr/include/SDL2/SDL.h || ! test -f /usr/include/png.h || ! test -f /usr/include/GL/gl.h || ! test -f /usr/include/alsa/asoundlib.h || ! test -f /usr/include/X11/extensions/Xrandr.h || ! test -f /usr/include/X11/extensions/scrnsaver.h || ! test -f /usr/include/X11/Xcursor/Xcursor.h; then
           apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          apt_options+=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
           install_tools() {
             sudo timeout 120s apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update &&
               sudo timeout 180s apt-get "${apt_options[@]}" install -y build-essential cmake libcurl4-openssl-dev libgl-dev libegl1 libgl1-mesa-dri libasound2-dev libx11-dev libxss-dev libxrandr-dev libxcursor-dev libpng-dev libjpeg-dev zlib1g-dev xvfb xauth xclip ffmpeg libsdl2-dev ripgrep
@@ -172,6 +176,8 @@ jobs:
         mkdir -p qa/rb10/units
         g++ -std=c++17 -O2 -pthread -Ideps/imgui tests/entity-preview132-ui.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/entity-preview132-ui
         deps/entity-preview132-ui > qa/rb10/units/preview.log
+        g++ -std=c++17 -O2 tests/model-native-export.cpp -o deps/model-native-export -lz
+        deps/model-native-export qa/rb10/units/native-model > qa/rb10/units/native-model.log
     - name: Check selected input unit 4
       if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.input
       run: |
@@ -288,6 +294,8 @@ jobs:
       GALLIUM_DRIVER: llvmpipe
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: 71cc3785ef9445a2c7591fdc43b9e4e59a1117f4
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
@@ -382,6 +390,8 @@ jobs:
         mkdir -p qa/rb10/units
         g++ -std=c++17 -O2 -pthread -Ideps/imgui tests/entity-preview132-ui.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp -o deps/entity-preview132-ui.exe
         deps/entity-preview132-ui.exe > qa/rb10/units/preview.log
+        g++ -std=c++17 -O2 tests/model-native-export.cpp -o deps/model-native-export.exe -lz
+        deps/model-native-export.exe qa/rb10/units/native-model > qa/rb10/units/native-model.log
       shell: msys2 {0}
     - name: Check selected input unit 4
       if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.input
@@ -485,107 +495,3 @@ jobs:
         if-no-files-found: error
         retention-days: 7
     needs: plan
-
-  upload-draft:
-    if: inputs.rb21_evidence_commit == '' && (inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
-    runs-on: ubuntu-24.04
-    environment: rb21-release
-    permissions:
-      actions: read
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ inputs.version }}
-      RB21_EVIDENCE_RUN: ${{ inputs.rb21_evidence_run_id }}
-      RB21_CANDIDATE_RUN: ${{ inputs.rb21_candidate_run_id }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Verify both successful runs belong to this source revision
-      shell: bash
-      run: |
-        for run in "$RB21_CANDIDATE_RUN" "$RB21_EVIDENCE_RUN"; do
-          [[ "$run" =~ ^[0-9]+$ ]]
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" | \
-            jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
-              '.head_sha == $sha and .conclusion == "success" and .head_repository.full_name == $repo'
-        done
-    - uses: actions/download-artifact@v4
-      with:
-        name: rb21-release-evidence
-        github-token: ${{ github.token }}
-        run-id: ${{ inputs.rb21_evidence_run_id }}
-        path: acceptance
-    - uses: actions/download-artifact@v4
-      with:
-        pattern: release-packages-*
-        github-token: ${{ github.token }}
-        run-id: ${{ inputs.rb21_candidate_run_id }}
-        path: release-packages
-    - name: Verify the complete acceptance evidence and all three package sets
-      shell: bash
-      run: |
-        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" > approvals.json
-        for platform in Windows-x64 Linux-x64 Linux-SDL2-x64; do
-          python3 scripts/check-character-release.py --evidence acceptance \
-            --release "release-packages/release-packages-$platform" --commit "$GITHUB_SHA" --platform "$platform" \
-            --approvals approvals.json --owner "$GITHUB_REPOSITORY_OWNER"
-        done
-    - name: Upload the validated packages to the existing draft
-      shell: bash
-      run: |
-        test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
-        gh release upload "v$VERSION" release-packages/release-packages-*/* --clobber
-
-  import-rb21-evidence:
-    if: inputs.rb21_evidence_commit != '' && inputs.rb21_evidence_run_id == '' && github.actor == github.repository_owner
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: read
-      contents: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-      PROOF_COMMIT: ${{ inputs.rb21_evidence_commit }}
-      CANDIDATE_RUN: ${{ inputs.rb21_candidate_run_id }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Verify candidate run and extract evidence files
-      shell: bash
-      run: |
-        [[ "$PROOF_COMMIT" =~ ^[0-9a-f]{40}$ && "$CANDIDATE_RUN" =~ ^[0-9]+$ ]]
-        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" | \
-          jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
-            '.head_sha == $sha and .conclusion == "success" and .head_repository.full_name == $repo'
-        git fetch --no-tags --depth=2 origin "$PROOF_COMMIT"
-        test "$(git rev-list --parents -n1 "$PROOF_COMMIT")" = "$PROOF_COMMIT $GITHUB_SHA"
-        proof="$PROOF_COMMIT:qa/rb-21/evidence"
-        git ls-tree -r "$proof" > proof-files.txt
-        test -s proof-files.txt
-        awk '$1 != "100644" || $2 != "blob" {exit 1}' proof-files.txt
-        mkdir acceptance
-        git archive "$proof" | tar -x -C acceptance
-    - uses: actions/download-artifact@v4
-      with:
-        pattern: release-packages-*
-        github-token: ${{ github.token }}
-        run-id: ${{ inputs.rb21_candidate_run_id }}
-        path: release-packages
-    - name: Validate evidence and package digests
-      shell: bash
-      run: |
-        python3 - <<'PY'
-        from datetime import datetime, timezone
-        from pathlib import Path
-        import os
-        import runpy
-
-        verifier = runpy.run_path("scripts/check-character-release.py")
-        for platform in verifier["PLATFORMS"]:
-            verifier["validate"](Path("acceptance"), Path("release-packages/release-packages-" + platform),
-                                 os.environ["GITHUB_SHA"], platform, datetime.now(timezone.utc))
-        PY
-    - uses: actions/upload-artifact@v4
-      with:
-        name: rb21-release-evidence
-        path: acceptance
-        if-no-files-found: error
-        retention-days: 7

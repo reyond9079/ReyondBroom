@@ -131,6 +131,7 @@ def main():
                 click("choose-file/file-path")
                 ui.key("a", ("ctrl",))
                 ui.text(path.as_posix())
+                wait(lambda: live()["globalWidgets"].get("choose-file/path-value", {}).get("value") == path.as_posix())
                 click("choose-file/file-choose")
 
             wait(lambda: live()["globalWidgets"].get("menu/Assets"))

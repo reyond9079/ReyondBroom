@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "ftebroom_bb_geometry.h"
+#include "ftebroom_filesystem_path.h"
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #ifndef STBI_INCLUDE_STB_IMAGE_H
@@ -103,9 +105,13 @@ inline std::string tga(const Texture &t) {
   return out;
 }
 inline std::string readFile(const std::filesystem::path &path, size_t limit = 128 * 1024 * 1024) {
-  if (!std::filesystem::is_regular_file(path) || std::filesystem::file_size(path) > limit)
+  const auto physical = ftebroom::filesystemAccessPath(path);
+  if (!std::filesystem::is_regular_file(physical) || std::filesystem::file_size(physical) > limit)
     throw std::runtime_error("Missing file or file exceeds budget");
-  std::ifstream in(path, std::ios::binary);
+  std::ifstream in(physical, std::ios::binary);
+  if (!in)
+    throw std::filesystem::filesystem_error("Cannot open file", path,
+      std::error_code(errno, std::generic_category()));
   std::string out((std::istreambuf_iterator<char>(in)), {});
   if (!in.eof() && in.fail())
     throw std::runtime_error("Cannot read model file");
@@ -114,21 +120,28 @@ inline std::string readFile(const std::filesystem::path &path, size_t limit = 12
 inline void atomicWrite(const std::filesystem::path &path, const std::string &bytes) {
   auto tmp = path;
   tmp += "." + uuid() + ".tmp";
+  const auto temporary = ftebroom::filesystemAccessPath(tmp);
+  const auto target = ftebroom::filesystemAccessPath(path);
   try {
-    std::ofstream out(tmp, std::ios::binary);
+    std::ofstream out(temporary, std::ios::binary);
+    if (!out)
+      throw std::filesystem::filesystem_error("Cannot open temporary file for writing", tmp,
+        std::error_code(errno, std::generic_category()));
     out.write(bytes.data(), bytes.size());
     out.close();
     if (!out)
-      throw std::runtime_error("Cannot write model file");
+      throw std::filesystem::filesystem_error("Cannot write temporary file", tmp,
+        std::error_code(errno, std::generic_category()));
 #ifdef _WIN32
-    if (!MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-      throw std::runtime_error("Cannot replace model file");
+    if (!MoveFileExW(temporary.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+      throw std::filesystem::filesystem_error("Cannot replace file", tmp, path,
+        std::error_code(int(GetLastError()), std::system_category()));
 #else
-    std::filesystem::rename(tmp, path);
+    std::filesystem::rename(temporary, target);
 #endif
   } catch (...) {
     std::error_code ec;
-    std::filesystem::remove(tmp, ec);
+    std::filesystem::remove(temporary, ec);
     throw;
   }
 }

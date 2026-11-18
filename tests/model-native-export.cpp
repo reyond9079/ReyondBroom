@@ -3,14 +3,37 @@
 #include "../native/ftebroom_model_studio_export.h"
 #include "../native/ftebroom_legacy_models.h"
 #include "../native/ftebroom_legacy_images.h"
+#include "../native/ftebroom_bb_io.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 using namespace ftebroom;
 static void check(bool ok,const char* name){if(!ok)throw std::runtime_error(name);std::cout<<"PASS "<<name<<'\n';}
 static void save(const std::filesystem::path& p,const std::string& b){std::ofstream f(p,std::ios::binary);f.write(b.data(),b.size());if(!f)throw std::runtime_error("Cannot write fixture.");}
+
+static void checkLongSourcePaths(const std::filesystem::path& root) {
+  auto folder = std::filesystem::absolute(root);
+  for (int i = 0; i < 5; ++i)
+    folder /= "portable-project-directory-with-many-characters-" + std::to_string(i);
+  std::filesystem::create_directories(filesystemAccessPath(folder));
+  const auto source = folder / std::filesystem::u8path(u8"текстура-素材.rbtexpkg");
+  bb::atomicWrite(source, "original");
+  bb::atomicWrite(source, "replacement");
+  check(source.native().size() > 260 && bb::readFile(source) == "replacement",
+        "atomic_write_and_read_long_unicode_path");
+  const auto absent = folder / "missing-parent" / "file.rbtexpkg";
+  bool diagnosed = false;
+  try {
+    bb::atomicWrite(absent, "invalid");
+  } catch (const std::filesystem::filesystem_error& error) {
+    diagnosed = error.path1().parent_path() == absent.parent_path() && bool(error.code());
+  }
+  check(diagnosed && bb::readFile(source) == "replacement", "atomic_write_reports_os_error_and_preserves_prior_file");
+}
+
 int main(int argc,char** argv){try{
   if(argc!=2)throw std::runtime_error("Pass a private output directory.");std::filesystem::path root=argv[1];std::filesystem::create_directories(root);
+  checkLongSourcePaths(root);
   auto lights=quake1::halfLifeLights("{\n\"classname\" \"light\"\n\"light\" \"300\"\n}\n");check(lights.find("\"_light\" \"255 255 255 300\"")!=lights.npos,"halflife_legacy_light_conversion");
   auto explicitLight=quake1::halfLifeLights("{\n\"classname\" \"light\"\n\"_light\" \"200 100 50 400\"\n}\n");check(explicitLight.find("255 255 255")==explicitLight.npos,"halflife_explicit_light_preserved");
   modelExport::Mesh mesh;mesh.frames=3;modelExport::Surface s;s.material="skin";s.triangles={{0,1,2}};

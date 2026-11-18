@@ -138,6 +138,7 @@ static void runUiBrowsePanel(){
    if(selected){if(folder){runUiBrowseFolder=p;break;}runUiBrowsePath=p.u8string();}
   }
   ImGui::EndChild();ImGui::SetNextItemWidth(-1);runUiEdit("##Selected file",runUiBrowsePath);record("file-path");
+  if(runUiLive)runUiGlobalRects["choose-file/path-value"]={{"value",runUiBrowsePath}};
   if(ImGui::Button(runUiBrowseAllowNew?"Save":"Choose",{80*uiScale(),0})){
    auto path=std::filesystem::u8path(runUiBrowsePath);
    if(!runUiBrowsePath.empty()&&(runUiBrowseAllowNew?!std::filesystem::is_directory(path,error):std::filesystem::is_regular_file(path,error))){

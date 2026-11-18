@@ -231,7 +231,22 @@ class NativeInput:
 
  def key(self,name,mods=()):
   names={'enter':'Return','esc':'Escape','tab':'Tab','backspace':'BackSpace','grave':'grave'}
-  if os.name=='nt':self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','space':'{SPACE}','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
+  if os.name=='nt':
+   if mods==('ctrl',) and len(name)==1 and name.isascii() and name.isalpha():
+    # Keep the modifier in the native queue until the editor has sampled it.
+    # Sending Ctrl+A to the window directly can insert text without selecting the field.
+    self.position()
+    self.mod('ctrl',True)
+    try:
+     vk=ord(name.upper())
+     scan=self.user.MapVirtualKeyW(vk,0)
+     self.user.keybd_event(vk,scan,0,0)
+     self.user.keybd_event(vk,scan,2,0)
+     self.settle()
+    finally:self.mod('ctrl',False)
+    self.settle()
+    return
+   self.strokes(''.join({'ctrl':'^','shift':'+','alt':'%'}[m] for m in mods)+{'enter':'{ENTER}','esc':'{ESC}','tab':'{TAB}','backspace':'{BACKSPACE}','grave':'`','space':'{SPACE}','Home':'{HOME}','End':'{END}','Down':'{DOWN}','Up':'{UP}'}.get(name,name));return
   for mod in mods:self.mod(mod,True)
   code=self.d.keysym_to_keycode(self.XK.string_to_keysym(names.get(name,name)));self.xtest.fake_input(self.d,self.X.KeyPress,code);self.xtest.fake_input(self.d,self.X.KeyRelease,code);self.d.sync()
   for mod in reversed(mods):self.mod(mod,False)

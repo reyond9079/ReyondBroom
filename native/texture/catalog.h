@@ -329,7 +329,7 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       parameters["mortar"] = index == 6 ? .13 : .075;
     }
     if (pattern == Pattern::stripes && category == 3 && index == 7) {
-      parameters["duty"] = .074;
+      parameters["duty"] = .11;
       parameters["feather"] = .042;
       parameters["slant"] = 0;
     }

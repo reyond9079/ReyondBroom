@@ -7,6 +7,35 @@ int fb_export_testcommand()
         fb_export_expect(fb_trace_count>0 && fb_trace_index>=0 && vlen(fb_camera_eye-fb_trace_points[fb_trace_index])<.05,"leak111_camera_at_selected_point");
         fb_export_expect(fb_trace_vertices!=__NULL__ && fb_trace_lines!=__NULL__,"leak111_cached_route_mesh");return TRUE;
     }
+    if(argv(1)=="brushmodel"){
+        fb_tool_deactivate();brush_deselectall();
+        int source=fb_createbox('160 320 480','64 64 64');
+        brush_deselectall();brush_select(1,source);
+        cvar_set("ftebroom_brush_model_request","37");
+        fb_export_expect(fb_export_selected_bsp(TRUE),"brush_model_snapshot_for_replacement");
+        int before=history;
+        fb_brush_model_replace(37,"misc_model","models/reyondbroom/test.bsp","",FALSE);
+        string replacement=terrain_edit(TEREDIT_ENT_GET,fb_selected_entity());
+        fb_export_expect(cvar_string("ftebroom_brush_model_status")=="ok" &&
+            strstrofs(replacement,"models/reyondbroom/test.bsp",0)>=0 &&
+            strstrofs(replacement,"160 320 480",0)>=0 &&
+            !brush_get(1,source,__NULL__,0,__NULL__),"brush_model_replaces_at_original_origin");
+        brush_undo();fb_document_tick();
+        fb_export_expect(history==before && selectedbrushcount==1 &&
+            brush_get(selectedbrushes[0].model,selectedbrushes[0].id,__NULL__,0,__NULL__)>0,
+            "brush_model_undo_restores_original_brush");
+        source=selectedbrushes[0].id;
+        cvar_set("ftebroom_brush_model_request","38");
+        fb_export_expect(fb_export_selected_bsp(TRUE),"brush_model_resnapshots_after_undo");
+        fb_createbox('320 320 480','64 64 64');
+        before=history;
+        fb_brush_model_replace(38,"misc_model","models/reyondbroom/stale.bsp","",FALSE);
+        fb_export_expect(cvar_string("ftebroom_brush_model_status")=="stale" &&
+            history==before && brush_get(1,source,__NULL__,0,__NULL__)>0,
+            "brush_model_stale_document_keeps_geometry");
+        cvar_set("ftebroom_brush_model_request","0");
+        return TRUE;
+    }
     if(argv(1)=="bsp90"){
         fb_tool_deactivate();brush_deselectall();
         fb_createbox('16 32 48','64 64 64');brush_deselectall();

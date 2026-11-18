@@ -132,6 +132,42 @@ void fb_modelviewer_draw()
     setproperty(VF_ORIGIN,oldOrigin);setproperty(VF_ANGLES,oldAngles);setproperty(VF_MIN,oldMin);setproperty(VF_SIZE,oldSize);setproperty(VF_FOV,oldFov);setproperty(VF_DRAWWORLD,1);setproperty(VF_PERSPECTIVE,oldPerspective);setproperty(VF_MINDIST,oldNear);setproperty(VF_MAXDIST,oldFar);
 }
 
+entity fb_brush_model_preview_entity;
+string fb_brush_model_preview_path;
+
+void fb_brush_model_preview_draw()
+{
+    string path=cvar_string("ftebroom_brush_model_preview");
+    if(path==""){
+        if(fb_brush_model_preview_entity){remove(fb_brush_model_preview_entity);fb_brush_model_preview_entity=world;}
+        return;
+    }
+    if(!fb_brush_model_preview_entity || path!=fb_brush_model_preview_path){
+        if(fb_brush_model_preview_entity)remove(fb_brush_model_preview_entity);
+        fb_brush_model_preview_entity=spawn();setmodel(fb_brush_model_preview_entity,path);
+        strunzone(fb_brush_model_preview_path);fb_brush_model_preview_path=strzone(path);
+    }
+    entity item=fb_brush_model_preview_entity;
+    vector low=editor_model_info(item.modelindex,0,1),high=editor_model_info(item.modelindex,0,2);
+    vector angles=[cvar("ftebroom_brush_model_pitch"),cvar("ftebroom_brush_model_yaw"),0];
+    makevectors(angles);
+    vector size=[bound(64,cvar("ftebroom_brush_model_width"),1280),bound(64,cvar("ftebroom_brush_model_height"),720),0];
+    vector eye=(high+low)*.5-v_forward*max(8,vlen(high-low)*1.22)*cvar("ftebroom_brush_model_zoom");
+    vector oldOrigin=getproperty(VF_ORIGIN),oldAngles=getproperty(VF_ANGLES),oldMin=getproperty(VF_MIN),
+        oldSize=getproperty(VF_SIZE),oldFov=getproperty(VF_FOV);
+    float oldPerspective=getproperty(VF_PERSPECTIVE),oldNear=getproperty(VF_MINDIST),oldFar=getproperty(VF_MAXDIST);
+    clearscene();setproperty(VF_PERSPECTIVE,TRUE);setproperty(VF_MINDIST,1);setproperty(VF_MAXDIST,0);
+    setproperty(VF_RT_DESTCOLOUR,"ftebroom_brush_model",-IMGFMT_R8G8B8A8,size);
+    setproperty(VF_MIN,'0 0 0');setproperty(VF_SIZE,size);setproperty(VF_ORIGIN,eye);setproperty(VF_ANGLES,angles);
+    setproperty(VF_DRAWWORLD,0);setproperty(VF_FOVY,45);setproperty(VF_FOVX,atan(tan(45*M_PI/360)*size_x/size_y)*360/M_PI);
+    drawfill('0 0 0',size,'0.08 0.09 0.11',1,0);
+    item.effects=EF_FULLBRIGHT;addentity(item);
+    renderscene();setproperty(VF_RT_DESTCOLOUR,"");
+    setproperty(VF_ORIGIN,oldOrigin);setproperty(VF_ANGLES,oldAngles);setproperty(VF_MIN,oldMin);
+    setproperty(VF_SIZE,oldSize);setproperty(VF_FOV,oldFov);setproperty(VF_DRAWWORLD,1);
+    setproperty(VF_PERSPECTIVE,oldPerspective);setproperty(VF_MINDIST,oldNear);setproperty(VF_MAXDIST,oldFar);
+}
+
 float(float model,float sequence,float frames,float fps,optional float skin) editor_model_extract = #0:editor_model_extract;
 int fb_model_extract_command()
 {

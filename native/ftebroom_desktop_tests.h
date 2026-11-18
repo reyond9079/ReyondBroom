@@ -1576,7 +1576,10 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
     bool widths=true,vertices=true;
     for(int scale=0;scale<3;scale++)for(int language=0;language<7;language++){
       uiScaleChoice=scale;uiLanguage=language;uiStyle();
-      ImGui::NewFrame();ImGui::SetNextWindowPos({0,0});ImGui::SetNextWindowSize({1200,750});ImGui::Begin("Text sizing regression");
+      ImGui::NewFrame();ImGui::SetNextWindowPos({0,0});ImGui::SetNextWindowSize({1200,750});
+      ImGui::Begin("Text sizing regression",nullptr,ImGuiWindowFlags_NoNav);
+      // Frame shadows and keyboard focus outlines are intentionally drawn outside the button.
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,0);
       for(auto label:labels){
         const char* translated=label;const char* end=nullptr;FteBroomTranslate(translated,end);
         float actual=ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(),FLT_MAX,0,translated,end).x;
@@ -1585,7 +1588,14 @@ double stats[4]{};if(bbAPI())bbAPI()->stats(stats);expect(stats[2]==72&&stats[3]
         widths&=high.x-low.x>=actual+50*uiScale();
         for(int v=first;v<list->VtxBuffer.Size;v++)vertices&=list->VtxBuffer[v].pos.x>=low.x-1&&list->VtxBuffer[v].pos.x<=high.x+1;
       }
-      ImGui::End();ImGui::EndFrame();
+      const char* play=toolbarPlayCaption();
+      auto* list=ImGui::GetWindowDrawList();
+      const int first=list->VtxBuffer.Size;
+      compileButton("Play mod",3,false,{},play);
+      const auto low=ImGui::GetItemRectMin(),high=ImGui::GetItemRectMax();
+      widths&=std::strcmp(play,"Play game")!=0&&high.x-low.x>=ImGui::CalcTextSize(play).x+50*uiScale();
+      for(int v=first;v<list->VtxBuffer.Size;v++)vertices&=list->VtxBuffer[v].pos.x>=low.x-1&&list->VtxBuffer[v].pos.x<=high.x+1;
+      ImGui::PopStyleVar();ImGui::End();ImGui::EndFrame();
     }
     expect(widths,"text84_translated_widths_seven_languages_three_scales");expect(vertices,"text84_button_geometry_stays_inside_bounds");
     uiLanguage=languageBefore;uiScaleChoice=scaleBefore;uiStyle();

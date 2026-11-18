@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <cmath>
 #include "../native/ftebroom_entity_defs.h"
+#include "../native/ftebroom_brush_model_entity.h"
 #include <cassert>
 #include <iostream>
 int main() {
@@ -27,6 +28,27 @@ spawnflags(flags) = [ 1 : "Fast" : 1 : "Moves at double speed" 4 : "Silent" : 0 
   assert(fgd.at("player").properties.at("spawnflags").choices.front().description=="Moves at double speed");
   assert(fgd.at("player").properties.at("mode").choices.size()==2);
   assert(fgd.at("player").mins[2]==-24 && fgd.at("player").model=="models/player.md3");
+  auto modelClasses=entityRead(R"(
+@PointClass = misc_model [
+  mdl(string) : "Model path"
+]
+@PointClass = func_model [
+  model(string) : "Model path"
+]
+@SolidClass = func_wall []
+)", ".fgd");
+  for(bool mdl:{true,false}){
+    auto quake=brushModelEntity(2,mdl,false,modelClasses);
+    assert(std::string(quake.classname)=="misc_model"&&quake.writeMdlKey&&!quake.fteQuake);
+    assert(!brushModelEntity(2,mdl,false,{}).classname);
+    auto extension=brushModelEntity(2,mdl,true,{});
+    assert(std::string(extension.classname)=="misc_model"&&extension.fteQuake);
+    assert(std::string(brushModelEntity(1,mdl,false,modelClasses).classname)=="func_model");
+  }
+  assert(std::string(brushModelEntity(4,true,false,modelClasses).classname)=="cycler");
+  assert(!brushModelEntity(4,false,false,modelClasses).classname);
+  assert(!brushModelEntity(0,false,false,modelClasses).classname);
+  assert(!brushModelEntity(3,false,false,{}).classname);
   auto inherited=entityRead(R"(
 @BaseClass = Skill [ spawnflags(flags) = [ 256 : "Not in Easy" : 1 : "Difficulty" ]
   speed(integer) : "Speed" : 100 ]

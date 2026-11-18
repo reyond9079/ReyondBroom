@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-static void bspModelShow();
+static void bspModelShow(bool mdl=false,bool worldOnly=false);
 static void plantBrushShow();
 namespace { static void characterCreateHere(); }
 static bool sceneContextPending = false, sceneContextCandidate = false;
@@ -32,6 +32,140 @@ static void sceneContextRelease()
   if(sceneContextEpoch!=organizationMapEpoch)return;
   sceneContextPending = true;
 }
+static void sceneContextEntityMenu(bool brush)
+{
+  const bool open=ImGui::BeginMenu(brush?"Create brush entity":"Create point entity");
+  if(brush)placementRect("context/brush-entity");
+  if(!open)return;
+
+  std::map<std::string,std::vector<std::string>> categories;
+  for(const auto& item:entityDefinitions)
+    if(item.first!="worldspawn" && item.second.brush==brush)
+      categories[item.first.substr(0,item.first.find('_'))].push_back(item.first);
+  for(const auto& category:categories){
+    const bool categoryOpen=ImGui::BeginMenu(category.first.c_str());
+    if(brush&&placementQa())placementRect(("context/brush-category/"+category.first).c_str());
+    if(!categoryOpen)continue;
+    for(const auto& name:category.second){
+      const bool clicked=ImGui::MenuItem(name.c_str());
+      if(brush&&placementQa())placementRect(("context/brush-class/"+name).c_str());
+      if(!clicked)continue;
+      if(brush){
+        float position[3]{};
+        entityCreate(entityDefinitions.at(name),position);
+      }else{
+        command(("ftebroom_entity_drop "+organizationQuote(name)+" "+
+          std::to_string(sceneContextX)+" "+std::to_string(sceneContextY)+"\n").c_str());
+      }
+    }
+    ImGui::EndMenu();
+  }
+  ImGui::EndMenu();
+}
+static void sceneContextCreateMenu()
+{
+  if(jamEditing()&&gameProfile!=1)return;
+  const bool create=ImGui::BeginMenu("Create");
+  placementRect("context/create");
+  if(!create)return;
+  if(!jamEditing()){
+    const bool model=ImGui::BeginMenu("Model");
+    placementRect("context/model");
+    if(model){
+      if(ImGui::MenuItem("3d model"))placementCreate(false);
+      placementRect("context/new-model");
+      if(ImGui::MenuItem("Plant",nullptr,false,viewTypes[viewFocus]==0))plantBrushShow();
+      placementRect("context/plant-brush");
+      if(ImGui::MenuItem("New plant model..."))placementCreate(true);
+      placementRect("context/new-plant");
+      if(ImGui::MenuItem("Character..."))characterCreateHere();
+      placementRect("context/new-character");
+      ImGui::EndMenu();
+    }
+  }
+  if(gameProfile==1 && ImGui::MenuItem("Create FTE Engine terrain here...")){
+    terrainCreateWindow=true;
+    command(("ftebroom_terrain_position "+std::to_string(sceneContextX)+" "+std::to_string(sceneContextY)+"\n").c_str());
+  }
+  ImGui::EndMenu();
+}
+static void sceneContextActions()
+{
+  const bool brushes=cvars->GetFloat("ftebroom_selection_count")>0;
+  const bool selected=brushes||cvars->GetFloat("ftebroom_entity_selection_count")>0;
+  const bool hit=cvars->GetFloat("ftebroom_context_hit")!=0;
+  const bool worldBrushes=cvars->GetFloat("ftebroom_context_world_brushes")!=0;
+  const int group=int(cvars->GetFloat("ftebroom_context_group"));
+  const int selectedGroups=int(cvars->GetFloat("ftebroom_context_selected_groups"));
+  const int owner=int(cvars->GetFloat("ftebroom_context_entity"));
+  const int layer=int(cvars->GetFloat("ftebroom_context_layer"));
+  char classname[256]{},material[1024]{};
+  cvars->GetString("ftebroom_context_class",classname,sizeof classname);
+  cvars->GetString("ftebroom_context_material",material,sizeof material);
+
+  if(*material&&ImGui::MenuItem("Reveal material in browser")){
+    cvars->SetString("ftebroom_reveal_material",material);
+    selectMaterialTab=true;
+  }
+  if(brushes&&hit)sceneContextEntityMenu(true);
+  sceneContextEntityMenu(false);
+  if(brushes&&!hit)sceneContextEntityMenu(true);
+  sceneContextCreateMenu();
+
+  const bool canConvert=worldBrushes&&!jamEditing();
+  if(selected||layer>=0||*classname){
+    ImGui::Separator();
+    if(selected&&ImGui::BeginMenu("Group")){
+      if(ImGui::MenuItem("Group...")){organizationNameRequest=true;organizationRename=false;}
+      if(selectedGroups&&ImGui::MenuItem("Ungroup"))organize("ungroup");
+      if(selectedGroups>1&&ImGui::MenuItem("Merge groups"))organize("mergegroups");
+      if(selectedGroups&&ImGui::MenuItem("Rename groups...")){organizationNameRequest=true;organizationRename=true;}
+      if(group&&ImGui::MenuItem("Add objects to this group"))organize("move",group);
+      if(cvars->GetFloat("ftebroom_context_open_group")&&ImGui::MenuItem("Remove objects from group"))
+        organize("removefromgroup");
+      ImGui::EndMenu();
+    }
+    if(selected&&ImGui::BeginMenu("Visibility")){
+      if(ImGui::MenuItem("Hide selection"))command("ftebroom_visibility hide\n");
+      if(ImGui::MenuItem("Isolate selection"))command("ftebroom_visibility isolate\n");
+      ImGui::EndMenu();
+    }
+    if((selected||layer>=0)&&ImGui::BeginMenu("Layer")){
+      if(selected&&ImGui::BeginMenu("Move to layer")){
+        for(const auto& n:organizationNodes)
+          if(n.kind==1&&!(n.flags&3)&&ImGui::MenuItem(n.name.c_str()))organize("move",n.id);
+        ImGui::EndMenu();
+      }
+      if(layer>=0){
+        if(layer!=int(cvars->GetFloat("ftebroom_context_active_layer"))&&ImGui::MenuItem("Make layer active"))
+          organize("layeractive",layer);
+        if(ImGui::MenuItem("Hide this layer"))organize("layerhidden",layer,"1");
+        if(ImGui::MenuItem("Select all in this layer"))organize("layerselect",layer);
+        if(ImGui::MenuItem("Isolate this layer")){
+          std::vector<std::pair<int,int>> values;
+          for(const auto& n:organizationNodes)
+            if(n.kind==1)values.emplace_back(n.id,n.id!=layer);
+          organizationBatch("layerhidden",values);
+        }
+      }
+      ImGui::EndMenu();
+    }
+    if(*classname&&ImGui::MenuItem(("Select all "+std::string(classname)).c_str()))
+      command(("ftebroom_entity_select_class "+organizationQuote(classname)+"\n").c_str());
+    if(brushes&&owner&&cvars->GetFloat("ftebroom_context_brush_entity")&&ImGui::MenuItem("Move brushes to this entity"))
+      command(("ftebroom_entity_move_to "+std::to_string(owner)+"\n").c_str());
+  }
+  if(brushes||canConvert){
+    ImGui::Separator();
+    if(ImGui::MenuItem("Make structural"))organize("structural");
+    if(canConvert&&ImGui::BeginMenu("Convert into...")){
+      if((gameProfile==2||gameProfile==4)&&ImGui::MenuItem("MDL model"))bspModelShow(true,true);
+      if(ImGui::MenuItem("BSP model"))bspModelShow(false,true);
+      ImGui::EndMenu();
+    }
+    if(!canConvert&&!jamEditing()&&ImGui::MenuItem("Export selected BSP model..."))bspModelShow();
+  }
+}
 static void sceneContextPanel()
 {
   if (
@@ -45,134 +179,7 @@ static void sceneContextPanel()
   }
   if (ImGui::BeginPopup("Scene context"))
   {
-    if(gameProfile==1 && ImGui::MenuItem("Create FTE Engine terrain here...")){terrainCreateWindow=true;command(("ftebroom_terrain_position "+std::to_string(sceneContextX)+" "+std::to_string(sceneContextY)+"\n").c_str());}
-    bool create=!jamEditing() && ImGui::BeginMenu("Create");if(!jamEditing())placementRect("context/create");if(create){bool model=ImGui::BeginMenu("Model");placementRect("context/model");if(model){
-      if(ImGui::MenuItem("3d model"))placementCreate(false);placementRect("context/new-model");
-      if(ImGui::MenuItem("Plant",nullptr,false,viewTypes[viewFocus]==0))plantBrushShow();placementRect("context/plant-brush");
-      if(ImGui::MenuItem("New plant model..."))placementCreate(true);placementRect("context/new-plant");
-      if(ImGui::MenuItem("Character..."))characterCreateHere();placementRect("context/new-character");
-      ImGui::EndMenu();}ImGui::EndMenu();}
-    bool selected = cvars->GetFloat("ftebroom_selection_count")
-                    || cvars->GetFloat("ftebroom_entity_selection_count");
-    int group = (int)cvars->GetFloat("ftebroom_context_group"),
-        owner = (int)cvars->GetFloat("ftebroom_context_entity"),
-        layer = (int)cvars->GetFloat("ftebroom_context_layer");
-    if(!jamEditing()&&ImGui::MenuItem("Export selected BSP model...",nullptr,false,cvars->GetFloat("ftebroom_selection_count")>0))bspModelShow();
-    if (ImGui::MenuItem("Group...", nullptr, false, selected))
-    {
-      organizationNameRequest = true;
-      organizationRename = false;
-    }
-    if (ImGui::MenuItem("Ungroup", nullptr, false, selected))
-      organize("ungroup");
-    if (ImGui::MenuItem("Merge groups", nullptr, false, selected))
-      organize("mergegroups");
-    if (ImGui::MenuItem("Rename groups...", nullptr, false, selected))
-    {
-      organizationNameRequest = true;
-      organizationRename = true;
-    }
-    if (group && ImGui::MenuItem("Add objects to this group", nullptr, false, selected))
-      organize("move", group);
-    if (ImGui::MenuItem("Remove objects from group", nullptr, false, selected))
-      organize("removefromgroup");
-    if(ImGui::MenuItem("Hide selection",nullptr,false,selected))command("ftebroom_visibility hide\n");
-    if(ImGui::MenuItem("Isolate selection",nullptr,false,selected))command("ftebroom_visibility isolate\n");
-    if (ImGui::BeginMenu("Move to layer", selected))
-    {
-      for (const auto& n : organizationNodes)
-        if (n.kind == 1 && ImGui::MenuItem(n.name.c_str()))
-          organize("move", n.id);
-      ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("Make layer active"))
-    {
-      for (const auto& n : organizationNodes)
-        if (n.kind == 1 && ImGui::MenuItem(n.name.c_str()))
-          organize("layeractive", n.id);
-      ImGui::EndMenu();
-    }
-    if (ImGui::MenuItem("Hide this layer"))
-      organize("layerhidden", layer, "1");
-    if (ImGui::MenuItem("Select all in this layer"))
-      organize("layerselect", layer);
-    if (ImGui::MenuItem("Isolate this layer"))
-    {
-      for (const auto& n : organizationNodes)
-        if (n.kind == 1)
-          organize("layerhidden", n.id, n.id == layer ? "0" : "1");
-    }
-    if (ImGui::MenuItem("Make structural", nullptr, false, selected))
-      organize("structural");
-    char classname[256]{}, material[1024]{};
-    cvars->GetString("ftebroom_context_class", classname, sizeof classname);
-    cvars->GetString("ftebroom_context_material", material, sizeof material);
-    if (*classname && ImGui::MenuItem(("Select all " + std::string(classname)).c_str()))
-      command(
-        ("ftebroom_entity_select_class " + organizationQuote(classname) + "\n").c_str());
-    if (
-      owner && cvars->GetFloat("ftebroom_context_brush_entity")
-      && ImGui::MenuItem(
-        "Move brushes to this entity",
-        nullptr,
-        false,
-        cvars->GetFloat("ftebroom_selection_count") > 0))
-      command(("ftebroom_entity_move_to " + std::to_string(owner) + "\n").c_str());
-    if (*material && ImGui::MenuItem("Reveal material in browser"))
-    {
-      cvars->SetString("ftebroom_reveal_material", material);
-      selectMaterialTab = true;
-    }
-    ImGui::Separator();
-    for (int type = 0; type < 2; type++)
-    {
-      bool open = ImGui::BeginMenu(type ? "Create brush entity" : "Create point entity",
-        !type || cvars->GetFloat("ftebroom_selection_count") > 0);
-      if(type)placementRect("context/brush-entity");
-      if (open)
-      {
-        std::map<std::string, std::vector<std::string>> categories;
-        for (const auto& item : entityDefinitions)
-          if (item.first != "worldspawn" && item.second.brush == (type != 0))
-            categories[item.first.substr(0, item.first.find('_'))].push_back(item.first);
-        for (const auto& category : categories)
-        {
-          bool categoryOpen = ImGui::BeginMenu(category.first.c_str());
-          if(type && placementQa())placementRect(("context/brush-category/"+category.first).c_str());
-          if (categoryOpen)
-          {
-            for (const auto& name : category.second)
-            {
-              const auto& item = *entityDefinitions.find(name);
-              bool clicked = ImGui::MenuItem(item.first.c_str());
-              if(type && placementQa())placementRect(("context/brush-class/"+item.first).c_str());
-              if (clicked)
-              {
-                if (type)
-                {
-                  float position[3]{};
-                  entityCreate(item.second, position);
-                }
-                else
-                {
-                  char query[512];
-                  std::snprintf(
-                    query,
-                    sizeof query,
-                    "ftebroom_entity_drop %s %g %g\n",
-                    organizationQuote(item.first).c_str(),
-                    sceneContextX,
-                    sceneContextY);
-                  command(query);
-                }
-              }
-            }
-            ImGui::EndMenu();
-          }
-        }
-        ImGui::EndMenu();
-      }
-    }
+    sceneContextActions();
     ImGui::EndPopup();
   }
   if (organizationNameRequest)

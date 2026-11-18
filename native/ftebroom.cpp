@@ -190,7 +190,7 @@ static char mapName[64] = "my_map";
 static bool moveHeld[6] = {};
 static int cameraButton = 0;
 static const char* modalNames[] = {
-  "Default (Move)",
+  "Select/Move",
   "Brush",
   "Clip",
   "Rotate",
@@ -620,19 +620,17 @@ static void panel(float w, float h)
     if(softChrome&&!horizontalTools)ImGui::SetCursorPosX(toolsLeft+std::max(0.f,(toolsArea.x-width)*.5f));
     toolsFirst=false;
   };
-  const int toolIds[] = {0, 1, 2, 7, 8, 9, 10, 3, 4, 5, 6, 11, 12, 13, 14, 15, 16};
-  const char* toolNames[] = {
-    "Default (Move)",
-    "Brush",
-    "Clip",
-    "Vertex",
-    "Edge",
-    "Face",
-    "Control Point",
-    "Rotate",
-    "Sweep",
-    "Scale",
-    "Shear", "Sculpt", "Bezier Bend", "Polygon Cut", "Polygon Spawn", "Spin", "Rotate Grid"};
+  using BrushTool=BrushIcons::Tool;
+  const std::pair<BrushTool,const char*> primaryTools[]={
+    {BrushTool::Move,"Select/Move"},{BrushTool::Brush,"Brush"},{BrushTool::Clip,"Clip"},
+    {BrushTool::Vertex,"Vertex"},{BrushTool::Edge,"Edge"},{BrushTool::Face,"Face"},
+    {BrushTool::ControlPoint,"Control Point"},{BrushTool::Rotate,"Rotate"},{BrushTool::Scale,"Scale"}
+  };
+  const std::pair<BrushTool,const char*> additionalTools[]={
+    {BrushTool::Sweep,"Sweep"},{BrushTool::Shear,"Shear"},
+    {BrushTool::Sculpt,"Sculpt"},{BrushTool::Bend,"Bezier Bend"},{BrushTool::PolygonCut,"Polygon Cut"},
+    {BrushTool::PolygonSpawn,"Polygon Spawn"},{BrushTool::Spin,"Spin"},{BrushTool::RotateGrid,"Rotate Grid"}
+  };
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,toolPadding);
   auto editTool=[&](ToolbarEditAction action){
     toolFlow(toolWidth);
@@ -641,32 +639,19 @@ static void panel(float w, float h)
   for(auto edit:{ToolbarEditAction::Undo,ToolbarEditAction::Redo,ToolbarEditAction::Delete}){
     editTool(edit);
   }
-  for (int i = 0; i < 17; i++)
-  {
-    if(i==11) {
-      editTool(ToolbarEditAction::FlipHorizontal);
-      editTool(ToolbarEditAction::FlipVertical);
-      toolFlow(toolWidth);
-      const auto direction=horizontalTools
-        ? (extraToolsExpanded?ImGuiDir_Left:ImGuiDir_Right)
-        : (extraToolsExpanded?ImGuiDir_Up:ImGuiDir_Down);
-      if(ImGui::ArrowButtonEx("##extra-tools",direction,toolSize))extraToolsExpanded=!extraToolsExpanded;
-      runUiRecordGlobal("tools-extra-toggle");
-      if(ImGui::IsItemHovered())ImGui::SetTooltip("%s Sculpt, Bezier Bend, Polygon Cut, Polygon Spawn, Spin, Rotate Grid",extraToolsExpanded?"Hide":"Show");
-    }
-    if(i>=11&&!extraToolsExpanded)continue;
-    int tool = toolIds[i];
-    if(gameClassic() && tool==10)continue;
+  const auto brushTool=[&](BrushTool symbol,const char* name){
+    const int tool=static_cast<int>(symbol);
+    if(gameClassic()&&symbol==BrushTool::ControlPoint)return;
     bool active = (int)cvars->GetFloat("ftebroom_tool") == tool;
     const Action* entry = nullptr;
     for (auto& a : actions)
-      if (std::string(a.id) == std::string("Menu/Tools/") + toolNames[i])
+      if (std::string(a.id) == std::string("Menu/Tools/") + name)
         entry = &a;
     if (active)
       ImGui::PushStyleColor(ImGuiCol_Button, uiActiveToolColor());
-    ImGui::PushID(i);
+    ImGui::PushID(tool);
     toolFlow(toolWidth);
-    if (BrushIcons::button("##tool",static_cast<BrushIcons::Tool>(tool),toolSize))
+    if (BrushIcons::button("##tool",symbol,toolSize))
     {
       sceneDrag = sceneLook = false;
       if (entry)
@@ -679,10 +664,10 @@ static void panel(float w, float h)
     if(ImGui::IsItemHovered()){
       const char* shortcut=entry?entry->shortcutText.c_str():"";
       if(tool==0)
-        ImGui::SetTooltip("%s %s\n%s",uiTr(toolNames[i]),shortcut,uiTr("Right-click for tool settings"));
-      else ImGui::SetTooltip("%s %s",toolNames[i],shortcut);
+        ImGui::SetTooltip("%s %s\n%s",uiTr(name),shortcut,uiTr("Right-click for tool settings"));
+      else ImGui::SetTooltip("%s %s",uiTr(name),shortcut);
     }
-    if(runUiLive&&tool!=0)runUiRecordGlobal(std::string("tools/")+toolNames[i]);
+    if(runUiLive&&tool!=0)runUiRecordGlobal(std::string("tools/")+name);
     if(tool==0&&!modEmbedded){
       runUiRecordGlobal("tools/default-move");
       ImGui::SetNextWindowSizeConstraints({330*uiScale(),0},{FLT_MAX,FLT_MAX});
@@ -692,6 +677,21 @@ static void panel(float w, float h)
       }
     }
     ImGui::PopID();
+  };
+  for(auto [symbol,name]:primaryTools)brushTool(symbol,name);
+  toolFlow(toolWidth);
+  const auto extraDirection=horizontalTools
+    ? (extraToolsExpanded?ImGuiDir_Left:ImGuiDir_Right)
+    : (extraToolsExpanded?ImGuiDir_Up:ImGuiDir_Down);
+  if(ImGui::ArrowButtonEx("##extra-tools",extraDirection,toolSize))extraToolsExpanded=!extraToolsExpanded;
+  runUiRecordGlobal("tools-extra-toggle");
+  if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr(extraToolsExpanded?"Fewer tools":"More tools"));
+  if(extraToolsExpanded){
+    brushTool(additionalTools[0].first,additionalTools[0].second);
+    brushTool(additionalTools[1].first,additionalTools[1].second);
+    editTool(ToolbarEditAction::FlipHorizontal);
+    editTool(ToolbarEditAction::FlipVertical);
+    for(size_t i=2;i<std::size(additionalTools);++i)brushTool(additionalTools[i].first,additionalTools[i].second);
   }
   if(!horizontalTools)ImGui::Separator();
   const bool snapInteger=cvars->GetFloat("ftebroom_auto_integer_snap")!=0;
@@ -732,17 +732,24 @@ static void panel(float w, float h)
         uv ? "UV Lock (stored preference; advanced transforms pending)"
            : "Texture Lock: keep texture attached while moving");
   }
+  ImGui::EndDisabled();
+  buildToolbar(toolSize,toolFlow,horizontalTools,compactRail,std::max(1.f,toolsArea.x));
+  ImGui::BeginDisabled(modEmbedded);
   auto viewportControls=[&](bool strip){
-    auto begin=[&](const char* id,const char* value,const char* compact){
+    auto begin=[&](const char* id,const char* value,float width){
       if(!strip){
         ImGui::SetNextItemWidth(-FLT_MIN);
         return uiToolDropdown([&]{return ImGui::BeginCombo(id,value);});
       }
-      toolFlow(toolWidth);
-      return uiToolValueCombo(id,compact,toolSize);
+      width=std::min(width,std::max(1.f,toolsArea.x));
+      toolFlow(width);
+      return uiToolValueCombo(id,value,{width,toolHeight});
     };
-    auto choice=[&](const char* id,int& value,const auto& choices,const char* compact){
-      if(!begin(id,choices[value],compact))return false;
+    auto choice=[&](const char* id,int& value,const auto& choices,float minimum){
+      float width=minimum*uiScale();
+      for(const char* label:choices)
+        width=std::max(width,ImGui::CalcTextSize(label).x+20*uiScale());
+      if(!begin(id,uiTr(choices[value]),width))return false;
       bool changed=false;
       for(int i=0;i<IM_ARRAYSIZE(choices);++i){
         const bool selected=value==i;
@@ -755,7 +762,11 @@ static void panel(float w, float h)
     const float grid=cvars->GetFloat("ca_grid");
     char gridLabel[96]{};
     std::snprintf(gridLabel,sizeof gridLabel,"%s %g",uiTr("Grid"),grid);
-    if(begin("##Grid",gridLabel,gridLabel)){
+    char longestGridLabel[96]{};
+    std::snprintf(longestGridLabel,sizeof longestGridLabel,"%s 0.125",uiTr("Grid"));
+    const float gridWidth=std::max({70*uiScale(),ImGui::CalcTextSize(gridLabel).x+20*uiScale(),
+      ImGui::CalcTextSize(longestGridLabel).x+20*uiScale()});
+    if(begin("##Grid",gridLabel,gridWidth)){
       for(int i=0;i<12;++i){
         const float step=std::ldexp(1.f,i-3);
         char label[16]{};
@@ -768,9 +779,8 @@ static void panel(float w, float h)
     runUiRecordGlobal("tools/Grid");
     if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",gridLabel);
     const char* views[]={"Perspective","YZ (side)","XZ (front)","XY (top)"};
-    const char* compactViews[]={"3D","YZ","XZ","XY"};
     int view=std::clamp(int(cvars->GetFloat("ca_brush_view")),0,3);
-    if(choice("##View",view,views,compactViews[view])){
+    if(choice("##View",view,views,100)){
       cancelGesture();
       viewTypes[viewFocus]=view;
       viewActivate(viewFocus);
@@ -780,7 +790,7 @@ static void panel(float w, float h)
       ImGui::SetTooltip("%s\n%s",uiTr(views[view]),view?"View plane / hold Shift during drag: axis":"XY plane / Alt: Z");
     const char* layouts[]={"1 view","2 views","3 views","4 views"};
     int layoutChoice=std::clamp(viewLayout-1,0,3);
-    if(choice("##Layout",layoutChoice,layouts,uiTr(layouts[layoutChoice])))
+    if(choice("##Layout",layoutChoice,layouts,70))
       viewSetLayout(layoutChoice+1);
     runUiRecordGlobal("tools/Layout");
     if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",uiTr(layouts[layoutChoice]));
@@ -797,7 +807,6 @@ static void panel(float w, float h)
   ImGui::PopStyleVar();
   ImGui::EndDisabled();
   int currentTool = (int)cvars->GetFloat("ftebroom_tool");
-  buildToolbar(toolSize,toolFlow,horizontalTools,compactRail);
   ImGui::BeginDisabled(modEmbedded);
   if(currentTool==0&&!modEmbedded){
     static bool shapeExpanded=false;
@@ -1159,6 +1168,7 @@ static void panel(float w, float h)
   if (!jamEditing()) runPanel();
   runMissingPanel();
   if (!jamEditing()) {buildPanel();bspModelPanel();}
+  else cvars->SetString("ftebroom_brush_model_preview","");
   ImGui::EndDisabled();
   runUiConfirmClose();
   buildOverlay();
@@ -1226,7 +1236,7 @@ static void panel(float w, float h)
     bool colorsTab=ImGui::BeginTabItem("Colors");runUiRecordGlobal("preferences-colors-tab");
     if(colorsTab)
     {
-      for(auto setting:{std::pair{"Brush edges","ftebroom_color_brush_edges"},std::pair{"2D viewport background","ftebroom_color_2d_background"},std::pair{"3D background without sky","ftebroom_color_3d_background"},std::pair{"2D grid","ftebroom_grid_color_2d"},std::pair{"3D grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Entity links","ftebroom_color_entity_links"},std::pair{"Selected entity links","ftebroom_color_selected_entity_links"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
+      for(auto setting:{std::pair{"2D brush edges","ftebroom_color_brush_edges"},std::pair{"3D brush edges","ftebroom_color_brush_edges_3d"},std::pair{"2D viewport background","ftebroom_color_2d_background"},std::pair{"3D background without sky","ftebroom_color_3d_background"},std::pair{"2D grid","ftebroom_grid_color_2d"},std::pair{"3D grid","ftebroom_grid_color"},std::pair{"Entity bounds","ftebroom_color_entity_bounds"},std::pair{"Entity links","ftebroom_color_entity_links"},std::pair{"Selected entity links","ftebroom_color_selected_entity_links"},std::pair{"Selected geometry","ftebroom_color_selected"},std::pair{"Locked geometry","ftebroom_color_locked"},std::pair{"Hovered geometry","ftebroom_color_hover"}})
       {
         char text[128]={};float color[3]={};cvars->GetString(setting.second,text,sizeof text);std::sscanf(text,"%f %f %f",&color[0],&color[1],&color[2]);
         if(ImGui::ColorEdit3(setting.first,color)){std::snprintf(text,sizeof text,"%.6g %.6g %.6g",color[0],color[1],color[2]);cvars->SetString(setting.second,text);if(!std::strcmp(setting.second,"ftebroom_color_entity_bounds"))cvars->SetFloat("ftebroom_entity_bounds_class_colors",0);preferencesSave();}

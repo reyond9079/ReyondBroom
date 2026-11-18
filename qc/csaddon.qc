@@ -361,6 +361,7 @@ void() wrap_renderscene =
         fb_visual_face_hover();
     }
     fb_modelviewer_draw();
+    fb_brush_model_preview_draw();
     cvar_set("ca_brush_view",itos(activeType));
     cvar_set("ftebroom_ctx_view",itos(activeType==3?1:(activeType==2?2:(activeType==1?3:0))));
     if(cvar("ftebroom_benchmark")) {
@@ -986,6 +987,7 @@ void(float prevprogs) init =
     registercommand("ftebroom_export_unity");
     registercommand("ftebroom_tag");
     registercommand("ftebroom_context");
+    registercommand("ftebroom_replace_brush_model");
     registercommand("ftebroom_entity_drop");
     registercommand("ftebroom_model_drop");
     registercommand("ftebroom_terrain_position");

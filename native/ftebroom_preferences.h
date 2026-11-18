@@ -10,7 +10,7 @@ static const char* preferenceVariables[] = {
   "ftebroom_look_speed","ftebroom_pan_speed","ftebroom_move_speed","ftebroom_fly_speed",
   "ftebroom_fov","ftebroom_invert_horizontal","ftebroom_invert_vertical",
   "ftebroom_move_to_cursor","ftebroom_alt_move","ftebroom_grid_alpha",
-  "ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_color_brush_edges","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_color_entity_links","ftebroom_color_selected_entity_links","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
+  "ftebroom_grid_color","ftebroom_grid_color_2d","ftebroom_color_brush_edges","ftebroom_color_brush_edges_3d","ftebroom_color_2d_background","ftebroom_color_3d_background","ftebroom_color_entity_bounds","ftebroom_color_entity_links","ftebroom_color_selected_entity_links","ftebroom_entity_bounds_class_colors","ftebroom_color_selected","ftebroom_color_locked","ftebroom_color_hover",
   "ftebroom_show_entity_names","ftebroom_show_entity_names_2d","ftebroom_show_entity_bounds","ftebroom_show_group_bounds",
   "ftebroom_show_brush_entity_bounds","ftebroom_show_edges","ftebroom_grid_visible",
   "ftebroom_grid_plane","ftebroom_show_brushes","ftebroom_show_points","ftebroom_show_models","ftebroom_show_patches",
@@ -54,14 +54,19 @@ static void preferencesApplyActions()
   static bool loaded=false;
   if(!loaded)
   {
-    loaded=true;std::ifstream stream(documentPath("ftebroom-preferences.cfg"));std::string line;
+    loaded=true;std::ifstream stream(documentPath("ftebroom-preferences.cfg"));std::string line,oldEdgeColor;
+    bool saved3dEdgeColor=false;
     while(std::getline(stream,line))
     {
       std::istringstream row(line);std::string commandName,name,value;
       if(!(row>>commandName>>name>>std::quoted(value)) || commandName!="seta")continue;
       if(name.rfind("ftebroom_key_",0)==0)shortcutOverrides[name]=value;
       else for(auto setting : preferenceVariables)if(name==setting)cvars->SetString(setting,value.c_str());
+      if(name=="ftebroom_color_brush_edges")oldEdgeColor=value;
+      if(name=="ftebroom_color_brush_edges_3d")saved3dEdgeColor=true;
     }
+    if(!saved3dEdgeColor&&!oldEdgeColor.empty())
+      cvars->SetString("ftebroom_color_brush_edges_3d",oldEdgeColor.c_str());
     float angle=cvars->GetFloat("ftebroom_grid_rotation");
     cvars->SetFloat("ftebroom_grid_rotation",std::isfinite(angle)?std::clamp(std::round(angle),-180.f,180.f):0);
   }

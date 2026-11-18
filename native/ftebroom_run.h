@@ -500,7 +500,13 @@ static void runTick()
     const auto& task=runningProfile.tasks[runStep];auto source=runExpand(task.source),destination=runExpand(task.destination);
     runAppend("Step "+std::to_string(runStep+1)+": "+source+" "+destination+"\n");
     if(runTesting){++runStep;return;}
-    if(task.kind==0){cvars->SetFloat("ftebroom_export_status",0);command(task.destination=="@selected-brushes"?"ftebroom_export_selected_bsp\n":"ftebroom_export_map\n");runExportWaiting=true;return;}
+    if(task.kind==0){
+      cvars->SetFloat("ftebroom_export_status",0);
+      const char* exportCommand="ftebroom_export_map\n";
+      if(task.destination=="@selected-world-brushes")exportCommand="ftebroom_export_selected_bsp world\n";
+      else if(task.destination=="@selected-brushes")exportCommand="ftebroom_export_selected_bsp\n";
+      command(exportCommand);runExportWaiting=true;return;
+    }
     if(task.kind==1){
       auto working=std::filesystem::u8path(activeVariables["WORK_DIR_PATH"]);
       const bool launchEngine=(task.flags&RunLaunchEngine)!=0;

@@ -21,7 +21,8 @@ float fb_entity_command();
 int fb_export_map();
 void fb_compile_mods(string replacement);
 void fb_attach_wad(string value);
-int fb_export_selected_bsp();
+int fb_export_selected_bsp(optional int worldOnly);
+void fb_brush_model_replace(int ticket,string classname,string modelPath,string legacyKey,int fteQ1);
 float fb_context_command();
 float fb_plant_brush_command();
 int fb_plant_brush_cancel();
@@ -707,7 +708,13 @@ float() ftebroom_command =
     if(fb_context_command())return TRUE;
     if(fb_plant_brush_command())return TRUE;
     if(argv(0)=="ftebroom_tag") {fb_filter_tag(argv(1),stoi(argv(2)));return TRUE;}
-    if(argv(0)=="ftebroom_export_selected_bsp") {fb_export_selected_bsp();return TRUE;}
+    if(argv(0)=="ftebroom_export_selected_bsp") {fb_export_selected_bsp(argv(1)=="world");return TRUE;}
+    if(argv(0)=="ftebroom_replace_brush_model") {
+        int ticket=stoi(argv(1)),fteQ1=stoi(argv(5));
+        string modelClass=strzone(argv(2)),modelPath=strzone(argv(3)),modelKey=strzone(argv(4));
+        fb_brush_model_replace(ticket,modelClass,modelPath,modelKey,fteQ1);
+        strunzone(modelClass);strunzone(modelPath);strunzone(modelKey);return TRUE;
+    }
     if(argv(0)=="ftebroom_gpu_snapshot") {cvar_set("ftebroom_gpu_snapshot_status",itos(editor_gpu_snapshot(argv(1))));cvar_set("ftebroom_gpu_snapshot_path",argv(1));return TRUE;}
     if(argv(0)=="ftebroom_compile_mods") {fb_compile_mods(argv(1));return TRUE;}
     if(argv(0)=="ftebroom_attach_wad") {fb_attach_wad(argv(1));return TRUE;}

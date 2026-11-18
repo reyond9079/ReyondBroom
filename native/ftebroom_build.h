@@ -454,32 +454,37 @@ static float compileButtonWidth(const char* label)
 {
   return ImGui::CalcTextSize(label,nullptr,true).x+54*uiScale();
 }
-static bool compileButton(const char* label,int icon,bool iconOnly=false,ImVec2 cell={})
+static const char* toolbarPlayCaption()
 {
-  const float u=uiScale(),size=20*u;
+  return uiLanguage==0?"Play":uiTr("Play game");
+}
+static bool compileButton(const char* label,int icon,bool iconOnly=false,ImVec2 cell={},const char* caption=nullptr)
+{
+  const float u=uiScale();
   const auto p=ImGui::GetCursorScreenPos();
-  const float width=cell.x>0?cell.x:(iconOnly?32*u:compileButtonWidth(label));
+  const float width=cell.x>0?cell.x:(iconOnly?32*u:compileButtonWidth(caption?caption:label));
   const float height=cell.y>0?cell.y:(iconOnly?30.f:34.f)*u;
   bool clicked=ImGui::Button((std::string("##compile-")+label).c_str(),{width,height});
   auto list=ImGui::GetWindowDrawList();auto color=ImGui::GetColorU32(ImGuiCol_Text);
+  const float size=std::min(20*u,std::min(width,height)*.72f),iconScale=size/20.f;
   const float x=p.x+(iconOnly?(width-size)*.5f:12*u),y=p.y+(height-size)*.5f;
-  auto point=[&](float a,float b){return ImVec2{x+a*u,y+b*u};};
-  auto line=[&](float a,float b,float c,float d){list->AddLine(point(a,b),point(c,d),color,1.7f*u);};
+  auto point=[&](float a,float b){return ImVec2{x+a*iconScale,y+b*iconScale};};
+  auto line=[&](float a,float b,float c,float d){list->AddLine(point(a,b),point(c,d),color,std::max(1.f,1.7f*iconScale));};
   if(icon==0){line(3,17,12,8);line(1,15,10,6);line(1,15,3,17);line(8,4,12,0);line(12,0,19,7);line(19,7,15,11);line(15,11,8,4);}
-  else if(icon==1){for(int row=0;row<3;row++){float v=3+7*row,k=row==1?13:6;line(1,v,k-2,v);line(k+2,v,19,v);list->AddRect(point(k-2,v-2),point(k+2,v+2),color,0,0,1.5f*u);}}
+  else if(icon==1){for(int row=0;row<3;row++){float v=3+7*row,k=row==1?13:6;line(1,v,k-2,v);line(k+2,v,19,v);list->AddRect(point(k-2,v-2),point(k+2,v+2),color,0,0,std::max(1.f,1.5f*iconScale));}}
   else if(icon==2){line(2,5,10,1);line(10,1,18,5);line(18,5,18,15);line(18,15,10,19);line(10,19,2,15);line(2,15,2,5);line(2,5,10,9);line(10,9,18,5);line(10,9,10,19);}
   else if(icon==3){list->AddTriangleFilled(point(4,1),point(18,10),point(4,19),color);}
   else if(icon==4){line(17,10,2,10);line(2,10,8,4);line(2,10,8,16);}
   else {line(3,18,3,3);line(3,3,17,3);line(17,3,14,7);line(14,7,17,11);line(17,11,3,11);}
-  const char* text=label;const char* end=nullptr;FteBroomTranslate(text,end);
+  const char* text=caption&&!iconOnly?caption:uiTr(label);
   if(!iconOnly)
-    list->AddText({p.x+38*u,p.y+(height-ImGui::GetFontSize())*.5f},color,text,end);
+    list->AddText({p.x+38*u,p.y+(height-ImGui::GetFontSize())*.5f},color,text);
   else if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-    ImGui::SetTooltip("%.*s",end?int(end-text):int(std::strlen(text)),text);
+    ImGui::SetTooltip("%s",text);
   return clicked;
 }
 template<class Place>
-static void buildToolbar(ImVec2 cell,Place place,bool inlineTools,bool compactRail)
+static void buildToolbar(ImVec2 cell,Place place,bool inlineTools,bool compactRail,float availableWidth)
 {
     const bool preview=cvars->GetFloat("ftebroom_bsp_preview")!=0;
     gameProfileLoad();
@@ -503,20 +508,50 @@ static void buildToolbar(ImVec2 cell,Place place,bool inlineTools,bool compactRa
       return clicked;
     };
     if(!jamEditing()){
-      ImGui::BeginDisabled(runActive||buildRunning);
+      const float preferredCompileWidth=compileButtonWidth("Compile");
+      const bool labeled=preferredCompileWidth+cell.x<=availableWidth;
+      const float setupWidth=labeled?cell.x:std::max(1.f,std::min(cell.x,std::floor(availableWidth*.5f)));
+      const float compileWidth=labeled?preferredCompileWidth:setupWidth;
+      // Place both hit targets as one group so wrapping cannot split them.
+      place(compileWidth+setupWidth);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,0);
       ImGui::PushStyleColor(ImGuiCol_Button,uiModern()?uiModernPalette().action:uiColor(47,99,160));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered,uiModern()?uiModernPalette().actionHover:uiColor(58,122,195));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive,uiModern()?uiModernPalette().actionHover:uiColor(45,107,185));
       ImGui::PushStyleColor(ImGuiCol_Text,uiColor(255,255,255));
-      const bool compile=control("Compile",0);placementRect("build/compile");
+      ImGui::BeginDisabled(runActive||buildRunning);
+      const bool compile=compileButton("Compile",3,!labeled,{compileWidth,cell.y});
+      runUiRecordGlobal("tools/Compile");
+      placementRect("build/compile");
+      ImGui::EndDisabled();
+      ImGui::SameLine(0,0);
+      const bool setup=compileButton("Setup compile",1,true,{setupWidth,cell.y});
+      runUiRecordGlobal("tools/Setup compile");
+      const auto split=ImGui::GetItemRectMin();
+      ImGui::GetWindowDrawList()->AddLine({split.x,split.y+5*uiScale()},
+        {split.x,split.y+cell.y-5*uiScale()},ImGui::GetColorU32(ImVec4(1,1,1,.55f)),uiScale());
+      ImGui::PopStyleColor(4);
+      ImGui::PopStyleVar();
       if(compile)buildBegin();
-      ImGui::PopStyleColor(3);ImGui::EndDisabled();
-      if(control("Setup compile",1))buildWindow=true;
+      if(setup)buildWindow=true;
+    }
+    if(canPlay&&!jamEditing()){
+      const char* caption=toolbarPlayCaption();
+      const float width=compileButtonWidth(caption);
+      const bool labeled=width<=availableWidth;
+      const ImVec2 playSize{labeled?width:std::min(cell.x,availableWidth),cell.y};
+      place(playSize.x);
+      ImGui::BeginDisabled(runActive||runExclusive||buildRunning||assetsLoading);
+      const bool play=compileButton("Play mod",3,!labeled,playSize,caption);
+      runUiRecordGlobal("tools/Play mod");
+      if(labeled&&ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s",uiTr("Play mod"));
+      ImGui::EndDisabled();
+      if(play)modPreview();
     }
     if(preview){if(control(previewLabel,4))buildEdit();}
     else {ImGui::BeginDisabled(buildResult.empty()||(buildResultDocument!=documentFile || buildResultProfile!=gameProfile)||buildRunning);
       if(control(previewLabel,2))buildShow();ImGui::EndDisabled();}
-    if(canPlay&&!jamEditing()){ImGui::BeginDisabled(runActive||runExclusive||buildRunning||assetsLoading);
-      if(control("Play mod",3))modPreview();ImGui::EndDisabled();}
     if(!tracePoints.empty()&&control("Leak route",5))traceWindow=true;
 }
 static void buildOverlay()

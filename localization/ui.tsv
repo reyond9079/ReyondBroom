@@ -224,7 +224,7 @@ Reset grid rotation|Сбросить поворот сетки|Rasterdrehung zur
 Perspective|Перспектива|Perspektive|Perspective|透视|透視図|Perspectiva
 Layout|Раскладка|Anordnung|Disposition|布局|レイアウト|Distribución
 Selection|Выделение|Auswahl|Sélection|选择|選択|Selección
-Default (Move)|Выбор / перемещение|Auswählen / Verschieben|Sélection / Déplacement|选择／移动|選択・移動|Seleccionar / Mover
+Select/Move|Выбор / перемещение|Auswählen / Verschieben|Sélection / Déplacement|选择／移动|選択・移動|Seleccionar / Mover
 Brush|Браш|Brush|Brush|笔刷|ブラシ|Pincel
 Clip|Разрезать|Schneiden|Découper|裁切|クリップ|Recortar
 Vertex|Вершина|Scheitelpunkt|Sommet|顶点|頂点|Vértice
@@ -488,3 +488,19 @@ Brush geometry (game-native)|Брашевая геометрия|Brush geometry 
 Ready|Готово|Ready|Ready|Ready|Ready|Ready
 Quake 1 (recommended)|Quake 1 (рекомендуется)|Quake 1 (empfohlen)|Quake 1 (recommandé)|Quake 1（推荐）|Quake 1（推奨）|Quake 1 (recomendado)
 Download LibreQuake (recommended)|Скачать LibreQuake (рекомендуется)|LibreQuake herunterladen (empfohlen)|Télécharger LibreQuake (recommandé)|下载 LibreQuake（推荐）|LibreQuake をダウンロード（推奨）|Descargar LibreQuake (recomendado)
+Create|Создать|Erstellen|Créer|创建|作成|Crear
+Layer|Слой|Ebene|Calque|图层|レイヤー|Capa
+Create point entity|Создать точечную энтити|Punktentität erstellen|Créer une entité ponctuelle|创建点实体|ポイントエンティティを作成|Crear entidad puntual
+Create brush entity|Создать брашевую энтити|Brush-Entität erstellen|Créer une entité de brush|创建笔刷实体|ブラシエンティティを作成|Crear entidad de brush
+Reveal material in browser|Показать материал в браузере|Material im Browser anzeigen|Afficher le matériau dans le navigateur|在浏览器中显示材质|ブラウザーでマテリアルを表示|Mostrar material en el explorador
+Hide selection|Скрыть выделение|Auswahl ausblenden|Masquer la sélection|隐藏所选|選択を非表示|Ocultar selección
+Isolate selection|Изолировать выделение|Auswahl isolieren|Isoler la sélection|隔离所选|選択を単独表示|Aislar selección
+Rename groups...|Переименовать группы…|Gruppen umbenennen…|Renommer les groupes…|重命名分组…|グループ名を変更…|Renombrar grupos…
+Remove objects from group|Убрать объекты из группы|Objekte aus Gruppe entfernen|Retirer les objets du groupe|从分组中移除对象|グループから削除|Quitar objetos del grupo
+Create FTE Engine terrain here...|Создать здесь террейн FTE…|Hier FTE-Terrain erstellen…|Créer ici un terrain FTE…|在此创建 FTE 地形…|ここに FTE 地形を作成…|Crear terreno FTE aquí…
+Convert into...|Преобразовать в…|Konvertieren in…|Convertir en…|转换为…|変換…|Convertir en…
+MDL model|Модель MDL|MDL-Modell|Modèle MDL|MDL 模型|MDL モデル|Modelo MDL
+BSP model|Модель BSP|BSP-Modell|Modèle BSP|BSP 模型|BSP モデル|Modelo BSP
+2D brush edges|Контуры брашей в 2D|Brush-Kanten in 2D|Arêtes des brushes en 2D|2D 笔刷边缘|2D ブラシの輪郭|Bordes de brushes en 2D
+3D brush edges|Контуры брашей в 3D|Brush-Kanten in 3D|Arêtes des brushes en 3D|3D 笔刷边缘|3D ブラシの輪郭|Bordes de brushes en 3D
+Convert selected brushes to MDL|Преобразовать выделенные браши в MDL|Ausgewählte Brushes in MDL konvertieren|Convertir les brushes sélectionnés en MDL|将所选笔刷转换为 MDL|選択したブラシを MDL に変換|Convertir brushes seleccionados a MDL

@@ -29,6 +29,7 @@ inline std::string prepareStaticModels(const std::string& bytes,int profile,size
   bool marked=e.get("_reyondbroom_authoring")=="1"&&generatedAuthoringPath(e.get("model"));
   bool legacy=generatedIvyPath(e.get("model"));
   if(!marked&&!legacy)continue;
+  const auto originalFields=e.fields;
   if(marked&&classname=="func_model"&&(profile==3||profile==4))throw std::runtime_error("The map contains a linked authoring func_model. Quake II plant assets are native MD2, but the base game has no arbitrary-model spawner. Use a compatible mod entity with that model before compiling. GoldSrc also requires studio MDL conversion.");
   if(marked&&profile==2&&classname=="func_model"&&e.get("_reyondbroom_fte_q1")!="1")throw std::runtime_error("Quake plant assets are native MDL, but vanilla game code cannot spawn func_model. Enable the explicit FTE static-model extension in Plant Editor and Save, or use the MDL with a compatible mod entity before compiling.");
   if(marked&&profile==2){
@@ -42,7 +43,7 @@ inline std::string prepareStaticModels(const std::string& bytes,int profile,size
    std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<scale;e.fields["scale"]=out.str();e.fields.erase("modelscale");e.fields.erase("modelscale_vec");
   }
   if((profile==0&&marked)||(profile==2&&(marked||legacy))){
-   e.fields["classname"]="misc_model";changed++;
+   e.fields["classname"]="misc_model";
    if(profile==0){
     double scale=1;auto value=e.get("scale");if(value.empty())value=e.get("modelscale");
     if(!value.empty()){std::istringstream in(value);in.imbue(std::locale::classic());if(!(in>>scale)||!std::isfinite(scale))throw std::runtime_error("Invalid authoring model scale in build copy.");}
@@ -53,6 +54,7 @@ inline std::string prepareStaticModels(const std::string& bytes,int profile,size
     }else{std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<scale;e.fields["modelscale"]=out.str();}
    }
   }
+  if(e.fields!=originalFields)++changed;
  }
  if(!changed)return bytes;std::string result;
  for(auto& e:entities){result+="{\n";for(auto& f:e.fields)result+=prefab::quote(f.first)+" "+prefab::quote(f.second)+"\n";result+=e.geometry+"}\n";}

@@ -13,6 +13,7 @@ int main(){try{
  check(ftebroom::generatedIvyModels(copy).size()==1&&!ftebroom::generatedIvyPath("models/reyond-plugins/ivy-x/../../escape.mdl"),"generated_resource_paths_scoped");
  std::string authoring="{\n\"classname\" \"worldspawn\"\n}\n{\n\"classname\" \"func_model\"\n\"model\" \"models/monster.mdl\"\n\"_reyondbroom_authoring\" \"1\"\n\"_reyondbroom_fte_q1\" \"1\"\n\"origin\" \"0 0 24\"\n}\n";
  auto authoringCopy=ftebroom::prepareStaticModels(authoring,2,n);check(n==1&&authoringCopy.find("misc_model")!=authoringCopy.npos,"authoring_model_uses_native_q1_runtime_fallback");check(authoring.find("misc_model")==authoring.npos&&ftebroom::generatedIvyModels(authoringCopy).count("models/monster.mdl"),"authoring_model_staged_without_source_change");
+ check(ftebroom::prepareStaticModels(authoringCopy,2,n)==authoringCopy&&n==0,"quake_misc_model_fallback_is_idempotent");
  auto q3=ftebroom::prepareStaticModels(authoring,0,n);check(n==1&&q3.find("misc_model")!=q3.npos,"q3_build_copy_adapts_marked_authoring_models");
  check(ftebroom::prepareStaticModels(authoring,1,n)==authoring&&n==0,"fte_keeps_authoring_func_model");
  for(int profile:{2,3,4}){auto unsupported=authoring;if(profile==2){auto at=unsupported.find("_reyondbroom_fte_q1");unsupported.replace(at,20,"extension_disabledxx");}bool rejected=false;try{ftebroom::prepareStaticModels(unsupported,profile,n);}catch(const std::runtime_error&){rejected=true;}check(rejected,"unsupported_runtime_has_explicit_diagnostic");}

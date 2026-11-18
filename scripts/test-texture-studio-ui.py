@@ -346,6 +346,7 @@ def main():
             print("PASS Model Editor opens the saved graph and preserves original bytes through Undo and Redo")
 
             click("texture-studio/new")
+            wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["catalogThumbnails"] > 0)
             click("texture-studio/preset-search")
             ui.text("Flemish Brick")
             before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
@@ -376,6 +377,29 @@ def main():
             click("texture-studio/save")
             wait(lambda: json.loads(material_file.read_text(encoding="utf-8")) == graph)
             print("PASS Ctrl+Z and Ctrl+Y target the focused Texture Studio history")
+
+            click("texture-studio/graph-tab")
+            click("texture-studio/graph/node")
+            click("texture-studio/graph/node/pattern")
+            click("texture-studio/graph/include")
+            click("texture-studio/graph/group")
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            click("texture-studio/graph/group-create")
+            wait(model_ready)
+            click("texture-studio/save")
+            grouped = wait(lambda: (doc if (doc := json.loads(material_file.read_text(encoding="utf-8")))[
+                "graph"].get("groups") else None))
+            group_id, definition = next(iter(grouped["graph"]["groups"].items()))
+            pin = definition["inputs"][0]["name"]
+            click("texture-studio/graph/input/" + pin)
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            click("texture-studio/graph/source/detail/value")
+            wait(model_ready)
+            click("texture-studio/save")
+            connected = wait(lambda: (doc if (doc := json.loads(material_file.read_text(encoding="utf-8"))) != grouped else None))
+            assert {"fromNode": "detail", "fromPort": "value", "toNode": group_id, "toPort": pin} in connected[
+                "graph"]["edges"]
+            print("PASS native graph grouping and typed group input reconnection persist in the source")
         finally:
             if game.poll() is None:
                 game.kill()

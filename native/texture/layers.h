@@ -17,7 +17,8 @@ inline LayerChain layers(Document& doc) {
   for (unsigned depth = 0; depth < maxNodes; ++depth) {
     const auto id = output.at("node").get<std::string>();
     const auto& layer = findNode(doc, id);
-    if (layer.at("type") != "Blend" || layer.at("version") != 1) {
+    if (layer.at("type") != "Blend" || layer.at("version") != 1 ||
+        !(layer.value("studioLayer", false) || layer.value("label", "") == "Color layer")) {
       stack.anchor = id;
       stack.port = output.at("port").get<std::string>();
       std::reverse(stack.order.begin(), stack.order.end());
@@ -58,10 +59,43 @@ inline void appendSolidLayer(Document& doc, LayerChain stack, const std::string&
   nodes.push_back(node(maskId.c_str(), "Constant", {{"value", 1}}, 3, row + 1));
   auto blend = node(id.c_str(), "Blend", defaultParameters(Kernel::blend), 4, row);
   blend["label"] = "Color layer";
+  blend["studioLayer"] = true;
   nodes.push_back(std::move(blend));
   edges.push_back(wire(colorId.c_str(), "color", id.c_str(), "top"));
   edges.push_back(wire(maskId.c_str(), "value", id.c_str(), "mask"));
   stack.order.push_back(id);
+  bindLayers(doc, stack);
+}
+
+inline void duplicateLayer(Document& doc, LayerChain stack, size_t position, const std::string& id) {
+  require(position < stack.order.size() && identifier(id), "layers", "Choose a layer to duplicate.");
+  const auto original = stack.order[position];
+  auto layer = findNode(doc, original);
+  auto& graph = doc.source.at("graph");
+  auto& nodes = graph.at("nodes");
+  auto& edges = graph.at("edges");
+  Json links = Json::array();
+  for (auto edge : edges) {
+    if (edge.at("toNode") != original || edge.at("toPort") == "base") continue;
+    const auto& input = findNode(doc, edge.at("fromNode").get<std::string>());
+    if (input.at("type") == "ConstantColor" || input.at("type") == "Constant") {
+      auto copy = input;
+      const auto copyId = id + "-" + edge.at("toPort").get<std::string>();
+      copy["id"] = copyId;
+      copy["position"] = {696, 112 * (4 + int(position))};
+      edge["fromNode"] = copyId;
+      nodes.push_back(std::move(copy));
+    }
+    edge["toNode"] = id;
+    links.push_back(std::move(edge));
+  }
+  layer["id"] = id;
+  layer["studioLayer"] = true;
+  layer["label"] = layer.value("label", "Layer") + " copy";
+  layer["position"] = {928, 112 * (4 + int(position))};
+  nodes.push_back(std::move(layer));
+  for (auto& edge : links) edges.push_back(std::move(edge));
+  stack.order.insert(stack.order.begin() + position + 1, id);
   bindLayers(doc, stack);
 }
 

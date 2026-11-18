@@ -22,6 +22,7 @@ struct TextureStudioState {
   struct Result {
     unsigned revision = 0;
     bool fullSize = false;
+    rbTexture::Resolution previewSize{};
     rbTexture::Evaluation image{};
     std::map<std::string,std::string> preview;
     std::vector<unsigned char> modelPixels;
@@ -29,7 +30,9 @@ struct TextureStudioState {
 
   bool open = false, focus = false, focused = false, scheduled = false, fullSize = false;
   bool playing = false;
+  bool actualPixels = false, previewGrid = false, previewSeams = false;
   Preview previewMode = flat;
+  rbTexture::PreviewCamera previewCamera;
   unsigned revision = 0, imageRevision = 0, frame = 0;
   double deadline = 0, nextRender = 0, nextAutosave = 0;
   double playStarted = 0;
@@ -39,7 +42,8 @@ struct TextureStudioState {
   std::string channel = "baseColor", message, error, material, wadReference;
   std::string savedSource, recoveredSource;
   std::string surfaceData;
-  std::string movingNode, wireStart;
+  std::string movingNode;
+  std::pair<std::string, std::string> wireStart;
   std::set<std::string> groupSelection;
   std::array<char, 96> presetSearch{};
   int catalogVariation = 0;
@@ -48,6 +52,8 @@ struct TextureStudioState {
   std::set<std::string> favorites;
   std::vector<std::string> recentPresets;
   std::vector<std::pair<std::string, std::string>> userPresets;
+  std::future<std::pair<std::string, std::string>> thumbnailJob;
+  std::map<std::string, int> thumbnails;
   std::filesystem::path file, destination, recoveryFile, assetFolder;
   std::vector<std::filesystem::path> recoverable;
   std::optional<rbTexture::History> document;
@@ -155,7 +161,7 @@ static void studioNewDocument(rbTexture::Document document) {
   s.file.clear();
   s.drag.reset();
   s.movingNode.clear();
-  s.wireStart.clear();
+  s.wireStart = {};
   s.groupSelection.clear();
   s.document.emplace(std::move(document));
   s.assets.clear();
@@ -192,7 +198,7 @@ static void studioCancel() {
   s.playing = false;
   if (!s.movingNode.empty()) s.drag.reset();
   s.movingNode.clear();
-  s.wireStart.clear();
+  s.wireStart = {};
   s.groupSelection.clear();
   if (s.cancel) *s.cancel = true;
   ++s.revision;
@@ -569,6 +575,7 @@ static void studioTick() {
       const auto frame = s.frame;
       const auto full = s.fullSize;
       const auto mode = s.previewMode;
+      const auto camera = s.previewCamera;
       const auto targetProfile = gameProfile;
       const bool model = s.apply == TextureStudioState::Apply::model;
       s.scheduled = false;
@@ -579,7 +586,7 @@ static void studioTick() {
         else if (targetProfile == 4) targetPalette = studioGoldSrcPalette();
       }
       s.cancel = std::make_shared<std::atomic<bool>>(false);
-      s.job = std::async(std::launch::async, [doc = std::move(doc), assets = s.assets, revision, full, model, frame, mode,
+      s.job = std::async(std::launch::async, [doc = std::move(doc), assets = s.assets, revision, full, model, frame, mode, camera,
           targetProfile, palette = std::move(targetPalette), surfaceData = s.surfaceData,
           stop = s.cancel, cache = s.previewCache]() {
         const auto size = doc.resolution();
@@ -595,7 +602,7 @@ static void studioTick() {
         if (preview.outputs.count("baseColor")) {
           if (mode == TextureStudioState::sphere || mode == TextureStudioState::cube)
             pngs.emplace("material-preview", rbTexture::png(rbTexture::materialPreview(preview,
-              mode == TextureStudioState::cube, stop.get())));
+              mode == TextureStudioState::cube, stop.get(), camera)));
           else if (mode == TextureStudioState::target)
             pngs.emplace("material-preview", rbTexture::png(studioTargetPreview(
               *preview.outputs.at("baseColor"), targetProfile, palette)));
@@ -608,7 +615,7 @@ static void studioTick() {
           ? rbTexture::evaluate(plan, size, stop.get(), rbTexture::memoryBudget, workers, frame) : std::move(preview);
         std::vector<unsigned char> modelPixels;
         if (model) modelPixels = rbTexture::rgba8(*result.outputs.at("baseColor"));
-        return TextureStudioState::Result{revision, full, std::move(result), std::move(pngs), std::move(modelPixels)};
+        return TextureStudioState::Result{revision, full, previewSize, std::move(result), std::move(pngs), std::move(modelPixels)};
       });
     }
   } catch (const std::exception& e) {
@@ -794,6 +801,54 @@ static void studioRecordPreset(const std::string& id) {
   studioSaveLibrary();
 }
 
+static void studioReleaseThumbnails() {
+  for (const auto& [id, handle] : textureStudio.thumbnails) if (handle) draw->UnloadImage(handle);
+  textureStudio.thumbnails.clear();
+}
+
+static void studioThumbnailTick() {
+  auto& s = textureStudio;
+  if (!s.thumbnailJob.valid() || s.thumbnailJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+  auto [id, bytes] = s.thumbnailJob.get();
+  if (!s.open) return;
+  int handle = 0;
+  if (!bytes.empty()) {
+    const auto path = "ftebroom/texture-studio/preset-" + id + ".png";
+    draw->LoadImageData(path.c_str(), "image/png", bytes.data(), bytes.size());
+    handle = draw->LoadImage(path.c_str());
+  }
+  s.thumbnails.emplace(id, handle);
+}
+
+template<class Recipe>
+static float studioPresetThumbnail(const std::string& id, Recipe recipe) {
+  auto& s = textureStudio;
+  const float side = 32 * uiScale();
+  const ImVec2 size{side, side};
+  const auto found = s.thumbnails.find(id);
+  if (found != s.thumbnails.end() && found->second)
+    ImGui::Image((ImTextureID)found->second, size);
+  else {
+    const bool visible = ImGui::IsRectVisible(size);
+    ImGui::Dummy(size);
+    if (visible && found == s.thumbnails.end() && !s.thumbnailJob.valid()) {
+      s.thumbnailJob = std::async(std::launch::async, [id, recipe] {
+        try {
+          const auto plan = rbTexture::compile(recipe());
+          const auto result = rbTexture::evaluate(plan, {48, 48}, nullptr, rbTexture::memoryBudget, 1);
+          return std::make_pair(id, rbTexture::png(*result.outputs.at("baseColor")));
+        } catch (const std::exception&) {
+          return std::make_pair(id, std::string{});
+        }
+      });
+    }
+  }
+  ImGui::SameLine();
+  const auto& style = ImGui::GetStyle();
+  return std::max(1.f, ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("☆").x -
+    2 * style.FramePadding.x - 2 * style.ItemSpacing.x);
+}
+
 static void studioSaveUserPreset(const std::string& label) {
   studioLoadLibrary();
   auto& s = textureStudio;
@@ -833,6 +888,7 @@ static void studioOpenFile() {
         doc = rbTexture::open(ftebroom::bb::readFile(path, rbTexture::maxSourceBytes));
         if (!doc.readOnly) assets = rbTexture::loadAssets(doc, folder);
       }
+      studioAutosave();
       studioCancel();
       textureStudio.drag.reset();
       textureStudio.file = archived ? std::filesystem::path{} : path;
@@ -882,6 +938,7 @@ static void studioImportRaster(std::string license, std::string textureName) {
       reference["width"] = raster->size.width;
       reference["height"] = raster->size.height;
       auto doc = rbTexture::importedImage(ftebroom::bb::uuid(), *raster, std::move(reference));
+      studioAutosave();
       studioCancel();
       auto& s = textureStudio;
       s.file.clear();
@@ -1172,6 +1229,7 @@ static void studioLayers() {
     return;
   }
   auto stack = rbTexture::layers(doc);
+  if (stack.order.empty()) ImGui::TextUnformatted("Base Color comes from the node graph.");
   static rbTexture::Pixel tint{.38f, .27f, .19f, 1.f};
   ImGui::ColorEdit4("Layer color", tint.data(), ImGuiColorEditFlags_Float);
   const bool added = ImGui::Button("Add color layer");
@@ -1199,12 +1257,36 @@ static void studioLayers() {
     ImGui::EndDisabled();
     ImGui::SameLine();
     const bool remove = ImGui::SmallButton("Remove");
+    const bool duplicate = ImGui::SmallButton("Duplicate");
+    std::array<char, 81> label{};
+    std::snprintf(label.data(), label.size(), "%s", layer.value("label", id).c_str());
+    const bool rename = ImGui::InputText("Name", label.data(), label.size(), ImGuiInputTextFlags_EnterReturnsTrue) && label[0];
     int mode = parameters.value("mode", 0);
     const bool modeChanged = ImGui::Combo("Blend mode", &mode, "Normal\0Multiply\0Screen\0Add\0Overlay\0");
     studioParameter(rbTexture::Json{{"node", id}, {"key", "opacity"}, {"label", "Opacity"},
                                    {"min", 0.f}, {"max", 1.f}, {"step", 0}});
+    const auto& edges = doc.source.at("graph").at("edges");
+    const auto mask = std::find_if(edges.begin(), edges.end(), [&](const auto& edge) {
+      return edge.at("toNode") == id && edge.at("toPort") == "mask";
+    });
+    if (mask != edges.end()) {
+      const auto source = mask->at("fromNode").get<std::string>();
+      if (rbTexture::findNode(doc, source).at("type") == "Constant")
+        studioParameter(rbTexture::Json{{"node", source}, {"key", "value"}, {"label", "Mask coverage"},
+                                       {"min", 0.f}, {"max", 1.f}, {"step", 0}});
+      else ImGui::TextUnformatted("Mask comes from the node graph.");
+    }
     ImGui::PopID();
-    if (!visibility && !up && !down && !remove && !modeChanged) continue;
+    if (!visibility && !up && !down && !remove && !rename && !duplicate && !modeChanged) continue;
+    if (duplicate) {
+      rbTexture::duplicateLayer(doc, stack, slot, ftebroom::bb::uuid());
+      studioEdit(std::move(doc));
+      return;
+    }
+    if (rename) {
+      layer["label"] = label.data();
+      layer["studioLayer"] = true;
+    }
     if (visibility) parameters["enabled"] = enabled;
     if (modeChanged) parameters["mode"] = mode;
     if (up) std::swap(stack.order[slot], stack.order[slot + 1]);
@@ -1216,14 +1298,71 @@ static void studioLayers() {
   }
 }
 
+struct StudioGraphPins {
+  using Pin = std::pair<std::string, rbTexture::Port>;
+  std::vector<Pin> inputs, outputs;
+};
+
+static StudioGraphPins studioGraphPins(const rbTexture::Json& node, const rbTexture::Json& graph,
+                                        std::map<std::string, StudioGraphPins>& definitions, unsigned depth = 0) {
+  StudioGraphPins result;
+  if (node.value("version", 0) != 1 || depth > 16) return result;
+  const auto type = node.at("type").get<std::string>();
+  if (const auto* spec = rbTexture::contract(type)) {
+    for (const auto& pin : spec->inputs) result.inputs.emplace_back(pin.name, pin.type);
+    result.outputs.emplace_back(spec->output.name, spec->output.type);
+    return result;
+  }
+  if (type != "Subgraph") return result;
+  const auto name = node.at("parameters").at("group").get<std::string>();
+  const auto found = definitions.find(name);
+  if (found != definitions.end()) return found->second;
+  const auto& group = graph.at("groups").at(name);
+  std::map<std::string, StudioGraphPins> internal;
+  for (const auto& child : group.at("nodes"))
+    internal.emplace(child.at("id").get<std::string>(), studioGraphPins(child, graph, definitions, depth + 1));
+  const auto resolve = [&](const rbTexture::Json& binding, bool output) -> std::optional<rbTexture::Port> {
+    const auto child = internal.find(binding.at("node").get<std::string>());
+    if (child == internal.end()) return {};
+    const auto& pins = output ? child->second.outputs : child->second.inputs;
+    const auto pin = std::find_if(pins.begin(), pins.end(), [&](const auto& pair) {
+      return pair.first == binding.at("port");
+    });
+    return pin == pins.end() ? std::nullopt : std::optional{pin->second};
+  };
+  std::map<std::string, std::optional<rbTexture::Port>> inputs;
+  for (const auto& binding : group.at("inputs")) {
+    const auto value = resolve(binding, false);
+    const auto [entry, inserted] = inputs.try_emplace(binding.at("name").get<std::string>(), value);
+    if (!inserted && entry->second != value) entry->second.reset();
+  }
+  for (const auto& [name, value] : inputs)
+    if (value) result.inputs.emplace_back(name, *value);
+  const auto& outputs = group.at("outputs");
+  for (auto binding = outputs.begin(); binding != outputs.end(); ++binding)
+    if (const auto type = resolve(*binding, true)) result.outputs.emplace_back(binding.key(), *type);
+  definitions.emplace(name, result);
+  return result;
+}
+
 static void studioNodes() {
   auto& s = textureStudio;
   auto doc = textureStudioDoc();
   auto& graph = doc.source.at("graph");
   auto& nodes = graph.at("nodes");
   auto& edges = graph.at("edges");
+  static unsigned pinRevision = std::numeric_limits<unsigned>::max();
+  static std::map<std::string, StudioGraphPins> nodePins;
+  if (pinRevision != s.revision) {
+    nodePins.clear();
+    std::map<std::string, StudioGraphPins> definitions;
+    for (const auto& node : nodes)
+      nodePins.emplace(node.at("id").get<std::string>(), studioGraphPins(node, graph, definitions));
+    pinRevision = s.revision;
+  }
   static float zoom = .70f;
   static ImVec2 pan{12,12};
+  static bool minimap = false;
   if (ImGui::Button("Add node")) ImGui::OpenPopup("Add texture node");
   runUiRecordGlobal("texture-studio/graph-add");
   if (ImGui::BeginPopup("Add texture node")) {
@@ -1247,15 +1386,21 @@ static void studioNodes() {
     zoom = .70f;
   }
   ImGui::SameLine();
+  const bool zoomAll = ImGui::Button("Zoom to all");
+  ImGui::SameLine();
+  ImGui::Checkbox("Minimap", &minimap);
   ImGui::BeginDisabled(s.groupSelection.empty());
   if (ImGui::Button("Group nodes…")) ImGui::OpenPopup("Group texture nodes");
+  runUiRecordGlobal("texture-studio/graph/group");
   ImGui::EndDisabled();
   if (ImGui::BeginPopupModal("Group texture nodes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
     static char name[80] = "Material group";
     ImGui::InputText("Name", name, sizeof(name));
     bool grouped = false;
     ImGui::BeginDisabled(!name[0] || s.groupSelection.empty());
-    if (ImGui::Button("Create group")) studioAction([&] {
+    const bool create = ImGui::Button("Create group");
+    runUiRecordGlobal("texture-studio/graph/group-create");
+    if (create) studioAction([&] {
       rbTexture::groupNodes(doc, s.groupSelection, ftebroom::bb::uuid(), name);
       studioEdit(std::move(doc));
       s.selectedNode = int(textureStudioDoc().source.at("graph").at("nodes").size()) - 1;
@@ -1275,7 +1420,13 @@ static void studioNodes() {
   const auto origin = ImGui::GetCursorScreenPos();
   const auto area = ImGui::GetContentRegionAvail();
   const bool hovered = ImGui::IsWindowHovered();
-  if (hovered && ImGui::GetIO().MouseWheel) zoom = std::clamp(zoom + ImGui::GetIO().MouseWheel * .07f, .30f, 2.f);
+  if (hovered && ImGui::GetIO().MouseWheel) {
+    const float next = std::clamp(zoom * std::pow(1.15f, ImGui::GetIO().MouseWheel), .04f, 2.f);
+    const auto mouse = ImGui::GetIO().MousePos;
+    pan = {mouse.x-origin.x - (mouse.x-origin.x-pan.x)*next/zoom,
+           mouse.y-origin.y - (mouse.y-origin.y-pan.y)*next/zoom};
+    zoom = next;
+  }
   if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
     pan.x += ImGui::GetIO().MouseDelta.x; pan.y += ImGui::GetIO().MouseDelta.y;
   }
@@ -1284,9 +1435,9 @@ static void studioNodes() {
   const auto accent = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
   const ImVec2 card{200 * zoom, 68 * zoom};
   std::map<std::string, ImVec2> positions;
-  struct CanvasPin { ImVec2 center; const char* name; rbTexture::Port type; };
-  std::map<std::string, CanvasPin> sendPins;
-  std::map<std::pair<std::string, std::string>, CanvasPin> receivePins;
+  std::map<std::string, float> heights;
+  struct CanvasPin { ImVec2 center; rbTexture::Port type; };
+  std::map<std::pair<std::string, std::string>, CanvasPin> sendPins, receivePins;
   const ImVec2 mouse = ImGui::GetIO().MousePos;
   const auto nearPin = [&](ImVec2 center) {
     const auto dx = center.x - mouse.x, dy = center.y - mouse.y;
@@ -1303,23 +1454,30 @@ static void studioNodes() {
     const auto id = n.at("id").get<std::string>();
     const auto position = ImVec2{origin.x + pan.x + x * zoom, origin.y + pan.y + y * zoom};
     positions[id] = position;
-    const auto* spec = rbTexture::contract(n.at("type").get<std::string>());
-    if (!spec) continue;
-    sendPins.emplace(id, CanvasPin{{position.x + card.x, position.y + card.y * .62f}, spec->output.name, spec->output.type});
-    for (size_t i = 0; i < spec->inputs.size(); ++i) {
-      const auto& pin = spec->inputs[i];
-      const float offset = card.y * (.42f + .15f * i);
-      receivePins.emplace(std::make_pair(id, pin.name), CanvasPin{{position.x, position.y + offset}, pin.name, pin.type});
-    }
+    const auto& ports = nodePins.at(id);
+    const auto count = std::max(ports.inputs.size(), ports.outputs.size());
+    const float step = std::max(15.f, 15 * zoom);
+    heights[id] = std::max(card.y, 26 * zoom + (count + 1) * step);
+    const auto place = [&](const auto& entries, float left, auto& destination) {
+      for (size_t i = 0; i < entries.size(); ++i) {
+        const auto& [name, type] = entries[i];
+        const float top = position.y + 26 * zoom + (i + .5f) * step;
+        destination.emplace(std::make_pair(id, name), CanvasPin{{left, top}, type});
+      }
+    };
+    place(ports.outputs, position.x + card.x, sendPins);
+    place(ports.inputs, position.x, receivePins);
   }
   for (const auto& e : edges) {
     auto start = positions.find(e.at("fromNode").get<std::string>());
     auto end = positions.find(e.at("toNode").get<std::string>());
     if (start == positions.end() || end == positions.end()) continue;
-    const auto from = sendPins.find(start->first);
+    const auto from = sendPins.find({start->first, e.at("fromPort").get<std::string>()});
     const auto to = receivePins.find({end->first, e.at("toPort").get<std::string>()});
     const ImVec2 a = from == sendPins.end() ? ImVec2{start->second.x + card.x, start->second.y + card.y * .5f} : from->second.center;
     const ImVec2 b = to == receivePins.end() ? ImVec2{end->second.x, end->second.y + card.y * .5f} : to->second.center;
+    if (std::max(a.x,b.x) + card.x * .25f < origin.x || std::min(a.x,b.x) - card.x * .25f > origin.x + area.x ||
+        std::max(a.y,b.y) < origin.y || std::min(a.y,b.y) > origin.y + area.y) continue;
     painter->AddBezierCubic(a, {a.x + card.x * .25f, a.y}, {b.x - card.x * .25f, b.y}, b, accent, 2.f);
   }
   for (size_t index = 0; index < nodes.size(); ++index) {
@@ -1327,7 +1485,8 @@ static void studioNodes() {
     auto id = n.at("id").get<std::string>();
     auto type = n.at("type").get<std::string>();
     const auto a = positions.at(id);
-    const ImVec2 b{a.x + card.x, a.y + card.y};
+    const ImVec2 b{a.x + card.x, a.y + heights.at(id)};
+    if (b.x < origin.x || b.y < origin.y || a.x > origin.x + area.x || a.y > origin.y + area.y) continue;
     const bool selected = int(index) == s.selectedNode || s.groupSelection.count(id);
     painter->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_FrameBg), 4);
     painter->AddRect(a, b, selected ? accent : color, 4, 0, selected ? 2.f : 1.f);
@@ -1355,12 +1514,15 @@ static void studioNodes() {
     }
     return color;
   };
-  for (const auto& [id, pin] : sendPins) {
+  for (const auto& [key, pin] : sendPins) {
     const bool over = hovered && nearPin(pin.center);
     painter->AddCircleFilled(pin.center, over ? 5.f : 3.5f, pinColor(pin.type));
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-      s.wireStart = id;
-      s.movingNode.clear();
+    if (over) {
+      ImGui::SetTooltip("Output %s", key.second.c_str());
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        s.wireStart = key;
+        s.movingNode.clear();
+      }
     }
   }
   std::optional<rbTexture::Json> newConnection;
@@ -1371,18 +1533,50 @@ static void studioNodes() {
     const bool over = hovered && nearPin(pin.center);
     painter->AddCircleFilled(pin.center, over ? 5.f : 3.5f, pinColor(pin.type));
     if (!over) continue;
-    ImGui::SetTooltip("%s", pin.name);
-    if (sending != sendPins.end() && pin.type == sending->second.type && key.first != sending->first &&
+    const bool compatible = sending == sendPins.end() ||
+      (pin.type == sending->second.type && key.first != sending->first.first);
+    ImGui::SetTooltip("%s%s", key.second.c_str(), compatible ? "" : " · Incompatible output");
+    if (sending != sendPins.end() && compatible &&
         ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-      newConnection = rbTexture::wire(sending->first.c_str(), sending->second.name, key.first.c_str(), pin.name);
+      newConnection = rbTexture::wire(sending->first.first.c_str(), sending->first.second.c_str(),
+        key.first.c_str(), key.second.c_str());
   }
-  if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) s.wireStart.clear();
+  if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) s.wireStart = {};
   if (!s.movingNode.empty() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
     const auto position = positions.at(s.movingNode);
     const auto delta = ImGui::GetIO().MouseDelta;
     rbTexture::findNode(doc, s.movingNode)["position"] = {
       (position.x + delta.x - origin.x - pan.x) / zoom, (position.y + delta.y - origin.y - pan.y) / zoom};
     s.drag = doc;
+  }
+  if ((zoomAll || minimap) && !positions.empty()) {
+    ImVec2 low = positions.begin()->second, high = low;
+    for (const auto& [id, point] : positions) {
+      low = {std::min(low.x, point.x), std::min(low.y, point.y)};
+      high = {std::max(high.x, point.x + card.x), std::max(high.y, point.y + heights.at(id))};
+    }
+    if (zoomAll) {
+      const float next = std::clamp(zoom * std::min(std::max(1.f, area.x - 18) / (high.x-low.x),
+        std::max(1.f, area.y - 18) / (high.y-low.y)), .04f, 2.f);
+      pan = {area.x*.5f - ((low.x+high.x)*.5f-origin.x-pan.x)*next/zoom,
+             area.y*.5f - ((low.y+high.y)*.5f-origin.y-pan.y)*next/zoom};
+      zoom = next;
+    }
+    if (minimap) {
+      const float scale = std::min(126.f/(high.x-low.x), 75.f/(high.y-low.y));
+      const ImVec2 mount{origin.x+area.x-141, origin.y+area.y-90};
+      const ImVec2 corner{mount.x+132, mount.y+81};
+      painter->AddRectFilled(mount, corner, ImGui::GetColorU32(ImGuiCol_WindowBg), 3);
+      painter->PushClipRect(mount, corner, true);
+      const auto toMini = [&](ImVec2 p) {
+        return ImVec2{mount.x+3+(p.x-low.x)*scale, mount.y+3+(p.y-low.y)*scale};
+      };
+      for (const auto& [id, point] : positions)
+        painter->AddRectFilled(toMini(point), toMini({point.x+card.x, point.y+heights.at(id)}), accent);
+      painter->AddRect(toMini(origin), toMini({origin.x+area.x, origin.y+area.y}), ImGui::GetColorU32(ImGuiCol_Text));
+      painter->PopClipRect();
+      painter->AddRect(mount, corner, color, 3);
+    }
   }
   ImGui::Dummy({std::max(1.f, area.x), std::max(1.f, area.y)});
   ImGui::EndChild();
@@ -1398,10 +1592,14 @@ static void studioNodes() {
   if (nodes.empty()) return;
   s.selectedNode = std::clamp(s.selectedNode, 0, int(nodes.size()) - 1);
   const auto selected = nodes[size_t(s.selectedNode)].at("id").get<std::string>();
-  if (ImGui::BeginCombo("Node", selected.c_str())) {
+  const bool chooseNode = ImGui::BeginCombo("Node", selected.c_str());
+  runUiRecordGlobal("texture-studio/graph/node");
+  if (chooseNode) {
     for (size_t i = 0; i < nodes.size(); ++i) {
       const auto id = nodes[i].at("id").get<std::string>();
-      if (ImGui::Selectable(id.c_str(), int(i) == s.selectedNode)) {
+      const bool clicked = ImGui::Selectable(id.c_str(), int(i) == s.selectedNode);
+      runUiRecordGlobal("texture-studio/graph/node/" + id);
+      if (clicked) {
         s.selectedNode = int(i);
         const auto position = positions.at(id);
         pan = {pan.x + origin.x + (area.x - card.x) * .5f - position.x,
@@ -1419,6 +1617,7 @@ static void studioNodes() {
       if (included) s.groupSelection.insert(id);
       else s.groupSelection.erase(id);
     }
+    runUiRecordGlobal("texture-studio/graph/include");
   }
   if (type == "Subgraph") {
     const auto group = n.at("parameters").at("group").get<std::string>();
@@ -1431,8 +1630,11 @@ static void studioNodes() {
       ImGui::OpenPopup("Edit subgraph definition");
     }
     if (ImGui::BeginPopupModal("Edit subgraph definition", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::InputTextMultiline("##definition", buffer.data(), buffer.size(), {620 * uiScale(), 350 * uiScale()});
-      if (ImGui::Button("Apply")) studioAction([&] {
+      const auto window = ImGui::GetMainViewport()->WorkSize;
+      ImGui::InputTextMultiline("##definition", buffer.data(), buffer.size(),
+        {std::min(620 * uiScale(), window.x-72), std::min(350 * uiScale(), window.y-180)});
+      const bool attempted = ImGui::Button("Apply");
+      if (attempted) studioAction([&] {
         definition = rbTexture::parseJson(buffer.data());
         studioEdit(std::move(doc));
         ImGui::CloseCurrentPopup();
@@ -1441,15 +1643,16 @@ static void studioNodes() {
       if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
       if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
       ImGui::EndPopup();
+      if (attempted) return;
     }
-    return;
   }
-  const auto* dst = rbTexture::contract(type);
-  if (!dst) return;
-  if (ImGui::BeginCombo("Bind output", dst->output.name)) {
+  const auto& ports = nodePins.at(id);
+  for (const auto& [name, outputType] : ports.outputs) {
+    const auto label = "Output: " + name;
+    if (!ImGui::BeginCombo(label.c_str(), "Bind to material channel")) continue;
     for (const auto& [channel, port] : rbTexture::channelTypes()) {
-      if (dst->output.type != port || !ImGui::Selectable(channel.c_str())) continue;
-      doc.source["outputs"][channel] = {{"node", id}, {"port", dst->output.name}};
+      if (outputType != port || !ImGui::Selectable(channel.c_str())) continue;
+      doc.source["outputs"][channel] = {{"node", id}, {"port", name}};
       ImGui::EndCombo();
       studioEdit(std::move(doc));
       return;
@@ -1479,15 +1682,15 @@ static void studioNodes() {
     return;
   }
   static std::array<char, 4096> parameters;
-  ImGui::SameLine();
-  if (ImGui::Button("Parameters…")) {
+  if (type != "Subgraph") ImGui::SameLine();
+  if (type != "Subgraph" && ImGui::Button("Parameters…")) {
     const auto input = n.at("parameters").dump(2);
     rbTexture::require(input.size() < parameters.size(), "graph", "These node parameters exceed the editing budget.");
     std::copy(input.c_str(), input.c_str() + input.size() + 1, parameters.begin());
     ImGui::OpenPopup("Edit node parameters");
   }
   if (ImGui::BeginPopupModal("Edit node parameters", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-    ImGui::TextUnformatted(dst->type);
+    ImGui::TextUnformatted(type.c_str());
     ImGui::InputTextMultiline("##node-parameters", parameters.data(), parameters.size(), {440 * uiScale(), 180 * uiScale()});
     const bool attempted = ImGui::Button("Apply");
     if (attempted) {
@@ -1503,23 +1706,39 @@ static void studioNodes() {
     ImGui::EndPopup();
     if (attempted) return;
   }
-  for (const auto pin : dst->inputs) {
+  for (const auto& [pinName, pinType] : ports.inputs) {
     auto edge = std::find_if(edges.begin(), edges.end(), [&](const auto& e) {
-      return e.at("toNode") == id && e.at("toPort") == pin.name;
+      return e.at("toNode") == id && e.at("toPort") == pinName;
     });
-    const auto from = edge == edges.end() ? std::string{} : edge->at("fromNode").template get<std::string>();
+    const auto from = edge == edges.end() ? std::string{} : edge->at("fromNode").get<std::string>();
+    const auto fromPin = edge == edges.end() ? std::string{} : edge->at("fromPort").get<std::string>();
+    const auto text = from.empty() ? std::string("Unconnected") : from + " / " + fromPin;
     bool change = false;
-    if (ImGui::BeginCombo(pin.name, from.c_str())) {
-      for (const auto& other : nodes) {
-        const auto candidate = other.at("id").get<std::string>();
-        const auto* src = rbTexture::contract(other.at("type").get<std::string>());
-        if (!src || src->output.type != pin.type || candidate == id) continue;
-        if (ImGui::Selectable(candidate.c_str(), candidate == from) && candidate != from) {
-          auto connection = rbTexture::wire(candidate.c_str(), src->output.name, id.c_str(), pin.name);
-          if (edge == edges.end()) edges.push_back(std::move(connection));
-          else *edge = std::move(connection);
-          change = true;
+    const auto label = "Input: " + pinName;
+    const bool chooseSource = ImGui::BeginCombo(label.c_str(), text.c_str());
+    runUiRecordGlobal("texture-studio/graph/input/" + pinName);
+    if (chooseSource) {
+      if (!from.empty() && ImGui::Selectable("Disconnect")) {
+        edges.erase(edge);
+        change = true;
+      }
+      if (!change) for (const auto& [candidate, sourcePins] : nodePins) {
+        if (candidate == id) continue;
+        for (const auto& [outputName, outputType] : sourcePins.outputs) {
+          if (outputType != pinType) continue;
+          const auto name = candidate + " / " + outputName;
+          const bool active = candidate == from && outputName == fromPin;
+          const bool clicked = ImGui::Selectable(name.c_str(), active);
+          runUiRecordGlobal("texture-studio/graph/source/" + candidate + "/" + outputName);
+          if (clicked && !active) {
+            auto connection = rbTexture::wire(candidate.c_str(), outputName.c_str(), id.c_str(), pinName.c_str());
+            if (edge == edges.end()) edges.push_back(std::move(connection));
+            else *edge = std::move(connection);
+            change = true;
+            break;
+          }
         }
+        if (change) break;
       }
       ImGui::EndCombo();
     }
@@ -1569,22 +1788,93 @@ static void studioPreview() {
     ImGui::TextUnformatted(gameProfileName());
   if (s.previewMode == Preview::surface && s.surfaceData.empty())
     ImGui::TextUnformatted("Select a brush face in the map.");
+  const bool canvas3d = s.previewMode == Preview::sphere || s.previewMode == Preview::cube;
+  const bool canvas2d = s.previewMode == Preview::flat || s.previewMode == Preview::tiled;
+  if (canvas3d) {
+    ImGui::BeginDisabled(s.apply != TextureStudioState::Apply::none);
+    auto& camera = s.previewCamera;
+    int light = camera.softLight ? 1 : 0;
+    bool changed = ImGui::Combo("Lighting", &light, "Directional\0Soft\0");
+    camera.softLight = light != 0;
+    changed |= ImGui::SliderFloat("Relief", &camera.relief, 0, 4, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+    changed |= ImGui::SliderFloat("Zoom", &camera.zoom, .4f, 2.5f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+    if (ImGui::Button("Reset preview view")) { camera = {}; changed = true; }
+    if (changed) studioSchedule();
+    ImGui::EndDisabled();
+  } else if (canvas2d) {
+    ImGui::Checkbox("1:1 pixels", &s.actualPixels);
+    ImGui::SameLine();
+    ImGui::Checkbox("UV grid", &s.previewGrid);
+    ImGui::SameLine();
+    ImGui::Checkbox("Seams", &s.previewSeams);
+  }
   if (!s.handle || !s.result) return;
-  const bool mesh = s.previewMode == Preview::sphere || s.previewMode == Preview::cube || s.previewMode == Preview::surface;
-  const auto size = mesh ? rbTexture::Resolution{256, 256} : s.result->image.size;
-  const float scale = std::min(std::max(1.f, ImGui::GetContentRegionAvail().x) / size.width,
-    std::max(1.f, ImGui::GetContentRegionAvail().y - 32 * uiScale()) / size.height);
-  const ImVec2 rect{size.width * scale, size.height * scale};
-  if (s.previewMode == Preview::tiled) {
-    auto* painter = ImGui::GetWindowDrawList();
-    const auto at = ImGui::GetCursorScreenPos();
-    const ImVec2 tile{rect.x / 3, rect.y / 3};
-    for (int y = 0; y < 3; ++y)
-      for (int x = 0; x < 3; ++x)
-        painter->AddImage((ImTextureID)s.handle, {at.x + tile.x * x, at.y + tile.y * y},
-          {at.x + tile.x * (x + 1), at.y + tile.y * (y + 1)});
+  const auto size = canvas3d || s.previewMode == Preview::surface
+    ? rbTexture::Resolution{256, 256} : s.result->previewSize;
+  const unsigned copies = s.previewMode == Preview::tiled ? 3 : 1;
+  const float scale = canvas2d && s.actualPixels ? 1.f : std::min(
+    std::max(1.f, ImGui::GetContentRegionAvail().x) / (copies * size.width),
+    std::max(1.f, ImGui::GetContentRegionAvail().y - 32 * uiScale()) / (copies * size.height));
+  const ImVec2 tile{size.width * scale, size.height * scale};
+  const ImVec2 rect{tile.x * copies, tile.y * copies};
+  const auto at = ImGui::GetCursorScreenPos();
+  auto* painter = ImGui::GetWindowDrawList();
+  const float cell = std::max(12.f, std::max(rect.x, rect.y) / 32);
+  for (int row = 0; row * cell < rect.y; ++row)
+    for (int col = 0; col * cell < rect.x; ++col) {
+      painter->AddRectFilled({at.x + col * cell, at.y + row * cell},
+        {at.x + std::min(rect.x, (col + 1) * cell), at.y + std::min(rect.y, (row + 1) * cell)},
+        ImGui::GetColorU32(((row ^ col) & 1) ? ImGuiCol_FrameBg : ImGuiCol_Button));
+    }
+  for (unsigned y = 0; y < copies; ++y)
+    for (unsigned x = 0; x < copies; ++x) {
+      const ImVec2 a{at.x + x * tile.x, at.y + y * tile.y}, b{a.x + tile.x, a.y + tile.y};
+      painter->AddImage((ImTextureID)s.handle, a, b);
+      if (canvas2d && s.previewGrid) {
+        const auto color = IM_COL32(255, 255, 255, 75);
+        for (int i = 1; i < 8; ++i) {
+          const float dx = tile.x * i / 8, dy = tile.y * i / 8;
+          painter->AddLine({a.x + dx, a.y}, {a.x + dx, b.y}, color);
+          painter->AddLine({a.x, a.y + dy}, {b.x, a.y + dy}, color);
+        }
+      }
+      if (canvas2d && s.previewSeams) painter->AddRect(a, b, IM_COL32(241, 173, 70, 230));
+    }
+  if (canvas3d) {
+    ImGui::InvisibleButton("Preview camera", rect, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle);
+    if (s.apply == TextureStudioState::Apply::none && ImGui::IsItemActive()) {
+      auto& camera = s.previewCamera;
+      const auto delta = ImGui::GetIO().MouseDelta;
+      if (delta.x != 0 || delta.y != 0) {
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+          camera.yaw = std::remainder(camera.yaw + delta.x * .012f, 6.2831853f);
+          camera.pitch = std::clamp(camera.pitch - delta.y * .012f, -1.6f, 1.6f);
+          studioSchedule();
+        } else if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+          camera.panX = std::clamp(camera.panX + delta.x / (rect.x * camera.zoom), -2.f, 2.f);
+          camera.panY = std::clamp(camera.panY + delta.y / (rect.y * camera.zoom), -2.f, 2.f);
+          studioSchedule();
+        }
+      }
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Drag to orbit. Middle-drag to pan.");
+  } else {
     ImGui::Dummy(rect);
-  } else ImGui::Image((ImTextureID)s.handle, rect);
+    if (canvas2d && ImGui::IsItemHovered() && s.result->image.outputs.count(s.channel)) {
+      const auto mouse = ImGui::GetIO().MousePos;
+      const auto& channel = *s.result->image.outputs.at(s.channel);
+      const unsigned x = unsigned(rbTexture::frac((mouse.x - at.x) / tile.x) * channel.size.width);
+      const unsigned y = unsigned(rbTexture::frac((mouse.y - at.y) / tile.y) * channel.size.height);
+      const auto& pixel = channel.sample(int(x), int(y));
+      ImGui::BeginTooltip();
+      ImGui::Text("Pixel %u, %u", x, y);
+      ImGui::Text("%s %.3f, %.3f, %.3f, %.3f", channel.type == rbTexture::Port::color ? "Linear" : "Data",
+                  pixel[0], pixel[1], pixel[2], pixel[3]);
+      if (channel.type == rbTexture::Port::color) ImGui::Text("sRGB %.3f, %.3f, %.3f",
+        rbTexture::toSrgb(pixel[0]), rbTexture::toSrgb(pixel[1]), rbTexture::toSrgb(pixel[2]));
+      ImGui::EndTooltip();
+    }
+  }
   ImGui::Text("%u × %u%s", size.width, size.height, s.imageRevision != s.revision ? " · Previous result" : "");
 }
 
@@ -1608,6 +1898,7 @@ static void studioModeTabs(bool applying) {
 static void textureStudioPanel() {
   auto& s = textureStudio;
   studioTick();
+  studioThumbnailTick();
   if (!s.open) return;
   if (s.previewMode == TextureStudioState::surface && s.apply == TextureStudioState::Apply::none &&
       !(s.scheduled && s.fullSize)) {
@@ -1623,7 +1914,7 @@ static void textureStudioPanel() {
       studioSchedule();
     }
   }
-  if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsMouseReleased(ImGuiMouseButton_Left)) s.wireStart.clear();
+  if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsMouseReleased(ImGuiMouseButton_Left)) s.wireStart = {};
   if (!s.movingNode.empty() && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
     if (s.drag) s.document->replace(std::move(*s.drag));
     s.drag.reset();
@@ -1665,6 +1956,8 @@ static void textureStudioPanel() {
         {"revision", s.revision}, {"previewReady", s.handle != 0 && s.imageRevision == s.revision},
         {"theme", uiEffectiveTheme()}, {"scale", uiScale()},
         {"faceCount", int(cvars->GetFloat("ftebroom_face_count"))},
+        {"catalogThumbnails", std::count_if(s.thumbnails.begin(), s.thumbnails.end(),
+                                              [](const auto& entry) { return entry.second != 0; })},
         {"previewMode", int(s.previewMode)}, {"hasSurface", !s.surfaceData.empty()},
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
         {"busy", s.job.valid() || s.apply != TextureStudioState::Apply::none}, {"error", s.error}
@@ -1686,7 +1979,7 @@ static void textureStudioPanel() {
     const bool shortcuts = s.focused && !io.WantTextInput &&
       !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
     if (shortcuts && s.apply != TextureStudioState::Apply::commit && ImGui::IsKeyPressed(ImGuiKey_Escape) &&
-        (applying || s.job.valid() || s.scheduled || s.drag || !s.wireStart.empty())) {
+        (applying || s.job.valid() || s.scheduled || s.drag || !s.wireStart.first.empty())) {
       studioCancel();
       s.drag.reset();
     }
@@ -1737,6 +2030,7 @@ static void textureStudioPanel() {
           auto assets = rbTexture::loadAssets(doc, path.parent_path());
           rbTexture::compile(doc, {}, assets);
           doc.source["documentId"] = ftebroom::bb::uuid();
+          studioAutosave();
           studioCancel();
           s.file.clear();
           s.recoveryFile.clear();
@@ -1759,8 +2053,10 @@ static void textureStudioPanel() {
       ImGui::EndPopup();
     }
     if (ImGui::BeginPopupModal("New source?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      const float listWidth = std::min(490 * uiScale(), screen.x - 60);
+      const float listHeight = std::clamp(screen.y - 195 * uiScale(), 110.f, 345 * uiScale());
       ImGui::TextUnformatted("Choose a preset. Save your current source before replacing it.");
-      ImGui::SetNextItemWidth(390);
+      ImGui::SetNextItemWidth(listWidth);
       ImGui::InputTextWithHint("##preset-search", "Search presets", s.presetSearch.data(), s.presetSearch.size());
       runUiRecordGlobal("texture-studio/preset-search");
       ImGui::SetNextItemWidth(180);
@@ -1783,7 +2079,7 @@ static void textureStudioPanel() {
       rbTexture::Assets selectedAssets;
       std::filesystem::path selectedAssetRoot;
       std::string selectedId;
-      if (ImGui::BeginChild("preset-library", ImVec2(390, 335), true)) {
+      if (ImGui::BeginChild("preset-library", ImVec2(listWidth, listHeight), ImGuiChildFlags_Borders)) {
         bool matched = query.empty() && !s.libraryFilter;
         const auto permitted = [&](const std::string& id) {
           if (s.libraryFilter == 1) return s.favorites.count(id) != 0;
@@ -1807,7 +2103,8 @@ static void textureStudioPanel() {
             const auto id = "featured-" + std::to_string(preset);
             if (!permitted(id) || lowercase(rbTexture::presetNames[preset]).find(query) == std::string::npos) continue;
             matched = true;
-            if (ImGui::Selectable(rbTexture::presetNames[preset], false, 0, {320, 0})) {
+            const auto width = studioPresetThumbnail(id, [preset] { return rbTexture::builtinPreset(preset, "thumbnail"); });
+            if (ImGui::Selectable(rbTexture::presetNames[preset], false, 0, {width, 32 * uiScale()})) {
               selected = rbTexture::builtinPreset(preset, ftebroom::bb::uuid());
               selectedId = id;
             }
@@ -1825,7 +2122,8 @@ static void textureStudioPanel() {
               const auto id = rbTexture::recipeId(category, index);
               if (!permitted(id) || (!categoryMatches && lowercase(name).find(query) == std::string::npos)) continue;
               matched = true;
-              if (ImGui::Selectable(name, false, 0, {320, 0})) {
+              const auto width = studioPresetThumbnail(id, [category, index] { return rbTexture::catalogPreset(category, index, "thumbnail"); });
+              if (ImGui::Selectable(name, false, 0, {width, 32 * uiScale()})) {
                 selected = rbTexture::catalogPreset(category, index, ftebroom::bb::uuid());
                 selectedId = id;
                 if (s.catalogVariation > 0)
@@ -1861,12 +2159,16 @@ static void textureStudioPanel() {
       }
       ImGui::EndChild();
       if (selected) {
-        studioNewDocument(std::move(*selected));
-        s.assets = std::move(selectedAssets);
-        s.assetFolder = std::move(selectedAssetRoot);
-        studioAction([&] { studioRecordPreset(selectedId); });
-        ImGui::CloseCurrentPopup();
+        studioAction([&] {
+          studioAutosave();
+          studioNewDocument(std::move(*selected));
+          s.assets = std::move(selectedAssets);
+          s.assetFolder = std::move(selectedAssetRoot);
+          ImGui::CloseCurrentPopup();
+          studioRecordPreset(selectedId);
+        });
       }
+      if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
       if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
       ImGui::EndPopup();
     }
@@ -1979,6 +2281,7 @@ static void textureStudioPanel() {
   if (!s.open) {
     studioCancel();
     studioReleaseImage();
+    studioReleaseThumbnails();
     s.result.reset();
     s.previewCache = std::make_shared<rbTexture::NodeCache>(32 * 1024 * 1024);
   }
@@ -1987,5 +2290,9 @@ static void textureStudioPanel() {
 static void textureStudioShutdown() {
   studioCancel();
   if (textureStudio.job.valid()) textureStudio.job.wait();
+  if (textureStudio.thumbnailJob.valid()) textureStudio.thumbnailJob.wait();
+  if (textureStudio.document && ImGui::GetCurrentContext())
+    studioAction(studioAutosave);
   studioReleaseImage();
+  studioReleaseThumbnails();
 }

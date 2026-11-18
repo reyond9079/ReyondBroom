@@ -338,13 +338,25 @@ int main(int argc, char** argv) try {
   flatNormal.outputs.erase("normal");
   check(materialPreview(flatNormal, false).pixels != sphere.pixels,
     "Lit preview uses the material normal channel");
+  const auto rearFace = cubeSurface(0, 0, {0,0,-1}, {-1,0,0}, {0,1,0});
+  check(rearFace && rearFace->n.z == -1 && rearFace->u == .5f && rearFace->v == .5f,
+    "Orbited cube intersects the back face with a stable UV");
+  PreviewCamera rotated;
+  rotated.yaw = 3.1415927f;
+  rotated.panX = .06f;
+  rotated.relief = .7f;
+  rotated.softLight = true;
+  const auto rear = materialPreview(a, true, nullptr, rotated);
+  check(rear.pixels[128 * rear.size.width + 128][3] == 1 && rear.pixels != cube.pixels,
+    "Orbit, pan, lighting and relief update the cube preview");
   auto layered = brick;
   appendSolidLayer(layered, layers(layered), "blue-layer", {.04f,.09f,.65f,1});
   appendSolidLayer(layered, layers(layered), "amber-layer", {.8f,.4f,.07f,1});
   const auto originalLayers = evaluate(compile(layered), {32,32}).outputs.at("baseColor");
   auto stack = layers(layered);
-  check(stack.order == std::vector<std::string>{"diffuse", "blue-layer", "amber-layer"}, "Layers use the graph order");
-  std::swap(stack.order[1], stack.order[2]);
+  check(stack.anchor == "diffuse" && stack.order == std::vector<std::string>{"blue-layer", "amber-layer"},
+    "Layers use the graph order and keep an ordinary Blend node as a custom base");
+  std::swap(stack.order[0], stack.order[1]);
   bindLayers(layered, stack);
   const auto reordered = evaluate(compile(layered), {32,32}).outputs.at("baseColor");
   check(originalLayers->pixels != reordered->pixels, "Layer order changes the compiled material");
@@ -354,6 +366,13 @@ int main(int argc, char** argv) try {
   bindLayers(layered, stack);
   check(hidden->pixels == evaluate(compile(layered), {32,32}).outputs.at("baseColor")->pixels,
     "A hidden layer leaves underlying pixels unchanged");
+  duplicateLayer(layered, layers(layered), 0, "amber-copy");
+  findNode(layered, "amber-copy-top")["parameters"]["rgba"] = {.2f,.3f,.85f,1.f};
+  check(layers(layered).order == std::vector<std::string>{"amber-layer", "amber-copy"} &&
+    findNode(layered, "amber-layer-color")["parameters"]["rgba"] != findNode(layered, "amber-copy-top")["parameters"]["rgba"],
+    "Duplicated managed layers keep independent constant inputs");
+  check(hidden->pixels != evaluate(compile(layered), {32,32}).outputs.at("baseColor")->pixels,
+    "The separately edited duplicate changes the composed pixels");
   NodeCache cache(4 * 1024 * 1024);
   auto preview = evaluate(compile(brick), {128,128}, nullptr, memoryBudget, 1, 0, &cache);
   auto adjusted = brick;

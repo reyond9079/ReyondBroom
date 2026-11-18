@@ -12,7 +12,7 @@
 namespace rbTexture = ftebroom::textureStudio;
 
 struct TextureStudioState {
-  enum class Apply { none, capture, baking, verify, commit, model };
+  enum class Apply { none, asset, capture, baking, verify, commit, model };
   enum Preview { flat, tiled, sphere, cube, target, surface };
   struct ModelTarget {
     uint64_t epoch = 0, revision = 0, textureRevision = 0;
@@ -256,11 +256,11 @@ static void studioQCSend(const char* step, const std::string& material = {}) {
   command((cmd + "\n").c_str());
 }
 
-static void studioBeginApply() {
+static void studioBeginApply(bool assetOnly) {
   auto& s = textureStudio;
   s.playing = false;
   if (!studioProfileAllowsApply()) throw std::runtime_error("Apply for this profile needs a profile-specific encoder.");
-  if (documentFile.empty()) throw std::runtime_error("Open a project map before applying a texture.");
+  if (!assetOnly && documentFile.empty()) throw std::runtime_error("Open a project map before applying a texture.");
   s.destination = studioDestination();
   if (s.destination.empty() || !std::filesystem::is_directory(s.destination))
     throw std::runtime_error("Choose a writable game or mod folder in Game profile.");
@@ -268,6 +268,11 @@ static void studioBeginApply() {
   s.epoch = organizationMapEpoch;
   s.profile = gameProfile;
   s.error.clear();
+  if (assetOnly) {
+    s.apply = TextureStudioState::Apply::asset;
+    studioSchedule(true);
+    return;
+  }
   s.apply = TextureStudioState::Apply::capture;
   s.ticket = s.ticket % 1000000 + 1;
   studioQCSend("capture");
@@ -475,12 +480,14 @@ static void studioInstall() {
   insert(".reyond.json", manifest.dump(2) + "\n");
   s.wadReference.clear();
   if (wad) {
-    const auto file = folder / (id + ".wad");
-    auto reference = file.lexically_relative(documentFile.parent_path());
-    if (reference.empty()) reference = relative / file.filename();
-    s.wadReference = reference.generic_u8string();
-    rbTexture::require(s.wadReference.find_first_of(";\"\r\n") == std::string::npos, "wad",
-      "Choose a map location without WAD separators or quotes in its path.");
+    if (s.apply != TextureStudioState::Apply::asset) {
+      const auto file = folder / (id + ".wad");
+      auto reference = file.lexically_relative(documentFile.parent_path());
+      if (reference.empty()) reference = relative / file.filename();
+      s.wadReference = reference.generic_u8string();
+      rbTexture::require(s.wadReference.find_first_of(";\"\r\n") == std::string::npos, "wad",
+        "Choose a map location without WAD separators or quotes in its path.");
+    }
     q1IndexAssets();
     resetMaterialBrowser();
     publishMaterialTags();
@@ -498,6 +505,15 @@ static void studioApplyTick() {
   }
   if (!studioContextMatches() && s.apply != A::commit)
     throw std::runtime_error("The map or game profile changed. Apply was cancelled.");
+  if (s.apply == A::asset) {
+    if (s.result && s.result->revision == s.revision && s.result->fullSize) {
+      studioInstall();
+      s.created.clear();
+      s.apply = A::none;
+      s.message = "Created " + s.material + ".";
+    }
+    return;
+  }
   if (s.apply == A::baking) {
     if (s.result && s.result->revision == s.revision && s.result->fullSize) {
       s.apply = A::verify;
@@ -633,6 +649,63 @@ static void studioAction(const std::function<void()>& action) {
   } catch (const std::exception& e) {
     s.error = e.what();
   }
+}
+
+static std::string studioMaterialId(std::string_view material) {
+  constexpr std::string_view prefix = "textures/";
+  if (material.substr(0, prefix.size()) == prefix) material.remove_prefix(prefix.size());
+  const bool indexed = gameProfile == 2 || gameProfile == 4;
+  if (indexed) {
+    if (material.size() != 15 || material.substr(0, 3) != "rb_") return {};
+  } else {
+    constexpr std::string_view folder = "reyond-studio/";
+    if (material.substr(0, folder.size()) != folder) return {};
+    material.remove_prefix(folder.size());
+    if (material.size() != (gameProfile == 3 ? 16 : 20)) return {};
+  }
+  const auto digest = material.substr(indexed ? 3 : 0);
+  if (digest.find_first_not_of("0123456789abcdef") != std::string_view::npos) return {};
+  return std::string(material);
+}
+
+static bool textureStudioHasMaterialSource(std::string_view material) {
+  return !jamEditing() && studioProfileAllowsApply() && !studioMaterialId(material).empty();
+}
+
+static void textureStudioShowMaterialSource(std::string_view material) {
+  if (!textureStudioHasMaterialSource(material)) return;
+  textureStudioShow();
+  studioAction([&] {
+    auto& s = textureStudio;
+    rbTexture::require(s.apply == TextureStudioState::Apply::none, "source", "Finish or cancel the current bake.");
+    const auto id = studioMaterialId(material);
+    const bool indexed = gameProfile == 2 || gameProfile == 4;
+    const auto root = std::filesystem::canonical(studioDestination());
+    const auto folder = root / (indexed ? "texture-wads" : "textures/reyond-studio");
+    const auto source = folder / (id + ".rbtex.json");
+    const auto sidecar = folder / (id + ".reyond.json");
+    rbTexture::require(std::filesystem::weakly_canonical(source) == source &&
+      std::filesystem::weakly_canonical(sidecar) == sidecar &&
+      std::filesystem::is_regular_file(source) && std::filesystem::is_regular_file(sidecar), "source",
+      "Keep the material's .rbtex.json and .reyond.json files beside its baked texture.");
+    const auto manifest = rbTexture::parseJson(ftebroom::bb::readFile(sidecar, 65536));
+    const auto bytes = ftebroom::bb::readFile(source, rbTexture::maxSourceBytes);
+    const auto expected = "textures/" + std::string(indexed ? "" : "reyond-studio/") + id;
+    rbTexture::require(manifest.value("material", "") == expected &&
+      ftebroom::sha256(bytes) == manifest.value("sourceHash", ""), "source",
+      "The saved source checksum differs from the texture manifest.");
+    auto doc = rbTexture::open(bytes);
+    rbTexture::require(!doc.readOnly, "source", "This material needs a newer Texture Studio.");
+    auto assets = rbTexture::loadAssets(doc, folder);
+    const auto plan = rbTexture::compile(doc, {}, assets);
+    const auto frame = std::min(manifest.value("frame", 0u), plan.frames - 1u);
+    studioAutosave();
+    studioNewDocument(std::move(doc));
+    s.assetFolder = folder;
+    s.assets = std::move(assets);
+    s.frame = frame;
+    s.message = "Opened the source of " + expected + ". Save As creates an editable copy.";
+  });
 }
 
 static void textureStudioShowModelTexture() {
@@ -1591,6 +1664,7 @@ static void textureStudioPanel() {
       runUiGlobalRects["texture-studio/render-state"] = {
         {"revision", s.revision}, {"previewReady", s.handle != 0 && s.imageRevision == s.revision},
         {"theme", uiEffectiveTheme()}, {"scale", uiScale()},
+        {"faceCount", int(cvars->GetFloat("ftebroom_face_count"))},
         {"previewMode", int(s.previewMode)}, {"hasSurface", !s.surfaceData.empty()},
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
         {"busy", s.job.valid() || s.apply != TextureStudioState::Apply::none}, {"error", s.error}
@@ -1857,10 +1931,12 @@ static void textureStudioPanel() {
     runUiRecordGlobal("texture-studio/export");
     ImGui::EndDisabled();
     studioExportDialog();
-    nextButton("Generate & Apply");
     const auto faces = cvars->GetFloat("ftebroom_face_count");
-    ImGui::BeginDisabled(!studioProfileAllowsApply() || faces <= 0);
-    if (ImGui::Button("Generate & Apply")) studioAction(studioBeginApply);
+    const bool assetOnly = faces <= 0;
+    const char* generate = assetOnly ? "Generate Asset" : "Generate & Apply";
+    nextButton(generate);
+    ImGui::BeginDisabled(!studioProfileAllowsApply());
+    if (ImGui::Button(generate)) studioAction([&] { studioBeginApply(assetOnly); });
     runUiRecordGlobal("texture-studio/apply");
     ImGui::EndDisabled();
     if (bbActive) {

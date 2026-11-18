@@ -790,6 +790,12 @@ static void assetsMenu()
   actionMenuEntry("Menu/File/New model...","New Model...");
   if(ImGui::MenuItem("Texture Studio..."))textureStudioShow();
   runUiRecordGlobal("Menu/Assets/Texture Studio...");
+  char material[256]{};
+  cvars->GetString("ca_newbrushtexture", material, sizeof material);
+  if (textureStudioHasMaterialSource(material)) {
+    if (ImGui::MenuItem("Edit Texture Studio source...")) textureStudioShowMaterialSource(material);
+    runUiRecordGlobal("Menu/Assets/Edit Texture Studio source...");
+  }
   if(ImGui::MenuItem("Plant Editor..."))plantShow();
   runUiRecordGlobal("Menu/Assets/Plant Editor...");
   if(ImGui::MenuItem("Prefab collections"))prefabShow();

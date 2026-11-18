@@ -81,8 +81,7 @@ def main():
                       f'set ftebroom_test_import_root "{output.as_posix()}"\n'
                       "in 7 mapedit maps/texture-studio-qa.map\n"
                       "in 9 ftebroom_select all\n"
-                      f"in 9 ftebroom_test_desktop reyon8qa {args.theme}\n"
-                      f"in 9.1 ftebroom_test_run {60 + (args.scale - 100) // 25}\n",
+                      f"in 9 ftebroom_test_desktop reyon8qa {args.theme}\n",
                       encoding="ascii")
     engine = runtime / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
     width, height = args.size.split("x")
@@ -125,6 +124,9 @@ def main():
                 ui.text(path.as_posix())
                 click("choose-file/file-choose")
 
+            wait(lambda: live()["globalWidgets"].get("menu/Assets"))
+            if args.scale != 100:
+                ui.console(f"ftebroom_test_run {60 + (args.scale - 100) // 25}")
             click("menu/Assets")
             click("Menu/Assets/Texture Studio...")
 
@@ -178,7 +180,6 @@ def main():
                 click("texture-studio/preview-mode/0")
                 print("PASS selected brush surface preview used the actual map geometry and UV projection")
 
-            click("texture-studio/apply")
             folder = project / ("texture-wads" if wad else "textures/reyond-studio")
 
             def installed():
@@ -187,6 +188,9 @@ def main():
                     raise RuntimeError(state["error"])
                 return next(iter(folder.glob("*.reyond.json")), None)
 
+            ui.console("ftebroom_deselect")
+            wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["faceCount"] == 0)
+            click("texture-studio/apply")
             manifest_file = wait(installed)
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
             asset_name = manifest["material"]
@@ -205,6 +209,13 @@ def main():
             def uses_asset(rows):
                 return bool(rows) and all(row[1].endswith(asset_name.removeprefix("textures/")) for row in rows)
 
+            save_when(lambda rows: bool(rows) and all(row[1].endswith(original_texture) for row in rows))
+            if wad:
+                assert re.search(r'"wad"\s+"prior\.wad"', map_file.read_text(encoding="ascii"))
+            print("PASS Generate Asset creates the game texture without changing the map")
+            ui.console("ftebroom_select all")
+            wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["faceCount"] > 0)
+            click("texture-studio/apply")
             applied = save_when(uses_asset)
             if wad:
                 text = map_file.read_text(encoding="ascii")
@@ -225,6 +236,16 @@ def main():
             if wad:
                 assert map_file.read_bytes() == (output / "applied.map").read_bytes()
             print(f"PASS {args.profile} Apply, save, Undo and Redo preserve all {len(applied)} face projections")
+            click("texture-studio/close")
+            click("menu/Assets")
+            click("Menu/Assets/Edit Texture Studio source...")
+            click("texture-studio/save")
+            saved_copy = output / "generated-graph-copy.rbtex.json"
+            choose(saved_copy)
+            wait(saved_copy.is_file)
+            assert json.loads(saved_copy.read_text(encoding="utf-8")) == json.loads(source.read_text(encoding="utf-8"))
+            assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest["sourceHash"]
+            print("PASS Edit Texture Studio source opens the map material's graph and preserves the original")
             if args.profile != "fte":
                 return
 
@@ -343,6 +364,18 @@ def main():
             selected = nodes[graph["outputs"]["baseColor"]["node"]]
             assert selected["type"] == "Blend" and selected["label"] == "Color layer"
             print("PASS native preset search, layer editor, and saved source share the same graph")
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            ui.key("z", ("ctrl",))
+            wait(model_ready)
+            click("texture-studio/save")
+            previous = wait(lambda: (doc if (doc := json.loads(material_file.read_text(encoding="utf-8"))) != graph else None))
+            assert len(previous["graph"]["nodes"]) < len(graph["graph"]["nodes"])
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            ui.key("y", ("ctrl",))
+            wait(model_ready)
+            click("texture-studio/save")
+            wait(lambda: json.loads(material_file.read_text(encoding="utf-8")) == graph)
+            print("PASS Ctrl+Z and Ctrl+Y target the focused Texture Studio history")
         finally:
             if game.poll() is None:
                 game.kill()

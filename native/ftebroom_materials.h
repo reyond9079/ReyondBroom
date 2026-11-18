@@ -310,6 +310,8 @@ static bool materialMatches(const std::string& name, const char* query)
 }
 #include "ftebroom_uv_editor.h"
 static void textureStudioShow();
+static bool textureStudioHasMaterialSource(std::string_view material);
+static void textureStudioShowMaterialSource(std::string_view material);
 static void materialBrowser(bool lesson=false)
 {
   materialTestItems.clear();
@@ -562,6 +564,8 @@ static void materialBrowser(bool lesson=false)
         }
         if (ImGui::BeginPopupContextItem("material_context"))
         {
+          if (!lesson && textureStudioHasMaterialSource(mat.name) && ImGui::MenuItem("Edit Texture Studio source…"))
+            textureStudioShowMaterialSource(mat.name);
           for (const auto* mode : {"faces", "brushes"})
           {
             if (ImGui::MenuItem((std::string("Select ") + mode).c_str()))

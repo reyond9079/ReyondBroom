@@ -54,6 +54,10 @@ run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
         description: Successful run containing Texture Studio acceptance at the exact checkout revision
         type: string
         default: ''
+      rb23_candidate_run_id:
+        description: Successful native build run for the exact Texture Studio candidate
+        type: string
+        default: ''
       rb23_build_sha256:
         description: Texture Studio release build SHA-256 from the acceptance run
         type: string
@@ -66,7 +70,10 @@ permissions:
   contents: read
 jobs:
   plan:
-    if: inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == '' && inputs.rb21_evidence_commit == ''
+    if: >-
+      inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == '' &&
+      inputs.rb21_evidence_commit == '' && inputs.rb23_candidate_run_id == '' &&
+      inputs.rb23_evidence_run_id == ''
     uses: ./.github/workflows/ci-plan.yml
     with:
       base: ${{ inputs.validation_base }}
@@ -522,7 +529,10 @@ jobs:
     needs: plan
 
   verify-rb23-release:
-    if: inputs.rb21_evidence_commit == '' && (inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
+    if: >-
+      inputs.rb21_evidence_commit == '' &&
+      (inputs.rb23_candidate_run_id != '' || inputs.rb23_evidence_run_id != '' ||
+       inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -530,7 +540,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       EVIDENCE_RUN: ${{ inputs.rb23_evidence_run_id }}
-      CANDIDATE_RUN: ${{ inputs.rb21_candidate_run_id }}
+      CANDIDATE_RUN: ${{ inputs.rb23_candidate_run_id || inputs.rb21_candidate_run_id }}
       BUILD_HASH: ${{ inputs.rb23_build_sha256 }}
       VERSION: ${{ inputs.version }}
       AUTHORIZED: ${{ inputs.rb23_publication_authorized }}
@@ -541,6 +551,7 @@ jobs:
     - name: Verify owner authorization and the evidence run's identity
       run: |
         test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+        test "$GITHUB_REF" = refs/heads/main
         test "$AUTHORIZED" = true
         [[ "$BUILD_HASH" =~ ^[0-9a-f]{64}$ ]]
         for run in "$EVIDENCE_RUN" "$CANDIDATE_RUN"; do
@@ -561,7 +572,7 @@ jobs:
       with:
         pattern: release-packages-*
         github-token: ${{ github.token }}
-        run-id: ${{ inputs.rb21_candidate_run_id }}
+        run-id: ${{ env.CANDIDATE_RUN }}
         path: ${{ runner.temp }}/rb23-packages
     - name: Require every Texture Studio check for this source and build
       run: |
@@ -571,7 +582,6 @@ jobs:
 
   upload-draft:
     needs: verify-rb23-release
-    if: inputs.rb21_evidence_commit == '' && (inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
     runs-on: ubuntu-24.04
     environment: rb21-release
     permissions:
@@ -580,45 +590,43 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
-      RB21_EVIDENCE_RUN: ${{ inputs.rb21_evidence_run_id }}
-      RB21_CANDIDATE_RUN: ${{ inputs.rb21_candidate_run_id }}
+      BUILD_HASH: ${{ inputs.rb23_build_sha256 }}
+      AUTHORIZED: ${{ inputs.rb23_publication_authorized }}
+      CANDIDATE_RUN: ${{ inputs.rb23_candidate_run_id || inputs.rb21_candidate_run_id }}
     steps:
     - uses: actions/checkout@v4
-    - name: Verify both successful runs belong to this source revision
-      shell: bash
-      run: |
-        for run in "$RB21_CANDIDATE_RUN" "$RB21_EVIDENCE_RUN"; do
-          [[ "$run" =~ ^[0-9]+$ ]]
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" | \
-            jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
-              '.head_sha == $sha and .conclusion == "success" and .head_repository.full_name == $repo'
-        done
+      with:
+        persist-credentials: false
     - uses: actions/download-artifact@v4
       with:
-        name: rb21-release-evidence
+        name: rb23-release-evidence
         github-token: ${{ github.token }}
-        run-id: ${{ inputs.rb21_evidence_run_id }}
-        path: acceptance
+        run-id: ${{ inputs.rb23_evidence_run_id }}
+        path: ${{ runner.temp }}/rb23-evidence
     - uses: actions/download-artifact@v4
       with:
         pattern: release-packages-*
         github-token: ${{ github.token }}
-        run-id: ${{ inputs.rb21_candidate_run_id }}
-        path: release-packages
-    - name: Verify the complete acceptance evidence and all three package sets
+        run-id: ${{ env.CANDIDATE_RUN }}
+        path: ${{ runner.temp }}/rb23-packages
+    - name: Verify owner approval, acceptance evidence and all three package sets
       shell: bash
       run: |
-        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" > approvals.json
-        for platform in Windows-x64 Linux-x64 Linux-SDL2-x64; do
-          python3 scripts/check-character-release.py --evidence acceptance \
-            --release "release-packages/release-packages-$platform" --commit "$GITHUB_SHA" --platform "$platform" \
-            --approvals approvals.json --owner "$GITHUB_REPOSITORY_OWNER"
-        done
+        test "$AUTHORIZED" = true
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
+          jq -e --arg owner "$GITHUB_REPOSITORY_OWNER" '
+            map(select(.user.login == $owner and any(.environments[]; .name == "rb21-release"))) |
+            length > 0 and all(.[]; .state == "approved")
+          '
+        python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-evidence" \
+          --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . --publish --publication-authorized \
+          --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
     - name: Upload the validated packages to the existing draft
       shell: bash
       run: |
-        test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft)" = true
-        gh release upload "v$VERSION" release-packages/release-packages-*/* --clobber
+        gh release view "v$VERSION" --json isDraft,targetCommitish |
+          jq -e --arg sha "$GITHUB_SHA" '.isDraft and .targetCommitish == $sha'
+        gh release upload "v$VERSION" "$RUNNER_TEMP/rb23-packages"/release-packages-{Windows-x64,Linux-x64,Linux-SDL2-x64}/* --clobber
 
   import-rb21-evidence:
     if: inputs.rb21_evidence_commit != '' && inputs.rb21_evidence_run_id == '' && github.actor == github.repository_owner

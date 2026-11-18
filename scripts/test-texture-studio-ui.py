@@ -142,6 +142,9 @@ def main():
                 widgets = wait(lambda: (items if (items := live()["globalWidgets"]).get(
                     "texture-studio/render-state", {}).get("previewReady") else None))
                 state = widgets["texture-studio/render-state"]
+                if os.name != "nt":
+                    from PIL import ImageGrab
+                    ImageGrab.grab().save(output / "quick.png")
                 assert state["scale"] == args.scale / 100 and state["theme"] == (3 if args.theme == "light" else 0)
                 assert live()["display"] == [int(width), int(height)]
                 preview = widgets["texture-studio/preview-image"]
@@ -157,9 +160,6 @@ def main():
                     for b in controls[i + 1:]:
                         assert a["x"] + a["width"] <= b["x"] or b["x"] + b["width"] <= a["x"] or \
                             a["y"] + a["height"] <= b["y"] or b["y"] + b["height"] <= a["y"], (a, b)
-                if os.name != "nt":
-                    from PIL import ImageGrab
-                    ImageGrab.grab().save(output / "quick.png")
                 click("texture-studio/layers-tab")
                 wait(lambda: live()["globalWidgets"].get("texture-studio/layer-add"))
                 click("texture-studio/graph-tab")

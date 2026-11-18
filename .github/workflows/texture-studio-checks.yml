@@ -1,0 +1,114 @@
+name: Texture Studio checks
+'on':
+  pull_request:
+    paths:
+    - .github/workflows/texture-studio-checks.yml
+    - native/texture/**
+    - native/ftebroom_texture_studio.h
+    - native/ftebroom_pk3.h
+    - qc/fb_texture_studio.qc
+    - tests/*texture-studio*
+    - scripts/*texture-studio*
+  push:
+    branches:
+    - main
+    paths:
+    - native/texture/**
+    - native/ftebroom_texture_studio.h
+    - native/ftebroom_pk3.h
+    - qc/fb_texture_studio.qc
+    - tests/*texture-studio*
+  workflow_dispatch: null
+  schedule:
+  - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - run: |
+        mkdir -p out
+        for test in core properties; do
+          g++ -std=c++17 -O2 -ffp-contract=off -pthread "tests/texture-studio-$test.cpp" -lz -o "out/$test"
+        done
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread native/texture/cli.cpp -lz -ldl -o out/texture-studio
+        out/core out/fixtures
+        out/properties
+        python3 tests/check-texture-studio-formats.py out/fixtures
+        python3 tests/texture-studio-cli.py out/texture-studio
+        python3 tests/texture-studio-release-gate.py
+
+  windows:
+    if: github.event_name != 'schedule'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        path-type: inherit
+        install: mingw-w64-x86_64-gcc mingw-w64-x86_64-zlib
+    - shell: msys2 {0}
+      run: |
+        set -e
+        mkdir -p out
+        for test in core properties; do
+          g++ -std=c++17 -O2 -ffp-contract=off -static -pthread "tests/texture-studio-$test.cpp" -lz -o "out/$test.exe"
+        done
+        g++ -std=c++17 -O2 -ffp-contract=off -static -pthread native/texture/cli.cpp -lz -lshell32 -o out/texture-studio.exe
+    - shell: pwsh
+      run: |
+        ./out/core.exe out/fixtures
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        ./out/properties.exe
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        python tests/check-texture-studio-formats.py out/fixtures
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        python tests/texture-studio-cli.py out/texture-studio.exe
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        python tests/texture-studio-release-gate.py
+
+  nightly-parsers:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        parser: [graph, image, zip]
+    env:
+      ASAN_OPTIONS: halt_on_error=1:detect_leaks=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      PARSER: ${{ matrix.parser }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Verify the parser for 30 minutes
+      run: |
+        mkdir -p qa
+        g++ -std=c++17 -O1 -g -ffp-contract=off -pthread -fsanitize=address,undefined \
+          -fno-omit-frame-pointer tests/fuzz-texture-studio.cpp -lz -o fuzz-texture-studio
+        timeout 1860 ./fuzz-texture-studio "$PARSER" 1800 2> "qa/$PARSER.log" | tee "qa/$PARSER.json"
+        test ! -s "qa/$PARSER.log"
+      shell: bash
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: texture-studio-fuzz-${{ matrix.parser }}
+        path: qa/
+        retention-days: 14

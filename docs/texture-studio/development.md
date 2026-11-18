@@ -39,6 +39,10 @@ The indexed profiles use a local 768-byte palette supplied through `--palette`. 
 - The native editor script runs on a disposable runtime copy. It uses real input to test face Apply and history, model-slot Apply and history, and image import with a portable package. Use `--layout-only` with `--theme`, `--size`, and `--scale` to check the studio controls in the live editor.
 - Static and animated material fixtures were viewed in QuakeSpasm with LibreQuake, Yamagi Quake II, OpenArena, Steam Half-Life and the FTE preview engine from alpha.31. The FTE material fixture compares the same scene with a flat normal and with emission disabled.
 
-## Remaining release criteria
+## Release controls
 
-RB-23 still requires the remaining graph operations and profile checks, full visual coverage of the preset and family variants, long fuzz and performance evidence, and the complete platform regression suite on an exact candidate. The current implementation is an internal development build. The release verifier requires passing evidence and the exact package hashes before granting upload credentials.
+The build workflow produces unpublished artifacts. The Texture Studio checks run the graph, format, CLI and release-gate suites on Windows and Linux. The scheduled job exercises the graph, image and ZIP parsers under AddressSanitizer and UndefinedBehaviorSanitizer.
+
+The release workflow checks a successful evidence run and candidate build run from the same checkout and repository. It verifies the complete RB-23 test inventory and the SHA-256 of every runtime and source archive. Upload requires a separate publication authorization and an approval recorded for the repository owner in the `rb21-release` environment. The draft must already exist and target the exact verified commit.
+
+Repository administrators configure the GitHub rules before enabling publication. Require pull requests, the relevant CI checks and approval for workflow changes on `main`, block force pushes and deletion, and restrict the release environment to that protected branch. If checks are configured as universally required, keep their workflow unconditional at the pull-request level or provide an always-running aggregate check. Restrict creation, updates and deletion of release tags matching `v*` to a dedicated release identity. Keep the release identity scoped to this repository and its credentials confined to the protected publication job. Verify enforcement using the repository settings and a disposable tag matching the rule before relying on it for production releases.

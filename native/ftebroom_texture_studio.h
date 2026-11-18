@@ -41,7 +41,7 @@ struct TextureStudioState {
   double nextSurfaceQuery = 0;
   uint32_t variationBase = 0;
   int handle = 0, slot = 0, ticket = 0, epoch = 0, profile = 0, selectedNode = 0;
-  std::string channel = "baseColor", message, error, material, wadReference;
+  std::string channel = "baseColor", message, error, errorNode, material, wadReference;
   std::string savedSource, recoveredSource;
   std::string surfaceData;
   std::string movingNode;
@@ -146,13 +146,30 @@ static void studioSchedule(bool full = false) {
     s.frame = std::min(s.frame, textureStudioDoc().source.at("animation").at("frames").get<unsigned>() - 1);
   ++s.revision;
   s.error.clear();
+  s.errorNode.clear();
   s.scheduled = true;
   s.fullSize = full;
   s.nextRender = ImGui::GetTime() + (full ? 0 : .10);
 }
 
 static void studioEdit(rbTexture::Document document) {
-  rbTexture::compile(document, {}, textureStudio.assets);
+  auto& s = textureStudio;
+  s.errorNode.clear();
+  try {
+    rbTexture::compile(document, {}, s.assets);
+  } catch (const rbTexture::Error& error) {
+    constexpr std::string_view prefix = "graph.nodes.";
+    std::string_view location = error.location;
+    if (location.substr(0, prefix.size()) == prefix) {
+      location.remove_prefix(prefix.size());
+      for (const auto& node : document.source.at("graph").at("nodes")) {
+        const auto& id = node.at("id").get_ref<const std::string&>();
+        if (location.substr(0, id.size()) == id && (location.size() == id.size() || location[id.size()] == '.') &&
+            id.size() > s.errorNode.size()) s.errorNode = id;
+      }
+    }
+    throw;
+  }
   textureStudio.document->replace(std::move(document));
   textureStudio.drag.reset();
   studioSchedule();
@@ -1465,6 +1482,9 @@ static void studioNodes() {
   if (ImGui::Button("Group nodes…")) ImGui::OpenPopup("Group texture nodes");
   runUiRecordGlobal("texture-studio/graph/group");
   ImGui::EndDisabled();
+  std::string locate;
+  if (!s.error.empty() && !s.errorNode.empty() && ImGui::Button("Locate problem node"))
+    locate = s.errorNode;
   if (ImGui::BeginPopupModal("Group texture nodes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
     static char name[80] = "Material group";
     ImGui::InputText("Name", name, sizeof(name));
@@ -1663,6 +1683,10 @@ static void studioNodes() {
   }
   if (nodes.empty()) return;
   s.selectedNode = std::clamp(s.selectedNode, 0, int(nodes.size()) - 1);
+  if (!locate.empty()) {
+    for (size_t i = 0; i < nodes.size(); ++i)
+      if (nodes[i].at("id") == locate) { s.selectedNode = int(i); break; }
+  }
   const auto selected = nodes[size_t(s.selectedNode)].at("id").get<std::string>();
   const bool chooseNode = ImGui::BeginCombo("Node", selected.c_str());
   runUiRecordGlobal("texture-studio/graph/node");
@@ -1673,15 +1697,18 @@ static void studioNodes() {
       runUiRecordGlobal("texture-studio/graph/node/" + id);
       if (clicked) {
         s.selectedNode = int(i);
-        const auto position = positions.at(id);
-        pan = {pan.x + origin.x + (area.x - card.x) * .5f - position.x,
-               pan.y + origin.y + (area.y - card.y) * .5f - position.y};
+        locate = id;
       }
     }
     ImGui::EndCombo();
   }
   const auto& n = nodes[size_t(s.selectedNode)];
   const auto id = n.at("id").get<std::string>();
+  if (locate == id) {
+    const auto position = positions.at(id);
+    pan = {pan.x + origin.x + (area.x - card.x) * .5f - position.x,
+           pan.y + origin.y + (area.y - heights.at(id)) * .5f - position.y};
+  }
   const auto type = n.at("type").get<std::string>();
   if (type != "Subgraph") {
     bool included = s.groupSelection.count(id) != 0;
@@ -1826,7 +1853,16 @@ static void studioPreview() {
   using Preview = TextureStudioState::Preview;
   static constexpr const char* subjects[]{"Flat", "Tiled 3 × 3", "Sphere", "Cube", "Game profile", "Selected surface"};
   int mode = s.previewMode;
+  const auto& style = ImGui::GetStyle();
+  const float previewLabel = ImGui::CalcTextSize("Preview").x + style.ItemInnerSpacing.x;
+  const float channelLabel = ImGui::CalcTextSize("Channel").x + style.ItemInnerSpacing.x;
+  const float previewField = ImGui::CalcTextSize("Selected surface").x + ImGui::GetFrameHeight() + 2 * style.FramePadding.x;
+  const float channelField = ImGui::CalcTextSize("ambientOcclusion").x + ImGui::GetFrameHeight() + 2 * style.FramePadding.x;
+  const bool showChannel = s.previewMode < Preview::sphere && s.result.has_value();
+  const bool inlineChannel = showChannel && ImGui::GetContentRegionAvail().x >=
+    previewLabel + previewField + style.ItemSpacing.x + channelLabel + channelField;
   ImGui::BeginDisabled(s.apply != TextureStudioState::Apply::none);
+  if (inlineChannel) ImGui::SetNextItemWidth(previewField);
   const bool choice = ImGui::BeginCombo("Preview", subjects[mode]);
   runUiRecordGlobal("texture-studio/preview-mode");
   if (choice) {
@@ -1845,6 +1881,10 @@ static void studioPreview() {
     else studioUpload();
   }
   ImGui::EndDisabled();
+  if (inlineChannel && s.previewMode < Preview::sphere) {
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(channelField);
+  }
   if (s.previewMode < Preview::sphere && s.result && ImGui::BeginCombo("Channel", s.channel.c_str())) {
     for (const auto& [name, data] : s.result->image.outputs) {
       if (ImGui::Selectable(name.c_str(), name == s.channel)) {
@@ -1884,9 +1924,10 @@ static void studioPreview() {
   const auto size = canvas3d || s.previewMode == Preview::surface
     ? rbTexture::Resolution{256, 256} : s.result->previewSize;
   const unsigned copies = s.previewMode == Preview::tiled ? 3 : 1;
+  const float footerHeight = ImGui::GetTextLineHeightWithSpacing();
   const float scale = canvas2d && s.actualPixels ? 1.f : std::min(
     std::max(1.f, ImGui::GetContentRegionAvail().x) / (copies * size.width),
-    std::max(1.f, ImGui::GetContentRegionAvail().y - 32 * uiScale()) / (copies * size.height));
+    std::max(1.f, ImGui::GetContentRegionAvail().y - footerHeight) / (copies * size.height));
   const ImVec2 tile{size.width * scale, size.height * scale};
   const ImVec2 rect{tile.x * copies, tile.y * copies};
   const auto at = ImGui::GetCursorScreenPos();

@@ -476,22 +476,29 @@ class PreparedReuseTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_character_draft_rechecks_owner_and_frozen_packages(self):
+    def test_texture_studio_draft_rechecks_owner_and_frozen_packages(self):
         import yaml
         source = (REPO/'.github/workflows/release-linux-ui-update.yml').read_text()
         workflow = yaml.safe_load(source)
         jobs = workflow['jobs']
         self.assertEqual(workflow['permissions']['contents'], 'read')
         self.assertEqual(source.count('gh release upload'), 1)
+        verify = jobs['verify-rb23-release']
+        self.assertEqual(verify['permissions'], {'contents': 'read', 'actions': 'read'})
+        self.assertIn('refs/heads/main', verify['steps'][1]['run'])
         upload = jobs['upload-draft']
+        self.assertEqual(upload['needs'], 'verify-rb23-release')
         self.assertEqual(upload['environment'], 'rb21-release')
         self.assertEqual(upload['permissions']['contents'], 'write')
         downloads = [step['with'] for step in upload['steps'] if step.get('uses') == 'actions/download-artifact@v4']
         self.assertEqual({step['run-id'] for step in downloads},
-                         {'${{ inputs.rb21_candidate_run_id }}', '${{ inputs.rb21_evidence_run_id }}'})
+                         {'${{ env.CANDIDATE_RUN }}', '${{ inputs.rb23_evidence_run_id }}'})
+        self.assertEqual([step['name'] for step in downloads if 'name' in step], ['rb23-release-evidence'])
         commands = [step['run'] for step in upload['steps'] if 'run' in step]
         self.assertIn('/approvals', commands[-2])
-        self.assertIn('check-character-release.py', commands[-2])
+        self.assertIn('check-texture-studio-release.py', commands[-2])
+        self.assertIn('--publication-authorized', commands[-2])
+        self.assertIn('.targetCommitish == $sha', commands[-1])
         self.assertIn('gh release upload', commands[-1])
 
     def test_gates_and_caches_are_wired_without_fuzzy_restores(self):

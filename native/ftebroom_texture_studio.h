@@ -45,6 +45,7 @@ struct TextureStudioState {
   std::string movingNode;
   std::pair<std::string, std::string> wireStart;
   std::set<std::string> groupSelection;
+  std::set<std::string> parameterLocks;
   std::array<char, 96> presetSearch{};
   int catalogVariation = 0;
   int libraryFilter = 0;
@@ -163,6 +164,7 @@ static void studioNewDocument(rbTexture::Document document) {
   s.movingNode.clear();
   s.wireStart = {};
   s.groupSelection.clear();
+  s.parameterLocks.clear();
   s.document.emplace(std::move(document));
   s.assets.clear();
   s.assetFolder.clear();
@@ -319,11 +321,13 @@ static void studioApplyModel() {
   auto originals = rbTexture::Json::object();
   size_t retainedBytes = 0;
   for (const auto& reference : graph.source.at("assetReferences")) {
+    const auto hash = rbTexture::idField(reference, "sha256", "assets");
+    if (originals.contains(hash)) continue;
     const auto bytes = rbTexture::readOriginal(s.assetFolder, reference);
     rbTexture::require(bytes.size() <= studioModelAssetLimit - retainedBytes, "assets",
       "A model material can retain up to 16 MiB of original images. Reduce the source size before applying it.");
     retainedBytes += bytes.size();
-    originals[rbTexture::idField(reference, "sha256", "assets")] = ftebroom::bb::base64(bytes);
+    originals[hash] = ftebroom::bb::base64(bytes);
   }
   size_t imageBytes = result.modelPixels.size();
   for (size_t i = 0; i < bbProject.textures.size(); ++i)
@@ -727,13 +731,15 @@ static void textureStudioShowModelTexture() {
     rbTexture::require(!doc.readOnly, "source", "This model material needs a newer Texture Studio.");
     const auto& refs = doc.source.at("assetReferences");
     const auto& embedded = metadata.value("reyond_texture_studio_originals", rbTexture::Json::object());
-    rbTexture::require(embedded.is_object() && refs.size() <= 64 && embedded.size() == refs.size(),
+    rbTexture::require(embedded.is_object() && refs.size() <= 64 && embedded.size() <= refs.size(),
       "assets", "A model material is missing its original images.");
     const auto folder = studioRecoveryRoot();
     std::filesystem::create_directories(folder);
     size_t retainedBytes = 0;
+    std::set<std::string> restored;
     for (const auto& record : refs) {
       const auto hash = rbTexture::idField(record, "sha256", "assets");
+      if (!restored.insert(hash).second) continue;
       const auto& original = rbTexture::member(embedded, hash.c_str(), "assets");
       rbTexture::require(original.is_string() && original.get_ref<const std::string&>().size() <=
         ((studioModelAssetLimit - retainedBytes + 2) / 3) * 4,
@@ -744,6 +750,7 @@ static void textureStudioShowModelTexture() {
       retainedBytes += bytes.size();
       studioWriteOriginal(folder, rbTexture::imageRelativePath(hash), bytes);
     }
+    rbTexture::require(restored.size() == embedded.size(), "assets", "The model has unexpected embedded image data.");
     auto assets = rbTexture::loadAssets(doc, folder);
     const auto plan = rbTexture::compile(doc, {}, assets);
     const auto frame = std::min(metadata.value("reyond_texture_studio_frame", 0u), plan.frames - 1u);
@@ -900,6 +907,7 @@ static void studioOpenFile() {
       textureStudio.recoveredSource.clear();
       textureStudio.nextAutosave = ImGui::GetTime() + 60;
       textureStudio.selectedNode = 0;
+      textureStudio.parameterLocks.clear();
       textureStudio.frame = 0;
       if (!textureStudioDoc().readOnly) {
         textureStudio.variationBase = textureStudioDoc().seed();
@@ -952,6 +960,7 @@ static void studioImportRaster(std::string license, std::string textureName) {
       s.variationBase = 0;
       s.channel = "baseColor";
       s.selectedNode = 0;
+      s.parameterLocks.clear();
       s.frame = 0;
       studioSchedule();
       studioAutosave();
@@ -1089,43 +1098,69 @@ static void studioExportDialog() {
   ImGui::EndPopup();
 }
 
-static void studioParameter(const rbTexture::Json& binding) {
-  auto& s = textureStudio;
+static std::string studioParameterId(const rbTexture::Json& binding) {
+  return binding.value("group", "") + "/" + binding.at("node").get<std::string>() + "/" +
+    binding.at("key").get<std::string>();
+}
+
+static rbTexture::Json& studioParameterValue(rbTexture::Document& document, const rbTexture::Json& binding) {
   const auto id = binding.at("node").get<std::string>();
   const auto group = binding.value("group", "");
   const auto key = binding.at("key").get<std::string>();
-  const auto label = binding.at("label").get<std::string>();
-  auto document = textureStudioDoc();
   auto& scope = document.source.at("graph");
   auto& nodes = group.empty() ? scope.at("nodes") : scope.at("groups").at(group).at("nodes");
   auto node = std::find_if(nodes.begin(), nodes.end(), [&](const auto& entry) { return entry["id"] == id; });
   rbTexture::require(node != nodes.end(), "graph", "The parameter's node no longer exists.");
-  auto& param = node->at("parameters").at(key);
+  return node->at("parameters").at(key);
+}
+
+struct StudioParameterRange { float low, high; int step; };
+
+static StudioParameterRange studioParameterRange(const rbTexture::Json& binding) {
+  const auto low = binding.at("min").get<float>(), high = binding.at("max").get<float>();
+  rbTexture::require(std::isfinite(low) && std::isfinite(high) && low >= -1000000 && high <= 1000000 && low <= high,
+    "parameters", "The parameter has an invalid slider range.");
+  const auto step = rbTexture::integer(binding.at("step"), 0, 1000000, "parameters.step");
+  return {low, high, int(std::max(1u, step))};
+}
+
+static void studioParameter(const rbTexture::Json& binding) {
+  auto& s = textureStudio;
+  const auto id = binding.at("node").get<std::string>();
+  const auto key = binding.at("key").get<std::string>();
+  const auto label = binding.at("label").get<std::string>();
+  auto document = textureStudioDoc();
+  auto& param = studioParameterValue(document, binding);
+  const auto range = studioParameterRange(binding);
   bool changed = false;
-  ImGui::PushID((group + "/" + id + "/" + key).c_str());
+  ImGui::PushID(studioParameterId(binding).c_str());
   if (param.is_number_integer()) {
     int v = param.get<int>();
-    const int minimum = int(binding.at("min").get<float>());
-    const int maximum = int(binding.at("max").get<float>());
-    const int step = int(binding.at("step").get<unsigned>());
-    changed = ImGui::SliderInt(label.c_str(), &v, minimum, maximum);
+    const int minimum = int(range.low), maximum = int(range.high);
+    changed = ImGui::SliderInt(label.c_str(), &v, minimum, maximum, "%d", ImGuiSliderFlags_AlwaysClamp);
     if (changed) {
-      v = std::clamp(minimum + std::max(1, step) * ((v - minimum) / std::max(1, step)), minimum, maximum);
+      v = std::clamp(minimum + range.step * ((v - minimum) / range.step), minimum, maximum);
       param = v;
     }
   } else {
     float v = param.get<float>();
-    changed = ImGui::SliderFloat(label.c_str(), &v, binding.at("min").get<float>(), binding.at("max").get<float>(), "%.3f");
+    changed = ImGui::SliderFloat(label.c_str(), &v, range.low, range.high,
+      "%.3f", ImGuiSliderFlags_AlwaysClamp);
     if (changed) param = v;
   }
   const bool completed = ImGui::IsItemDeactivatedAfterEdit();
   runUiRecordGlobal("texture-studio/parameter/" + id + "/" + key);
+  ImGui::PopID();
   if (changed) {
     s.drag = std::move(document);
     studioSchedule();
   }
-  if (completed && s.drag) studioEdit(*s.drag);
-  ImGui::PopID();
+  if (completed && s.drag) {
+    auto edit = std::move(*s.drag);
+    s.drag.reset();
+    try { studioEdit(std::move(edit)); }
+    catch (...) { studioSchedule(); throw; }
+  }
 }
 
 static void studioQuick() {
@@ -1208,6 +1243,41 @@ static void studioQuick() {
   }
   auto bindings = textureStudioDoc().source.at("exposedParameters");
   for (const auto& binding : bindings) studioParameter(binding);
+  if (!bindings.empty()) {
+    const auto unlocked = [&](const auto& binding) { return !s.parameterLocks.count(studioParameterId(binding)); };
+    ImGui::BeginDisabled(std::none_of(bindings.begin(), bindings.end(), unlocked));
+    const bool randomize = ImGui::Button("Randomize parameters");
+    runUiRecordGlobal("texture-studio/randomize-parameters");
+    ImGui::EndDisabled();
+    if (randomize) {
+      auto next = textureStudioDoc();
+      rbTexture::Pcg32 random(rbTexture::stableSeed(next.seed(), ftebroom::bb::uuid()), 0);
+      for (const auto& binding : bindings) {
+        if (!unlocked(binding)) continue;
+        auto& value = studioParameterValue(next, binding);
+        const auto range = studioParameterRange(binding);
+        const unsigned number = random.next();
+        if (value.is_number_integer()) {
+          const int slots = (int(range.high) - int(range.low)) / range.step + 1;
+          value = int(range.low) + int(number % unsigned(slots)) * range.step;
+        } else value = rbTexture::mix(range.low, range.high, float(number >> 8) / 16777216.f);
+      }
+      studioEdit(std::move(next));
+    }
+    if (ImGui::TreeNode("Parameter locks")) {
+      for (const auto& binding : bindings) {
+        const auto id = studioParameterId(binding);
+        bool locked = s.parameterLocks.count(id) != 0;
+        ImGui::PushID(id.c_str());
+        if (ImGui::Checkbox(binding.at("label").get_ref<const std::string&>().c_str(), &locked)) {
+          if (locked) s.parameterLocks.insert(id);
+          else s.parameterLocks.erase(id);
+        }
+        ImGui::PopID();
+      }
+      ImGui::TreePop();
+    }
+  }
   ImGui::SeparatorText("Variations");
   for (unsigned variation = 0; variation < 16; ++variation) {
     if (variation % 4) ImGui::SameLine();
@@ -1790,7 +1860,7 @@ static void studioPreview() {
     ImGui::TextUnformatted("Select a brush face in the map.");
   const bool canvas3d = s.previewMode == Preview::sphere || s.previewMode == Preview::cube;
   const bool canvas2d = s.previewMode == Preview::flat || s.previewMode == Preview::tiled;
-  if (canvas3d) {
+  if (canvas3d && ImGui::CollapsingHeader("Preview settings")) {
     ImGui::BeginDisabled(s.apply != TextureStudioState::Apply::none);
     auto& camera = s.previewCamera;
     int light = camera.softLight ? 1 : 0;
@@ -1842,6 +1912,7 @@ static void studioPreview() {
     }
   if (canvas3d) {
     ImGui::InvisibleButton("Preview camera", rect, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle);
+    runUiRecordGlobal("texture-studio/preview-image");
     if (s.apply == TextureStudioState::Apply::none && ImGui::IsItemActive()) {
       auto& camera = s.previewCamera;
       const auto delta = ImGui::GetIO().MouseDelta;
@@ -1860,6 +1931,7 @@ static void studioPreview() {
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Drag to orbit. Middle-drag to pan.");
   } else {
     ImGui::Dummy(rect);
+    runUiRecordGlobal("texture-studio/preview-image");
     if (canvas2d && ImGui::IsItemHovered() && s.result->image.outputs.count(s.channel)) {
       const auto mouse = ImGui::GetIO().MousePos;
       const auto& channel = *s.result->image.outputs.at(s.channel);
@@ -2043,6 +2115,7 @@ static void textureStudioPanel() {
           s.variationBase = textureStudioDoc().seed();
           s.channel = "baseColor";
           s.selectedNode = 0;
+          s.parameterLocks.clear();
           s.frame = 0;
           studioSchedule();
           ImGui::CloseCurrentPopup();
@@ -2222,8 +2295,9 @@ static void textureStudioPanel() {
     ImGui::EndDisabled();
     ImGui::EndDisabled();
 
-    if (writable) ImGui::TextUnformatted(textureStudioDoc().source.at("name").get_ref<const std::string&>().c_str());
-    ImGui::Text("Profile %s", gameProfileName());
+    if (writable) ImGui::TextWrapped("%s · %s", textureStudioDoc().source.at("name").get_ref<const std::string&>().c_str(),
+                                    gameProfileName());
+    else ImGui::TextUnformatted(gameProfileName());
     ImGui::BeginDisabled(!writable || applying);
     if (ImGui::Button("Generate")) studioAction([&] { s.playing = false; studioAutosave(); studioSchedule(true); });
     runUiRecordGlobal("texture-studio/generate");
@@ -2260,7 +2334,7 @@ static void textureStudioPanel() {
     if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
     else if (!s.message.empty()) ImGui::TextWrapped("%s", s.message.c_str());
     if (!writable) ImGui::TextWrapped("This source uses a newer format. Save As preserves its original bytes.");
-    const bool stacked = ImGui::GetContentRegionAvail().x < 660 * uiScale();
+    const bool stacked = ImGui::GetContentRegionAvail().x < std::min(660 * uiScale(), 980.f);
     if (writable && stacked) {
       const float height = std::clamp(ImGui::GetContentRegionAvail().y * .45f, 130.f, std::max(130.f, 310 * uiScale()));
       ImGui::BeginChild("Texture Preview", {-1, height}, ImGuiChildFlags_Borders);

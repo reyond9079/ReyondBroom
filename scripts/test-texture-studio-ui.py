@@ -136,6 +136,9 @@ def main():
                 state = widgets["texture-studio/render-state"]
                 assert state["scale"] == args.scale / 100 and state["theme"] == (3 if args.theme == "light" else 0)
                 assert live()["display"] == [int(width), int(height)]
+                preview = widgets["texture-studio/preview-image"]
+                assert min(preview["width"], preview["height"]) >= 64, preview
+                assert preview["y"] + preview["height"] <= int(height), preview
                 controls = ("new", "import", "save", "save-package", "export", "apply",
                             "preview-mode", "quick-tab", "layers-tab", "graph-tab")
                 controls = [widgets[f"texture-studio/{name}"] for name in controls]
@@ -377,6 +380,20 @@ def main():
             click("texture-studio/save")
             wait(lambda: json.loads(material_file.read_text(encoding="utf-8")) == graph)
             print("PASS Ctrl+Z and Ctrl+Y target the focused Texture Studio history")
+            click("texture-studio/quick-tab")
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            click("texture-studio/randomize-parameters")
+            wait(model_ready)
+            click("texture-studio/save")
+            randomized = wait(lambda: (doc if (doc := json.loads(material_file.read_text(encoding="utf-8"))) != graph else None))
+            assert randomized["rootSeed"] == graph["rootSeed"]
+            assert randomized["graph"]["nodes"] != graph["graph"]["nodes"]
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            ui.key("z", ("ctrl",))
+            wait(model_ready)
+            click("texture-studio/save")
+            wait(lambda: json.loads(material_file.read_text(encoding="utf-8")) == graph)
+            print("PASS randomizing Quick parameters preserves the root seed and can be undone")
 
             click("texture-studio/graph-tab")
             click("texture-studio/graph/node")

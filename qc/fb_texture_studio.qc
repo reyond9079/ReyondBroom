@@ -16,30 +16,52 @@ int studio_selection_matches()
 
 void studio_surface_sample()
 {
+    static int last_selection = -1, last_revision = -1, last_map = -1;
+    int revision = fb_document_revision();
+    int map_epoch = (int)cvar("ftebroom_map_instance");
+    if(last_selection == fb_selection_epoch && last_revision == revision && last_map == map_epoch)return;
+    last_selection = fb_selection_epoch;
+    last_revision = revision;
+    last_map = map_epoch;
     cvar_set("ftebroom_texture_surface", "");
     if(!selectedbrushcount)return;
     selbrush_t item=selectedbrushes[0];
+    for(int i=0;i<selectedbrushcount;i++){
+        if(selbrush_whole(&selectedbrushes[i]))continue;
+        item=selectedbrushes[i];
+        break;
+    }
     static brushface_t faces[128];
     static vector points[48];
     int count=brush_get(item.model,item.id,faces,128,__NULL__);
     if(count<4 || count>128)return;
+    float best_area=0;
+    int best_face=-1;
     for(int face=0;face<count;face++){
         if(!selbrush_face(&item,face))continue;
         int corners=brush_getfacepoints(item.model,item.id,face+1,points,48);
-        if(corners<3 || corners>48)return;
-        vector xaxis=normalize(points[1]-points[0]);
-        vector yaxis=normalize(crossproduct(faces[face].planenormal,xaxis));
-        if(vlen(xaxis)==0 || vlen(yaxis)==0)return;
-        string data=strcat(itos(corners)," ");
-        for(int i=0;i<corners;i++){
-            vector relative=points[i]-points[0];
-            float s=points[i]*faces[face].sdir+faces[face].sbias;
-            float t=points[i]*faces[face].tdir+faces[face].tbias;
-            data=strcat(data,sprintf("%.8g %.8g %.8g %.8g ",relative*xaxis,relative*yaxis,s,t));
-        }
-        cvar_set("ftebroom_texture_surface",data);
-        return;
+        if(corners<3 || corners>48)continue;
+        float area=0;
+        for(int i=1;i+1<corners;i++)
+            area += vlen(crossproduct(points[i]-points[0],points[i+1]-points[0]));
+        if(area<=best_area)continue;
+        best_area=area;
+        best_face=face;
     }
+    if(best_face<0)return;
+    int corners=brush_getfacepoints(item.model,item.id,best_face+1,points,48);
+    if(corners<3 || corners>48)return;
+    vector xaxis=normalize(points[1]-points[0]);
+    vector yaxis=normalize(crossproduct(faces[best_face].planenormal,xaxis));
+    if(vlen(xaxis)==0 || vlen(yaxis)==0)return;
+    string data=strcat(itos(corners)," ");
+    for(int i=0;i<corners;i++){
+        vector relative=points[i]-points[0];
+        float s=points[i]*faces[best_face].sdir+faces[best_face].sbias;
+        float t=points[i]*faces[best_face].tdir+faces[best_face].tbias;
+        data=strcat(data,sprintf("%.8g %.8g %.8g %.8g ",relative*xaxis,relative*yaxis,s,t));
+    }
+    cvar_set("ftebroom_texture_surface",data);
 }
 
 int fb_texture_studio_command()

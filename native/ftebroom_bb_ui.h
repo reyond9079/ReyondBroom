@@ -38,6 +38,7 @@ static bool bbNewFteQ1=false;
 static bool bbEmbed = true, bbQuakeInspector = false, bbPixelGrid = true, bbBrushOutline = true,
             bbLoopPreview = true;
 static uint64_t bbSavedStamp = 0;
+static uint64_t bbDocumentEpoch = 0;
 static std::string bbSaved, bbMessage, bbLastExport, bbClipboard;
 static bb::Json bbClipboardData;
 struct BbPreviewEdge {
@@ -88,6 +89,7 @@ static void bbTimeline();
 static void bbMenus();
 static void bbDialogs();
 static void bbTexturePanel();
+static void textureStudioShow();
 static void bbUVPanel(bool paint = false);
 static bool bbDirty() {
   return bbActive && bbHistory.state() != bbSavedStamp;
@@ -201,6 +203,7 @@ static void bbSettingsSave() {
   }
 }
 static void bbActivate(bb::Project project) {
+  ++bbDocumentEpoch;
   placementCancel(modelPlacement);placementCancel(modelNewPlacement);
   bbSettingsLoad();
   bbResetInteraction();

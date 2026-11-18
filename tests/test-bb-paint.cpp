@@ -45,6 +45,26 @@ int main() {
     history.redo(p, s);
     if (pixel(p.textures[0], 8, 8)[1] != 255)
       throw std::runtime_error("Paint redo mismatch");
+    p.textures[0].path = "textures/original.png";
+    const auto original = p.textures[0];
+    history.begin(p, s, {0});
+    p.textures[0].path.clear();
+    p.root["textures"][0]["reyond_texture_studio"] = {{"schemaVersion", 1}, {"rootSeed", 42}};
+    p.textures[0].rgba[0] = 117;
+    history.finish(p, s, "Replace texture binding");
+    const auto generated = p.textures[0].rgba;
+    history.undo(p, s);
+    if (p.textures[0].path != original.path || p.textures[0].rgba != original.rgba ||
+        p.root["textures"][0].contains("reyond_texture_studio"))
+      throw std::runtime_error("Undo must restore the previous model texture binding");
+    history.redo(p, s);
+    if (!p.textures[0].path.empty() || p.textures[0].rgba != generated ||
+        p.root["textures"][0]["reyond_texture_studio"]["rootSeed"] != 42)
+      throw std::runtime_error("Redo must restore the embedded model texture and its source");
+    const auto reopened = parseProject(serialize(p));
+    if (reopened.textures[0].rgba != generated || reopened.textures[0].uvWidth != original.uvWidth ||
+        reopened.root["textures"][0]["reyond_texture_studio"]["rootSeed"] != 42)
+      throw std::runtime_error("Model texture and source must survive save and reopen");
     o.clip = {2, 2, 5, 5};
     stroke(p.textures[0], 0, 3, 15, 3, o);
     if (pixel(p.textures[0], 7, 3)[1])

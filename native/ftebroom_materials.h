@@ -309,11 +309,13 @@ static bool materialMatches(const std::string& name, const char* query)
   return true;
 }
 #include "ftebroom_uv_editor.h"
+static void textureStudioShow();
 static void materialBrowser(bool lesson=false)
 {
   materialTestItems.clear();
   materialDropTarget();
   const float scale=uiScale();
+  if(!lesson&&!jamEditing()&&ImGui::Button("Texture Studio…"))textureStudioShow();
   const float room=ImGui::GetContentRegionAvail().y;
   static float propertiesHeight=std::min(448*scale,room*.55f);
   const float savedPropertiesHeight=propertiesHeight;

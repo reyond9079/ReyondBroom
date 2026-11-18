@@ -124,7 +124,7 @@ static void runUiBrowsePanel(){
  if(runUiBrowseRequested){runUiBrowseRequested=false;ImGui::OpenPopup("Choose file");}
  ImGui::SetNextWindowSize({640*uiScale(),440*uiScale()},ImGuiCond_FirstUseEver);
  if(ImGui::BeginPopupModal("Choose file",nullptr,ImGuiWindowFlags_NoDocking)){
-  auto record=[](const char* key){auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();runUiBrowseRects[key]={{"x",a.x},{"y",a.y},{"width",b.x-a.x},{"height",b.y-a.y},{"active",ImGui::IsItemActive()}};};
+  auto record=[](const char* key){auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();runUiBrowseRects[key]={{"x",a.x},{"y",a.y},{"width",b.x-a.x},{"height",b.y-a.y},{"active",ImGui::IsItemActive()}};if(runUiLive)runUiRecordGlobal(std::string("choose-file/")+key);};
   if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{8*uiScale(),8*uiScale()});
   if(ImGui::Button("Up"))runUiBrowseFolder=runUiBrowseFolder.parent_path();ImGui::SameLine();ImGui::TextUnformatted(runUiBrowseFolder.u8string().c_str());

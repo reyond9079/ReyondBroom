@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReyondBroom Texture Studio source",
+  "type": "object",
+  "required": ["schemaVersion", "generatorVersion", "documentId", "name", "rootSeed", "resolution", "colorManagement", "graph", "exposedParameters", "layerBindings", "outputs", "assetReferences", "animation", "exportProfiles", "provenance"],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
+    "pin": {
+      "type": "object",
+      "required": ["node", "port"],
+      "properties": {"node": {"$ref": "#/$defs/id"}, "port": {"$ref": "#/$defs/id"}}
+    }
+  },
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "generatorVersion": {"const": "1.0.0"},
+    "documentId": {"$ref": "#/$defs/id"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 256},
+    "rootSeed": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "resolution": {
+      "type": "object", "required": ["width", "height"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 1, "maximum": 8192},
+        "height": {"type": "integer", "minimum": 1, "maximum": 8192}
+      }
+    },
+    "colorManagement": {
+      "type": "object", "required": ["working", "display"],
+      "properties": {"working": {"const": "linear-srgb"}, "display": {"const": "srgb"}}
+    },
+    "graph": {
+      "type": "object", "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": {
+          "type": "array", "maxItems": 2048,
+          "items": {
+            "type": "object", "required": ["id", "type", "version", "parameters"],
+            "properties": {
+              "id": {"$ref": "#/$defs/id"},
+              "type": {"$ref": "#/$defs/id"},
+              "version": {"type": "integer", "minimum": 1, "maximum": 65535},
+              "parameters": {"type": "object"}
+            }
+          }
+        },
+        "edges": {
+          "type": "array", "maxItems": 8192,
+          "items": {
+            "type": "object", "required": ["fromNode", "fromPort", "toNode", "toPort"],
+            "properties": {
+              "fromNode": {"$ref": "#/$defs/id"}, "fromPort": {"$ref": "#/$defs/id"},
+              "toNode": {"$ref": "#/$defs/id"}, "toPort": {"$ref": "#/$defs/id"}
+            }
+          }
+        }
+      }
+    },
+    "exposedParameters": {"type": "array"},
+    "layerBindings": {"type": "array"},
+    "assetReferences": {"type": "array"},
+    "exportProfiles": {"type": "array"},
+    "outputs": {
+      "type": "object", "minProperties": 1, "additionalProperties": false,
+      "properties": {
+        "baseColor": {"$ref": "#/$defs/pin"}, "height": {"$ref": "#/$defs/pin"},
+        "normal": {"$ref": "#/$defs/pin"}, "roughness": {"$ref": "#/$defs/pin"},
+        "metalness": {"$ref": "#/$defs/pin"}, "ao": {"$ref": "#/$defs/pin"},
+        "emissive": {"$ref": "#/$defs/pin"}, "opacity": {"$ref": "#/$defs/pin"},
+        "packedData": {"$ref": "#/$defs/pin"}
+      }
+    },
+    "animation": {
+      "type": "object", "required": ["frames", "fps", "loop"],
+      "properties": {
+        "frames": {"type": "integer", "minimum": 1, "maximum": 64},
+        "fps": {"type": "integer", "minimum": 1, "maximum": 30},
+        "loop": {"type": "boolean"}
+      }
+    },
+    "provenance": {"type": "object"}
+  }
+}

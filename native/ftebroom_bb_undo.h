@@ -143,7 +143,9 @@ public:
               b = i < p.textures.size() ? p.textures[i] : Texture{};
       PixelDelta d;
       d.index = i;
-      if (i >= imageCount || i >= p.textures.size() || a.width != b.width || a.height != b.height) {
+      const bool bindingChanged = a.id != b.id || a.name != b.name || a.path != b.path
+        || a.uvWidth != b.uvWidth || a.uvHeight != b.uvHeight;
+      if (i >= imageCount || i >= p.textures.size() || a.width != b.width || a.height != b.height || bindingChanged) {
         d.whole = true;
         d.before = std::move(a);
         d.after = std::move(b);

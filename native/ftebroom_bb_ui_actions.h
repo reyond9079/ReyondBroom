@@ -1056,18 +1056,24 @@ static void bbMenus() {
   if (!ImGui::BeginMenuBar())
     return;
   bool fileMenu=ImGui::BeginMenu("File");placementRect("model/file-menu");
+  runUiRecordGlobal("texture-studio/model/file-menu");
   if (fileMenu) {
     for (auto name : {"New model", "Open", "Import", "Save", "Save as", "Export", "Close"}){
-      if (ImGui::MenuItem(name))bbAction(name);placementRect((std::string("model/file/")+name).c_str());}
+      if (ImGui::MenuItem(name))bbAction(name);placementRect((std::string("model/file/")+name).c_str());
+      if (std::string_view(name) == "Save") runUiRecordGlobal("texture-studio/model/save");}
     if (ImGui::MenuItem("Project settings..."))
       bbProjectSettingsOpen = true;
     ImGui::EndMenu();
   }
-  if (ImGui::BeginMenu("Edit")) {
+  const bool editMenu = ImGui::BeginMenu("Edit");
+  runUiRecordGlobal("texture-studio/model/edit-menu");
+  if (editMenu) {
     for (auto name : {"Undo", "Redo", "Copy", "Cut", "Paste", "Duplicate", "Delete", "Select all",
-                      "Invert selection"})
-      if (ImGui::MenuItem(name))
-        bbAction(name);
+                      "Invert selection"}) {
+      if (ImGui::MenuItem(name)) bbAction(name);
+      if (std::string_view(name) == "Undo" || std::string_view(name) == "Redo")
+        runUiRecordGlobal(std::string("texture-studio/model/") + name);
+    }
     if (ImGui::MenuItem("Settings..."))
       bbSettingsOpen = true;
     ImGui::EndMenu();

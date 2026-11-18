@@ -50,6 +50,18 @@ run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
         description: Child commit containing the reviewed QA evidence for this source revision
         type: string
         default: ''
+      rb23_evidence_run_id:
+        description: Successful run containing Texture Studio acceptance at the exact checkout revision
+        type: string
+        default: ''
+      rb23_build_sha256:
+        description: Texture Studio release build SHA-256 from the acceptance run
+        type: string
+        default: ''
+      rb23_publication_authorized:
+        description: Owner has authorized publishing this exact tested candidate
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -150,10 +162,18 @@ jobs:
       run: python scripts/prepare-jam-release.py deps/jam-release-endpoint.h
     - name: Build and test the native module and profile importer
       run: |
-        g++ -std=c++17 -O2 -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
+        g++ -std=c++17 -O2 -ffp-contract=off -shared -fPIC -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/src/BulletDynamics/libBulletDynamics.a deps/bullet-build/src/BulletCollision/libBulletCollision.a deps/bullet-build/src/LinearMath/libLinearMath.a -lz -ldl -o deps/fteplug_ftebroom_amd64.so
     - name: Check changed audio DSP
       if: fromJSON(needs.plan.outputs.plan).flags.audio_core
       run: scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
+    - name: Verify Texture Studio graph, formats and release guard
+      run: |
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread tests/texture-studio-core.cpp -lz -o deps/texture-studio-core
+        deps/texture-studio-core qa/texture-studio/fixtures
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread native/texture/cli.cpp -lz -ldl -o deps/texture-studio
+        python3 tests/check-texture-studio-formats.py qa/texture-studio/fixtures
+        python3 tests/texture-studio-cli.py deps/texture-studio
+        python3 tests/texture-studio-release-gate.py
     - name: Check selected plant_core unit 1
       if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.plant_core
       run: |
@@ -204,7 +224,7 @@ jobs:
       run: |
         engine=deps/editor-engine/engine/release-editor/fteqw-gl64
         if test "$PLATFORM" = Linux-SDL2-x64; then engine=deps/editor-engine/engine/release-sdl2/fteqw-glsdl2_64; fi
-        python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --csprogs csaddon.dat --engine "$engine" --engine-source deps/editor-engine --version "$VERSION" --output out/release
+        python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --csprogs csaddon.dat --texture-cli deps/texture-studio --engine "$engine" --engine-source deps/editor-engine --version "$VERSION" --output out/release
         (cd out/release && sha256sum -c ./*.sha256)
     - name: Materialize selected validation scope
       shell: bash
@@ -361,7 +381,18 @@ jobs:
         mkdir -p audio-qa
         make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
         deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
-        g++ -std=c++17 -O1 -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+        g++ -std=c++17 -O1 -ffp-contract=off -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+    - name: Build Texture Studio test binaries
+      shell: msys2 {0}
+      run: |
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread -static tests/texture-studio-core.cpp -lz -o deps/texture-studio-core.exe
+        g++ -std=c++17 -O2 -ffp-contract=off -pthread -static native/texture/cli.cpp -lz -o deps/texture-studio.exe
+    - name: Verify Texture Studio graph, formats and release guard
+      run: |
+        & ./deps/texture-studio-core.exe qa/texture-studio/fixtures
+        python tests/check-texture-studio-formats.py qa/texture-studio/fixtures
+        python tests/texture-studio-cli.py deps/texture-studio.exe
+        python tests/texture-studio-release-gate.py
     - name: Check selected plant_core unit 1
       if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.plant_core
       run: |
@@ -428,7 +459,7 @@ jobs:
     - name: Package runtime and complete corresponding sources
       shell: msys2 {0}
       run: |
-        python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --engine deps/editor-engine/engine/release-editor/fteglqw64.exe --engine-source deps/editor-engine --audio-dir tools/audio --version "$VERSION" --output out/release
+        python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --texture-cli deps/texture-studio.exe --engine deps/editor-engine/engine/release-editor/fteglqw64.exe --engine-source deps/editor-engine --audio-dir tools/audio --version "$VERSION" --output out/release
         (cd out/release && sha256sum -c ./*.sha256)
     - name: Materialize selected validation scope
       shell: pwsh
@@ -486,7 +517,56 @@ jobs:
         retention-days: 7
     needs: plan
 
+  verify-rb23-release:
+    if: inputs.rb21_evidence_commit == '' && (inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EVIDENCE_RUN: ${{ inputs.rb23_evidence_run_id }}
+      CANDIDATE_RUN: ${{ inputs.rb21_candidate_run_id }}
+      BUILD_HASH: ${{ inputs.rb23_build_sha256 }}
+      VERSION: ${{ inputs.version }}
+      AUTHORIZED: ${{ inputs.rb23_publication_authorized }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Verify owner authorization and the evidence run's identity
+      run: |
+        test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+        test "$AUTHORIZED" = true
+        [[ "$BUILD_HASH" =~ ^[0-9a-f]{64}$ ]]
+        for run in "$EVIDENCE_RUN" "$CANDIDATE_RUN"; do
+          [[ "$run" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+            jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" '
+              .head_sha == $sha and .head_repository.full_name == $repo and
+              .status == "completed" and .conclusion == "success"
+            '
+        done
+    - uses: actions/download-artifact@v4
+      with:
+        name: rb23-release-evidence
+        github-token: ${{ github.token }}
+        run-id: ${{ inputs.rb23_evidence_run_id }}
+        path: ${{ runner.temp }}/rb23-evidence
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: release-packages-*
+        github-token: ${{ github.token }}
+        run-id: ${{ inputs.rb21_candidate_run_id }}
+        path: ${{ runner.temp }}/rb23-packages
+    - name: Require every Texture Studio check for this source and build
+      run: |
+        python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-evidence" \
+          --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . --publish --publication-authorized \
+          --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
+
   upload-draft:
+    needs: verify-rb23-release
     if: inputs.rb21_evidence_commit == '' && (inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
     runs-on: ubuntu-24.04
     environment: rb21-release

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Included inside ftebroom::pak. ZIP32 store/deflate; no encrypted or ZIP64 entries.
-struct ZipEntry {std::string name;uint32_t offset=0,compressed=0,size=0,crc=0;uint16_t method=0,flags=0;};
+struct ZipEntry {std::string name;uint32_t offset=0,compressed=0,size=0,crc=0,attributes=0;uint16_t method=0,flags=0;};
 inline uint16_t half(const char* p){return (unsigned char)p[0]|uint16_t((unsigned char)p[1])<<8;}
 inline void putHalf(std::ostream& out,uint16_t v){out.put(char(v));out.put(char(v>>8));}
 inline bool zipFile(const fs::path& path){auto ext=path.extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),::tolower);return ext==".pk3";}
@@ -43,19 +43,20 @@ inline void zipStore(std::ostream& out,const std::map<std::string,std::string_vi
   zipCentralDirectory(out,entries);
   if(!out)throw std::runtime_error("Cannot finish ZIP.");
 }
-inline std::vector<ZipEntry> zipDirectory(std::istream& in,uint64_t size){
+inline std::vector<ZipEntry> zipDirectory(std::istream& in,uint64_t size,unsigned entryLimit=65534){
   if(size<22)throw std::runtime_error("Truncated PK3.");
   size_t tail=std::min<uintmax_t>(size,65557);std::string bytes(tail,0);in.seekg(size-tail);if(!in.read(bytes.data(),tail))throw std::runtime_error("Cannot read PK3 directory.");
   size_t end=bytes.npos;for(size_t i=tail-22;;--i){if(word(bytes.data()+i)==0x06054b50&&i+22+half(bytes.data()+i+20)==tail){end=i;break;}if(!i)break;}
   if(end==bytes.npos)throw std::runtime_error("PK3 end-of-directory was not found.");auto h=bytes.data()+end;
   unsigned count=half(h+10);uint64_t offset=word(h+16),length=word(h+12);
   if(half(h+4)||half(h+6)||half(h+8)!=count||count==65535||offset+length>size-tail+end)throw std::runtime_error("Split or ZIP64 PK3 archives are unsupported.");
+  if(count>entryLimit)throw std::runtime_error("Too many entries in this ZIP archive.");
   in.seekg(offset);std::vector<ZipEntry> result;std::map<std::string,bool> seen;uint64_t consumed=0;
   for(unsigned i=0;i<count;i++){
     char row[46];if(!in.read(row,46)||word(row)!=0x02014b50)throw std::runtime_error("Invalid PK3 central directory.");
     auto n=half(row+28),extra=half(row+30),comment=half(row+32);consumed+=46+n+extra+comment;if(consumed>length)throw std::runtime_error("PK3 directory overflow.");
     ZipEntry e;e.name.resize(n);if(!in.read(e.name.data(),n))throw std::runtime_error("Truncated PK3 name.");in.seekg(extra+comment,std::ios::cur);
-    e.flags=half(row+8);e.method=half(row+10);e.crc=word(row+16);e.compressed=word(row+20);e.size=word(row+24);e.offset=word(row+42);
+    e.flags=half(row+8);e.method=half(row+10);e.crc=word(row+16);e.compressed=word(row+20);e.size=word(row+24);e.attributes=word(row+38);e.offset=word(row+42);
     if(!zipName(e.name)||!seen.emplace(e.name,true).second||(e.flags&1)||(e.method!=0&&e.method!=8)||e.compressed==0xffffffff||e.size==0xffffffff||uint64_t(e.offset)+30>offset)throw std::runtime_error("Unsupported, unsafe or duplicate PK3 entry.");
     result.push_back(e);
   }

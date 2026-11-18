@@ -8,6 +8,7 @@ void fb_transfer_finish(int commit);
 int fb_transfer_begin(vector pixel,int rotate,int materialOnly);
 void fb_transfer_at(vector pixel,int allFaces);
 void fb_material_replace();
+int fb_texture_studio_command();
 void fb_material_drop(string material,vector pixel);
 void fb_plugin_root_cancel();
 int fb_plugin_root_pointer(string action,vector pixel,int view);
@@ -706,6 +707,7 @@ float() ftebroom_command =
     if(argv(0)=="ftebroom_visibility") {fb_visibility_command(argv(1));return TRUE;}
     if(fb_entity_command()) return TRUE;
     if(fb_context_command())return TRUE;
+    if(fb_texture_studio_command())return TRUE;
     if(fb_plant_brush_command())return TRUE;
     if(argv(0)=="ftebroom_tag") {fb_filter_tag(argv(1),stoi(argv(2)));return TRUE;}
     if(argv(0)=="ftebroom_export_selected_bsp") {fb_export_selected_bsp(argv(1)=="world");return TRUE;}

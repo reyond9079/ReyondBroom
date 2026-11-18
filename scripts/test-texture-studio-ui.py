@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""Test map and model texture Apply in a disposable copy of the native editor."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import time
+import zipfile
+
+from editor_os_input import NativeInput, read_ui_json
+
+
+def faces(path):
+    lines = path.read_text(encoding="ascii").splitlines()
+    return sorted(match.groups() for line in lines if (match := re.fullmatch(
+        r"(\s*\([^)]*\)\s*\([^)]*\)\s*\([^)]*\)\s+)(\S+)(\s+.+)", line
+    )))
+
+
+def main():
+    cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument("runtime", type=Path)
+    cli.add_argument("--output", type=Path, required=True)
+    cli.add_argument("--profile", default="fte", choices=("fte", "quake1", "quake2", "quake3", "halflife"))
+    args = cli.parse_args()
+    output = args.output.resolve()
+    output.mkdir(parents=True)
+    runtime = output / "editor"
+    shutil.copytree(args.runtime.resolve(), runtime)
+    profile_ids = {"quake3": 0, "fte": 1, "quake1": 2, "quake2": 3, "halflife": 4}
+    profile = profile_ids[args.profile]
+    wad = profile in (2, 4)
+    data = runtime / "ftebroom"
+    project = runtime / {2: "id1", 3: "baseq2", 4: "valve"}.get(profile, "baseq3")
+    project.mkdir(exist_ok=True)
+    if profile == 3:
+        # The editor reads this bounded PCX for the game palette, even when the
+        # original room only has an unresolved texture.
+        header = bytearray(128)
+        header[:4] = bytes((10, 5, 1, 8))
+        header[65:68] = bytes((1, 1, 0))
+        palette = bytes(c for i in range(256) for c in (i, i, i))
+        (project / "pics").mkdir(exist_ok=True)
+        (project / "pics/colormap.pcx").write_bytes(header + b"\0\x0c" + palette)
+    map_file = data / "maps/texture-studio-qa.map"
+    fixture = Path(__file__).resolve().parents[1] / "tests/make-build-fixture.py"
+    subprocess.run([sys.executable, str(fixture), str(map_file)], check=True)
+    original_texture = "fb_grey" if wad else "ftebroom/grid"
+    key = "when-the-sky-went-dark" if args.profile == "fte" else args.profile
+    style = "quake-standard" if profile == 2 else "valve220" if profile in (3, 4) else "quake3"
+    source = map_file.read_text(encoding="ascii").replace("ftebroom/grid", original_texture)
+    source = source.replace(" 0 0 0 1 1 0 0 0", " 7 -3 0 2 1" if wad else " 7 -3 0 2 1 0 0 0")
+    if wad:
+        magic = b"WAD2" if profile == 2 else b"WAD3"
+        (project / "prior.wad").write_bytes(magic + struct.pack("<II", 0, 12))
+        source = source.replace('"classname" "worldspawn"\n', '"classname" "worldspawn"\n"wad" "prior.wad"\n', 1)
+    map_file.write_text(f"// ReyondBroom profile={key} format={style}\n" + source, encoding="ascii")
+    for directory in (runtime, data):
+        (directory / "ftebroom-project.txt").write_text(project.as_posix(), encoding="ascii")
+        settings = f'{profile} 0 "{project.as_posix()}" "" "" "" 1 5 "" 1 1\n'
+        (directory / "ftebroom-game-profile.txt").write_text(settings, encoding="ascii")
+        quake = f'"" "{project.as_posix()}" "" "" 0 0 "" 0\n'
+        (directory / "ftebroom-quake1.txt").write_text(quake, encoding="ascii")
+        legacy = f'"{project.as_posix()}" "{project.as_posix()}" "" "" "" 0\n'
+        (directory / "reyondbroom-legacy-games.txt").write_text(legacy, encoding="ascii")
+    state_path = data / "compilation-ui-live.json"
+    state_path.unlink(missing_ok=True)
+    config = data / "texture-studio-qa.cfg"
+    config.write_text("exec ftebroom.cfg\nset ftebroom_skip_setup 1\n"
+                      f'set ftebroom_test_import_root "{output.as_posix()}"\n'
+                      "in 7 mapedit maps/texture-studio-qa.map\n"
+                      "in 9 ftebroom_select all\n"
+                      "in 9 ftebroom_test_desktop reyon8qa\n"
+                      "in 11 ftebroom_texture_studio\n", encoding="ascii")
+    engine = runtime / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
+    flags = ["-nohome", "-noupdates", "-nosound", "-window", "-width", "1440", "-height", "900"]
+    with (output / "engine.log").open("wb") as log:
+        game = subprocess.Popen([str(engine), *flags, "+exec", config.name], cwd=runtime,
+                                stdout=log, stderr=subprocess.STDOUT)
+        try:
+            def live():
+                return read_ui_json(state_path)
+
+            def wait(predicate, timeout=25):
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    if game.poll() is not None:
+                        raise RuntimeError(f"The isolated editor exited with {game.returncode}")
+                    try:
+                        value = predicate()
+                        if value:
+                            return value
+                    except (FileNotFoundError, PermissionError, KeyError):
+                        pass
+                    time.sleep(.1)
+                raise TimeoutError("The editor did not report the expected state")
+
+            ui = NativeInput(game, state_path, live, wait, output)
+
+            def click(name):
+                rect = wait(lambda: live()["globalWidgets"].get(name))
+                ui.click(rect["x"] + rect["width"] * .5, rect["y"] + rect["height"] * .5)
+
+            def save_when(predicate):
+                click("menu/File")
+                click("Menu/File/Save")
+                return wait(lambda: (rows if predicate(rows := faces(map_file)) else None))
+
+            def choose(path):
+                click("choose-file/file-path")
+                ui.key("a", ("ctrl",))
+                ui.text(path.as_posix())
+                click("choose-file/file-choose")
+
+            click("texture-studio/apply")
+            folder = project / ("texture-wads" if wad else "textures/reyond-studio")
+
+            def installed():
+                state = live()["globalWidgets"]["texture-studio/render-state"]
+                if state["error"]:
+                    raise RuntimeError(state["error"])
+                return next(iter(folder.glob("*.reyond.json")), None)
+
+            manifest_file = wait(installed)
+            manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+            asset_name = manifest["material"]
+            stem = folder / Path(asset_name).name
+            runtime_texture = stem.with_suffix(".wad" if wad else ".wal" if profile == 3 else ".tga")
+            source = stem.with_suffix(".rbtex.json")
+            assert hashlib.sha256(runtime_texture.read_bytes()).hexdigest() == manifest["runtimeHash"]
+            assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest["sourceHash"]
+            if wad:
+                content = runtime_texture.read_bytes()
+                assert content[:4] == (b"WAD2" if profile == 2 else b"WAD3")
+                assert struct.unpack_from("<II", content, 28) == (256, 256)
+            elif profile == 3:
+                assert struct.unpack_from("<II", runtime_texture.read_bytes(), 32) == (256, 256)
+
+            def uses_asset(rows):
+                return bool(rows) and all(row[1].endswith(asset_name.removeprefix("textures/")) for row in rows)
+
+            applied = save_when(uses_asset)
+            if wad:
+                text = map_file.read_text(encoding="ascii")
+                assert re.search(r'"wad"\s+"prior\.wad;[^"]*' + re.escape(runtime_texture.name), text), text[:300]
+            shutil.copy2(map_file, output / "applied.map")
+            ui.console("ftebroom_undo")
+            restored = save_when(lambda rows: bool(rows) and all(row[1].endswith(original_texture) for row in rows))
+            if wad:
+                text = map_file.read_text(encoding="ascii")
+                assert re.search(r'"wad"\s+"prior\.wad"', text), text[:300]
+            shutil.copy2(map_file, output / "restored.map")
+            assert sorted((row[0], row[2]) for row in applied) == sorted((row[0], row[2]) for row in restored), (
+                "Apply must preserve geometry and UVs. Compare applied.map and restored.map."
+            )
+            assert runtime_texture.is_file(), "Undo must retain a potentially shared asset"
+            ui.console("ftebroom_redo")
+            assert save_when(uses_asset) == applied
+            if wad:
+                assert map_file.read_bytes() == (output / "applied.map").read_bytes()
+            print(f"PASS {args.profile} Apply, save, Undo and Redo preserve all {len(applied)} face projections")
+            if args.profile != "fte":
+                return
+
+            ui.console("ftebroom_test_desktop bb121open")
+            ui.console("ftebroom_test_desktop bb121save")
+            model_file = output / "monster.bbmodel"
+            original = wait(lambda: json.loads(model_file.read_text(encoding="utf-8")))
+            ui.console("ftebroom_texture_studio")
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            click("texture-studio/apply-model")
+
+            def model_ready():
+                state = live()["globalWidgets"]["texture-studio/render-state"]
+                if state["error"]:
+                    raise RuntimeError(state["error"])
+                return state["revision"] > before and not state["busy"] and state["previewReady"]
+
+            wait(model_ready)
+            click("texture-studio/close")
+
+            def save_model_when(predicate):
+                click("texture-studio/model/file-menu")
+                click("texture-studio/model/save")
+                return wait(lambda: (model if predicate(model := json.loads(
+                    model_file.read_text(encoding="utf-8"))) else None))
+
+            def generated(model):
+                return "reyond_texture_studio" in model["textures"][0]
+
+            after = save_model_when(generated)
+            slot = after["textures"][0]
+            old = original["textures"][0]
+            assert slot["source"] != old["source"] and slot["uuid"] == old["uuid"]
+            assert (slot["uv_width"], slot["uv_height"]) == (old["uv_width"], old["uv_height"])
+            assert after["elements"] == original["elements"]
+            click("texture-studio/model/edit-menu")
+            click("texture-studio/model/Undo")
+            assert save_model_when(lambda model: not generated(model))["textures"][0]["source"] == old["source"]
+            click("texture-studio/model/edit-menu")
+            click("texture-studio/model/Redo")
+            assert save_model_when(generated)["textures"][0] == slot
+            print("PASS Model Editor Apply, save, Undo and Redo preserve the selected slot, UVs and graph")
+
+            ui.console("ftebroom_texture_studio")
+            click("texture-studio/import")
+            click("texture-studio/import-license")
+            ui.text("CC0-1.0")
+            click("texture-studio/import-choose")
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            choose(runtime_texture)
+            wait(model_ready)
+            click("texture-studio/save-package")
+            package = output / "imported-image.rbtexpkg"
+            choose(package)
+            wait(package.is_file)
+            with zipfile.ZipFile(package) as archive:
+                imported = json.loads(archive.read("source.rbtex.json"))
+                reference, = imported["assetReferences"]
+                assert reference["license"] == "CC0-1.0"
+                assert archive.read(reference["path"]) == runtime_texture.read_bytes()
+                assert {"baseColor", "height", "normal", "ao"} == set(imported["outputs"])
+            print("PASS native Image Import and Save Package preserve the original image and license")
+            click("texture-studio/generate")
+            wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["fullSize"])
+            click("texture-studio/export")
+            click("texture-studio/export-dry-run")
+            dry_run = wait(lambda: live()["globalWidgets"].get("texture-studio/export-manifest"))
+            click("texture-studio/export-destination")
+            png = output / "exported-source.png"
+            choose(png)
+            assert wait(lambda: png.is_file() and png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
+            assert png.stat().st_size == dry_run["bytes"]
+            assert hashlib.sha256(png.read_bytes()).hexdigest() == dry_run["sha256"]
+            print("PASS native Texture Studio PNG matches the exact bytes and SHA-256 shown by Dry run")
+
+            click("texture-studio/new")
+            click("texture-studio/preset-search")
+            ui.text("Flemish Brick")
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            click("texture-studio/recipe/masonry-flemish-brick")
+            wait(model_ready)
+            click("texture-studio/layers-tab")
+            before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+            click("texture-studio/layer-add")
+            wait(model_ready)
+            click("texture-studio/save")
+            material_file = output / "flemish.rbtex.json"
+            choose(material_file)
+            graph = wait(lambda: json.loads(material_file.read_text(encoding="utf-8")))
+            assert graph["provenance"]["preset"] == "masonry-flemish-brick"
+            nodes = {node["id"]: node for node in graph["graph"]["nodes"]}
+            selected = nodes[graph["outputs"]["baseColor"]["node"]]
+            assert selected["type"] == "Blend" and selected["label"] == "Color layer"
+            print("PASS native preset search, layer editor, and saved source share the same graph")
+        finally:
+            if game.poll() is None:
+                game.kill()
+            game.wait(timeout=15)
+
+
+if __name__ == "__main__":
+    main()

@@ -347,6 +347,7 @@ void jamWorldLabels()
 #include "ftebroom_entity_list.h"
 #include "ftebroom_fullscreen.h"
 #include "ftebroom_resolution.h"
+#include "ftebroom_texture_studio.h"
 #include "ftebroom_actions.h"
 #include "ftebroom_preferences.h"
 #include "ftebroom_shapes.h"
@@ -1297,7 +1298,7 @@ static void panel(float w, float h)
   if (!jamEditing()) {
     shaderPackPanel();
     modFilesPanel(statusText,selectionStatus[0]!=0);
-    modelViewerPanel();bbBenchTick();plantPanel();characterPanel();worldPanel();
+    modelViewerPanel();bbBenchTick();plantPanel();characterPanel();worldPanel();textureStudioPanel();
     plantBrushHover();
     pluginsPanel();pluginPreviewDraw();
     textureFolderPanel();prefabPanel();
@@ -2165,6 +2166,7 @@ static void shutdownEditor()
   modEmbedEnd();
   if(runActive)runStop();
   characterShutdown();
+  textureStudioShutdown();
   plantShutdown();
   if(worldArchitect.work)worldArchitect.work->cancel=true;worldRelease();
   pluginsShutdown();
@@ -2199,6 +2201,8 @@ static void QDECL videoChanged(int width,int height,qboolean restarted)
   modelViewerImage=0;modelViewerSkinTexture=0;modelViewerSkinTextureIndex=-1;
   characterEditor.uploaded=false;
   characterEditor.materialUploads.clear();
+  textureStudio.handle=0;
+  if(textureStudio.open&&textureStudio.document&&!textureStudioDoc().readOnly)studioSchedule();
   plantVideoChanged();
   uploadFontAtlas();
   ImGui::GetIO().DisplaySize={float(width),float(height)};
@@ -2289,6 +2293,7 @@ extern "C" qboolean NATIVEEXPORT FTEPlug_Init(plugcorefuncs_t* api)
   commands->AddCommand("ftebroom_test_uv_input", testUVInput, "Test UV canvas pointer routing.");
   commands->AddCommand("ftebroom_test_run", testRunProfiles, "Test run profiles in disposable runs.");
   commands->AddCommand("ftebroom_world_architect",worldCommand,"Open World Architect.");
+  commands->AddCommand("ftebroom_texture_studio",textureStudioCommand,"Open Texture Studio.");
   commands->AddCommand("ftebroom_plant",plantCommand,"Open the native Plant Editor or select a plant preset.");
   commands->AddCommand("ftebroom_character",characterCommand,"Open Character Creator in an offline project.");
   commands->AddCommand("ftebroom_test_desktop",testDesktop,"Test desktop integration in disposable installations.");

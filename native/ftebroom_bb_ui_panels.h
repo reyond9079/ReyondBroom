@@ -530,6 +530,9 @@ static void bbTexturePanel() {
   ImGui::SameLine();
   if (ImGui::Button("Create..."))
     bbTemplateOpen = true;
+  ImGui::SameLine();
+  if (ImGui::Button("Texture Studio…"))
+    textureStudioShow();
   if (ImGui::BeginCombo("Materials", "Import from material browser")) {
     static char filter[128] = {};
     ImGui::InputText("Filter", filter, sizeof filter);

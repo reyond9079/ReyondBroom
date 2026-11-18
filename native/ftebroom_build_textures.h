@@ -119,13 +119,27 @@ static bool runPrepareExport(const std::filesystem::path& target){
       if(!normalized.empty())buildWriteTexture(target,normalized);
       auto q2pal=gameProfile==3?q2Palette():std::string{};bool aliasesChanged=false;
       std::set<std::string> q3Shaders;
+      std::set<std::string> stagedWal;
       for(const auto& name:names){
         if(!ftebroom::safeMaterialPath(name))throw std::runtime_error("Unsafe material path: "+name);
         bool neutral=name=="__tb_empty"||name=="fb_grey";
         if(gameProfile==3){
           auto bytes=q2WalBytes(name);
           if(!bytes.empty()){
-            ftebroom::legacy::wal(bytes,q2pal);buildWriteTexture(target.parent_path()/std::filesystem::u8path("textures/"+name+".wal"),bytes);
+            std::set<std::string> chain;
+            auto member=name;
+            while(!member.empty()){
+              if(!ftebroom::safeMaterialPath(member)||!chain.insert(member).second||chain.size()>64)
+                throw std::runtime_error("Invalid WAL animation chain for "+name);
+              if(bytes.empty())throw std::runtime_error("Missing WAL animation frame "+member+" for "+name);
+              ftebroom::legacy::wal(bytes,q2pal);
+              if(stagedWal.insert(member).second)
+                buildWriteTexture(target.parent_path()/std::filesystem::u8path("textures/"+member+".wal"),bytes);
+              member=ftebroom::quake1::name(bytes,56,32);
+              if(member==name||member.empty())break;
+              if(!ftebroom::safeMaterialPath(member))throw std::runtime_error("Invalid WAL animation path for "+name);
+              bytes=q2WalBytes(member);
+            }
             auto root=q2Material(name);if(root&&root->looseWal){auto copy=*root;copy.name="textures/"+name;auto current=materials.find(copy.name);if(current==materials.end()||current->second.preview!=copy.preview){materials[copy.name]=copy;aliasesChanged=true;}buildRegisterMaterialAlias(name,copy.preview);}
             continue;
           }

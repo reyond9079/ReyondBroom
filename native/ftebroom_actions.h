@@ -786,6 +786,8 @@ static void assetsMenu()
 {
   if(!ImGui::BeginMenu("Assets"))return;
   actionMenuEntry("Menu/File/New model...","New Model...");
+  if(ImGui::MenuItem("Texture Studio..."))textureStudioShow();
+  runUiRecordGlobal("Menu/Assets/Texture Studio...");
   if(ImGui::MenuItem("Plant Editor..."))plantShow();
   runUiRecordGlobal("Menu/Assets/Plant Editor...");
   if(ImGui::MenuItem("Prefab collections"))prefabShow();

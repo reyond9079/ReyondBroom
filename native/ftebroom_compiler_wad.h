@@ -4,6 +4,17 @@
 #include <map>
 #include <set>
 namespace ftebroom::quake1 {
+inline bool mapUsesMipTexture(const std::set<std::string>& wanted,const std::string& name) {
+    if(wanted.count(name))return true;
+    if(name.size()<3 || name.front()!='+')return false;
+    const auto isFrame=[](char c){return (c>='0'&&c<='9')||(c>='a'&&c<='j');};
+    if(!isFrame(name[1]))return false;
+    auto frame=name;
+    for(char c='0';c<='9';++c){frame[1]=c;if(wanted.count(frame))return true;}
+    for(char c='a';c<='j';++c){frame[1]=c;if(wanted.count(frame))return true;}
+    return false;
+}
+
 inline std::string mipWad(const std::map<std::string,std::string>& lumps,bool hl=false){
     std::string output(hl?"WAD3":"WAD2",4);output.resize(12,0);std::string directory;
     auto put=[](std::string& to,size_t at,uint32_t value){for(int b=0;b<4;b++)to[at+b]=char(value>>(b*8));};
@@ -22,7 +33,7 @@ inline std::string compilerWad(const std::vector<std::string>& archives,const st
         auto count=word(bytes,4),offset=word(bytes,8);if(count>65536)throw std::runtime_error("Too many WAD entries.");range(bytes,offset,uint64_t(count)*32);
         for(unsigned i=0;i<count;i++){
             size_t at=offset+i*32;if((unsigned char)bytes[at+12]!=(hl?67:68))continue;
-            auto key=name(bytes,at+16,16);for(char& c:key)c=char(std::tolower((unsigned char)c));if(!wanted.count(key))continue;
+            auto key=name(bytes,at+16,16);for(char& c:key)c=char(std::tolower((unsigned char)c));if(!mapUsesMipTexture(wanted,key))continue;
             if(bytes[at+13])throw std::runtime_error("Compressed WAD textures are unsupported.");
             auto start=word(bytes,at),size=word(bytes,at+4);range(bytes,start,size);auto lump=bytes.substr(start,size);
             if(lump.size()<40)throw std::runtime_error("Truncated WAD mip texture.");lumps[key]=std::move(lump);
@@ -45,7 +56,7 @@ inline std::string embeddedTextureWad(const std::string& bytes,const std::set<st
         const auto at=start+offset;
         auto key=name(bytes,at,16);
         for(auto& c:key)c=char(std::tolower((unsigned char)c));
-        if(!wanted.count(key) || key.empty() || key.size()>15 ||
+        if(!mapUsesMipTexture(wanted,key) || key.empty() || key.size()>15 ||
            key.find_first_of("/\\\";\r\n\t ")!=key.npos)continue;
         const auto width=word(bytes,at+16),height=word(bytes,at+20);
         if(!width||!height||width>4096||height>4096)continue;

@@ -35,6 +35,29 @@ inline std::string imageFileBytes(const std::filesystem::path& file) {
   return result;
 }
 
+inline void checkTgaPayload(std::string_view bytes, int width, int height) {
+  const auto byte = [&](size_t offset) { return static_cast<unsigned char>(bytes[offset]); };
+  size_t offset = 18 + byte(0);
+  const size_t pixelBytes = (byte(16) + 7) / 8;
+  const size_t pixels = size_t(width) * height;
+  const auto intact = [&](bool ok) { require(ok, "assets", "The TGA image has damaged pixel data."); };
+  intact(offset <= bytes.size());
+  if (byte(2) < 10) {
+    intact(pixels * pixelBytes <= bytes.size() - offset);
+    return;
+  }
+  size_t remaining = pixels;
+  while (remaining) {
+    intact(offset < bytes.size());
+    const unsigned packet = byte(offset++);
+    const size_t count = (packet & 0x7f) + 1;
+    const size_t payload = (packet & 0x80 ? 1 : count) * pixelBytes;
+    intact(count <= remaining && payload <= bytes.size() - offset);
+    offset += payload;
+    remaining -= count;
+  }
+}
+
 inline std::shared_ptr<Raster> decodeRaster(std::string_view bytes, size_t budget = decodedAssetLimit) {
   require(!bytes.empty() && bytes.size() <= assetByteLimit, "assets", "The image is empty or exceeds 64 MiB.");
   const bool png = bytes.substr(0, 8) == "\x89PNG\r\n\x1a\n";
@@ -49,6 +72,7 @@ inline std::shared_ptr<Raster> decodeRaster(std::string_view bytes, size_t budge
     width <= int(maxDimension) && height <= int(maxDimension), "assets", "Use a supported raster up to 8192 × 8192.");
   const auto needed = size_t(width) * height * 4;
   require(needed <= std::min(budget, decodedAssetLimit), "assets", "Decoded images exceed their memory budget.");
+  if (tga) checkTgaPayload(bytes, width, height);
   const Resolution expected{unsigned(width), unsigned(height)};
   std::unique_ptr<stbi_uc, decltype(&stbi_image_free)> pixels(
     stbi_load_from_memory(raw, length, &width, &height, &format, 4), stbi_image_free);

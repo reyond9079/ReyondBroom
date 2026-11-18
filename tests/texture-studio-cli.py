@@ -68,6 +68,24 @@ def run(executable, root):
     assert export("fte-diffuse", "fte", "custom/mortar")[0] == 0
     loose = (root / "q3" / texture_path).read_bytes()
     assert loose == (root / "fte" / texture_path).read_bytes()
+    tga_header = bytearray(18)
+    tga_header[2], tga_header[12], tga_header[14], tga_header[16] = 10, 2, 1, 32
+    run = tga_header + bytes((0x81, 1, 2, 3, 255))
+    literals = tga_header + bytes((0x01, 1, 2, 3, 255, 4, 5, 6, 255))
+    for name, data, valid in (
+        ("raw-truncated", loose[:-1], False),
+        ("rle-truncated", run[:-1], False),
+        ("rle-overrun", tga_header + bytes((0x82, 1, 2, 3, 255)), False),
+        ("rle-run", run, True),
+        ("rle-literals", literals, True),
+    ):
+        raster = root / (name + ".tga")
+        raster.write_bytes(data)
+        output = root / ("tga-" + name)
+        result, diagnostics = invoke("import", raster, "--license", "CC0-1.0", "--out", output)
+        assert (result == 0) == valid and output.exists() == valid
+        if not valid:
+            assert "damaged pixel data" in diagnostics["message"]
     assert export("q3-baseline", "pk3", "custom/mortar", "--pk3")[0] == 0
     status, planned = export("q3-baseline", "preview", "custom/mortar", "--pk3", "--dry-run")
     assert status == 0 and planned["state"] == "planned" and not (root / "preview").exists()

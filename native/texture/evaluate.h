@@ -216,12 +216,14 @@ inline float materialGrain(GrainKind kind, int frequency, uint64_t seed, float u
     return .32f + .30f * layers + .16f * loose + .25f * (grain - .5f);
   }
   case GrainKind::marble: {
-    const float fault = u + .42f * (valueNoise(seed + 2, 3, u, v) - .5f) +
-      .07f * (valueNoise(seed + 3, 12, u, v) - .5f);
-    const auto fold = valueNoise(seed + 4, std::max(2, frequency / 4), 3, fault, v);
-    const float streak = 1.f - softThreshold(.015f, .095f, std::abs(fold - .47f));
-    const float hairline = 1.f - softThreshold(.007f, .03f, std::abs(fold - .34f));
-    return .74f - .45f * streak - .14f * hairline + .14f * (grain - .5f);
+    const float fracture = valueNoise(seed + 2, 3, 4, u, v);
+    const float ripple = valueNoise(seed + 3, frequency, u, v);
+    const float fault = u + v + .48f * (fracture - .5f) + .08f * (ripple - .5f);
+    const float root = std::abs(frac(fault) - .49f);
+    const float branch = std::abs(frac(fault + .25f * (broad - .42f) + .018f) - .49f);
+    const float vein = 1.f - softThreshold(.005f, mix(.025f, .092f, fracture), root);
+    const float hairline = 1.f - softThreshold(.002f, mix(.009f, .025f, ripple), branch);
+    return .74f - .38f * vein - .32f * hairline + .14f * (grain - .5f);
   }
   case GrainKind::count: break;
   }

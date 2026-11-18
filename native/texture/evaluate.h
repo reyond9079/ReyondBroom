@@ -259,6 +259,10 @@ public:
   void store(std::string key, std::shared_ptr<const Image> image) {
     const size_t bytes = image->pixels.size() * sizeof(Pixel);
     if (key.empty() || bytes > capacity) return;
+    if (const auto existing = indices.find(key); existing != indices.end()) {
+      entries.splice(entries.begin(), entries, existing->second);
+      return;
+    }
     while (used > capacity - bytes) {
       used -= entries.back().image->pixels.size() * sizeof(Pixel);
       indices.erase(entries.back().key);
@@ -802,9 +806,10 @@ inline Evaluation evaluate(const Plan& plan, Resolution size,
     : float(frame) / (plan.frames - 1);
   const size_t pixels = size_t(size.width) * size.height;
   const size_t imageBytes = pixels * sizeof(Pixel);
-  require(!cache || cache->limit() < budget, "assets", "The preview cache exceeds the render budget.");
-  if (cache) budget -= cache->limit();
-  std::vector<unsigned> uses(plan.nodes.size());
+  require(!cache || (budget > 0 && cache->limit() <= (budget - 1) / 2),
+    "assets", "The preview cache exceeds the render budget.");
+  // A render can retain old hits while it replaces their entries with new images.
+  if (cache) budget -= 2 * cache->limit();
   std::set<const Raster*> inputRasters;
   for (int n : plan.order) {
     const auto& raster = plan.nodes[n].raster;
@@ -816,38 +821,53 @@ inline Evaluation evaluate(const Plan& plan, Resolution size,
     auto tiles = evaluateTiles(plan, size, budget, time, threads, cancelled);
     if (tiles) return std::move(*tiles);
   }
-  for (int n : plan.order)
-    for (int in : plan.nodes[n].inputs) if (in >= 0) ++uses[in];
-  for (const auto& [name, index] : plan.outputs) ++uses[index];
-  unsigned resident = 0, peak = 0;
-  auto estimated = uses;
-  for (int n : plan.order) {
-    peak = std::max(peak, ++resident);
-    for (int in : plan.nodes[n].inputs) if (in >= 0 && !--estimated[in]) --resident;
-  }
-  require(peak > 0 && peak <= budget / imageBytes, "resolution",
-    "Evaluation exceeds its RAM budget. Reduce the size or select fewer channels.");
-
-  std::vector<std::shared_ptr<const Image>> images(plan.nodes.size());
-  std::vector<std::string> keys(plan.nodes.size());
   const auto checkCancel = [&] {
     if (cancelled && cancelled->load(std::memory_order_relaxed))
       throw Error("render", "Rendering was cancelled.");
   };
+  std::vector<std::shared_ptr<const Image>> images(plan.nodes.size());
+  std::vector<std::string> keys;
+  if (cache) {
+    keys.resize(plan.nodes.size());
+    for (const int index : plan.order) {
+      checkCancel();
+      const auto& node = plan.nodes[index];
+      const auto seed = stableSeed(plan.seed, node.seedIdentity.empty() ? node.id : node.seedIdentity);
+      keys[index] = evalKey(node, seed, size, time, keys);
+    }
+  }
+  std::vector<unsigned> uses(plan.nodes.size());
+  for (const auto& [name, index] : plan.outputs) ++uses[index];
+  // Find reusable results before inserting new entries. Walking backwards also
+  // lets a cached result satisfy a branch without rendering its inputs again.
+  for (auto it = plan.order.rbegin(); it != plan.order.rend(); ++it) {
+    const int index = *it;
+    if (!uses[index]) continue;
+    if (cache) images[index] = cache->find(keys[index]);
+    if (!images[index])
+      for (const int input : plan.nodes[index].inputs) if (input >= 0) ++uses[input];
+  }
+  unsigned resident = 0, peak = 0;
+  auto estimated = uses;
+  for (int n : plan.order) {
+    if (!uses[n] || images[n]) continue;
+    peak = std::max(peak, ++resident);
+    for (int in : plan.nodes[n].inputs) if (in >= 0 && !images[in] && !--estimated[in]) --resident;
+  }
+  require(!plan.outputs.empty() && peak <= budget / imageBytes, "resolution",
+    "Evaluation exceeds its RAM budget. Reduce the size or select fewer channels.");
+
   constexpr unsigned tileSize = 128;
   const unsigned columns = (size.width + tileSize - 1) / tileSize;
   const unsigned tileCount = columns * ((size.height + tileSize - 1) / tileSize);
   const unsigned workers = std::min(threads, tileCount);
   for (int n : plan.order) {
     checkCancel();
+    if (!uses[n] || images[n]) continue;
     const auto& node = plan.nodes[n];
     const auto seed = stableSeed(plan.seed, node.seedIdentity.empty() ? node.id : node.seedIdentity);
     const auto path = "graph.nodes." + node.id;
-    if (cache) {
-      keys[n] = evalKey(node, seed, size, time, keys);
-      images[n] = cache->find(keys[n]);
-    }
-    if (!images[n]) {
+    {
       auto image = std::make_shared<Image>(Image{size, node.spec->output.type, {}});
       try {
         image->pixels.resize(pixels);

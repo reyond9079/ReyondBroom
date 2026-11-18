@@ -381,6 +381,26 @@ int main(int argc, char** argv) try {
   check(revised.outputs.at("baseColor") == preview.outputs.at("baseColor") &&
     revised.outputs.at("normal") != preview.outputs.at("normal") && cache.hitCount() != 0 && cache.bytes() <= cache.limit(),
     "Independent branches remain cached after an adjustment");
+  auto deep = brick;
+  std::string previous = "bond";
+  for (int i = 0; i < 40; ++i) {
+    const auto id = "filter-" + std::to_string(i);
+    deep.source["graph"]["nodes"].push_back(node(id.c_str(), "Clamp", {{"low", 0}, {"high", 1}}, 0));
+    deep.source["graph"]["edges"].push_back(wire(previous.c_str(), "value", id.c_str(), "value"));
+    previous = id;
+  }
+  deep.source["outputs"] = {{"height", {{"node", previous}, {"port", "value"}}}};
+  NodeCache smallCache(2 * 64 * 64 * sizeof(Pixel));
+  const auto deepPlan = compile(deep);
+  auto uncached = evaluate(deepPlan, {64,64}, nullptr, memoryBudget, 1, 0, &smallCache);
+  const auto beforeHits = smallCache.hitCount();
+  auto ready = evaluate(deepPlan, {64,64}, nullptr, memoryBudget, 1, 0, &smallCache);
+  check(ready.outputs.at("height") == uncached.outputs.at("height") && smallCache.hitCount() == beforeHits + 1 &&
+    smallCache.bytes() <= smallCache.limit(), "A cached output skips its long upstream branch");
+  findNode(deep, previous)["parameters"]["low"] = .25;
+  auto edited = evaluate(compile(deep), {64,64}, nullptr, memoryBudget, 1, 0, &smallCache);
+  check(edited.outputs.at("height")->pixels == evaluate(compile(deep), {64,64}).outputs.at("height")->pixels &&
+    smallCache.hitCount() == beforeHits + 2, "A long graph retains reusable ancestors before storing new outputs");
   const auto plan = compile(brick);
   auto single = evaluate(plan, {257,129});
   for (unsigned workers : {2u, 4u, 16u}) {

@@ -504,9 +504,10 @@ static void studioInstall() {
     {"version", 1}, {"generatorVersion", rbTexture::generatorVersion}, {"profile", gameProfileName()},
     {"material", s.material}, {"sourceHash", digest}, {"frame", s.frame}, {"paletteSha256", paletteHash},
     {"identity", ftebroom::jam::sha256(rbTexture::renderIdentity(graph))}, {"runtimeHash", ftebroom::jam::sha256(imageBytes)}};
-  insert(wad ? ".wad" : quake2 ? ".wal" : ".tga", imageBytes);
   insert(".rbtex.json", graph.save());
   insert(".reyond.json", manifest.dump(2) + "\n");
+  // Publish the discoverable texture only after its editable source and manifest are in place.
+  insert(wad ? ".wad" : quake2 ? ".wal" : ".tga", imageBytes);
   s.wadReference.clear();
   if (wad) {
     if (s.apply != TextureStudioState::Apply::asset) {
@@ -2160,6 +2161,7 @@ static void textureStudioPanel() {
     runUiRecordGlobal("texture-studio/new");
     nextButton("Open…");
     if (ImGui::Button("Open…")) ImGui::OpenPopup("Open source?");
+    runUiRecordGlobal("texture-studio/open");
     nextButton("Import Image…");
     if (ImGui::Button("Import Image…")) ImGui::OpenPopup("Import original image");
     runUiRecordGlobal("texture-studio/import");
@@ -2393,6 +2395,7 @@ static void textureStudioPanel() {
     if (ImGui::BeginPopupModal("Open source?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       ImGui::TextUnformatted("Save your current source before replacing it.");
       if (ImGui::Button("Choose file…")) { ImGui::CloseCurrentPopup(); studioOpenFile(); }
+      runUiRecordGlobal("texture-studio/open-choose");
       ImGui::SameLine();
       if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
       ImGui::EndPopup();

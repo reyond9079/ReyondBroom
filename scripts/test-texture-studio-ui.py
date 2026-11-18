@@ -32,10 +32,13 @@ def main():
     cli.add_argument("--three-faces", action="store_true")
     cli.add_argument("--layout-only", action="store_true")
     cli.add_argument("--preset-library", action="store_true")
+    cli.add_argument("--interrupt-apply", choices=("before-asset", "before-register"))
     cli.add_argument("--theme", choices=("light", "dark"), default="dark")
     cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
     cli.add_argument("--size", choices=("1280x720", "1440x900", "1920x1080"), default="1440x900")
     args = cli.parse_args()
+    if args.interrupt_apply and not sys.platform.startswith("linux"):
+        cli.error("The Apply interruption fixture requires Linux.")
     output = args.output.resolve()
     output.mkdir(parents=True)
     runtime = output / "editor"
@@ -94,9 +97,24 @@ def main():
     engine = runtime / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
     width, height = args.size.split("x")
     flags = ["-nohome", "-noupdates", "-nosound", "-window", "-width", width, "-height", height]
+    runtime_suffix = ".wad" if wad else ".wal" if profile == 3 else ".tga"
+    folder = project / ("texture-wads" if wad else "textures/reyond-studio")
+    env = os.environ.copy()
+    if args.interrupt_apply:
+        hook = output / "interrupt-asset-rename.so"
+        fixture = Path(__file__).resolve().parents[1] / "tests/fixtures/texture-studio/interrupt-asset-rename.c"
+        subprocess.run(["cc", "-shared", "-fPIC", str(fixture), "-ldl", "-o", str(hook)], check=True)
+        env["LD_PRELOAD"] = str(hook)
+        env["RB_TEXTURE_TEST_INTERRUPT_FOLDER"] = str(folder)
+        env["RB_TEXTURE_TEST_INTERRUPT_EXTENSION"] = (
+            ".reyond.json" if args.interrupt_apply == "before-asset" else runtime_suffix)
+
+    def launch(log, environment):
+        return subprocess.Popen([str(engine), *flags, "+exec", config.name], cwd=runtime,
+                                stdout=log, stderr=subprocess.STDOUT, env=environment)
+
     with (output / "engine.log").open("wb") as log:
-        game = subprocess.Popen([str(engine), *flags, "+exec", config.name], cwd=runtime,
-                                stdout=log, stderr=subprocess.STDOUT)
+        game = launch(log, env)
         try:
             def live():
                 return read_ui_json(state_path)
@@ -146,6 +164,55 @@ def main():
                 ui.console(f"ftebroom_test_run {60 + (args.scale - 100) // 25}")
             click("menu/Assets")
             click("Menu/Assets/Texture Studio...")
+
+            if args.interrupt_apply:
+                original_map = map_file.read_bytes()
+                recovery = output / "saved-before-interruption.rbtex.json"
+                click("texture-studio/save")
+                choose(recovery)
+                wait(recovery.is_file)
+                wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["faceCount"] > 0)
+                action = wait(lambda: live()["globalWidgets"].get("texture-studio/apply"))
+                try:
+                    ui.click(action["x"] + action["width"] / 2, action["y"] + action["height"] / 2)
+                except (RuntimeError, TimeoutError, FileNotFoundError):
+                    if game.poll() != 91:
+                        raise
+                assert game.wait(timeout=25) == 91, "The fault hook did not interrupt Apply"
+                assert map_file.read_bytes() == original_map
+                manifest_file, = folder.glob("*.reyond.json")
+                asset_stem = manifest_file.name.removesuffix(".reyond.json")
+                manifest = json.loads(manifest_file.read_bytes())
+                runtime_file = folder / (asset_stem + runtime_suffix)
+                source_file = folder / (asset_stem + ".rbtex.json")
+                assert hashlib.sha256(source_file.read_bytes()).hexdigest() == manifest["sourceHash"]
+                if args.interrupt_apply == "before-asset":
+                    assert not runtime_file.exists()
+                else:
+                    assert hashlib.sha256(runtime_file.read_bytes()).hexdigest() == manifest["runtimeHash"]
+
+                log.write(b"\n--- Restart after interrupted Apply ---\n")
+                log.flush()
+                state_path.unlink(missing_ok=True)
+                game = launch(log, os.environ.copy())
+                ui = NativeInput(game, state_path, live, wait, output)
+                wait(lambda: Path(live()["document"]).resolve() == map_file)
+                edit("Select All", selection=True)
+                click("menu/Assets")
+                click("Menu/Assets/Texture Studio...")
+                click("texture-studio/open")
+                click("texture-studio/open-choose")
+                choose(recovery)
+                wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["previewReady"])
+                click("texture-studio/apply")
+                wait(runtime_file.is_file)
+                generated = manifest["material"].removeprefix("textures/")
+                wait(lambda: not live()["globalWidgets"]["texture-studio/render-state"]["busy"])
+                save_when(lambda rows: bool(rows) and all(row[1].endswith(generated) for row in rows))
+                assert list(folder.glob("*.reyond.json")) == [manifest_file]
+                assert hashlib.sha256(runtime_file.read_bytes()).hexdigest() == manifest["runtimeHash"]
+                print(f"PASS restart after {args.interrupt_apply} interruption preserves map and retries the same asset")
+                return
 
             if args.preset_library:
                 original_source = output / "saved-before-library-edit.rbtex.json"
@@ -244,13 +311,12 @@ def main():
                 click("texture-studio/preview-mode/0")
                 print("PASS selected brush surface preview used the actual map geometry and UV projection")
 
-            folder = project / ("texture-wads" if wad else "textures/reyond-studio")
-
             def installed():
                 state = live()["globalWidgets"]["texture-studio/render-state"]
                 if state["error"]:
                     raise RuntimeError(state["error"])
-                return next(iter(folder.glob("*.reyond.json")), None)
+                return next((manifest for manifest in folder.glob("*.reyond.json") if
+                             (folder / (manifest.name.removesuffix(".reyond.json") + runtime_suffix)).is_file()), None)
 
             edit("Deselect All", selection=True)
             wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["faceCount"] == 0)
@@ -259,7 +325,7 @@ def main():
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
             asset_name = manifest["material"]
             stem = folder / Path(asset_name).name
-            runtime_texture = stem.with_suffix(".wad" if wad else ".wal" if profile == 3 else ".tga")
+            runtime_texture = stem.with_suffix(runtime_suffix)
             source = stem.with_suffix(".rbtex.json")
             assert hashlib.sha256(runtime_texture.read_bytes()).hexdigest() == manifest["runtimeHash"]
             assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest["sourceHash"]

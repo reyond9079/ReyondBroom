@@ -83,7 +83,7 @@ def click(name,global_=False):
  r=wait(lambda:live()['globalWidgets' if global_ else 'widgets'].get(name));w={'x':0,'y':0} if global_ else live()['widgets']['window']
  ui.click(w['x']+r['x']+r['width']*.5,w['y']+r['y']+r['height']*.5)
 def preferences():
- click('menu/View',True);click('menu-preferences',True);click('preferences-colors-tab',True)
+ click('menu/Edit',True);click('Menu/Edit/Preferences...',True);click('preferences-colors-tab',True)
 def rgb(setting,values):
  r=wait(lambda:live()['globalWidgets'].get('preference-color-'+setting))
  ui.click(r['x']+25,r['y']+r['height']*.5,mods=('ctrl',))

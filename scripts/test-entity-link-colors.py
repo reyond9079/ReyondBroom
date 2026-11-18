@@ -84,7 +84,7 @@ try:
  link_delta('selected-links-red',red)
  ui.console('ftebroom_deselect');link_delta('ordinary-links-green',green)
  select_source();link_delta('clicked-source-links-red',red)
- click('menu/View');click('menu-preferences');click('preferences-colors-tab')
+ click('menu/Edit');click('Menu/Edit/Preferences...');click('preferences-colors-tab')
  rgb('ftebroom_color_entity_links',(0,255,255));rgb('ftebroom_color_selected_entity_links',(255,0,255))
  click('preferences-close');link_delta('selected-links-custom-magenta',magenta)
  ui.console('ftebroom_deselect');link_delta('ordinary-links-custom-cyan',cyan)

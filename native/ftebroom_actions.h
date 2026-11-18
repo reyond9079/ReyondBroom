@@ -545,6 +545,211 @@ static void symmetryPanel(){
     ImGui::TextWrapped("Existing groups are relinked only when every side matches. Otherwise new copies are created. Later linked edits synchronize geometry and unprotected entity properties.");
   }ImGui::End();
 }
+// Menu placement is independent of action IDs: saved shortcuts, command dispatch
+// and UI automation retain the existing catalogue identifiers.
+static void actionMenuEntry(const std::string& id,const char* label=nullptr)
+{
+  for(const auto& a:actions)if(id==a.id){
+    if(!jamActionAllowed(a)||(gameClassic()&&id=="Menu/Tools/Control Point"))return;
+    const bool held=a.command&&std::string_view(a.command).rfind("ftebroom_hold ",0)==0;
+    bool checked=false;
+    if(id=="Menu/Edit/Texture Lock")checked=cvars->GetFloat("ftebroom_texture_lock")!=0;
+    if(id=="Menu/Edit/UV Lock")checked=cvars->GetFloat("ftebroom_uv_lock")!=0;
+    if(ImGui::MenuItem(label?label:historyActionLabel(a).c_str(),a.shortcutText.c_str(),checked,actionAvailable(a)&&!held))executeAction(a);
+    runUiRecordGlobal(a.id);
+    return;
+  }
+}
+static void actionMenuEntries(const char* group,std::initializer_list<const char*> names)
+{
+  for(const char* name:names)actionMenuEntry(std::string("Menu/")+group+"/"+name);
+}
+static bool editSubmenu(const char* label)
+{
+  const bool opened=ImGui::BeginMenu(label);
+  runUiRecordGlobal(std::string("Menu/Edit/")+label);
+  return opened;
+}
+static void editGeometryMenu()
+{
+  actionMenuEntries("Edit",{"CSG Convex Merge","CSG Subtract","CSG Subtract 2","CSG Intersect","CSG Hollow"});
+  ImGui::Separator();
+  const auto generator=[](const char* label,int kind){
+    if(ImGui::MenuItem(label)){command("ftebroom_generator cancel\n");generatorWindow=kind;generatorPreview=false;}
+    runUiRecordGlobal(std::string("Menu/Edit/Geometry Tools/")+label);
+  };
+  generator("Bevel...",2);generator("Inset...",5);generator("Subdivision...",6);
+  generator("Perforate...",4);generator("Fracture...",3);
+  ImGui::Separator();
+  generator("Rock...",8);
+  if(ImGui::MenuItem("Spin...")){command("ftebroom_tool_toggle spin\n");generatorWindow=0;generatorPreview=false;}
+  runUiRecordGlobal("Menu/Tools/Spin");
+  generator("Terrain generator...",1);
+  if(gameProfile==1)ImGui::MenuItem("Create FTE Engine terrain...",nullptr,&terrainCreateWindow);
+  ImGui::Separator();
+  actionMenuEntries("Edit",{"Convert Selection to Patches","Convert Triangulated Brushes"});
+  ImGui::Separator();
+  actionMenuEntries("Edit",{"Make Structural","Create func_detail"});
+}
+static void editToolsMenu()
+{
+  actionMenuEntries("Tools",{"Brush","Clip","Vertex","Edge","Face","Control Point"});
+  ImGui::Separator();
+  actionMenuEntries("Tools",{"Rotate","Scale","Shear","Sweep","Polygon Cut","Polygon Spawn","Bezier Bend","Sculpt"});
+  ImGui::Separator();
+  actionMenuEntries("Tools",{"Spawn Master","Unity Sync"});
+  // Apply/cancel and tool-specific operations follow the currently active tool.
+  bool separated=false;
+  for(const auto& a:actions){
+    const std::string_view id=a.id;
+    if(id.rfind("Menu/Tools/",0)!=0||!actionAvailable(a))continue;
+    const auto name=id.substr(11);
+    if(name=="Brush"||name=="Clip"||name=="Vertex"||name=="Edge"||name=="Face"||name=="Control Point"||
+       name=="Rotate"||name=="Scale"||name=="Shear"||name=="Sweep"||name=="Polygon Cut"||name=="Polygon Spawn"||
+       name=="Bezier Bend"||name=="Sculpt"||name=="Spin"||name=="Spawn Master"||name=="Unity Sync")continue;
+    if(!separated){ImGui::Separator();separated=true;}
+    actionMenuEntry(a.id);
+  }
+}
+static void editTransformMenu()
+{
+  actionMenuEntries("Edit",{"Move objects..."});
+  for(const char* operation:{"Move","Rotate","Duplicate and move"}){
+    if(ImGui::BeginMenu(operation)){
+      for(const char* direction:{"Forward","Back","Left","Right","Up","Down"})
+        actionMenuEntry(std::string("Menu/Transform/")+operation+" "+direction);
+      ImGui::EndMenu();
+    }
+  }
+  ImGui::Separator();
+  actionMenuEntries("Transform",{"Flip horizontal","Flip vertical"});
+  ImGui::Separator();
+  actionMenuEntries("Edit",{"Snap Vertices to Grid","Snap Vertices to Integer"});
+  ImGui::Separator();
+  if(ImGui::MenuItem("Array..."))arrayOpen=true;
+  runUiRecordGlobal("Menu/Edit/Transform/Array...");
+  if(ImGui::MenuItem("Settle...")){command("ftebroom_generator cancel\n");generatorWindow=0;settleWindow=true;}
+  runUiRecordGlobal("Menu/Edit/Transform/Settle...");
+  if(ImGui::BeginMenu("Symmetry")){
+    actionMenuGroup("Edit/Symmetry");ImGui::Separator();
+    if(ImGui::MenuItem("Settings..."))symmetryWindow=true;
+    ImGui::EndMenu();
+  }
+}
+static void editTexturesMenu()
+{
+  actionMenuEntries("Edit",{"Replace Material..."});
+  ImGui::Separator();
+  actionMenuEntries("Edit",{"Texture Lock","UV Lock"});
+  ImGui::Separator();
+  actionMenuEntries("Textures",{"Reset alignment","Reset to world aligned","Flip horizontal","Flip vertical"});
+  ImGui::Separator();
+  for(const char* operation:{"Move","Rotate"})if(ImGui::BeginMenu(operation)){
+    for(const auto& a:actions){
+      const std::string prefix=std::string("Menu/Textures/")+operation+" ";
+      if(std::string_view(a.id).rfind(prefix,0)==0)actionMenuEntry(a.id);
+    }
+    ImGui::EndMenu();
+  }
+}
+static void editMenu()
+{
+  actionMenuEntries("Edit",{"Undo","Redo"});
+  ImGui::Separator();
+  actionMenuEntries("Edit",{"Cut","Copy","Paste","Paste at Original Position","Duplicate","Delete"});
+  ImGui::Separator();
+  if(editSubmenu("Selection")){
+    actionMenuEntries("Edit",{"Select All","Deselect All","Invert Selection"});
+    ImGui::Separator();
+    actionMenuEntries("Edit",{"Select Touching","Select Inside","Select Tall","Select Siblings","Select Linked Groups"});
+    ImGui::Separator();
+    actionMenuEntries("Edit",{"Select by Line Number..."});
+    ImGui::EndMenu();
+  }
+  if(editSubmenu("Tools")){editToolsMenu();ImGui::EndMenu();}
+  if(editSubmenu("Geometry Tools")){editGeometryMenu();ImGui::EndMenu();}
+  if(editSubmenu("Transform")){editTransformMenu();ImGui::EndMenu();}
+  if(editSubmenu("Textures")){editTexturesMenu();ImGui::EndMenu();}
+  if(editSubmenu("Groups")){
+    actionMenuEntries("Edit",{"Group","Ungroup","Rename Groups","Create func_group"});
+    ImGui::Separator();
+    actionMenuEntries("Edit",{"Create Linked Duplicate","Separate Linked Groups","Extract Linked Group","Clear Protected Properties"});
+    ImGui::EndMenu();
+  }
+  if(editSubmenu("Repeat")){
+    actionMenuEntries("Edit",{"Repeat Last Commands","Clear Repeatable Commands"});
+    ImGui::EndMenu();
+  }
+  ImGui::Separator();
+  actionMenuEntries("Edit",{"Preferences..."});
+}
+static bool viewSubmenu(const char* label)
+{
+  const bool opened=ImGui::BeginMenu(label);
+  runUiRecordGlobal(std::string("Menu/View/")+label);
+  return opened;
+}
+static void viewMenu()
+{
+  actionMenuEntries("View",{"Focus Camera on Selection","Cycle map view","Maximize current view"});
+  ImGui::Separator();
+  if(viewSubmenu("Visibility")){
+    actionMenuEntries("View",{"Isolate","Hide","Show All"});
+    ImGui::Separator();
+    bool outlines=cvars->GetFloat("ftebroom_show_edges")!=0;
+    if(ImGui::MenuItem("Brush outlines",nullptr,outlines))cvars->SetFloat("ftebroom_show_edges",!outlines);
+    runUiRecordGlobal("Menu/View/Brush outlines");
+    if(ImGui::MenuItem("Viewport options..."))viewOptionsOpen=true;
+    runUiRecordGlobal("Menu/View/Viewport options...");
+    ImGui::EndMenu();
+  }
+  if(viewSubmenu("Grid")){
+    actionMenuGroup("View/Grid");
+    ImGui::Separator();
+    float opacity=cvars->GetFloat("ftebroom_grid_alpha");
+    if(ImGui::SliderFloat("Grid opacity",&opacity,0,1))cvars->SetFloat("ftebroom_grid_alpha",opacity);
+    if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
+    int angle=(int)std::round(cvars->GetFloat("ftebroom_grid_rotation"));
+    if(ImGui::SliderInt("Grid rotation",&angle,-180,180,"%d degrees")){cvars->SetFloat("ftebroom_grid_rotation",angle);preferencesSave();}
+    if(ImGui::MenuItem("Reset grid rotation"))command("ftebroom_grid reset\n");
+    ImGui::EndMenu();
+  }
+  if(viewSubmenu("Camera")){
+    actionMenuEntries("View",{"Move Camera to...","Reset camera zoom","Reset 2D Cameras"});
+    ImGui::EndMenu();
+  }
+  if(viewSubmenu("Panels")){
+    actionMenuEntries("View",{"Map Inspector","Entity Inspector","Face Inspector"});
+    ImGui::Separator();
+    actionMenuEntries("View",{"Entity list"});
+    ImGui::EndMenu();
+  }
+  if(viewSubmenu("Diagnostics")){
+    actionMenuEntries("View",{"Issues"});
+    ImGui::Separator();
+    actionMenuEntries("View",{"Next Point","Previous Point"});
+    ImGui::EndMenu();
+  }
+  if(viewSubmenu("Appearance")){
+    if(ImGui::MenuItem("Appearance...")){preferencesRequest=true;preferencesAppearanceRequest=true;}
+    runUiRecordGlobal("menu-preferences");
+    runUiRecordGlobal("Menu/View/Appearance/Appearance...");
+    ImGui::Separator();
+    if(ImGui::BeginMenu("Interface theme")){
+      for(int t=0;t<6;t++)if(ImGui::MenuItem(uiThemeNames[t],nullptr,uiTheme==t)){uiTheme=t;uiSaveAppearance();}
+      ImGui::EndMenu();
+    }
+    if(ImGui::BeginMenu("Language")){
+      for(int language=0;language<7;language++)if(ImGui::MenuItem(uiLanguageNames[language],nullptr,uiLanguage==language)){uiLanguage=language;uiSaveAppearance();}
+      ImGui::EndMenu();
+    }
+    ImGui::EndMenu();
+  }
+  ImGui::Separator();
+  if(ImGui::MenuItem("Fullscreen",nullptr,uiFullscreen))uiFullscreenSet(!uiFullscreen);
+  runUiRecordGlobal("Menu/View/Fullscreen");
+  if(!uiFullscreenError.empty())ImGui::TextWrapped("%s",uiFullscreenError.c_str());
+}
 static void actionMenus()
 {
   initActions();
@@ -554,78 +759,18 @@ static void actionMenus()
     if (std::string_view(group) == "File") placementRect("menu/file");
     if (opened)
     {
-      actionMenuGroup(group);
+      if(std::string_view(group)=="Edit")editMenu();
+      else if(std::string_view(group)=="View")viewMenu();
+      else actionMenuGroup(group);
       if (std::string_view(group) == "File" && characterAvailable()) {
         if (ImGui::MenuItem("Character Creator...")) command("ftebroom_character\n");
         runUiRecordGlobal("Menu/File/Character Creator...");
         placementRect("menu/file/character");
       }
       if(!jamEditing()&&std::string(group)=="Help"&&ImGui::MenuItem("Interactive onboarding..."))documentRequest("__tour");
-      if(std::string(group)=="Edit") {
-        if(!jamEditing()&&ImGui::MenuItem("Plant Editor..."))plantShow();
-        if(ImGui::BeginMenu("Symmetry")){
-          actionMenuGroup("Edit/Symmetry");ImGui::Separator();
-          if(ImGui::MenuItem("Settings..."))symmetryWindow=true;
-          ImGui::TextDisabled("Open a side's group to edit all sides.");ImGui::EndMenu();
-        }
-        if(ImGui::MenuItem("Terrain generator...")){command("ftebroom_generator cancel\n");generatorWindow=1;generatorPreview=false;}
-        if(ImGui::MenuItem("Subdivision...")){command("ftebroom_generator cancel\n");generatorWindow=6;generatorPreview=false;}
-        if(ImGui::MenuItem("Rock...")){command("ftebroom_generator cancel\n");generatorWindow=8;generatorPreview=false;}
-        if(ImGui::MenuItem("Spin...")){command("ftebroom_tool_toggle spin\n");generatorWindow=0;generatorPreview=false;}
-        if(ImGui::MenuItem("Settle...")){command("ftebroom_generator cancel\n");generatorWindow=0;settleWindow=true;}
-        if(ImGui::MenuItem("Inset...")){command("ftebroom_generator cancel\n");generatorWindow=5;generatorPreview=false;}
-        if(ImGui::MenuItem("Array..."))arrayOpen=true;
-        if(ImGui::MenuItem("Perforate...")){command("ftebroom_generator cancel\n");generatorWindow=4;generatorPreview=false;}
-        if(ImGui::MenuItem("Fracture...")){command("ftebroom_generator cancel\n");generatorWindow=3;generatorPreview=false;}
-        if(ImGui::MenuItem("Bevel...")){command("ftebroom_generator cancel\n");generatorWindow=2;generatorPreview=false;}
-      }
-      if(std::string(group)=="Edit" && gameProfile==1)ImGui::MenuItem("Create FTE Engine terrain...",nullptr,&terrainCreateWindow);
       if(std::string_view(group)=="Help"){
         if(ImGui::MenuItem("Updates..."))recentOpenUpdates();
         runUiRecordGlobal("Menu/Help/Updates...");
-      }
-      if(std::string(group)=="View") {
-        if(ImGui::BeginMenu("Visibility")){actionMenuGroup("View",true);ImGui::EndMenu();}
-        if(ImGui::MenuItem("Viewport options..."))viewOptionsOpen=true;
-        if(ImGui::MenuItem("Preferences...")){preferencesRequest=true;preferencesAppearanceRequest=true;}
-        runUiRecordGlobal("menu-preferences");
-        bool outlines=cvars->GetFloat("ftebroom_show_edges")!=0;
-        if(ImGui::MenuItem("Brush outlines",nullptr,outlines))cvars->SetFloat("ftebroom_show_edges",!outlines);
-        if(ImGui::MenuItem("Resolution...")){uiResolutionRead();uiResolutionWindow=true;}
-        if(ImGui::MenuItem("Fullscreen",nullptr,uiFullscreen))uiFullscreenSet(!uiFullscreen);
-        if(!uiFullscreenError.empty())ImGui::TextWrapped("%s",uiFullscreenError.c_str());
-        ImGui::Separator();
-      }
-      if(std::string(group)=="View"&&ImGui::BeginMenu("Language")) {
-        for(int language=0;language<7;language++)if(ImGui::MenuItem(uiLanguageNames[language],nullptr,uiLanguage==language)){uiLanguage=language;uiSaveAppearance();}
-        ImGui::EndMenu();
-      }
-      if(std::string(group)=="View" && ImGui::BeginMenu("Interface theme")) {
-        for(int t=0;t<6;t++)if(ImGui::MenuItem(uiThemeNames[t],nullptr,uiTheme==t)){uiTheme=t;uiSaveAppearance();}
-        ImGui::EndMenu();
-      }
-      if (std::string(group) == "View" && ImGui::BeginMenu("Grid"))
-      {
-        actionMenuGroup("View/Grid");
-        float opacity=cvars->GetFloat("ftebroom_grid_alpha");
-        if(ImGui::SliderFloat("Grid opacity",&opacity,0,1))cvars->SetFloat("ftebroom_grid_alpha",opacity);
-        if(ImGui::IsItemDeactivatedAfterEdit())preferencesSave();
-        int angle=(int)std::round(cvars->GetFloat("ftebroom_grid_rotation"));
-        if(ImGui::SliderInt("Grid rotation",&angle,-180,180,"%d degrees")){cvars->SetFloat("ftebroom_grid_rotation",angle);preferencesSave();}
-        if(ImGui::MenuItem("Reset grid rotation")){command("ftebroom_grid reset\n");}
-        ImGui::EndMenu();
-      }
-      if (std::string(group) == "Edit")
-        for (auto nested : {"Tools", "Transform", "Textures"})
-          if (ImGui::BeginMenu(nested))
-          {
-            actionMenuGroup(nested);
-            ImGui::EndMenu();
-          }
-      if (std::string(group) == "View" && ImGui::BeginMenu("Camera"))
-      {
-        actionMenuGroup("Camera");
-        ImGui::EndMenu();
       }
       ImGui::EndMenu();
     }

@@ -97,7 +97,7 @@ def choose(key,index,global_=False):
  with (caseout/'os-clicks.jsonl').open('a') as log:log.write(json.dumps({'combo':key,'index':index,'rect':r,'time':time.monotonic()})+'\n')
  ui.click(r['x']+r['width']*.3,r['y']+r['height']+16+index*22);ui.settle()
 def preferences(profile):
- click('menu/View',True);click('menu-preferences',True);click('preferences-profile-tab',True)
+ click('menu/Edit',True);click('Menu/Edit/Preferences...',True);click('preferences-profile-tab',True)
  if profile!=live()['gameProfile']:choose('preferences-profile-combo',profile,True)
 def open_resources(profile):preferences(profile);click('preferences-profile-resources',True)
 def edit_folder(path):

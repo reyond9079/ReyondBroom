@@ -119,7 +119,7 @@ try:
   expect(wait(lambda:live()['widgets'].get('launch-engine/1',{}).get('selected')),'engine_manager_reorder_keeps_launch_selection')
   # The launch Close has its own rectangle, unlike the manager Close.
   click('launch-close') if 'launch-close' in live()['widgets'] else None
-  click('menu/View',True);click('menu-preferences',True);click('preferences-keyboard-tab',True)
+  click('menu/Edit',True);click('Menu/Edit/Preferences...',True);click('preferences-keyboard-tab',True)
   actions=[('func_detail','Menu/Edit/Create func_detail','j'),('FUNC_GROUP','Menu/Edit/Create func_group','k'),('WORLD TEXTURE ALIGNMENT','Menu/Textures/Reset to world aligned','l')]
   def filtered_binding(action):
    widgets=live()['globalWidgets']

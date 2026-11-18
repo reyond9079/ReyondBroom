@@ -89,7 +89,6 @@ def main():
     config.write_text("exec ftebroom.cfg\nset ftebroom_skip_setup 1\n"
                       f'set ftebroom_test_import_root "{output.as_posix()}"\n'
                       "in 7 mapedit maps/texture-studio-qa.map\n"
-                      "in 9 ftebroom_select all\n"
                       f"in 9 ftebroom_test_desktop reyon8qa {args.theme}\n",
                       encoding="ascii")
     engine = runtime / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
@@ -122,6 +121,12 @@ def main():
                 rect = wait(lambda: live()["globalWidgets"].get(name))
                 ui.click(rect["x"] + rect["width"] * .5, rect["y"] + rect["height"] * .5)
 
+            def edit(name, selection=False):
+                click("menu/Edit")
+                if selection:
+                    click("Menu/Edit/Selection")
+                click("Menu/Edit/" + name)
+
             def save_when(predicate):
                 click("menu/File")
                 click("Menu/File/Save")
@@ -135,6 +140,8 @@ def main():
                 click("choose-file/file-choose")
 
             wait(lambda: live()["globalWidgets"].get("menu/Assets"))
+            wait(lambda: Path(live()["document"]).resolve() == map_file)
+            edit("Select All", selection=True)
             if args.scale != 100:
                 ui.console(f"ftebroom_test_run {60 + (args.scale - 100) // 25}")
             click("menu/Assets")
@@ -245,7 +252,7 @@ def main():
                     raise RuntimeError(state["error"])
                 return next(iter(folder.glob("*.reyond.json")), None)
 
-            ui.console("ftebroom_deselect")
+            edit("Deselect All", selection=True)
             wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["faceCount"] == 0)
             click("texture-studio/apply")
             manifest_file = wait(installed)
@@ -282,7 +289,7 @@ def main():
                 ui.console(f"set ftebroom_material_query {selected_texture}")
                 ui.console("ftebroom_material_select faces")
             else:
-                ui.console("ftebroom_select all")
+                edit("Select All", selection=True)
             wait(lambda: (count := live()["globalWidgets"]["texture-studio/render-state"]["faceCount"]) > 0 and
                  (not args.three_faces or count == 3))
             click("texture-studio/apply")
@@ -296,7 +303,7 @@ def main():
                 text = map_file.read_text(encoding="ascii")
                 assert re.search(r'"wad"\s+"prior\.wad;[^"]*' + re.escape(runtime_texture.name), text), text[:300]
             shutil.copy2(map_file, output / "applied.map")
-            ui.console("ftebroom_undo")
+            edit("Undo")
             restored = save_when(lambda rows: expected_textures(rows, False))
             if wad:
                 text = map_file.read_text(encoding="ascii")
@@ -306,7 +313,7 @@ def main():
                 "Apply must preserve geometry and UVs. Compare applied.map and restored.map."
             )
             assert runtime_texture.is_file(), "Undo must retain a potentially shared asset"
-            ui.console("ftebroom_redo")
+            edit("Redo")
             assert save_when(lambda rows: expected_textures(rows, True)) == applied
             if wad:
                 assert map_file.read_bytes() == (output / "applied.map").read_bytes()

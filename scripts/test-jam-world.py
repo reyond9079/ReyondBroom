@@ -46,7 +46,9 @@ def capture(name):
  ui.settle();image=ImageGrab.grab();image.save(out/(name+'.png'))
  ox,oy=ui.position();sx,sy=getattr(ui,'scale',(1,1));v=next(v for v in live()['views'] if v['type']==0)
  image=image.crop((int(ox+(v['x']+12)*sx),int(oy+(v['y']+35)*sy),int(ox+(v['x']+v['width']-12)*sx),int(oy+(v['y']+v['height']-12)*sy))).convert('RGB')
- points=[(x,y) for y in range(image.height) for x in range(image.width) if (lambda r,g,b:g>r+65 and b>r+35 and g>b+15)(*image.getpixel((x,y)))]
+ # The green Y axis antialiased against the blue sky can also have g > b > r.
+ # Require the owned border's strong cyan component, not merely that ordering.
+ points=[(x,y) for y in range(image.height) for x in range(image.width) if (lambda r,g,b:g>r+90 and b>r+90 and g>b+35)(*image.getpixel((x,y)))]
  assert len(points)>100,'Owned plot border is not visibly rendered'
  return {'pixels':len(points),'top':min(y for x,y in points),'bottom':max(y for x,y in points)}
 try:
@@ -67,8 +69,8 @@ try:
   ui.console(command)
  ui.console('set ftebroom_jam_plot_half_size "1024 1024 512"');old=capture('legacy-volume')
  ui.console('set ftebroom_jam_plot_half_size "1024 1024 1024"');new=capture('cubic-volume')
- check(new['bottom']-new['top']>(old['bottom']-old['top'])*1.12,'new_ceiling_and_floor_expand_the_visible_volume')
  (out/'volume-pixels.json').write_text(json.dumps({'legacy':old,'cubic':new},indent=2))
+ check(new['top']<old['top'] and new['bottom']>old['bottom'] and new['bottom']-new['top']>(old['bottom']-old['top'])*1.12,'new_ceiling_and_floor_expand_the_visible_volume')
  (out/'results.json').write_text(json.dumps(checks,indent=2))
 except BaseException:
  try:ImageGrab.grab().save(out/'failure.png')

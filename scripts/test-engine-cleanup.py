@@ -62,7 +62,7 @@ for parent in [root,data]:
 for name in ['compilation-ui-live.json','native-input-live.json','welcome-ui-live.json']:(data/name).unlink(missing_ok=True)
 # These commands seed the fixture and enable read-only telemetry. Compilation
 # and both launch actions below are performed through native OS mouse input.
-(data/'engine-cleanup-qa.cfg').write_text('exec ftebroom.cfg\nset ftebroom_input_qa 1\nin 10 ftebroom_test_desktop reyon8qa dark\nin 11 ftebroom_test_filepath open '+json.dumps(mapfile.as_posix())+'\nin 12 ftebroom_test_run 50\n')
+(data/'engine-cleanup-qa.cfg').write_text('exec ftebroom.cfg\nset ftebroom_input_qa 1\nin 10 ftebroom_test_desktop reyon8qa dark\nin 11 ftebroom_test_filepath open '+json.dumps(mapfile.as_posix())+'\n')
 render=['+set','vid_renderer',os.environ['RB_QA_RENDERER']] if os.environ.get('RB_QA_RENDERER') else []
 stream=(out/'editor.log').open('wb');process=None;checks=[]
 def live():return read_ui_json(state)
@@ -90,10 +90,14 @@ def validate_record(path,prefix):
  check(record['argv'][-6:]==['-basedir',game.as_posix(),'-game','CustomMod','+map','customer-real-map'],prefix+'_uses_real_map_and_active_mod')
 try:
  process=subprocess.Popen([str(root/engine_name),*render,'+set','ftebroom_skip_setup','1','+set','ftebroom_input_qa','1','-ftebroom-child-processes','-nohome','-noupdates','-nosound','-condebug','-window','-width','1280','-height','800','-basedir',str(root),'+exec','engine-cleanup-qa.cfg'],cwd=root,env={**os.environ,'LIBGL_ALWAYS_SOFTWARE':'1'},stdout=stream,stderr=subprocess.STDOUT)
- wait(lambda:Path(live().get('document',''))==mapfile and live().get('compileOpen') and 'compile' in live().get('widgets',{}))
+ wait(lambda:Path(live().get('document',''))==mapfile)
  ui=NativeInput(process,state,live,wait,out,focus_required=True);ui.position()
  ui.assert_windows_mouse_activation('initial')
  if not windows:ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
+ for key in ('menu/Run','Menu/Run/Compile...'):
+  rect=wait(lambda:live()['globalWidgets'].get(key))
+  ui.click(rect['x']+rect['width']*.5,rect['y']+rect['height']*.5)
+ wait(lambda:live().get('compileOpen') and 'compile' in live().get('widgets',{}))
  ui.move(1100,740);ui.settle()
  check(Path(live()['document'])==mapfile,'external_map_path_keeps_user_filename')
  click('compile');wait(lambda:not live()['running'] and 'Launching engine profile' in live()['log'])

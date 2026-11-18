@@ -1,5 +1,5 @@
-name: Validate native export and package alpha.31
-run-name: Validate native export and package alpha.31 @ 71cc378
+name: Package alpha.31 after export and viewport acceptance
+run-name: Package alpha.31 after export and viewport acceptance @ 71cc378
 'on':
   workflow_dispatch:
     inputs:
@@ -61,7 +61,7 @@ jobs:
     - name: Select current viewport, model and entity integration checks
       id: scope
       run: |
-        echo 'plan={"schema":1,"mode":"affected","paths":[],"components":["viewport","model_ui","entities","grid","profile_core"],"reasons":{},"suites":["viewport","model_ui","entities","grid","profile_core"],"runtime":true,"smoke":true,"flags":{"audio_core":false,"browser":false,"catalog":false,"character_core":false,"character_ui":false,"compilation":true,"grid":true,"input":true,"matrix_ui":false,"model_ui":true,"plant_core":false,"plant_ui":false,"profile_core":true,"resource_lookup":true}}' >> "$GITHUB_OUTPUT"
+        echo 'plan={"schema":1,"mode":"affected","paths":[],"components":["viewport","model_ui","entities","grid","profile_core"],"reasons":{},"suites":["model_ui","entities","grid","profile_core"],"runtime":true,"smoke":true,"flags":{"audio_core":false,"browser":false,"catalog":false,"character_core":false,"character_ui":false,"compilation":true,"grid":true,"input":true,"matrix_ui":false,"model_ui":true,"plant_core":false,"plant_ui":false,"profile_core":true,"resource_lookup":true}}' >> "$GITHUB_OUTPUT"
   linux:
     runs-on: ubuntu-24.04
     strategy:
@@ -238,8 +238,9 @@ jobs:
       run: python scripts/test-character-core.py --output qa/character-core
     - name: Run affected packaged checks
       shell: bash
-      run: python scripts/ci-run-checks.py --plan ci-plan.json --runtime out/release/ReyondBroom-Linux-x64 --output qa/affected --probe
-        deps/profile-core/compilation-profile-probe --platform "$PLATFORM"
+      run: |
+        python scripts/ci-run-checks.py --plan ci-plan.json --runtime out/release/ReyondBroom-Linux-x64 --output qa/affected --probe deps/profile-core/compilation-profile-probe --platform "$PLATFORM"
+        xvfb-run -a -s '-screen 0 1920x1080x24' python scripts/test-engine-viewport.py out/release/ReyondBroom-Linux-x64 qa/export-viewport --probe deps/profile-core/compilation-profile-probe
     - name: Capture the complete native botanical catalogue and reference views
       if: matrix.platform == 'Linux-x64' && (inputs.capture_catalog || fromJSON(needs.plan.outputs.plan).flags.catalog)
       run: |
@@ -473,6 +474,8 @@ jobs:
       run: |-
         python scripts/ci-run-checks.py --plan ci-plan.json --runtime out/release/ReyondBroom-Windows-x64 --output qa/affected --probe deps/profile-core/compilation-profile-probe.exe --platform Windows-x64
         if ($LASTEXITCODE) { throw 'Affected release acceptance failed' }
+        python scripts/test-engine-viewport.py out/release/ReyondBroom-Windows-x64 qa/export-viewport --probe deps/profile-core/compilation-profile-probe.exe
+        if ($LASTEXITCODE) { throw 'Brush edge colors and engine launch acceptance failed' }
     - name: Collect compact release evidence
       if: always()
       shell: pwsh

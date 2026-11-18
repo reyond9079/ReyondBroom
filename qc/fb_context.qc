@@ -34,7 +34,11 @@ void fb_context_query(vector pixel)
             int layer=fb_nodes[hit.node].layer;
             cvar_set("ftebroom_context_layer",itos(layer>=2?fb_nodes[layer].id:0));
         }
-        if(hit.kind==FB_HIT_BRUSH && hit.face>0){static brushface_t faces[64];int faceCount=brush_get(hit.model,hit.id,faces,64,__NULL__);if(hit.face<=min(64,faceCount))cvar_set("ftebroom_context_material",faces[hit.face-1].shadername);}
+        if(hit.kind==FB_HIT_BRUSH && hit.face>0 && hit.face<=64){
+            static brushface_t faces[64];
+            int faceCount=brush_get(hit.model,hit.id,faces,64,__NULL__);
+            if(hit.face<=faceCount)cvar_set("ftebroom_context_material",faces[hit.face-1].shadername);
+        }
         if(hit.node>=0)for(int n=hit.node,steps=0;n>=2 && steps++<fb_node_count;n=fb_nodes[n].parent) {
             if(fb_nodes[n].kind==FB_NODE_GROUP && !cvar("ftebroom_context_group"))cvar_set("ftebroom_context_group",itos(fb_nodes[n].id));
             if(fb_nodes[n].kind==FB_NODE_LAYER)cvar_set("ftebroom_context_layer",itos(fb_nodes[n].id));

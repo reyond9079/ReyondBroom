@@ -2515,8 +2515,7 @@ static void textureStudioPanel() {
     }
     const auto availableHeight = ImGui::GetContentRegionAvail().y;
     const auto galleryHeight = std::clamp(availableHeight * .36f, 102 * uiScale(), 280 * uiScale());
-    const float controlsHeight = std::max(42.f, availableHeight - galleryHeight);
-    ImGui::BeginChild("Texture Studio controls", {0, controlsHeight});
+    ImGui::BeginChild("Texture Studio controls", {0, std::max(42.f, availableHeight - galleryHeight)});
     if (runUiLive) {
       const auto& clip = ImGui::GetCurrentWindowRead()->InnerClipRect;
       runUiGlobalRects["texture-studio/controls"] = {
@@ -2947,8 +2946,7 @@ static void textureStudioPanel() {
     if (!writable) ImGui::TextWrapped("This source uses a newer format. Save As preserves its original bytes.");
     const bool stacked = ImGui::GetContentRegionAvail().x < std::min(660 * uiScale(), 980.f);
     if (writable && stacked) {
-      const float height = std::min(std::clamp(ImGui::GetContentRegionAvail().x, 220 * uiScale(), 310 * uiScale()),
-        std::max(180.f, controlsHeight - ImGui::GetFrameHeight()));
+      const float height = std::clamp(ImGui::GetContentRegionAvail().x, 220 * uiScale(), 310 * uiScale());
       ImGui::BeginChild("Texture Preview", {-1, height}, ImGuiChildFlags_Borders);
       studioAction(studioPreview);
       ImGui::EndChild();

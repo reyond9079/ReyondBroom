@@ -5,6 +5,7 @@
 #include <functional>
 #include <iomanip>
 #include <map>
+#include <mutex>
 #include <random>
 #include <set>
 #include <sstream>
@@ -13,9 +14,13 @@ namespace ftebroom::bb {
 using Json = nlohmann::json;
 inline std::string uuid() {
   static std::mt19937_64 rng(std::random_device{}());
+  static std::mutex rngMutex;
   unsigned char b[16];
-  for (int i = 0; i < 16; i++)
-    b[i] = rng();
+  {
+    const std::lock_guard<std::mutex> lock(rngMutex);
+    for (auto& byte : b)
+      byte = rng();
+  }
   b[6] = (b[6] & 15) | 64;
   b[8] = (b[8] & 63) | 128;
   std::ostringstream s;

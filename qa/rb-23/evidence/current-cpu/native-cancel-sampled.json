@@ -1,0 +1,38 @@
+{
+  "cycles": 8,
+  "cancelCycles": [
+    {
+      "ackMs": 108.863511,
+      "workerIdleMs": 109.289922
+    },
+    {
+      "ackMs": 115.906019,
+      "workerIdleMs": 116.197252
+    },
+    {
+      "ackMs": 114.698233,
+      "workerIdleMs": 115.047226
+    },
+    {
+      "ackMs": 115.253764,
+      "workerIdleMs": 115.390938
+    },
+    {
+      "ackMs": 108.496447,
+      "workerIdleMs": 108.827484
+    },
+    {
+      "ackMs": 109.701877,
+      "workerIdleMs": 110.105179
+    },
+    {
+      "ackMs": 123.965191,
+      "workerIdleMs": 124.229416
+    },
+    {
+      "ackMs": 112.084553,
+      "workerIdleMs": 112.34718
+    }
+  ],
+  "closedDuringApply": true
+}

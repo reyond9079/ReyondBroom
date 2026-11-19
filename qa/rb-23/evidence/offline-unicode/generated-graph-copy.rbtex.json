@@ -1,0 +1,309 @@
+{
+  "animation": {
+    "fps": 10,
+    "frames": 1,
+    "loop": true
+  },
+  "assetReferences": [],
+  "colorManagement": {
+    "display": "srgb",
+    "working": "linear-srgb"
+  },
+  "documentId": "07e48cce-3ad0-4194-99fc-447ff013d46b",
+  "exportProfiles": [],
+  "exposedParameters": [
+    {
+      "key": "columns",
+      "label": "Columns",
+      "max": 32.0,
+      "min": 1.0,
+      "node": "bond",
+      "step": 1
+    },
+    {
+      "key": "rows",
+      "label": "Rows",
+      "max": 32.0,
+      "min": 2.0,
+      "node": "bond",
+      "step": 2
+    },
+    {
+      "key": "mortar",
+      "label": "Mortar width",
+      "max": 0.4000000059604645,
+      "min": 0.009999999776482582,
+      "node": "bond",
+      "step": 0
+    },
+    {
+      "key": "bevel",
+      "label": "Edge bevel",
+      "max": 0.4000000059604645,
+      "min": 0.009999999776482582,
+      "node": "bond",
+      "step": 0
+    },
+    {
+      "key": "wear",
+      "label": "Surface wear",
+      "max": 0.699999988079071,
+      "min": 0.0,
+      "node": "bond",
+      "step": 0
+    },
+    {
+      "key": "period",
+      "label": "Detail scale",
+      "max": 128.0,
+      "min": 1.0,
+      "node": "wear",
+      "step": 1
+    },
+    {
+      "key": "strength",
+      "label": "Bump strength",
+      "max": 8.0,
+      "min": 0.0,
+      "node": "normal",
+      "step": 0
+    }
+  ],
+  "generatorVersion": "1.0.0",
+  "graph": {
+    "edges": [
+      {
+        "fromNode": "wear",
+        "fromPort": "value",
+        "toNode": "bond",
+        "toPort": "variation"
+      },
+      {
+        "fromNode": "bond",
+        "fromPort": "value",
+        "toNode": "clay",
+        "toPort": "value"
+      },
+      {
+        "fromNode": "bond",
+        "fromPort": "value",
+        "toNode": "normal",
+        "toPort": "height"
+      },
+      {
+        "fromNode": "bond",
+        "fromPort": "value",
+        "toNode": "ao",
+        "toPort": "height"
+      },
+      {
+        "fromNode": "wear",
+        "fromPort": "value",
+        "toNode": "rough",
+        "toPort": "value"
+      },
+      {
+        "fromNode": "bond",
+        "fromPort": "value",
+        "toNode": "soot",
+        "toPort": "a"
+      },
+      {
+        "fromNode": "wear",
+        "fromPort": "value",
+        "toNode": "soot",
+        "toPort": "b"
+      },
+      {
+        "fromNode": "clay",
+        "fromPort": "color",
+        "toNode": "diffuse",
+        "toPort": "base"
+      },
+      {
+        "fromNode": "rough",
+        "fromPort": "color",
+        "toNode": "diffuse",
+        "toPort": "top"
+      },
+      {
+        "fromNode": "soot",
+        "fromPort": "value",
+        "toNode": "diffuse",
+        "toPort": "mask"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "wear",
+        "parameters": {
+          "contrast": 1.25,
+          "period": 36
+        },
+        "position": [
+          12,
+          12
+        ],
+        "type": "ValueNoise",
+        "version": 1
+      },
+      {
+        "id": "bond",
+        "parameters": {
+          "bevel": 0.06,
+          "columns": 4,
+          "mortar": 0.1,
+          "rows": 8,
+          "wear": 0.28
+        },
+        "position": [
+          242,
+          12
+        ],
+        "type": "Bricks",
+        "version": 1
+      },
+      {
+        "id": "clay",
+        "parameters": {
+          "high": [
+            0.48,
+            0.12,
+            0.065,
+            1
+          ],
+          "low": [
+            0.091,
+            0.081,
+            0.063,
+            1
+          ]
+        },
+        "position": [
+          472,
+          12
+        ],
+        "type": "ColorRamp",
+        "version": 1
+      },
+      {
+        "id": "normal",
+        "parameters": {
+          "invertY": false,
+          "strength": 2.8
+        },
+        "position": [
+          472,
+          137
+        ],
+        "type": "HeightToNormal",
+        "version": 1
+      },
+      {
+        "id": "ao",
+        "parameters": {
+          "strength": 2.5
+        },
+        "position": [
+          472,
+          262
+        ],
+        "type": "HeightToAO",
+        "version": 1
+      },
+      {
+        "id": "rough",
+        "parameters": {
+          "high": [
+            0.55,
+            0.48,
+            0.39,
+            1
+          ],
+          "low": [
+            0.29,
+            0.27,
+            0.23,
+            1
+          ]
+        },
+        "position": [
+          242,
+          137
+        ],
+        "type": "ColorRamp",
+        "version": 1
+      },
+      {
+        "id": "soot",
+        "parameters": {},
+        "position": [
+          242,
+          262
+        ],
+        "type": "Multiply",
+        "version": 1
+      },
+      {
+        "id": "diffuse",
+        "parameters": {
+          "opacity": 0.23
+        },
+        "position": [
+          702,
+          12
+        ],
+        "type": "Blend",
+        "version": 1
+      },
+      {
+        "id": "roughness",
+        "parameters": {
+          "value": 0.76
+        },
+        "position": [
+          702,
+          387
+        ],
+        "type": "Constant",
+        "version": 1
+      }
+    ]
+  },
+  "layerBindings": [],
+  "name": "Running Brick",
+  "outputs": {
+    "ao": {
+      "node": "ao",
+      "port": "value"
+    },
+    "baseColor": {
+      "node": "diffuse",
+      "port": "color"
+    },
+    "height": {
+      "node": "bond",
+      "port": "value"
+    },
+    "normal": {
+      "node": "normal",
+      "port": "normal"
+    },
+    "roughness": {
+      "node": "roughness",
+      "port": "value"
+    }
+  },
+  "provenance": {
+    "assets": [],
+    "author": "ReyondBroom",
+    "license": "GPL-3.0-or-later",
+    "preset": "masonry-running-brick"
+  },
+  "resolution": {
+    "height": 256,
+    "width": 256
+  },
+  "rootSeed": 24058,
+  "schemaVersion": 1
+}

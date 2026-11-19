@@ -1,0 +1,67 @@
+.............RUN fixture: tests/make-linux-build-fixture.py
+RUN character_ui: scripts/test-character-placement.py
+RUN character_ui: scripts/test-character-placement.py
+.RUN fixture: tests/make-linux-build-fixture.py
+.RUN fixture: tests/make-linux-build-fixture.py
+RUN compilation: scripts/test-compilation-runtime.py
+RUN compilation: scripts/test-engine-cleanup.py
+RUN compilation: scripts/test-compilation-paths.py
+RUN compilation: scripts/test-mod-profile-lighting.py
+RUN compilation_ui: scripts/test-compilation-ui.py
+.RUN fixture: tests/make-linux-build-fixture.py
+RUN compilation: scripts/test-compilation-runtime.py
+RUN compilation: scripts/test-engine-cleanup.py
+RUN compilation: scripts/test-compilation-paths.py
+RUN compilation: scripts/test-mod-profile-lighting.py
+RUN compilation_ui: scripts/test-compilation-ui.py
+.RUN fixture: tests/make-linux-build-fixture.py
+RUN world_legacy: scripts/test-world-legacy.py
+RUN world_legacy: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-modules.py
+RUN world_ui: scripts/test-world-gates.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-applied.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-gates.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN placement: scripts/test-viewport-create.py
+RUN fixture: tests/make-linux-build-fixture.py
+RUN world_legacy: scripts/test-world-legacy.py
+RUN world_legacy: scripts/test-world-architect-ui.py
+RUN world_core: scripts/test-world-architect.py
+RUN world_core: scripts/test-world-designer.py
+RUN world_core: scripts/test-world-modules.py
+RUN world_core: scripts/test-world-gates.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-applied.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN world_ui: scripts/test-world-gates.py
+RUN world_ui: scripts/test-world-architect-ui.py
+RUN placement: scripts/test-viewport-create.py
+............................
+----------------------------------------------------------------------
+Ran 45 tests in 3.599s
+
+OK

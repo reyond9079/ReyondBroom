@@ -1,0 +1,3 @@
+PASS Generate Asset creates the game texture without changing the map
+PASS halflife Apply, save, Undo and Redo update three selected faces and preserve all 42 face projections
+PASS Edit Texture Studio source opens the map material's graph and preserves the original

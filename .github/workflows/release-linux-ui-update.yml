@@ -124,7 +124,7 @@ jobs:
             ubuntu_sources=/etc/apt/sources.list.d/ubuntu.sources
             original_sources="$RUNNER_TEMP/ubuntu.sources"
             if test -f "$ubuntu_sources"; then cp "$ubuntu_sources" "$original_sources"; fi
-            for mirror in https://mirrors.edge.kernel.org/ubuntu https://archive.ubuntu.com/ubuntu https://azure.archive.ubuntu.com/ubuntu; do
+            for mirror in https://mirrors.edge.kernel.org/ubuntu https://mirrors.mit.edu/ubuntu https://archive.ubuntu.com/ubuntu https://azure.archive.ubuntu.com/ubuntu; do
               if ! curl --silent --show-error --fail --location --connect-timeout 6 --max-time 12 --output /dev/null "$mirror/dists/noble/InRelease"; then
                 continue
               fi

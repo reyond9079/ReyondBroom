@@ -10,6 +10,8 @@ root=a.runtime.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=
 for name in ['wa-before','wa-generated','wa-applied','wa-undone','wa-redone']:(data/'maps'/(name+'.map')).unlink(missing_ok=True)
 registry=data/'world-architect/registry.json'
 if a.menu_only:
+ placement_live = data/'placement-ui-live.json'
+ placement_live.unlink(missing_ok=True)
  registry_bytes=registry.read_bytes()
  registry.unlink()
 (data/'world-qa.cfg').write_text('exec qa-clip.cfg\nset ftebroom_placement_qa 1\n'+('set ftebroom_world_menu_qa 1\n' if a.menu_only else 'in 12 ftebroom_world_architect qa\n'))
@@ -83,7 +85,11 @@ def verify_paint(existing):
  click('undo-settings');wait(lambda:len(live()['settings']['influences'])==existing);check(True,'painted volumes participate in settings Undo')
 try:
  if a.menu_only:
+  # qa-clip.cfg opens its fixture after the menu is first drawn. Opening
+  # Plugins in that interval races the document switch and closes it.
+  wait(lambda:Path(read_ui_json(placement_live)['mapPath']).name=='qa_clip.map')
   wait(lambda:'menu/Plugins' in live()['globalWidgets']);ui.position()
+  ui.settle()
   if os.name!='nt':ui.window.set_input_focus(ui.X.RevertToParent,ui.X.CurrentTime);ui.d.sync()
   click('menu/Plugins','globalWidgets');click('Menu/Plugins/World Architect...','globalWidgets')
   missing=wait(lambda:live() if live()['open'] and 'reload-registry' in live()['widgets'] else None)

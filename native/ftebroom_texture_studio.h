@@ -2130,6 +2130,11 @@ static void studioNodes() {
     ImGui::TextUnformatted(type.c_str());
     ImGui::InputTextMultiline("##node-parameters", parameters.data(), parameters.size(), {440 * uiScale(), 180 * uiScale()});
     runUiRecordGlobal("texture-studio/graph/parameter-input");
+    if (runUiLive) {
+      auto& field = runUiGlobalRects["texture-studio/graph/parameter-input"];
+      field["active"] = ImGui::IsItemActive();
+      field["value"] = parameters.data();
+    }
     const bool attempted = ImGui::Button("Apply");
     runUiRecordGlobal("texture-studio/graph/parameters-apply");
     if (attempted) {

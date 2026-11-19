@@ -983,9 +983,13 @@ def main():
                     ui.key("tab")
                 else:
                     raise AssertionError("Could not focus the node parameter input with Tab")
-                ui.key("enter")
+                if not live()["globalWidgets"][parameter_key].get("active"):
+                    ui.key("enter")
+                wait(lambda: live()["globalWidgets"][parameter_key].get("active"))
+                invalid_parameters = '{"value": 2}'
                 ui.key("a", ("ctrl",))
-                ui.text('{"value": 2}')
+                ui.text(invalid_parameters, paste=True)
+                wait(lambda: live()["globalWidgets"][parameter_key].get("value") == invalid_parameters)
                 graph_action("parameters-apply")
                 wait(lambda: "outside its supported range" in live()["globalWidgets"][
                     "texture-studio/render-state"]["error"])

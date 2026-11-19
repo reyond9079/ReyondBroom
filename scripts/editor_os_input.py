@@ -253,8 +253,8 @@ class NativeInput:
   time.sleep(.15)
   self.settle()
 
- def text(self,text):
-  if any(ord(c)>127 for c in text) or (os.name=='nt' and len(text)>20):
+ def text(self,text,*,paste=False):
+  if paste or any(ord(c)>127 for c in text) or (os.name=='nt' and len(text)>20):
    # Clipboard paste is real OS input and preserves UTF-8 paths that cannot be
    # represented by the active keyboard layout. Long Windows paths/commands
    # also paste through the OS; short ASCII probes still use key events.

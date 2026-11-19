@@ -512,6 +512,10 @@ class WorkflowTests(unittest.TestCase):
         jobs = workflow['jobs']
         self.assertEqual(workflow['permissions']['contents'], 'read')
         self.assertEqual(source.count('gh release upload'), 1)
+        for platform in ('linux', 'windows'):
+            editor = next(step for step in jobs[platform]['steps']
+                          if step.get('name') == 'Verify Texture Studio in the packaged editor')
+            self.assertIn("github.ref == 'refs/heads/main'", editor['if'])
         verify = jobs['verify-rb23-release']
         self.assertEqual(verify['permissions'], {'contents': 'read', 'actions': 'read'})
         self.assertIn('refs/heads/main', verify['steps'][1]['run'])

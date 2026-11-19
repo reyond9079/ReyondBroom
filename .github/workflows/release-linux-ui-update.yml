@@ -269,7 +269,7 @@ jobs:
     - name: Install OS input probes
       run: python -m pip install python-xlib Pillow
     - name: Verify Texture Studio in the packaged editor
-      if: inputs.validation_mode == 'full'
+      if: inputs.validation_mode == 'full' || github.ref == 'refs/heads/main'
       shell: bash
       run: |
         set -euo pipefail
@@ -535,11 +535,11 @@ jobs:
         python scripts/ci-release-smoke.py out/release --platform Windows-x64 --version $env:VERSION --output qa/smoke --require-jam
         if ($LASTEXITCODE) { throw 'Packaged smoke failed' }
     - name: Build the Texture Studio decoder timeout fixture
-      if: inputs.validation_mode == 'full'
+      if: inputs.validation_mode == 'full' || github.ref == 'refs/heads/main'
       shell: msys2 {0}
       run: g++ -std=c++17 -pthread -static tests/fixtures/texture-studio/stalled-decoder.cpp -o deps/stalled-decoder.exe
     - name: Verify Texture Studio in the packaged editor
-      if: inputs.validation_mode == 'full'
+      if: inputs.validation_mode == 'full' || github.ref == 'refs/heads/main'
       shell: pwsh
       run: |
         $runtime = "out/release/ReyondBroom-Windows-x64"

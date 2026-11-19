@@ -466,19 +466,22 @@ static void studioInstall() {
   const auto& image = *s.result->image.outputs.at("baseColor");
   const auto source = graph.save();
   const auto digest = ftebroom::jam::sha256(source);
-  const bool quake1 = s.profile == 2, quake2 = s.profile == 3, goldsrc = s.profile == 4;
+  const bool quake3 = s.profile == 0, quake1 = s.profile == 2, quake2 = s.profile == 3, goldsrc = s.profile == 4;
   const bool wad = quake1 || goldsrc;
   std::string palette;
   if (quake1) palette = q1Palette();
   if (quake2) palette = q2Palette();
   if (goldsrc) palette = studioGoldSrcPalette();
   const auto paletteHash = palette.empty() ? std::string{} : ftebroom::sha256(palette);
-  const auto hash = ftebroom::sha256(digest + "/frame/" + std::to_string(s.frame) + "/palette/" + paletteHash);
+  // An earlier editor may have installed an upper-left TGA at the old name.
+  const auto encoding = quake3 ? "/tga/lower-left" : "";
+  const auto hash = ftebroom::sha256(digest + "/frame/" + std::to_string(s.frame) + "/palette/" + paletteHash + encoding);
   const auto id = wad ? "rb_" + hash.substr(0, 12) : hash.substr(0, quake2 ? 16 : 20);
   const auto name = wad ? id : "reyond-studio/" + id;
   const auto format = quake1 ? rbTexture::IndexedFormat::wad2 :
     goldsrc ? rbTexture::IndexedFormat::wad3 : rbTexture::IndexedFormat::wal;
-  const auto imageBytes = palette.empty() ? rbTexture::tga(image) : rbTexture::indexed(image, name, palette, format);
+  const auto origin = quake3 ? rbTexture::TgaOrigin::lowerLeft : rbTexture::TgaOrigin::upperLeft;
+  const auto imageBytes = palette.empty() ? rbTexture::tga(image, origin) : rbTexture::indexed(image, name, palette, format);
   s.material = "textures/" + name;
   const auto root = std::filesystem::canonical(s.destination);
   const std::filesystem::path relative = wad ? "texture-wads" : "textures/reyond-studio";
@@ -1069,7 +1072,7 @@ static std::string studioExportBytes(const rbTexture::Evaluation& image, StudioE
   rbTexture::require(rbTexture::indexedName(name, false, false), "name", "Use a portable name of up to 15 characters.");
   const auto files = format == F::fte ? rbTexture::fteWallMaterial(image, "reyond-studio/" + name)
     : std::map<std::string, std::string>{{"textures/reyond-studio/" + name + ".tga",
-        rbTexture::tga(*image.outputs.at("baseColor"))}};
+        rbTexture::tga(*image.outputs.at("baseColor"), rbTexture::TgaOrigin::lowerLeft)}};
   std::map<std::string, std::string_view> members;
   for (const auto& [path, contents] : files) members.emplace(path, contents);
   std::ostringstream archive(std::ios::binary | std::ios::out);

@@ -187,7 +187,9 @@ inline std::string combineAnimationWads(const std::vector<std::string>& frames, 
   return quake1::mipWad(lumps, format == IndexedFormat::wad3);
 }
 
-inline std::string tga(const Image& image) {
+enum class TgaOrigin { upperLeft, lowerLeft };
+
+inline std::string tga(const Image& image, TgaOrigin origin = TgaOrigin::upperLeft) {
   const unsigned width = image.size.width, height = image.size.height;
   require(width > 0 && width <= maxDimension && height > 0 && height <= maxDimension &&
     image.pixels.size() == size_t(width) * height, "tga", "Invalid image dimensions.");
@@ -196,11 +198,16 @@ inline std::string tga(const Image& image) {
   bytes[2] = 2;
   bytes[12] = char(width); bytes[13] = char(width >> 8);
   bytes[14] = char(height); bytes[15] = char(height >> 8);
-  bytes[16] = 32; bytes[17] = 0x28;
+  const bool lowerLeft = origin == TgaOrigin::lowerLeft;
+  bytes[16] = 32; bytes[17] = lowerLeft ? 0x08 : 0x28;
   bytes.reserve(18 + pixels.size());
-  for (size_t i = 0; i < pixels.size(); i += 4) {
-    bytes += char(pixels[i + 2]); bytes += char(pixels[i + 1]);
-    bytes += char(pixels[i]); bytes += char(pixels[i + 3]);
+  const size_t stride = size_t(width) * 4;
+  for (unsigned row = 0; row < height; ++row) {
+    const size_t start = (lowerLeft ? height - 1 - row : row) * stride;
+    for (size_t i = start; i < start + stride; i += 4) {
+      bytes += char(pixels[i + 2]); bytes += char(pixels[i + 1]);
+      bytes += char(pixels[i]); bytes += char(pixels[i + 3]);
+    }
   }
   return bytes;
 }

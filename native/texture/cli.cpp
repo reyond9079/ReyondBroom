@@ -325,7 +325,8 @@ void exportSequence(const Options& args, const ts::Document& doc, const ts::Plan
       ts::require(std::all_of(color.pixels.begin(), color.pixels.end(), [](const auto& p) { return p[3] == 1; }),
         "alpha", "This animation profile requires opaque Base Color.");
       stages += " " + relative;
-      files.emplace(relative, ts::tga(color));
+      const auto origin = args.profile == "q3-baseline" ? ts::TgaOrigin::lowerLeft : ts::TgaOrigin::upperLeft;
+      files.emplace(relative, ts::tga(color, origin));
     } else if (q2) {
       files.emplace(texturePath(name, ".wal"), ts::indexed(color, name, palette, ts::IndexedFormat::wal,
         false, suffix((frame + 1) % frames)));
@@ -530,7 +531,8 @@ int main(int argc, char** argv) try {
         files = ts::fteWallMaterial(result, args.name);
       } else if (args.profile == "q3-baseline" || args.profile == "fte-diffuse") {
         const auto name = texturePath(args.name, args.jpegQuality ? ".jpg" : ".tga");
-        auto bytes = args.jpegQuality ? ts::jpeg(base, args.jpegQuality) : ts::tga(base);
+        const auto origin = args.profile == "q3-baseline" ? ts::TgaOrigin::lowerLeft : ts::TgaOrigin::upperLeft;
+        auto bytes = args.jpegQuality ? ts::jpeg(base, args.jpegQuality) : ts::tga(base, origin);
         if (args.pk3) {
           std::ostringstream archive(std::ios::binary | std::ios::out);
           ftebroom::pak::zipStore(archive, {{name, bytes}});

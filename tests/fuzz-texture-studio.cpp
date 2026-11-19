@@ -34,8 +34,8 @@ int main(int argc, char** argv) try {
   }
   else if (mode == "zip") seedFiles.push_back(ts::pack(brick, {}));
   else {
-    seedFiles = {ts::png(*image), ts::tga(*image)};
-    references = {ts::Json::object(), ts::Json::object()};
+    seedFiles = {ts::png(*image), ts::tga(*image), ts::tga(*image, ts::TgaOrigin::lowerLeft)};
+    references.resize(seedFiles.size(), ts::Json::object());
     for (const auto& [format, encoding] : std::vector<std::pair<ts::IndexedFormat, std::string>>{
       {ts::IndexedFormat::wad2, "wad2"}, {ts::IndexedFormat::wad3, "wad3"}, {ts::IndexedFormat::wal, "wal"}}) {
       seedFiles.push_back(ts::indexed(*image, "probe", palette, format));

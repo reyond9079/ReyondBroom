@@ -74,7 +74,9 @@ def main():
     width = 128
     assert len(rgba) == 128 * (1 + 4 * width)
     tga = (root / "brick.tga").read_bytes()
+    quake3_tga = (root / "brick-quake3.tga").read_bytes()
     assert tga[2] == 2 and tga[16:18] == bytes((32, 40))
+    assert quake3_tga[:17] == tga[:17] and quake3_tga[17] == 8
     assert struct.unpack_from("<2H", tga, 12) == (128, 128)
     for y in range(128):
         start = y * (1 + width * 4)
@@ -83,6 +85,8 @@ def main():
             r, g, b, a = rgba[start + 1 + x * 4:start + 5 + x * 4]
             pos = 18 + (y * width + x) * 4
             assert tga[pos:pos + 4] == bytes((b, g, r, a)) and a == 255
+            legacy_pos = 18 + ((127 - y) * width + x) * 4
+            assert quake3_tga[legacy_pos:legacy_pos + 4] == bytes((b, g, r, a))
     height_header, height_chunks, height_data = png_payload(root / "height16.png")
     assert height_header == (128, 128, 16, 0, 0, 0, 0) and b"sRGB" not in height_chunks
     assert len(height_data) == 128 * (1 + 2 * width)
@@ -93,7 +97,7 @@ def main():
     wal(root / "brick.wal")
     print("PASS independent PNG, TGA, WAD2, WAD3 and WAL validation")
     if options.compare:
-        for name in ("brick.png", "normal.png", "height16.png", "brick.tga", "brick.wad2", "brick.wad3", "brick.wal"):
+        for name in ("brick.png", "normal.png", "height16.png", "brick.tga", "brick-quake3.tga", "brick.wad2", "brick.wad3", "brick.wal"):
             digest = hashlib.sha256((root / name).read_bytes()).hexdigest()
             assert hashlib.sha256((options.compare / name).read_bytes()).hexdigest() == digest, name
             print(f"PASS identical reference fixture {name} {digest}")

@@ -335,6 +335,8 @@ def main():
                 assert struct.unpack_from("<II", content, 28) == (256, 256)
             elif profile == 3:
                 assert struct.unpack_from("<II", runtime_texture.read_bytes(), 32) == (256, 256)
+            elif profile == 0:
+                assert runtime_texture.read_bytes()[17] == 8
 
             def expected_textures(rows, applied):
                 if len(rows) < 3:

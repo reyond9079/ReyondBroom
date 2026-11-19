@@ -153,7 +153,12 @@ def run(executable, root):
     assert export("q3-baseline", "q3", "custom/mortar")[0] == 0
     assert export("fte-diffuse", "fte", "custom/mortar")[0] == 0
     loose = (root / "q3" / texture_path).read_bytes()
-    assert loose == (root / "fte" / texture_path).read_bytes()
+    fte_tga = (root / "fte" / texture_path).read_bytes()
+    assert loose[:17] == fte_tga[:17] and loose[17] == 8 and fte_tga[17] == 40
+    width, height = struct.unpack_from("<HH", loose, 12)
+    stride = width * 4
+    assert loose[18:] == b"".join(fte_tga[18 + row*stride:18 + (row+1)*stride]
+                                  for row in reversed(range(height)))
     tga_header = bytearray(18)
     tga_header[2], tga_header[12], tga_header[14], tga_header[16] = 10, 2, 1, 32
     run = tga_header + bytes((0x81, 1, 2, 3, 255))
@@ -201,8 +206,8 @@ def run(executable, root):
     assert all(f"{field} textures/custom/mortar{suffix}.tga" in shader for field, suffix in (
         ("diffusemap", ""), ("normalmap", "_norm"), ("fullbrightmap", "_luma")
     ))
-    assert (rich / "textures/custom/mortar_luma.tga").read_bytes() == loose
-    assert (rich / "textures/custom/mortar_norm.tga").read_bytes() != loose
+    assert (rich / "textures/custom/mortar_luma.tga").read_bytes() == fte_tga
+    assert (rich / "textures/custom/mortar_norm.tga").read_bytes() != fte_tga
     assert export("q3-baseline", "invalid-workers", "custom/mortar", "--threads", 17)[0] != 0
     assert export("q3-baseline", "q3", "custom/mortar")[0] != 0
     assert (root / "q3" / texture_path).read_bytes() == loose
@@ -362,7 +367,8 @@ def run(executable, root):
                 script_name = actual["manifest"]["shaderListEntry"]
                 shader = runtime.read(f"scripts/{script_name}.shader").decode("ascii")
                 assert f"animMap {fps} " in shader
-                assert all(runtime.getinfo(f"textures/{name}_{i}.tga") for i in range(frame_count))
+                origin = 8 if profile == "q3-baseline" else 40
+                assert all(runtime.read(f"textures/{name}_{i}.tga")[17] == origin for i in range(frame_count))
                 assert runtime.read(f"textures/{name}_0.tga") != runtime.read(f"textures/{name}_1.tga")
 
     corpus = set()

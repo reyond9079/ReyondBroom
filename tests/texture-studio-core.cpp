@@ -645,6 +645,7 @@ int main(int argc, char** argv) try {
   }
   const auto& albedo = *a.outputs.at("baseColor");
   write(path / "brick.tga", tga(albedo));
+  write(path / "brick-quake3.tga", tga(albedo, TgaOrigin::lowerLeft));
   write(path / "brick.wad2", indexed(albedo, "brick", palette, IndexedFormat::wad2));
   write(path / "brick.wal", indexed(albedo, "studio/brick", palette, IndexedFormat::wal));
   auto white = albedo;

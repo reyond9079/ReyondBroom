@@ -393,7 +393,7 @@ class RunnerTests(unittest.TestCase):
 
 
 class PackageGateTests(unittest.TestCase):
-    def fixture(self, root, platform, source_splash=b'splash'):
+    def fixture(self, root, platform, source_splash=b'splash', studio=False, different_studio_inventory=False):
         version = 'ci-test'; windows = platform == 'Windows-x64'
         root_name = 'ReyondBroom-'+('Windows-x64' if windows else 'Linux-x64')
         revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
@@ -401,6 +401,17 @@ class PackageGateTests(unittest.TestCase):
         files = {'ftebroom/csaddon.dat': b'qc', 'ftebroom/ui/update-splash.png': b'splash', 'build-info.txt': info.encode(),
                  'bin/fteqw64.exe' if windows else 'fteqw-gl64': b'engine',
                  'fteplug_ftebroom_x64.dll' if windows else 'fteplug_ftebroom_amd64.so': b'plugin'}
+        if studio:
+            files['tools/texture-studio.exe' if windows else 'tools/texture-studio'] = b'editor cli'
+            common = {'version': '1', 'licenses': [{'license': {'id': 'MIT'}}],
+                      'externalReferences': [{'type': 'vcs', 'url': 'https://example.invalid'}],
+                      'hashes': [{'alg': 'SHA-256', 'content': hashlib.sha256(b'header fixture').hexdigest()}]}
+            inventory = {'metadata': {'component': {'version': version}, 'properties': [
+                {'name': 'reyondbroom:sourceRevision', 'value': revision},
+                {'name': 'reyondbroom:platform', 'value': platform},
+            ]}, 'components': [dict(common, name=name) for name in
+                               ('nlohmann/json', 'stb_image', 'stb_image_write', 'zlib')]}
+            files['texture-studio-sbom.json'] = json.dumps(inventory).encode()
         worker = 'tools/mapping-jams/prepare-resources'
         if not windows:
             files[worker] = b'worker'
@@ -427,9 +438,27 @@ class PackageGateTests(unittest.TestCase):
             for name in ('sources/fteqw-source.zip', 'sources/bullet-source.zip', 'sources/imgui-source.zip', 'sources/ftebroom/native/ftebroom.cpp'):
                 z.writestr(name, 'fixture')
             z.writestr('sources/ftebroom/runtime/ui/update-splash.png',source_splash)
+            if studio:
+                inventory_bytes = files['texture-studio-sbom.json']
+                if different_studio_inventory:
+                    inventory_bytes += b'\n'
+                z.writestr('texture-studio-sbom.json', inventory_bytes)
+                for header in ('json.hpp', 'stb_image.h', 'stb_image_write.h'):
+                    z.writestr('sources/ftebroom/native/third_party/' + header, b'header fixture')
         for p in (archive, source):
             p.with_name(p.name+'.sha256').write_text(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n')
         return version, archive
+
+    def test_texture_studio_inventory_matches_runtime_and_sources(self):
+        for different in (False, True):
+            with self.subTest(different=different), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder)
+                version, _ = self.fixture(path, 'Linux-x64', studio=True, different_studio_inventory=different)
+                if different:
+                    with self.assertRaisesRegex(AssertionError, 'inventory differs'):
+                        smoke.verify(path, 'Linux-x64', version)
+                else:
+                    smoke.verify(path, 'Linux-x64', version)
 
     def test_different_packaged_and_source_splash_is_rejected(self):
         for platform in ('Linux-x64','Linux-SDL2-x64','Windows-x64'):
@@ -495,10 +524,16 @@ class WorkflowTests(unittest.TestCase):
                          {'${{ env.CANDIDATE_RUN }}', '${{ inputs.rb23_evidence_run_id }}'})
         self.assertEqual([step['name'] for step in downloads if 'name' in step], ['rb23-release-evidence'])
         commands = [step['run'] for step in upload['steps'] if 'run' in step]
-        self.assertIn('test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"', commands[-2])
-        self.assertIn('test "$GITHUB_REF" = refs/heads/main', commands[-2])
-        self.assertIn('check-texture-studio-release.py', commands[-2])
-        self.assertIn('--publication-authorized', commands[-2])
+        self.assertIn('test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"', commands[-3])
+        self.assertIn('test "$GITHUB_REF" = refs/heads/main', commands[-3])
+        self.assertIn('check-texture-studio-release.py', commands[-3])
+        self.assertIn('--publication-authorized', commands[-3])
+        self.assertNotIn('RELEASE_TAG_KEY', upload['env'])
+        self.assertEqual(upload['steps'][-2]['env'],
+                         {'RELEASE_TAG_KEY': '${{ secrets.RB23_RELEASE_TAG_KEY }}'})
+        self.assertIn('StrictHostKeyChecking=yes', commands[-2])
+        self.assertIn('git push "git@github.com:$GITHUB_REPOSITORY.git" "$GITHUB_SHA:$ref"', commands[-2])
+        self.assertIn('--verify-tag', commands[-1])
         self.assertIn('.targetCommitish == $sha', commands[-1])
         self.assertIn('gh release upload', commands[-1])
         self.assertGreater(commands[-1].index('gh release edit'), commands[-1].index('gh release upload'))

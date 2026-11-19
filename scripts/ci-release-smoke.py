@@ -22,6 +22,8 @@ def verify(release, platform, version):
     prefix = 'ReyondBroom-'+version+'-'+platform
     runtime = release/(prefix+('.zip' if windows else '.tar.gz'))
     source = release/(prefix+'-Sources.zip')
+    studio_cli = 'tools/texture-studio.exe' if windows else 'tools/texture-studio'
+    studio_sbom = 'texture-studio-sbom.json'
     for path in (runtime, source):
         expected = path.with_name(path.name+'.sha256').read_text().strip()
         with path.open('rb') as f:
@@ -34,7 +36,7 @@ def verify(release, platform, version):
         assert path.parts[0] == root_name
         name = '/'.join(path.parts[1:])
         assert name and name not in hashes, 'Duplicate runtime entry'
-        if name in ('distribution-manifest.json', 'build-info.txt'):
+        if name in ('distribution-manifest.json', 'build-info.txt', studio_sbom):
             body = stream.read(); kept[name] = body
             hashes[name] = hashlib.sha256(body).hexdigest()
         else:
@@ -74,6 +76,25 @@ def verify(release, platform, version):
             assert name in z.namelist(), 'Missing corresponding source: '+name
         with z.open('sources/ftebroom/runtime/ui/update-splash.png') as stream:
             assert digest(stream)==manifest['ftebroom/ui/update-splash.png'], 'Splash artwork differs from corresponding source'
+        if studio_cli in manifest:
+            assert studio_sbom in kept, 'Texture Studio dependency inventory is missing'
+            assert z.read(studio_sbom) == kept[studio_sbom], 'Texture Studio inventory differs from the source archive'
+            inventory = json.loads(kept[studio_sbom])
+            assert inventory['metadata']['component']['version'] == version
+            metadata = {item['name']: item['value'] for item in inventory['metadata']['properties']}
+            assert metadata['reyondbroom:sourceRevision'] == revision and metadata['reyondbroom:platform'] == platform
+            components = {component['name']: component for component in inventory['components']}
+            headers = {'nlohmann/json': 'json.hpp', 'stb_image': 'stb_image.h',
+                       'stb_image_write': 'stb_image_write.h'}
+            assert components.keys() == headers.keys() | {'zlib'}, 'Unexpected Texture Studio dependencies'
+            for name, component in components.items():
+                assert component['version'] and component['licenses'] and component['externalReferences']
+                checksum, = component['hashes']
+                assert checksum['alg'] == 'SHA-256' and re.fullmatch('[a-f0-9]{64}', checksum['content'])
+                if name in headers:
+                    with z.open('sources/ftebroom/native/third_party/' + headers[name]) as stream:
+                        assert digest(stream) == checksum['content'], name + ' header differs from the inventory'
+            names.append(studio_sbom)
     return release/root_name, {'platform': platform, 'version': version, 'revision': revision,
                                'manifest_files': len(manifest), 'components': {n:manifest[n] for n in names}}
 

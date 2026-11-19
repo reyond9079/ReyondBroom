@@ -671,12 +671,33 @@ jobs:
         python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-evidence" \
           --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . --publish --publication-authorized \
           --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
+    - name: Create the verified release tag
+      shell: bash
+      env:
+        RELEASE_TAG_KEY: ${{ secrets.RB23_RELEASE_TAG_KEY }}
+      run: |
+        ref="refs/tags/v$VERSION"
+        existing="$(git ls-remote --refs "https://github.com/$GITHUB_REPOSITORY.git" "$ref" | cut -f1)"
+        if [[ -n "$existing" ]]; then
+          test "$existing" = "$GITHUB_SHA"
+          exit
+        fi
+        test -n "$RELEASE_TAG_KEY"
+        umask 077
+        signing_dir="$(mktemp -d)"
+        trap 'rm -f "$signing_dir/key" "$signing_dir/known_hosts"; rmdir "$signing_dir"' EXIT
+        printf '%s\n' "$RELEASE_TAG_KEY" > "$signing_dir/key"
+        unset RELEASE_TAG_KEY
+        gh api meta --jq '.ssh_keys[] | select(startswith("ssh-ed25519 ")) | "github.com "+.' > "$signing_dir/known_hosts"
+        test -s "$signing_dir/known_hosts"
+        GIT_SSH_COMMAND="ssh -i '$signing_dir/key' -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile='$signing_dir/known_hosts'" \
+          git push "git@github.com:$GITHUB_REPOSITORY.git" "$GITHUB_SHA:$ref"
     - name: Publish the verified prerelease
       shell: bash
       run: |
         tag="v$VERSION"
         if ! gh release view "$tag" --json isDraft,targetCommitish > "$RUNNER_TEMP/rb23-release.json"; then
-          gh release create "$tag" --target "$GITHUB_SHA" --title "ReyondBroom $VERSION" \
+          gh release create "$tag" --verify-tag --target "$GITHUB_SHA" --title "ReyondBroom $VERSION" \
             --draft --prerelease --generate-notes
         fi
         gh release view "v$VERSION" --json isDraft,targetCommitish |

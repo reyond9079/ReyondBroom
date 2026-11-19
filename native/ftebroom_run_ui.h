@@ -30,7 +30,12 @@ static void runUiConsumeEnter(){auto& g=*ImGui::GetCurrentContext();g.NavActivat
 static bool runUiSave(){return runSaveProfiles();}
 static void runUiHint(const char* text){if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))ImGui::SetTooltip("%s",text);}
 static void runUiRecord(const std::string& key){auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiRects[(key.rfind("##",0)==0?runUiRecordPrefix+key.substr(2):key)]={{"x",p.x-runUiOrigin.x},{"y",p.y-runUiOrigin.y},{"width",q.x-p.x},{"height",q.y-p.y},{"active",ImGui::IsItemActive()}};}
-static void runUiRecordGlobal(const std::string& key){if(!runUiLive)return;auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();runUiGlobalRects[key]={{"x",p.x},{"y",p.y},{"width",q.x-p.x},{"height",q.y-p.y}};}
+static void runUiRecordGlobal(const std::string& key){
+ if(!runUiLive)return;
+ auto p=ImGui::GetItemRectMin(),q=ImGui::GetItemRectMax();
+ runUiGlobalRects[key]={{"x",p.x},{"y",p.y},{"width",q.x-p.x},{"height",q.y-p.y}};
+ if(ImGui::IsItemFocused())runUiGlobalRects[key]["focused"]=true;
+}
 struct RunUiStyle {
  RunUiStyle(){
   const bool dark=uiTheme!=1&&uiTheme!=3;

@@ -2201,8 +2201,7 @@ static void QDECL videoChanged(int width,int height,qboolean restarted)
   modelViewerImage=0;modelViewerSkinTexture=0;modelViewerSkinTextureIndex=-1;
   characterEditor.uploaded=false;
   characterEditor.materialUploads.clear();
-  textureStudio.handle=0;
-  if(textureStudio.open&&textureStudio.document&&!textureStudioDoc().readOnly)studioSchedule();
+  studioVideoChanged();
   plantVideoChanged();
   uploadFontAtlas();
   ImGui::GetIO().DisplaySize={float(width),float(height)};

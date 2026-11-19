@@ -33,6 +33,8 @@ def main():
     cli.add_argument("--layout-only", action="store_true")
     cli.add_argument("--preset-library", action="store_true")
     cli.add_argument("--move-project", action="store_true")
+    cli.add_argument("--renderer-restart", action="store_true")
+    cli.add_argument("--graph-keyboard", action="store_true")
     cli.add_argument("--interrupt-apply", choices=("before-asset", "before-register"))
     cli.add_argument("--theme", choices=("light", "dark"), default="dark")
     cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
@@ -42,6 +44,8 @@ def main():
         cli.error("The Apply interruption fixture requires Linux.")
     if args.move_project and args.profile != "quake1":
         cli.error("The project relocation fixture exercises the Quake 1 WAD profile.")
+    if args.renderer_restart and not sys.platform.startswith("linux"):
+        cli.error("The renderer restart fixture needs the Linux software renderer.")
     output = args.output.resolve()
     output.mkdir(parents=True)
     runtime = output / "editor"
@@ -215,6 +219,42 @@ def main():
                 assert list(folder.glob("*.reyond.json")) == [manifest_file]
                 assert hashlib.sha256(runtime_file.read_bytes()).hexdigest() == manifest["runtimeHash"]
                 print(f"PASS restart after {args.interrupt_apply} interruption preserves map and retries the same asset")
+                return
+
+            if args.renderer_restart:
+                def current():
+                    return live()["globalWidgets"]["texture-studio/render-state"]
+
+                def preview_frame():
+                    from PIL import ImageGrab
+                    box = wait(lambda: live()["globalWidgets"].get("texture-studio/preview-image"))
+                    ox, oy = ui.position()
+                    x, y = int(ox + box["x"]), int(oy + box["y"])
+                    width, height = int(box["width"]), int(box["height"])
+                    return ImageGrab.grab(bbox=(x + 6, y + 6, x + width - 6, y + height - 6))
+
+                wait(lambda: current()["previewReady"])
+                click("texture-studio/generate")
+                wait(lambda: current()["fullSize"])
+                click("texture-studio/new")
+                wait(lambda: current()["catalogThumbnails"] > 0)
+                click("texture-studio/catalog-cancel")
+                revision = current()["revision"]
+                before = preview_frame()
+                old_log = (output / "engine.log").stat().st_size
+                ui.console("vid_restart")
+                wait(lambda: b"restored ImGui atlas after renderer restart" in
+                     (output / "engine.log").read_bytes()[old_log:])
+                wait(lambda: current()["previewReady"] and current()["fullSize"] and
+                     current()["catalogThumbnails"] == 0)
+                assert current()["revision"] == revision
+                after = preview_frame()
+                before.save(output / "before-renderer-restart.png")
+                after.save(output / "after-renderer-restart.png")
+                assert before.tobytes() == after.tobytes(), "Restarted renderer changed the baked preview"
+                click("texture-studio/new")
+                wait(lambda: current()["catalogThumbnails"] > 0)
+                print("PASS the restarted renderer restores the same full bake and rebuilds catalogue thumbnails")
                 return
 
             if args.preset_library:
@@ -605,27 +645,75 @@ def main():
             print("PASS randomizing Quick parameters preserves the root seed and can be undone")
 
             click("texture-studio/graph-tab")
-            click("texture-studio/graph/node")
-            click("texture-studio/graph/node/pattern")
-            click("texture-studio/graph/include")
-            click("texture-studio/graph/group")
+            def graph_action(name, navigation="tab"):
+                key = "texture-studio/graph/" + name
+                if not args.graph_keyboard:
+                    click(key)
+                    return
+                wait(lambda: live()["globalWidgets"].get(key))
+                for _ in range(54):
+                    if live()["globalWidgets"].get(key, {}).get("focused"):
+                        ui.key("enter")
+                        return
+                    ui.key(navigation)
+                raise AssertionError(f"Could not focus graph control with keyboard: {name}")
+
+            graph_action("node")
+            graph_action("node/pattern", "Down")
+            graph_action("include")
+            graph_action("group")
             before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
-            click("texture-studio/graph/group-create")
+            graph_action("group-create")
             wait(model_ready)
             click("texture-studio/save")
             grouped = wait(lambda: (doc if (doc := json.loads(material_file.read_text(encoding="utf-8")))[
                 "graph"].get("groups") else None))
             group_id, definition = next(iter(grouped["graph"]["groups"].items()))
             pin = definition["inputs"][0]["name"]
-            click("texture-studio/graph/input/" + pin)
+            graph_action("input/" + pin)
             before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
-            click("texture-studio/graph/source/detail/value")
+            graph_action("source/detail/value", "Down")
             wait(model_ready)
             click("texture-studio/save")
             connected = wait(lambda: (doc if (doc := json.loads(material_file.read_text(encoding="utf-8"))) != grouped else None))
             assert {"fromNode": "detail", "fromPort": "value", "toNode": group_id, "toPort": pin} in connected[
                 "graph"]["edges"]
             print("PASS native graph grouping and typed group input reconnection persist in the source")
+            if args.graph_keyboard:
+                before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+                graph_action("add")
+                graph_action("add/Constant", "Down")
+                wait(model_ready)
+                click("texture-studio/save")
+                with_constant = wait(lambda: (doc if len((doc := json.loads(material_file.read_text(
+                    encoding="utf-8")))["graph"]["nodes"]) > len(connected["graph"]["nodes"]) else None))
+                graph_action("parameters")
+                parameter_key = "texture-studio/graph/parameter-input"
+                for _ in range(8):
+                    if live()["globalWidgets"].get(parameter_key, {}).get("focused"):
+                        break
+                    ui.key("tab")
+                else:
+                    raise AssertionError("Could not focus the node parameter input with Tab")
+                ui.key("enter")
+                ui.key("a", ("ctrl",))
+                ui.text('{"value": 2}')
+                graph_action("parameters-apply")
+                wait(lambda: "outside its supported range" in live()["globalWidgets"][
+                    "texture-studio/render-state"]["error"])
+                graph_action("parameters-cancel")
+                graph_action("locate-error")
+                before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+                graph_action("delete")
+                wait(model_ready)
+                click("texture-studio/save")
+                wait(lambda: json.loads(material_file.read_text(encoding="utf-8")) == connected)
+                before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
+                ui.key("z", ("ctrl",))
+                wait(model_ready)
+                click("texture-studio/save")
+                wait(lambda: json.loads(material_file.read_text(encoding="utf-8")) == with_constant)
+                print("PASS keyboard-only graph grouping, connecting, error navigation, deleting and undo")
         finally:
             if game.poll() is None:
                 game.kill()

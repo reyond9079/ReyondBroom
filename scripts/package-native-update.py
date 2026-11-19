@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import io
 import json
+import re
 import runpy
 import shutil
 import subprocess
@@ -141,6 +142,37 @@ if windows:
         assert (root / 'tools/audio' / name).is_file(), name
 revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=src, text=True).strip()
 compiler = subprocess.check_output(['g++', '--version'], text=True).splitlines()[0]
+shutil.copy2(src / 'THIRD-PARTY.md', root / 'THIRD-PARTY.md')
+if a.texture_cli:
+    include = subprocess.check_output(
+        ['g++', '-dM', '-E', '-x', 'c++', '-'], input='#include <zlib.h>\n', text=True)
+    zlib_version = re.search(r'^#define ZLIB_VERSION "([^"]+)"$', include, re.MULTILINE).group(1)
+    zlib = Path(subprocess.check_output(
+        ['g++', '-print-file-name=libz.a' if windows else '-print-file-name=libz.so'], text=True).strip())
+    assert zlib.is_file(), 'Cannot identify linked zlib binary for the Texture Studio SBOM'
+
+    def component(name, version, license_id, source, data):
+        return {
+            'type': 'library', 'name': name, 'version': version,
+            'licenses': [{'license': {'id': license_id}}],
+            'externalReferences': [{'type': 'vcs', 'url': source}],
+            'hashes': [{'alg': 'SHA-256', 'content': sha(data)}],
+        }
+
+    vendor = src / 'native/third_party'
+    components = [
+        component('nlohmann/json', '3.12.0', 'MIT', 'https://github.com/nlohmann/json', vendor / 'json.hpp'),
+        component('stb_image', '2.30', 'MIT', 'https://github.com/nothings/stb', vendor / 'stb_image.h'),
+        component('stb_image_write', '1.16', 'MIT', 'https://github.com/nothings/stb', vendor / 'stb_image_write.h'),
+        component('zlib', zlib_version, 'Zlib', 'https://github.com/madler/zlib', zlib),
+    ]
+    sbom = {'bomFormat': 'CycloneDX', 'specVersion': '1.6', 'version': 1, 'metadata': {
+        'component': {'type': 'application', 'name': 'ReyondBroom Texture Studio', 'version': a.version},
+        'properties': [{'name': 'reyondbroom:sourceRevision', 'value': revision},
+                       {'name': 'reyondbroom:platform', 'value': a.platform}],
+    }, 'components': components}
+    for destination in (root, sources):
+        (destination / 'texture-studio-sbom.json').write_text(json.dumps(sbom, indent=2) + '\n', encoding='utf-8')
 info = (f'ReyondBroom {a.version}\nPlatform: {a.platform}\nEditor revision: {revision}\n'
         f'Editor compiler: {compiler}\nModule SHA256: {sha(root / module_name)}\n'
         + ('Engine rebuilt from pinned FTE sources with the current editor patch stack.\n' if a.engine else 'Engine retained from the verified base runtime.\n')+

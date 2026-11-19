@@ -20,7 +20,7 @@ The default engine build applies patches/preserve-brush-surface-metadata.patch t
 
 - Bundled q3map2: NetRadiant-custom 20260114, GPL; unmodified compiler, corresponding source archive and runtime notices in [tools/q3map2](tools/q3map2/README.md).
 
-- Quake 1 compiler bundle: ericw-tools v0.18.1 (separate GPL-3.0 tools), unmodified Windows binaries. Version, source URL and checksums: [tools/ericw/PIN.json](tools/ericw/PIN.json). The distribution contains corresponding source, GPL text and Embree/TBB notices. The repository fetches the pinned bundle during build rather than storing a second copy of all binaries.
+- Quake 1 compiler bundle: ericw-tools 2.0.0-alpha11 (separate GPL-3.0 tools), unmodified Windows and Linux binaries. Version, source URL and checksums are in [tools/ericw/PIN.json](tools/ericw/PIN.json). The distribution contains corresponding source, GPL text and the upstream dependency notices.
 - Quake entity descriptions in `runtime/quake1.ent`: Copyright (C) 1996-1997 Id Software, Inc., GPL-2.0-or-later; derived from [Quake-Tools qcc/v101qc](https://github.com/id-Software/Quake-Tools/tree/master/qcc/v101qc). ReyondBroom adds structured editor properties and model hints. The original game art, sounds and executable game logic are not included. `quake1-editor.wad` is original ReyondBroom test/editor artwork under the repository license.
 
 - `runtime/librequake.def`: QUAKED descriptions from LibreQuake v0.09-beta (`qcsrc`, https://github.com/lavenderdotpet/LibreQuake/tree/v0.09-beta/qcsrc), Copyright Id Software and LibreQuake contributors, GPL-2.0-or-later. The optional downloader retrieves the original upstream Mod Lite archive and preserves its per-resource license notices; game data is not bundled with ReyondBroom.
@@ -53,3 +53,7 @@ Polygon Cut/Spawn and symmetry behavior were studied against UltimateTrenchBroom
   MIT license, retained in the header.
 - `native/third_party/stb_image_write.h`: stb contributors, public-domain/MIT
   dual license, retained in the header. Existing stb_image notices also apply.
+- Texture Studio uses nlohmann/json, stb_image, stb_image_write and zlib.
+  The package includes `texture-studio-sbom.json` with the linked zlib version
+  and dependency hashes. stb_image and stb_image_write retain the MIT notice
+  in their source headers. zlib retains the license in its source distribution.

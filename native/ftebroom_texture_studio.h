@@ -32,6 +32,7 @@ struct TextureStudioState {
 
   bool open = false, focus = false, focused = false, scheduled = false, fullSize = false;
   bool playing = false;
+  bool previewUploadFailed = false;
   bool actualPixels = false, previewGrid = false, previewSeams = false;
   Preview previewMode = flat;
   rbTexture::PreviewCamera previewCamera;
@@ -231,6 +232,7 @@ static void studioReleaseImage() {
   auto& s = textureStudio;
   if (s.handle) draw->UnloadImage(s.handle);
   s.handle = 0;
+  s.previewUploadFailed = false;
 }
 
 static void studioUpload() {
@@ -246,6 +248,16 @@ static void studioUpload() {
   draw->LoadImageData(path.c_str(), "image/png", png.data(), png.size());
   s.handle = draw->LoadImage(path.c_str());
   if (s.handle) s.imageRevision = s.result->revision;
+  else s.previewUploadFailed = true;
+}
+
+static void studioVideoChanged() {
+  auto& s = textureStudio;
+  // Renderer-owned handles expired. Keep the CPU result and any in-flight bake.
+  s.handle = 0;
+  s.previewUploadFailed = false;
+  s.thumbnails.clear();
+  if (s.open && s.result && s.result->revision == s.revision) studioUpload();
 }
 
 static void studioRollback() {
@@ -1558,7 +1570,9 @@ static void studioNodes() {
   if (ImGui::BeginPopup("Add texture node")) {
     for (const auto& spec : rbTexture::contracts()) {
       if (spec.kernel == rbTexture::Kernel::image) continue;
-      if (!ImGui::MenuItem(spec.type)) continue;
+      const bool add = ImGui::MenuItem(spec.type);
+      runUiRecordGlobal(std::string("texture-studio/graph/add/") + spec.type);
+      if (!add) continue;
       const auto id = ftebroom::bb::uuid();
       const int index = int(nodes.size());
       nodes.push_back(rbTexture::node(id.c_str(), spec.type, rbTexture::defaultParameters(spec.kernel),
@@ -1584,8 +1598,10 @@ static void studioNodes() {
   runUiRecordGlobal("texture-studio/graph/group");
   ImGui::EndDisabled();
   std::string locate;
-  if (!s.error.empty() && !s.errorNode.empty() && ImGui::Button("Locate problem node"))
-    locate = s.errorNode;
+  if (!s.error.empty() && !s.errorNode.empty()) {
+    if (ImGui::Button("Locate problem node")) locate = s.errorNode;
+    runUiRecordGlobal("texture-studio/graph/locate-error");
+  }
   if (ImGui::BeginPopupModal("Group texture nodes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
     static char name[80] = "Material group";
     ImGui::InputText("Name", name, sizeof(name));
@@ -1866,7 +1882,9 @@ static void studioNodes() {
     }
     ImGui::EndCombo();
   }
-  if (ImGui::Button("Delete node")) {
+  const bool deleteNode = ImGui::Button("Delete node");
+  runUiRecordGlobal("texture-studio/graph/delete");
+  if (deleteNode) {
     for (auto edge = edges.begin(); edge != edges.end();) {
       if (edge->at("toNode") == id || edge->at("fromNode") == id) edge = edges.erase(edge);
       else ++edge;
@@ -1890,16 +1908,22 @@ static void studioNodes() {
   }
   static std::array<char, 4096> parameters;
   if (type != "Subgraph") ImGui::SameLine();
-  if (type != "Subgraph" && ImGui::Button("Parameters…")) {
-    const auto input = n.at("parameters").dump(2);
-    rbTexture::require(input.size() < parameters.size(), "graph", "These node parameters exceed the editing budget.");
-    std::copy(input.c_str(), input.c_str() + input.size() + 1, parameters.begin());
-    ImGui::OpenPopup("Edit node parameters");
+  if (type != "Subgraph") {
+    const bool editParameters = ImGui::Button("Parameters…");
+    runUiRecordGlobal("texture-studio/graph/parameters");
+    if (editParameters) {
+      const auto input = n.at("parameters").dump(2);
+      rbTexture::require(input.size() < parameters.size(), "graph", "These node parameters exceed the editing budget.");
+      std::copy(input.c_str(), input.c_str() + input.size() + 1, parameters.begin());
+      ImGui::OpenPopup("Edit node parameters");
+    }
   }
   if (ImGui::BeginPopupModal("Edit node parameters", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
     ImGui::TextUnformatted(type.c_str());
     ImGui::InputTextMultiline("##node-parameters", parameters.data(), parameters.size(), {440 * uiScale(), 180 * uiScale()});
+    runUiRecordGlobal("texture-studio/graph/parameter-input");
     const bool attempted = ImGui::Button("Apply");
+    runUiRecordGlobal("texture-studio/graph/parameters-apply");
     if (attempted) {
       studioAction([&] {
         nodes[size_t(s.selectedNode)]["parameters"] = rbTexture::parseJson(parameters.data());
@@ -1909,6 +1933,7 @@ static void studioNodes() {
     }
     ImGui::SameLine();
     if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+    runUiRecordGlobal("texture-studio/graph/parameters-cancel");
     if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
     ImGui::EndPopup();
     if (attempted) return;
@@ -2028,6 +2053,8 @@ static void studioPreview() {
     ImGui::SameLine();
     ImGui::Checkbox("Seams", &s.previewSeams);
   }
+  if (s.previewUploadFailed)
+    ImGui::TextWrapped("The renderer could not display the preview. Generated textures are still available.");
   if (!s.handle || !s.result) return;
   const auto size = canvas3d || s.previewMode == Preview::surface
     ? rbTexture::Resolution{256, 256} : s.result->previewSize;
@@ -2501,6 +2528,7 @@ static void textureStudioPanel() {
       }
       if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
       if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+      runUiRecordGlobal("texture-studio/catalog-cancel");
       ImGui::EndPopup();
     }
     if (ImGui::BeginPopupModal("Open source?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {

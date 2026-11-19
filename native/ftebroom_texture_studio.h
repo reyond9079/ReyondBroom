@@ -151,8 +151,13 @@ static void studioAutosave() {
 static void studioSchedule(bool full = false) {
   auto& s = textureStudio;
   if (s.cancel) *s.cancel = true;
-  if (s.document && !textureStudioDoc().readOnly)
+  if (s.document) {
+    if (textureStudioDoc().readOnly) {
+      s.scheduled = false;
+      return;
+    }
     s.frame = std::min(s.frame, textureStudioDoc().source.at("animation").at("frames").get<unsigned>() - 1);
+  }
   ++s.revision;
   s.error.clear();
   s.errorNode.clear();
@@ -201,12 +206,13 @@ static void studioNewDocument(rbTexture::Document document) {
   s.recoveredSource.clear();
   s.recoveryFile.clear();
   s.nextAutosave = ImGui::GetTime() + 60;
-  s.variationBase = s.document->get().seed();
+  const bool readOnly = s.document->get().readOnly;
+  s.variationBase = readOnly ? 0 : s.document->get().seed();
   s.selectedNode = 0;
   s.frame = 0;
   s.playing = false;
   s.channel = "baseColor";
-  studioSchedule();
+  if (!readOnly) studioSchedule();
 }
 
 static void studioNew(unsigned preset = 0) {
@@ -692,7 +698,6 @@ static void studioTick() {
       s.savedSource.clear();
       studioAutosave();
     }
-    if (textureStudioDoc().readOnly) s.scheduled = false;
   } catch (const std::exception& e) {
     if (!cancelled && s.open) s.error = e.what();
   }
@@ -2274,7 +2279,7 @@ static void textureStudioPanel() {
         {"previewMode", int(s.previewMode)}, {"hasSurface", !s.surfaceData.empty()},
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
         {"busy", s.job.valid() || s.inputJob.valid() || s.apply != TextureStudioState::Apply::none},
-        {"readingSource", s.inputJob.valid()}, {"error", s.error}
+        {"readingSource", s.inputJob.valid()}, {"readOnly", textureStudioDoc().readOnly}, {"error", s.error}
       };
       const auto* window = ImGui::GetCurrentWindowRead();
       if (!window->DockIsActive) {

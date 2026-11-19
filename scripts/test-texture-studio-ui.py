@@ -197,10 +197,10 @@ def main():
                 original = saved.read_bytes()
                 before = current()["revision"]
 
-                def open_source():
+                def open_source(source=saved):
                     click("texture-studio/open")
                     click("texture-studio/open-choose")
-                    choose(saved)
+                    choose(source)
 
                 open_source()
                 wait(lambda: current()["readingSource"])
@@ -229,8 +229,18 @@ def main():
                     return state["revision"] > before and state["previewReady"]
                 wait(reopened)
                 assert not current()["error"] and saved.read_bytes() == original
+                future = output / "future-format.rbtex.json"
+                future.write_bytes(b'{ "schemaVersion" : 999, "futureSetting": true }\n')
+                open_source(future)
+                wait(lambda: current()["readOnly"] and not current()["readingSource"])
+                click("texture-studio/save")
+                copied = output / "future-format-copy.rbtex.json"
+                choose(copied)
+                wait(copied.is_file)
+                assert copied.read_bytes() == future.read_bytes() and not current()["error"]
                 print(json.dumps({"status": "PASS", "cancelledSeconds": cancelled, "timeoutSeconds": elapsed,
-                                  "draftUnchanged": True, "reopenedWithRealDecoder": True}))
+                                  "draftUnchanged": True, "reopenedWithRealDecoder": True,
+                                  "futureSourcePreserved": True}))
                 return
 
             if args.interrupt_apply:

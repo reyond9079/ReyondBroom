@@ -70,12 +70,21 @@ run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
         description: Owner has authorized publishing this exact tested candidate
         type: boolean
         default: false
+      rb23_parser_handoff:
+        description: Run the two-hour Texture Studio sanitizer matrix without packaging
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
+  rb23-parsers:
+    if: inputs.rb23_parser_handoff
+    uses: ./.github/workflows/texture-studio-checks.yml
+    with:
+      rb23_parser_handoff: true
   plan:
     if: >-
-      inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == '' &&
+      !inputs.rb23_parser_handoff && inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == '' &&
       inputs.rb21_evidence_commit == '' && inputs.rb23_candidate_run_id == '' &&
       inputs.rb23_evidence_run_id == '' && inputs.rb23_evidence_commit == ''
     uses: ./.github/workflows/ci-plan.yml
@@ -542,7 +551,7 @@ jobs:
 
   verify-rb23-release:
     if: >-
-      inputs.rb21_evidence_commit == '' && inputs.rb23_evidence_commit == '' &&
+      !inputs.rb23_parser_handoff && inputs.rb21_evidence_commit == '' && inputs.rb23_evidence_commit == '' &&
       (inputs.rb23_candidate_run_id != '' || inputs.rb23_evidence_run_id != '' ||
        inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
     runs-on: ubuntu-24.04
@@ -651,7 +660,7 @@ jobs:
 
   import-rb23-evidence:
     if: >-
-      inputs.rb23_evidence_commit != '' && inputs.rb23_evidence_run_id == '' &&
+      !inputs.rb23_parser_handoff && inputs.rb23_evidence_commit != '' && inputs.rb23_evidence_run_id == '' &&
       inputs.rb21_evidence_commit == '' && github.actor == github.repository_owner
     runs-on: ubuntu-24.04
     permissions:
@@ -706,7 +715,9 @@ jobs:
         retention-days: 7
 
   import-rb21-evidence:
-    if: inputs.rb21_evidence_commit != '' && inputs.rb21_evidence_run_id == '' && github.actor == github.repository_owner
+    if: >-
+      !inputs.rb23_parser_handoff && inputs.rb21_evidence_commit != '' &&
+      inputs.rb21_evidence_run_id == '' && github.actor == github.repository_owner
     runs-on: ubuntu-24.04
     permissions:
       actions: read

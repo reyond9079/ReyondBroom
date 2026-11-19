@@ -213,7 +213,7 @@ static void textureStudioShow() {
 
 static void textureStudioCommand() { textureStudioShow(); }
 
-static void studioCancel() {
+static void studioCancel(bool report = false) {
   auto& s = textureStudio;
   s.playing = false;
   if (!s.movingNode.empty()) s.drag.reset();
@@ -224,6 +224,7 @@ static void studioCancel() {
   ++s.revision;
   s.scheduled = false;
   if (s.apply != TextureStudioState::Apply::commit) s.apply = TextureStudioState::Apply::none;
+  if (report) s.message = "Generation cancelled.";
 }
 
 static void studioReleaseImage() {
@@ -1040,7 +1041,7 @@ static void studioImportRaster(std::string license, std::string textureName) {
 static void studioSaveAs() {
   runUiChoose(documentPath("material.rbtex.json").u8string(), [](const std::string& name) {
     studioAction([&] { studioSave(std::filesystem::u8path(name)); });
-  }, true);
+  }, true, true);
 }
 
 static void studioSavePackage() {
@@ -1160,7 +1161,7 @@ static void studioExportDialog() {
           ftebroom::bb::atomicWrite(filename, bytes);
           textureStudio.message = "Exported " + filename.filename().u8string();
         });
-      }, true);
+      }, true, true);
     });
   }
   if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
@@ -2202,7 +2203,7 @@ static void textureStudioPanel() {
       !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
     if (shortcuts && s.apply != TextureStudioState::Apply::commit && ImGui::IsKeyPressed(ImGuiKey_Escape) &&
         (applying || s.job.valid() || s.scheduled || s.drag || !s.wireStart.first.empty())) {
-      studioCancel();
+      studioCancel(true);
       s.drag.reset();
     }
     ImGui::BeginDisabled(applying);
@@ -2560,7 +2561,12 @@ static void textureStudioPanel() {
                                     gameProfileName());
     else ImGui::TextUnformatted(gameProfileName());
     ImGui::BeginDisabled(!writable || applying);
-    if (ImGui::Button("Generate")) studioAction([&] { s.playing = false; studioAutosave(); studioSchedule(true); });
+    if (ImGui::Button("Generate")) studioAction([&] {
+      s.playing = false;
+      s.message.clear();
+      studioAutosave();
+      studioSchedule(true);
+    });
     runUiRecordGlobal("texture-studio/generate");
     nextButton("Export…");
     ImGui::BeginDisabled(!s.result || s.result->revision != s.revision || !s.result->fullSize);
@@ -2584,13 +2590,15 @@ static void textureStudioPanel() {
       ImGui::EndDisabled();
     }
     ImGui::EndDisabled();
-    if (s.job.valid() || applying) {
+    const bool cancelling = s.job.valid() && s.cancel && s.cancel->load() && !s.scheduled;
+    if (!cancelling && (s.job.valid() || s.apply != TextureStudioState::Apply::none)) {
       nextButton("Cancel");
       ImGui::BeginDisabled(s.apply == TextureStudioState::Apply::commit);
-      if (ImGui::Button("Cancel")) studioCancel();
+      const bool cancel = ImGui::Button("Cancel");
       runUiRecordGlobal("texture-studio/cancel");
       ImGui::EndDisabled();
-      ImGui::TextUnformatted("Generating…");
+      if (cancel) studioCancel(true);
+      else ImGui::TextUnformatted("Generating…");
     }
     if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
     else if (!s.message.empty()) ImGui::TextWrapped("%s", s.message.c_str());

@@ -111,21 +111,24 @@ static bool runUiEdit(const char* id,std::string& value,const char* hint="",int 
 }
 // A file chooser drawn with the editor's existing ImGui backend on every OS.
 static bool runUiBrowseRequested=false,runUiBrowseOpen=false,runUiBrowseAllowNew=false;
+static bool runUiBrowseConfirmOverwrite=false;
 static nlohmann::json runUiBrowseRects=nlohmann::json::object();
 static std::filesystem::path runUiBrowseFolder;
 static std::string runUiBrowsePath,runUiBrowseError;
 static std::function<void(const std::string&)> runUiBrowseAccept;
-static void runUiChoose(std::string initial,std::function<void(const std::string&)> accept,bool allowNew=false){
+static void runUiChoose(std::string initial,std::function<void(const std::string&)> accept,
+                        bool allowNew=false,bool confirmOverwrite=false){
  auto p=std::filesystem::u8path(initial);std::error_code error;runUiBrowseFolder=std::filesystem::is_directory(p,error)?p:p.parent_path();
  if(runUiBrowseFolder.empty()||!std::filesystem::is_directory(runUiBrowseFolder,error))runUiBrowseFolder=documentDefaultFolder();
  runUiBrowsePath=std::move(initial);runUiBrowseError.clear();runUiBrowseAccept=std::move(accept);runUiBrowseRequested=runUiBrowseOpen=true;runUiBrowseAllowNew=allowNew;
+ runUiBrowseConfirmOverwrite=confirmOverwrite;
 }
 static void runUiBrowsePanel(){
  if(runUiBrowseRequested){runUiBrowseRequested=false;ImGui::OpenPopup("Choose file");}
  ImGui::SetNextWindowSize({640*uiScale(),440*uiScale()},ImGuiCond_FirstUseEver);
  if(ImGui::BeginPopupModal("Choose file",nullptr,ImGuiWindowFlags_NoDocking)){
   auto record=[](const char* key){auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();runUiBrowseRects[key]={{"x",a.x},{"y",a.y},{"width",b.x-a.x},{"height",b.y-a.y},{"active",ImGui::IsItemActive()}};if(runUiLive)runUiRecordGlobal(std::string("choose-file/")+key);};
-  if(ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
+  if(!ImGui::IsPopupOpen("Replace existing file?")&&ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{8*uiScale(),8*uiScale()});
   if(ImGui::Button("Up"))runUiBrowseFolder=runUiBrowseFolder.parent_path();ImGui::SameLine();ImGui::TextUnformatted(runUiBrowseFolder.u8string().c_str());
   ImGui::BeginChild("Files",{0,-70*uiScale()},ImGuiChildFlags_Borders);
@@ -139,13 +142,31 @@ static void runUiBrowsePanel(){
   }
   ImGui::EndChild();ImGui::SetNextItemWidth(-1);runUiEdit("##Selected file",runUiBrowsePath);record("file-path");
   if(runUiLive)runUiGlobalRects["choose-file/path-value"]={{"value",runUiBrowsePath}};
+  bool accept=false;
   if(ImGui::Button(runUiBrowseAllowNew?"Save":"Choose",{80*uiScale(),0})){
    auto path=std::filesystem::u8path(runUiBrowsePath);
    if(!runUiBrowsePath.empty()&&(runUiBrowseAllowNew?!std::filesystem::is_directory(path,error):std::filesystem::is_regular_file(path,error))){
-    try{if(runUiBrowseAccept)runUiBrowseAccept(runUiBrowsePath);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();}catch(const std::exception& e){runUiBrowseError=e.what();}
+    if(runUiBrowseConfirmOverwrite&&std::filesystem::exists(std::filesystem::symlink_status(path,error)))
+     ImGui::OpenPopup("Replace existing file?");
+    else accept=true;
    }else runUiBrowseError=runUiBrowseAllowNew?"Choose a file path.":"Choose an existing file.";
   }record("file-choose");
   ImGui::SameLine();if(ImGui::Button("Cancel",{80*uiScale(),0})){runUiBrowseOpen=false;ImGui::CloseCurrentPopup();}record("file-cancel");if(!runUiBrowseError.empty())ImGui::TextWrapped("%s",runUiBrowseError.c_str());
+  if(ImGui::BeginPopupModal("Replace existing file?",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){
+   ImGui::TextWrapped("Replace %s?",std::filesystem::u8path(runUiBrowsePath).filename().u8string().c_str());
+   const bool replace=ImGui::Button("Replace");record("replace-confirm");
+   ImGui::SameLine();
+   const bool cancel=ImGui::Button("Cancel");record("replace-cancel");
+   ImGui::SetItemDefaultFocus();
+   if(replace||cancel||ImGui::IsKeyPressed(ImGuiKey_Escape)){
+    accept=replace;
+    ImGui::CloseCurrentPopup();
+   }
+   ImGui::EndPopup();
+  }
+  if(accept){
+   try{if(runUiBrowseAccept)runUiBrowseAccept(runUiBrowsePath);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();}catch(const std::exception& e){runUiBrowseError=e.what();}
+  }
   ImGui::PopStyleVar();ImGui::EndPopup();
  }
 }

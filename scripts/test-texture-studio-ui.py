@@ -32,6 +32,7 @@ def main():
     cli.add_argument("--three-faces", action="store_true")
     cli.add_argument("--layout-only", action="store_true")
     cli.add_argument("--preset-library", action="store_true")
+    cli.add_argument("--move-project", action="store_true")
     cli.add_argument("--interrupt-apply", choices=("before-asset", "before-register"))
     cli.add_argument("--theme", choices=("light", "dark"), default="dark")
     cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
@@ -39,6 +40,8 @@ def main():
     args = cli.parse_args()
     if args.interrupt_apply and not sys.platform.startswith("linux"):
         cli.error("The Apply interruption fixture requires Linux.")
+    if args.move_project and args.profile != "quake1":
+        cli.error("The project relocation fixture exercises the Quake 1 WAD profile.")
     output = args.output.resolve()
     output.mkdir(parents=True)
     runtime = output / "editor"
@@ -400,6 +403,43 @@ def main():
             assert json.loads(saved_copy.read_text(encoding="utf-8")) == json.loads(source.read_text(encoding="utf-8"))
             assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest["sourceHash"]
             print("PASS Edit Texture Studio source opens the map material's graph and preserves the original")
+            if args.move_project:
+                game.kill()
+                game.wait(timeout=15)
+                moved = output / "Moved Jam QA"
+                old_runtime = runtime
+                runtime.rename(moved)
+                assert not old_runtime.exists()
+                runtime = moved
+                project = moved / project.relative_to(old_runtime)
+                data = moved / data.relative_to(old_runtime)
+                map_file = moved / map_file.relative_to(old_runtime)
+                state_path = moved / state_path.relative_to(old_runtime)
+                engine = moved / engine.relative_to(old_runtime)
+                for directory in (runtime, data):
+                    (directory / "ftebroom-project.txt").write_text(project.as_posix(), encoding="utf-8")
+                    (directory / "ftebroom-game-profile.txt").write_text(
+                        f'{profile} 0 "{project.as_posix()}" "" "" "" 1 5 "" 1 1\n', encoding="utf-8")
+                    (directory / "ftebroom-quake1.txt").write_text(
+                        f'"" "{project.as_posix()}" "" "" 0 0 "" 0\n', encoding="utf-8")
+                state_path.unlink(missing_ok=True)
+                game = launch(log, env)
+                ui = NativeInput(game, state_path, live, wait, output)
+                wait(lambda: Path(live()["document"]).resolve() == map_file)
+                edit("Select All", selection=True)
+                click("menu/Assets")
+                click("Menu/Assets/Edit Texture Studio source...")
+                wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["previewReady"])
+                click("texture-studio/save")
+                restored_source = output / "relocated-graph-copy.rbtex.json"
+                choose(restored_source)
+                wait(restored_source.is_file)
+                assert restored_source.read_bytes() == saved_copy.read_bytes()
+                assert map_file.read_bytes() == (output / "applied.map").read_bytes()
+                moved_texture = moved / runtime_texture.relative_to(old_runtime)
+                assert hashlib.sha256(moved_texture.read_bytes()).hexdigest() == manifest["runtimeHash"]
+                print("PASS reopening the map after moving its project preserves the relative WAD and editable graph")
+                return
             if args.profile != "fte" or args.three_faces:
                 return
 
@@ -475,6 +515,21 @@ def main():
             assert png.stat().st_size == dry_run["bytes"]
             assert hashlib.sha256(png.read_bytes()).hexdigest() == dry_run["sha256"]
             print("PASS native Texture Studio PNG matches the exact bytes and SHA-256 shown by Dry run")
+
+            prior_export = b"Existing texture contents\n"
+            png.write_bytes(prior_export)
+            click("texture-studio/export")
+            click("texture-studio/export-destination")
+            choose(png)
+            wait(lambda: live()["globalWidgets"].get("choose-file/replace-confirm"))
+            assert png.read_bytes() == prior_export
+            click("choose-file/replace-cancel")
+            wait(lambda: not live()["globalWidgets"].get("choose-file/replace-confirm"))
+            assert png.read_bytes() == prior_export
+            click("choose-file/file-choose")
+            click("choose-file/replace-confirm")
+            wait(lambda: hashlib.sha256(png.read_bytes()).hexdigest() == dry_run["sha256"])
+            print("PASS exporting over an existing file requires confirmation and preserves it on cancel")
 
             before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
             click("texture-studio/apply-model")

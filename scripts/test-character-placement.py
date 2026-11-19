@@ -167,6 +167,18 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                              str(int(target)),str(int(y)),"sleep",".20","mouseup","1")
                     self.settle()
 
+                def drag_slider(self, x, y, target, reached):
+                    self.move(x,y)
+                    before = telemetry.stat().st_mtime_ns
+                    self.run("mousedown","1")
+                    try:
+                        wait(lambda: telemetry.stat().st_mtime_ns != before, timeout=5)
+                        self.move(target,y)
+                        wait(reached, timeout=5)
+                    finally:
+                        self.run("mouseup","1")
+                    self.settle()
+
                 def key(self,key,mods=()):
                     key = {"backspace":"BackSpace", "enter":"Return", "esc":"Escape", "escape":"Escape"}.get(key,key)
                     prefix="+".join((*mods,key))
@@ -340,7 +352,12 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                     left,y,right = visible_slider(key)
                     ui.click(left,y)
                     first = endpoint(name,key,-1)
-                    ui.orbit(left,y,right)
+                    # Saving changes focus and can move the inner scroll region.
+                    left,y,right = visible_slider(key)
+                    if os.name == "nt":
+                        ui.orbit(left,y,right)
+                    else:
+                        ui.drag_slider(left,y,right,lambda: live()["widgets"][key]["value"]==1)
                     last = endpoint(name,key,1)
                     changed = sum(ImageChops.difference(first,last).convert("L").histogram()[9:])
                     check(changed>=5,f"{name} has independent -1/+1 slider values and {changed} changed pixels")

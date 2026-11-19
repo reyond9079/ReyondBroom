@@ -19,6 +19,11 @@ name: Texture Studio checks
     - qc/fb_texture_studio.qc
     - tests/*texture-studio*
   workflow_dispatch: null
+  workflow_call:
+    inputs:
+      rb23_parser_handoff:
+        type: boolean
+        default: false
   schedule:
   - cron: '17 3 * * *'
 
@@ -27,7 +32,7 @@ permissions:
 
 jobs:
   linux:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && !inputs.rb23_parser_handoff
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -47,7 +52,7 @@ jobs:
         python3 tests/texture-studio-release-gate.py
 
   windows:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && !inputs.rb23_parser_handoff
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -82,10 +87,10 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         python tests/texture-studio-release-gate.py
 
-  nightly-parsers:
-    if: github.event_name == 'schedule'
+  parsers:
+    if: github.event_name == 'schedule' || inputs.rb23_parser_handoff
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: ${{ inputs.rb23_parser_handoff && 135 || 40 }}
     strategy:
       fail-fast: false
       matrix:
@@ -94,16 +99,24 @@ jobs:
       ASAN_OPTIONS: halt_on_error=1:detect_leaks=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
       PARSER: ${{ matrix.parser }}
+      FUZZ_SECONDS: ${{ inputs.rb23_parser_handoff && 7200 || 1800 }}
     steps:
     - uses: actions/checkout@v4
       with:
         persist-credentials: false
-    - name: Verify the parser for 30 minutes
+    - name: Verify parser under AddressSanitizer and UBSan
       run: |
+        set -euo pipefail
         mkdir -p qa
         g++ -std=c++17 -O1 -g -ffp-contract=off -pthread -fsanitize=address,undefined \
           -fno-omit-frame-pointer tests/fuzz-texture-studio.cpp -lz -o fuzz-texture-studio
-        timeout 1860 ./fuzz-texture-studio "$PARSER" 1800 2> "qa/$PARSER.log" | tee "qa/$PARSER.json"
+        {
+          git rev-parse HEAD
+          g++ --version
+          sha256sum ./fuzz-texture-studio
+          printf 'parser=%s seconds=%s\n' "$PARSER" "$FUZZ_SECONDS"
+        } > "qa/$PARSER-build.txt"
+        timeout "$((FUZZ_SECONDS + 60))" ./fuzz-texture-studio "$PARSER" "$FUZZ_SECONDS" 2> "qa/$PARSER.log" | tee "qa/$PARSER.json"
         test ! -s "qa/$PARSER.log"
       shell: bash
     - uses: actions/upload-artifact@v4

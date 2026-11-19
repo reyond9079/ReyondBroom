@@ -707,13 +707,19 @@ jobs:
       shell: bash
       run: |
         tag="v$VERSION"
-        if ! gh release view "$tag" --json isDraft,targetCommitish > "$RUNNER_TEMP/rb23-release.json"; then
+        ref="refs/tags/$tag"
+        test "$(git ls-remote --refs "https://github.com/$GITHUB_REPOSITORY.git" "$ref" | cut -f1)" = "$GITHUB_SHA"
+        if ! gh release view "$tag" --json isDraft,tagName > "$RUNNER_TEMP/rb23-release.json"; then
           gh release create "$tag" --verify-tag --target "$GITHUB_SHA" --title "ReyondBroom $VERSION" \
             --draft --prerelease --generate-notes
         fi
-        gh release view "v$VERSION" --json isDraft,targetCommitish |
-          jq -e --arg sha "$GITHUB_SHA" '.isDraft and .targetCommitish == $sha'
-        gh release upload "$tag" "$RUNNER_TEMP/rb23-packages"/release-packages-{Windows-x64,Linux-x64,Linux-SDL2-x64}/* --clobber
+        gh release view "$tag" --json isDraft,isPrerelease,tagName |
+          jq -e --arg tag "$tag" '.isDraft and .isPrerelease and .tagName == $tag'
+        assets=("$RUNNER_TEMP/rb23-packages"/release-packages-{Windows-x64,Linux-x64,Linux-SDL2-x64}/*)
+        gh release upload "$tag" "${assets[@]}" --clobber
+        for path in "${assets[@]}"; do basename "$path"; done | sort > "$RUNNER_TEMP/expected-assets.txt"
+        gh release view "$tag" --json assets --jq '.assets[].name' | sort > "$RUNNER_TEMP/uploaded-assets.txt"
+        cmp "$RUNNER_TEMP/expected-assets.txt" "$RUNNER_TEMP/uploaded-assets.txt"
         gh release edit "$tag" --draft=false --prerelease --latest=false
         gh release view "$tag" --json isDraft,isPrerelease,url |
           jq -e 'select(.isDraft == false and .isPrerelease == true) | .url'

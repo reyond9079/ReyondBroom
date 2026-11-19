@@ -533,11 +533,14 @@ class WorkflowTests(unittest.TestCase):
                          {'RELEASE_TAG_KEY': '${{ secrets.RB23_RELEASE_TAG_KEY }}'})
         self.assertIn('StrictHostKeyChecking=yes', commands[-2])
         self.assertIn('git push "git@github.com:$GITHUB_REPOSITORY.git" "$GITHUB_SHA:$ref"', commands[-2])
-        self.assertIn('--verify-tag', commands[-1])
-        self.assertIn('.targetCommitish == $sha', commands[-1])
-        self.assertIn('gh release upload', commands[-1])
-        self.assertGreater(commands[-1].index('gh release edit'), commands[-1].index('gh release upload'))
-        self.assertIn('--draft=false', commands[-1])
+        publish = commands[-1]
+        self.assertIn('--verify-tag', publish)
+        verify_tag = 'test "$(git ls-remote --refs "https://github.com/$GITHUB_REPOSITORY.git" "$ref" | cut -f1)" = "$GITHUB_SHA"'
+        compare_assets = 'cmp "$RUNNER_TEMP/expected-assets.txt" "$RUNNER_TEMP/uploaded-assets.txt"'
+        self.assertLess(publish.index(verify_tag), publish.index('gh release upload'))
+        self.assertLess(publish.index('gh release upload'), publish.index(compare_assets))
+        self.assertLess(publish.index(compare_assets), publish.index('gh release edit'))
+        self.assertIn('--draft=false', publish)
         importer = jobs['import-rb23-evidence']
         self.assertEqual(importer['permissions'], {'contents': 'read', 'actions': 'read'})
         self.assertIn('github.actor == github.repository_owner', importer['if'])

@@ -488,17 +488,17 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('refs/heads/main', verify['steps'][1]['run'])
         upload = jobs['upload-draft']
         self.assertEqual(upload['needs'], 'verify-rb23-release')
-        self.assertEqual(upload['environment'], 'rb21-release')
+        self.assertEqual(upload['environment'], 'rb23-release')
         self.assertEqual(upload['permissions']['contents'], 'write')
         downloads = [step['with'] for step in upload['steps'] if step.get('uses') == 'actions/download-artifact@v4']
         self.assertEqual({step['run-id'] for step in downloads},
                          {'${{ env.CANDIDATE_RUN }}', '${{ inputs.rb23_evidence_run_id }}'})
         self.assertEqual([step['name'] for step in downloads if 'name' in step], ['rb23-release-evidence'])
         commands = [step['run'] for step in upload['steps'] if 'run' in step]
-        self.assertIn('/approvals', commands[-2])
+        self.assertIn('test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"', commands[-2])
+        self.assertIn('test "$GITHUB_REF" = refs/heads/main', commands[-2])
         self.assertIn('check-texture-studio-release.py', commands[-2])
         self.assertIn('--publication-authorized', commands[-2])
-        self.assertIn('--owner "$GITHUB_REPOSITORY_OWNER"', commands[-2])
         self.assertIn('.targetCommitish == $sha', commands[-1])
         self.assertIn('gh release upload', commands[-1])
         self.assertGreater(commands[-1].index('gh release edit'), commands[-1].index('gh release upload'))
@@ -509,6 +509,19 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('qa/rb-23/evidence', importer['steps'][1]['run'])
         self.assertEqual(importer['steps'][-1]['with']['name'], 'rb23-release-evidence')
         self.assertIn('check-texture-studio-release.py', importer['steps'][-2]['run'])
+
+    def test_two_hour_parser_run_cannot_package_or_publish(self):
+        import yaml
+        release = yaml.safe_load((REPO/'.github/workflows/release-linux-ui-update.yml').read_text())['jobs']
+        for name in ('plan', 'verify-rb23-release', 'import-rb23-evidence', 'import-rb21-evidence'):
+            self.assertIn('!inputs.rb23_parser_handoff', release[name]['if'])
+        self.assertEqual(release['rb23-parsers']['with'], {'rb23_parser_handoff': True})
+        texture = yaml.safe_load((REPO/'.github/workflows/texture-studio-checks.yml').read_text())
+        self.assertEqual(texture['permissions']['contents'], 'read')
+        parsers = texture['jobs']['parsers']
+        self.assertEqual(parsers['strategy']['matrix']['parser'], ['graph', 'image', 'zip'])
+        self.assertIn('7200', parsers['env']['FUZZ_SECONDS'])
+        self.assertIn('pipefail', parsers['steps'][1]['run'])
 
     def test_gates_and_caches_are_wired_without_fuzzy_restores(self):
         import yaml

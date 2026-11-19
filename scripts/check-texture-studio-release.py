@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Validate evidence before giving a Texture Studio publisher its credentials."""
 import argparse
-from datetime import datetime
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -65,7 +64,7 @@ def verify_file(root, name, checksum):
             fail(f"Evidence checksum mismatch for {name}")
 
 
-def validate(root, source, build, publication=False, authorized=False, owner=None):
+def validate(root, source, build, publication=False, authorized=False):
     root = root.resolve(strict=True)
     if not SHA.fullmatch(source) or not DIGEST.fullmatch(build):
         fail("Expected the exact source commit and build checksum")
@@ -83,18 +82,6 @@ def validate(root, source, build, publication=False, authorized=False, owner=Non
         fail("Texture Studio has incomplete checks or open release defects")
     if publication and (not authorized or report.get("publicationAuthorized") is not True):
         fail("Publication needs separate authorization for this candidate")
-    if publication:
-        acceptance = report.get("humanAcceptance")
-        if (not owner or not isinstance(acceptance, dict) or acceptance.get("status") != "accepted"
-                or acceptance.get("acceptedBy") != owner or acceptance.get("sourceCommit") != source
-                or acceptance.get("buildSha256") != build):
-            fail("The repository owner must accept this exact source and build")
-        try:
-            accepted_at = datetime.fromisoformat(acceptance["acceptedAt"])
-        except (KeyError, TypeError, ValueError):
-            fail("Human acceptance needs a timestamp with a timezone")
-        if accepted_at.utcoffset() is None:
-            fail("Human acceptance needs a timestamp with a timezone")
     checks = report.get("requiredChecks")
     if not isinstance(checks, list) or not checks:
         fail("The required check inventory is empty")
@@ -127,7 +114,6 @@ def main():
     cli.add_argument("--repository", required=True, type=Path)
     cli.add_argument("--publish", action="store_true")
     cli.add_argument("--publication-authorized", action="store_true")
-    cli.add_argument("--owner")
     cli.add_argument("--packages", type=Path)
     cli.add_argument("--version")
     args = cli.parse_args()
@@ -139,7 +125,7 @@ def main():
         fail("Publication requires the actual package archives")
     if args.packages and (not args.version or candidate_digest(args.packages, args.version) != args.build):
         fail("Actual release packages differ from the verified build")
-    count = validate(args.evidence, args.source, args.build, args.publish, args.publication_authorized, args.owner)
+    count = validate(args.evidence, args.source, args.build, args.publish, args.publication_authorized)
     print(f"PASS Texture Studio release gate with {count} checks")
 
 

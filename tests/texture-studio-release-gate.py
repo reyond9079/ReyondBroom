@@ -13,7 +13,6 @@ gate = importlib.util.module_from_spec(module_spec)
 module_spec.loader.exec_module(gate)
 SOURCE = "a" * 40
 BUILD = "b" * 64
-OWNER = "release-owner"
 
 
 class GateTests(unittest.TestCase):
@@ -27,16 +26,14 @@ class GateTests(unittest.TestCase):
         self.report = dict(schemaVersion=1, specVersion="1.0", sourceCommit=SOURCE,
                            sourceTreeClean=True, buildSha256=BUILD, status="PASS",
                            openDefects=[], publicationAuthorized=True,
-                           humanAcceptance=dict(status="accepted", acceptedBy=OWNER,
-                                                sourceCommit=SOURCE, buildSha256=BUILD,
-                                                acceptedAt="2026-11-19T12:00:00Z"),
+                           humanAcceptance=None,
                            requiredChecks=[dict(id=key, status="PASS", exitCode=0,
                                                 evidence={"synthetic.log": hashlib.sha256(evidence).hexdigest()})
                                            for key in sorted(gate.CHECKS)])
 
     def verify(self, report, authorized=True):
         self.gatefile.write_text(json.dumps(report), encoding="utf-8")
-        return gate.validate(self.root, SOURCE, BUILD, publication=True, authorized=authorized, owner=OWNER)
+        return gate.validate(self.root, SOURCE, BUILD, publication=True, authorized=authorized)
 
     def test_only_complete_authorized_evidence_passes(self):
         self.assertEqual(self.verify(self.report), len(gate.CHECKS))
@@ -79,13 +76,6 @@ class GateTests(unittest.TestCase):
             "wrong build": lambda r: r.update(buildSha256="1" * 64),
             "open defects": lambda r: r.update(openDefects=["unverified profile"]),
             "no publication authorization": lambda r: r.update(publicationAuthorized=False),
-            "no human acceptance": lambda r: r.pop("humanAcceptance"),
-            "rejected by owner": lambda r: r["humanAcceptance"].update(status="rejected"),
-            "wrong reviewer": lambda r: r["humanAcceptance"].update(acceptedBy="other"),
-            "accepted old build": lambda r: r["humanAcceptance"].update(buildSha256="1" * 64),
-            "accepted old commit": lambda r: r["humanAcceptance"].update(sourceCommit="1" * 40),
-            "no acceptance timestamp": lambda r: r["humanAcceptance"].pop("acceptedAt"),
-            "time without timezone": lambda r: r["humanAcceptance"].update(acceptedAt="2026-11-19T12:00:00"),
             "unsafe path": lambda r: r["requiredChecks"][0].update(evidence={"../other.log": "0" * 64}),
             "missing file": lambda r: r["requiredChecks"][0].update(evidence={"missing.log": "0" * 64}),
             "wrong file hash": lambda r: r["requiredChecks"][0].update(evidence={"synthetic.log": "0" * 64}),

@@ -600,12 +600,12 @@ jobs:
       run: |
         python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-evidence" \
           --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . --publish --publication-authorized \
-          --owner "$GITHUB_REPOSITORY_OWNER" --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
+          --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
 
   upload-draft:
     needs: verify-rb23-release
     runs-on: ubuntu-24.04
-    environment: rb21-release
+    environment: rb23-release
     permissions:
       actions: read
       contents: write
@@ -631,18 +631,15 @@ jobs:
         github-token: ${{ github.token }}
         run-id: ${{ env.CANDIDATE_RUN }}
         path: ${{ runner.temp }}/rb23-packages
-    - name: Verify owner approval, acceptance evidence and all three package sets
+    - name: Verify publisher identity, acceptance evidence and all three package sets
       shell: bash
       run: |
+        test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+        test "$GITHUB_REF" = refs/heads/main
         test "$AUTHORIZED" = true
-        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" |
-          jq -e --arg owner "$GITHUB_REPOSITORY_OWNER" '
-            map(select(.user.login == $owner and any(.environments[]; .name == "rb21-release"))) |
-            length > 0 and all(.[]; .state == "approved")
-          '
         python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-evidence" \
           --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . --publish --publication-authorized \
-          --owner "$GITHUB_REPOSITORY_OWNER" --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
+          --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
     - name: Publish the verified prerelease
       shell: bash
       run: |

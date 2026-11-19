@@ -104,6 +104,8 @@ def main():
     engine = runtime / ("bin/fteqw64.exe" if os.name == "nt" else "fteqw-gl64")
     width, height = args.size.split("x")
     flags = ["-nohome", "-noupdates", "-nosound", "-window", "-width", width, "-height", height]
+    if renderer := os.environ.get("RB_QA_RENDERER"):
+        flags += ["+set", "vid_renderer", renderer]
     runtime_suffix = ".wad" if wad else ".wal" if profile == 3 else ".tga"
     folder = project / ("texture-wads" if wad else "textures/reyond-studio")
     env = os.environ.copy()

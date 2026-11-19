@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <chrono>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -47,12 +48,9 @@ inline std::wstring quote(const std::wstring &value) {
   return out + L"\"";
 }
 #endif
-inline int run(const fs::path &exe,
-               const std::vector<std::string> &args,
-               const fs::path &log,
-               const std::atomic<bool>* cancel,
-               std::chrono::seconds timeout,
-               std::string_view name) {
+inline std::optional<int> run(const fs::path &exe, const std::vector<std::string> &args,
+                              const fs::path &log, const std::atomic<bool>* cancel,
+                              std::chrono::seconds timeout, std::string_view name) {
   if (cancel && *cancel) return -1;
   const auto deadline = std::chrono::steady_clock::now() + timeout;
   int code = 1;
@@ -155,6 +153,8 @@ inline int run(const fs::path &exe,
       code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
       break;
     }
+    // On Unix the host engine may reap a completed child before the plugin does.
+    if (result < 0 && errno == ECHILD) return std::nullopt;
     if (result < 0 && errno != EINTR)
       throw std::runtime_error("Cannot read exit status for " + std::string(name) + ".");
     if ((cancel && *cancel) ||

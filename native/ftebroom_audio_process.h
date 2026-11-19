@@ -80,8 +80,10 @@ inline std::string process(const fs::path &exe,
   const auto code = ftebroom::child::run(exe, args, log, control ? &control->cancel : nullptr,
     std::chrono::seconds(120), "FFmpeg");
   cancelled(control);
+  if (!code)
+    throw std::runtime_error("Cannot read audio converter exit status");
   auto messages = fs::exists(log) ? readBytes(log, 4u * 1024 * 1024) : std::string{};
-  if (code) {
+  if (*code) {
     if (messages.size() > 1800)
       messages = messages.substr(messages.size() - 1800);
     throw std::runtime_error("FFmpeg failed: " + messages);

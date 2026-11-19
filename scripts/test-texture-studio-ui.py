@@ -202,27 +202,32 @@ def main():
                     click("texture-studio/open-choose")
                     choose(saved)
 
-                started = time.monotonic()
                 open_source()
                 wait(lambda: current()["readingSource"])
+                started = time.monotonic()
                 # The application still processes input while its child is stalled.
                 click("texture-studio/cancel-input")
                 wait(lambda: not current()["readingSource"], timeout=5)
                 cancelled = time.monotonic() - started
                 assert current()["revision"] == before and current()["previewReady"]
 
-                started = time.monotonic()
                 open_source()
                 wait(lambda: current()["readingSource"])
+                started = time.monotonic()
                 wait(lambda: "input decoder timed out" in current()["error"], timeout=36)
                 elapsed = time.monotonic() - started
-                assert 29 <= elapsed < 37, elapsed
+                assert 28 <= elapsed < 36, elapsed
                 assert current()["revision"] == before and current()["previewReady"]
                 assert saved.read_bytes() == original
 
                 actual_decoder.replace(decoder)
                 open_source()
-                wait(lambda: current()["revision"] > before and current()["previewReady"])
+                def reopened():
+                    state = current()
+                    if state["error"]:
+                        raise RuntimeError(state["error"])
+                    return state["revision"] > before and state["previewReady"]
+                wait(reopened)
                 assert not current()["error"] and saved.read_bytes() == original
                 print(json.dumps({"status": "PASS", "cancelledSeconds": cancelled, "timeoutSeconds": elapsed,
                                   "draftUnchanged": True, "reopenedWithRealDecoder": True}))

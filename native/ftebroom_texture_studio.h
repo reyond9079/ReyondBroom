@@ -1024,7 +1024,8 @@ static TextureStudioState::SourceInput studioReadInput(const std::filesystem::pa
   const auto code = ftebroom::child::run(ftebroom::filesystemAccessPath(tool), arguments, diagnostics, stop.get(),
     std::chrono::seconds(30), "Texture Studio input decoder");
   rbTexture::require(!*stop, "input", "Opening cancelled.");
-  if (code != 0) {
+  // The helper atomically renames its staging directory only after writing a complete result.
+  if ((code && *code != 0) || !fs::is_directory(output)) {
     const auto detail = ftebroom::bb::readFile(diagnostics, 4096);
     throw std::runtime_error(detail.empty() ? "The input decoder stopped. Try a smaller image or package." : detail);
   }

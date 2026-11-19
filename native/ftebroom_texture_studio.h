@@ -2269,11 +2269,15 @@ static void textureStudioPanel() {
       studioRecoverableFiles();
       ImGui::OpenPopup("Recover source");
     });
+    runUiRecordGlobal("texture-studio/recover");
     if (ImGui::BeginPopupModal("Recover source", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       if (s.recoverable.empty()) ImGui::TextUnformatted("There are no recovery copies.");
       else ImGui::TextUnformatted("Save your current source before opening a recovery copy.");
       for (const auto& path : s.recoverable) {
-        if (!ImGui::Selectable(path.stem().stem().u8string().c_str())) continue;
+        const auto id = path.stem().stem().u8string();
+        const bool restore = ImGui::Selectable(id.c_str());
+        runUiRecordGlobal("texture-studio/recover/" + id);
+        if (!restore) continue;
         studioAction([&] {
           auto doc = rbTexture::open(ftebroom::bb::readFile(path, rbTexture::maxSourceBytes));
           rbTexture::require(!doc.readOnly, "recovery", "Open a newer recovery copy using Open.");
@@ -2651,6 +2655,7 @@ static void textureStudioPanel() {
   ImGui::End();
   if (!s.open) {
     studioCancel();
+    if (s.document) studioAction(studioAutosave);
     studioReleaseImage();
     studioReleaseThumbnails();
     s.result.reset();

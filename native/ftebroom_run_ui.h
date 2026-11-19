@@ -133,7 +133,7 @@ static void runUiBrowsePanel(){
  ImGui::SetNextWindowSize({640*uiScale(),440*uiScale()},ImGuiCond_FirstUseEver);
  if(ImGui::BeginPopupModal("Choose file",nullptr,ImGuiWindowFlags_NoDocking)){
   auto record=[](const char* key){auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();runUiBrowseRects[key]={{"x",a.x},{"y",a.y},{"width",b.x-a.x},{"height",b.y-a.y},{"active",ImGui::IsItemActive()}};if(runUiLive)runUiRecordGlobal(std::string("choose-file/")+key);};
-  if(!ImGui::IsPopupOpen("Replace existing file?")&&ImGui::IsKeyPressed(ImGuiKey_Escape)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
+  if(!ImGui::IsPopupOpen("Replace existing file?")&&ImGui::IsKeyPressed(ImGuiKey_Escape,false)){ImGui::SetKeyOwner(ImGuiKey_Escape,ImGui::GetCurrentWindow()->ID);runUiBrowseOpen=false;ImGui::CloseCurrentPopup();ImGui::EndPopup();return;}
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{8*uiScale(),8*uiScale()});
   if(ImGui::Button("Up"))runUiBrowseFolder=runUiBrowseFolder.parent_path();ImGui::SameLine();ImGui::TextUnformatted(runUiBrowseFolder.u8string().c_str());
   ImGui::BeginChild("Files",{0,-70*uiScale()},ImGuiChildFlags_Borders);
@@ -163,7 +163,7 @@ static void runUiBrowsePanel(){
    ImGui::SameLine();
    const bool cancel=ImGui::Button("Cancel");record("replace-cancel");
    ImGui::SetItemDefaultFocus();
-   if(replace||cancel||ImGui::IsKeyPressed(ImGuiKey_Escape)){
+   if(replace||cancel||ImGui::IsKeyPressed(ImGuiKey_Escape,false)){
     accept=replace;
     ImGui::CloseCurrentPopup();
    }

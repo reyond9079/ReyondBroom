@@ -35,6 +35,7 @@ def main():
     cli.add_argument("--move-project", action="store_true")
     cli.add_argument("--renderer-restart", action="store_true")
     cli.add_argument("--graph-keyboard", action="store_true")
+    cli.add_argument("--recover-source", action="store_true")
     cli.add_argument("--interrupt-apply", choices=("before-asset", "before-register"))
     cli.add_argument("--theme", choices=("light", "dark"), default="dark")
     cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
@@ -259,6 +260,40 @@ def main():
                 print("PASS the restarted renderer restores the same full bake and rebuilds catalogue thumbnails")
                 return
 
+            if args.recover_source:
+                recovery = data / "data/texture-studio/recovery"
+                existing = set(recovery.glob("*.rbtex.json"))
+                def ready_revision():
+                    current = live()["globalWidgets"]["texture-studio/render-state"]
+                    return current["revision"] if current["previewReady"] and not current["busy"] else None
+
+                previous = wait(ready_revision)
+                click("texture-studio/randomize-parameters")
+                wait(lambda: (revision := ready_revision()) and revision > previous)
+                click("texture-studio/close")
+                backup, = wait(lambda: set(recovery.glob("*.rbtex.json")) - existing)
+                original = json.loads(backup.read_text(encoding="utf-8"))
+                game.kill()
+                game.wait(timeout=15)
+                state_path.unlink(missing_ok=True)
+                game = launch(log, env)
+                ui = NativeInput(game, state_path, live, wait, output)
+                wait(lambda: Path(live()["document"]).resolve() == map_file)
+                click("menu/Assets")
+                click("Menu/Assets/Texture Studio...")
+                click("texture-studio/recover")
+                click("texture-studio/recover/" + backup.name.removesuffix(".rbtex.json"))
+                wait(ready_revision)
+                click("texture-studio/save")
+                restored = output / "recovered.rbtex.json"
+                choose(restored)
+                wait(restored.is_file)
+                recovered = json.loads(restored.read_text(encoding="utf-8"))
+                assert original.pop("documentId") != recovered.pop("documentId")
+                assert recovered == original
+                print("PASS closing an unsaved Texture Studio panel preserves the exact source for recovery after restart")
+                return
+
             if args.preset_library:
                 original_source = output / "saved-before-library-edit.rbtex.json"
                 click("texture-studio/save")
@@ -468,7 +503,9 @@ def main():
                 game = launch(log, env)
                 ui = NativeInput(game, state_path, live, wait, output)
                 wait(lambda: Path(live()["document"]).resolve() == map_file)
-                edit("Select All", selection=True)
+                # Assets opens the source of the active material. Reopening the
+                # map does not carry over the material selected before restart.
+                ui.console("set ca_newbrushtexture " + asset_name.removeprefix("textures/"))
                 click("menu/Assets")
                 click("Menu/Assets/Edit Texture Studio source...")
                 wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["previewReady"])
@@ -648,7 +685,7 @@ def main():
 
             click("texture-studio/graph-tab")
             def graph_action(name, navigation="tab"):
-                key = "texture-studio/graph/" + name
+                key = "texture-studio/graph-add" if name == "add" else "texture-studio/graph/" + name
                 if not args.graph_keyboard:
                     click(key)
                     return

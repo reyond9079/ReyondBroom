@@ -1,0 +1,34 @@
+{
+  "engine": "fteqw64",
+  "engineSha256": "d98d32973ba3e21f4c407579395aea9319b58e81589654d79adc120626b853ea",
+  "bspSha256": "33fd3d9e6956d696accea00914ea5ec516450ff0c105e4d4d3e42a660d72420c",
+  "binaryExit": 0,
+  "referenceRGB": [
+    134.23834228515625,
+    113.70506286621094,
+    97.04920959472656
+  ],
+  "renderedRGB": [
+    76.56250944822374,
+    65.13174205354656,
+    55.80179814615905
+  ],
+  "resource": "7e1b7ba8772e9063d04e.tga",
+  "command": [
+    "/tmp/rb23-fte-runtime-lV94CS/fteqw64",
+    "-nohome",
+    "-noupdates",
+    "-nosound",
+    "-condebug",
+    "-basedir",
+    "/tmp/rb23-closure/e2e-engine-fte",
+    "-quake",
+    "-window",
+    "-width",
+    "1024",
+    "-height",
+    "768",
+    "+exec",
+    "rb23native.cfg"
+  ]
+}

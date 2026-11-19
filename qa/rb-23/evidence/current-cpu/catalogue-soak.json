@@ -1,0 +1,14 @@
+{
+  "afterKiB": 19612,
+  "beforeKiB": 31808,
+  "cacheMiB": 12,
+  "catalogue": {
+    "defaults": 120,
+    "peakAfterTwoBatchesKiB": 15236,
+    "singleWorkerSeconds": 7.634059344,
+    "textureOutputs": 636
+  },
+  "cycles": 1000,
+  "retainedKiB": -12196,
+  "workerCancellations": 1000
+}

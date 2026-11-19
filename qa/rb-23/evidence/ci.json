@@ -1,0 +1,12 @@
+{
+  "nativeSourceCommit": "c6bf481e28ae0e5ca89ba5b70c24c92d7048670b",
+  "characterTestSourceCommit": "26165622c3122f2ed2ba63b4b2520469ce11283e",
+  "packagedStudio": {
+    "Windows-x64": "success",
+    "Linux-SDL2-x64": "success",
+    "Linux-x64": "success"
+  },
+  "packagedTestRun": "https://github.com/reyond9079/ReyondBroom/actions/runs/44531760875",
+  "characterRetestRun": "https://github.com/reyond9079/ReyondBroom/actions/runs/44514916694",
+  "characterRetest": "success"
+}

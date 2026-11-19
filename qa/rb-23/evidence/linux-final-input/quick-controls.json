@@ -1,0 +1,63 @@
+{
+  "controls": [
+    {
+      "node": "bond",
+      "key": "columns",
+      "before": 4,
+      "after": 1,
+      "revision": 3
+    },
+    {
+      "node": "bond",
+      "key": "rows",
+      "before": 8,
+      "after": 2,
+      "revision": 5
+    },
+    {
+      "node": "bond",
+      "key": "mortar",
+      "before": 0.1,
+      "after": 0.009999999776482582,
+      "revision": 7
+    },
+    {
+      "node": "bond",
+      "key": "bevel",
+      "before": 0.06,
+      "after": 0.009999999776482582,
+      "revision": 9
+    },
+    {
+      "node": "bond",
+      "key": "wear",
+      "before": 0.28,
+      "after": 0.0,
+      "revision": 11
+    },
+    {
+      "node": "wear",
+      "key": "period",
+      "before": 36,
+      "after": 1,
+      "revision": 13
+    },
+    {
+      "node": "normal",
+      "key": "strength",
+      "before": 2.8,
+      "after": 0.0,
+      "revision": 15
+    }
+  ],
+  "seed": 1701,
+  "previewHashes": {
+    "flat": "faedf722719b92e44b140fec7fc6869451892bbedff324c62772dd814ae409ab",
+    "tiling": "2f70d3e41241bb853c2b29aaa29f4f2844de41586e3372cbfe0c05498635cb85",
+    "sphere": "5e76129c081620335264de193403750297607f96f761be58bf650aa43f18a73d",
+    "cube": "457159874237d88e44b80d8912376cc887f173f40db583ae09fcf8f86ad37a44",
+    "target": "a56d308876041048a8942b83fe3a3102e7c25ad703cdc145dedb2ad5fa1078b1",
+    "surface": "ba8b164e82ed242a74118f629eb91f6c09bef0d5e828ccd5e63d9500becb3e5f"
+  },
+  "status": "PASS"
+}

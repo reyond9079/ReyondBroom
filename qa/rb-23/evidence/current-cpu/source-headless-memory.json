@@ -1,0 +1,10 @@
+{
+  "noDisplay": true,
+  "emptyNetworkNamespace": true,
+  "cpuPng": "16017cb7335426d30a88e3054d60cf05bcc50fdfeb4b74b385b6c7bb85d5295f",
+  "limitMiB": 100,
+  "lowMemoryExit": 1,
+  "elapsedSeconds": 0.010775553000030413,
+  "error": "assets: The image is damaged or its dimensions changed while decoding.",
+  "sourceUnchanged": true
+}

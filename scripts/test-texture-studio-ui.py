@@ -129,6 +129,10 @@ def main():
             def live():
                 return read_ui_json(state_path)
 
+            def map_open():
+                path = Path(live()["document"])
+                return (runtime / path).resolve() == map_file
+
             def wait(predicate, timeout=25):
                 deadline = time.monotonic() + timeout
                 while time.monotonic() < deadline:
@@ -168,7 +172,7 @@ def main():
                 click("choose-file/file-choose")
 
             wait(lambda: live()["globalWidgets"].get("menu/Assets"))
-            wait(lambda: Path(live()["document"]).resolve() == map_file)
+            wait(map_open)
             edit("Select All", selection=True)
             if args.scale != 100:
                 ui.console(f"ftebroom_test_run {60 + (args.scale - 100) // 25}")
@@ -206,7 +210,7 @@ def main():
                 state_path.unlink(missing_ok=True)
                 game = launch(log, os.environ.copy())
                 ui = NativeInput(game, state_path, live, wait, output)
-                wait(lambda: Path(live()["document"]).resolve() == map_file)
+                wait(map_open)
                 edit("Select All", selection=True)
                 click("menu/Assets")
                 click("Menu/Assets/Texture Studio...")
@@ -278,7 +282,7 @@ def main():
                 state_path.unlink(missing_ok=True)
                 game = launch(log, env)
                 ui = NativeInput(game, state_path, live, wait, output)
-                wait(lambda: Path(live()["document"]).resolve() == map_file)
+                wait(map_open)
                 click("menu/Assets")
                 click("Menu/Assets/Texture Studio...")
                 click("texture-studio/recover")
@@ -502,7 +506,7 @@ def main():
                 state_path.unlink(missing_ok=True)
                 game = launch(log, env)
                 ui = NativeInput(game, state_path, live, wait, output)
-                wait(lambda: Path(live()["document"]).resolve() == map_file)
+                wait(map_open)
                 # Assets opens the source of the active material. Reopening the
                 # map does not carry over the material selected before restart.
                 ui.console("set ca_newbrushtexture " + asset_name.removeprefix("textures/"))

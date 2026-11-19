@@ -43,6 +43,7 @@ def main():
     cli.add_argument("--layout-only", action="store_true")
     cli.add_argument("--preset-library", action="store_true")
     cli.add_argument("--project-presets", action="store_true")
+    cli.add_argument("--legacy-project", type=Path, help="Copy an existing pre-numbered WAD preset library for migration testing.")
     cli.add_argument("--move-project", action="store_true")
     cli.add_argument("--renderer-restart", action="store_true")
     cli.add_argument("--graph-keyboard", action="store_true")
@@ -57,6 +58,8 @@ def main():
         cli.error("The Apply interruption fixture requires Linux.")
     if args.move_project and args.profile != "quake1":
         cli.error("The project relocation fixture exercises the Quake 1 WAD profile.")
+    if args.legacy_project and (not args.project_presets or args.profile not in ("quake1", "halflife")):
+        cli.error("Legacy library migration requires the Quake 1 or Half-Life project preset test.")
     if args.renderer_restart and not sys.platform.startswith("linux"):
         cli.error("The renderer restart fixture needs the Linux software renderer.")
     output = args.output.resolve()
@@ -66,6 +69,7 @@ def main():
     profile_ids = {"quake3": 0, "fte": 1, "quake1": 2, "quake2": 3, "halflife": 4}
     profile = profile_ids[args.profile]
     wad = profile in (2, 4)
+    profile_id = ("q3", "fte", "q1", "q2", "hl")[profile]
     data = runtime / "ftebroom"
     project = runtime / {2: "id1", 3: "baseq2", 4: "valve"}.get(profile, "baseq3")
     project.mkdir(exist_ok=True)
@@ -82,6 +86,16 @@ def main():
     fixture = Path(__file__).resolve().parents[1] / "tests/make-build-fixture.py"
     subprocess.run([sys.executable, str(fixture), str(map_file)], check=True)
     original_texture = "fb_grey" if wad else "ftebroom/grid"
+    legacy_material = legacy_wad = None
+    legacy_lumps = {}
+    if args.legacy_project:
+        legacy_material = "rbs_" + hashlib.sha256(f"{profile_id}/builtin-0".encode()).hexdigest()[:11]
+        legacy_wad = f"texture-wads/reyond-studio-presets-{profile_id}.wad"
+        for relative in ("texture-studio-presets", "texture-wads"):
+            shutil.copytree(args.legacy_project / relative, project / relative, dirs_exist_ok=True)
+        legacy_lumps = wad_contents(project / legacy_wad)
+        assert legacy_material in legacy_lumps and len(legacy_lumps) == 134
+        original_texture = legacy_material
     key = "when-the-sky-went-dark" if args.profile == "fte" else args.profile
     style = "quake-standard" if profile == 2 else "valve220" if profile in (3, 4) else "quake3"
     source = map_file.read_text(encoding="ascii").replace("ftebroom/grid", original_texture)
@@ -89,7 +103,8 @@ def main():
     if wad:
         magic = b"WAD2" if profile == 2 else b"WAD3"
         (project / "prior.wad").write_bytes(magic + struct.pack("<II", 0, 12))
-        source = source.replace('"classname" "worldspawn"\n', '"classname" "worldspawn"\n"wad" "prior.wad"\n', 1)
+        wad_refs = f"prior.wad;{legacy_wad}" if legacy_wad else "prior.wad"
+        source = source.replace('"classname" "worldspawn"\n', f'"classname" "worldspawn"\n"wad" "{wad_refs}"\n', 1)
     selected_texture = "qa_selected" if wad else "ftebroom/qa_selected"
     if args.three_faces:
         substitutions = iter((7, 19, 37))
@@ -123,6 +138,10 @@ def main():
         flags += ["+set", "vid_renderer", renderer]
     runtime_suffix = ".wad" if wad else ".wal" if profile == 3 else ".tga"
     folder = project / ("texture-wads" if wad else "textures/reyond-studio")
+    shared_wad = folder / f"reyond-studio-presets-{profile_id}.wad"
+    def runtime_bytes(path, material):
+        return wad_contents(path)[material.removeprefix("textures/")] if wad else path.read_bytes()
+
     env = os.environ.copy()
     decoder = runtime / ("tools/texture-studio.exe" if os.name == "nt" else "tools/texture-studio")
     if args.input_stall_helper:
@@ -171,7 +190,8 @@ def main():
             def locate(name):
                 rect = wait(lambda: live()["globalWidgets"].get(name))
                 studio = live()["globalWidgets"].get("texture-studio/controls")
-                if (studio and name.startswith("texture-studio/") and not name.startswith("texture-studio/project/")
+                main_controls = not name.startswith("texture-studio/project/") or name == "texture-studio/project/offer"
+                if (studio and name.startswith("texture-studio/") and main_controls
                         and studio["x"] <= rect["x"] + rect["width"] * .5 <= studio["x"] + studio["width"]):
                     middle = rect["y"] + rect["height"] * .5
                     if not studio["y"] <= middle <= studio["y"] + studio["height"]:
@@ -185,6 +205,9 @@ def main():
                 return rect
 
             def click(name):
+                if (not args.project_presets and not name.startswith("texture-studio/project/")
+                        and (offer := live()["globalWidgets"].get("texture-studio/project/later"))):
+                    ui.click(offer["x"] + offer["width"] * .5, offer["y"] + offer["height"] * .5)
                 if name == "texture-studio/close" and (tab := live()["globalWidgets"].get("texture-studio/tab")):
                     ui.click(tab["x"] + tab["width"] * .5, tab["y"] + tab["height"] * .5, button=2)
                     return
@@ -222,34 +245,65 @@ def main():
             if args.project_presets:
                 studio = lambda: live()["globalWidgets"]["texture-studio/render-state"]
                 assert wait(lambda: studio()["docked"])
-                assert not studio()["projectImported"]
+                assert studio()["projectAvailable"], studio()["error"]
+                assert studio()["projectImported"] == bool(legacy_wad)
                 original = [(geometry, uv) for geometry, _, uv in faces(map_file)]
+                click("texture-studio/project/later")
+                wait(lambda: "texture-studio/project/later" not in live()["globalWidgets"])
+                offer = locate("texture-studio/project/offer")
+                ui.move(offer["x"] + offer["width"] * .5, offer["y"] + offer["height"] * .5)
+                if os.name == "nt":
+                    scan = ui.user.MapVirtualKeyW(ord("W"), 0)
+                    assert scan and ui.windows_focused()
+                    ui.user.SendMessageW(ui.hwnd, 0x100, ord("W"), 1 | (scan << 16))
+                else:
+                    keycode = ui.d.keysym_to_keycode(ui.XK.string_to_keysym("w"))
+                    ui.xtest.fake_input(ui.d, ui.X.KeyPress, keycode)
+                    ui.d.sync()
+                try:
+                    wait(lambda: studio()["cameraForward"] == 1)
+                finally:
+                    if os.name == "nt":
+                        ui.user.SendMessageW(ui.hwnd, 0x101, ord("W"), 1 | (scan << 16) | (3 << 30))
+                    else:
+                        ui.xtest.fake_input(ui.d, ui.X.KeyRelease, keycode)
+                        ui.d.sync()
+                wait(lambda: studio()["cameraForward"] == 0)
+                click("texture-studio/project/offer")
                 click("texture-studio/project/import")
-                wait(lambda: studio()["projectImported"] or studio()["error"], timeout=360)
-                assert studio()["projectImported"], studio()["error"]
-                profile_id = ("q3", "fte", "q1", "q2", "hl")[profile]
                 metadata = project / "texture-studio-presets" / profile_id
                 manifest_file = metadata / "manifest.json"
+                wait(lambda: (studio()["projectImported"] and manifest_file.is_file() and
+                              read_ui_json(manifest_file).get("catalogNames")) or studio()["error"], timeout=360)
+                assert studio()["projectImported"] and not studio()["error"], studio()["error"]
                 manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
                 assert manifest["profile"] == profile_id
-                assert len(manifest["files"]) == (1 if wad else 403 if profile == 1 else 135 if profile == 0 else 134)
+                if not legacy_wad:
+                    assert len(manifest["files"]) == (1 if wad else 403 if profile == 1 else 135 if profile == 0 else 134)
                 for name, expected in manifest["files"].items():
                     assert hashlib.sha256((project / name).read_bytes()).hexdigest() == expected, name
                 key = "builtin-0"
-                token = hashlib.sha256(f"{profile_id}/{key}".encode()).hexdigest()
-                material = "rbs_" + token[:11] if wad else "reyond-studio/p" + token[:14]
+                assert len(set(manifest["catalogNames"].values())) == 134
+                assert all(re.fullmatch(r"[a-z]+_\d+", name) for name in manifest["catalogNames"].values())
+                assert manifest["catalogNames"][key] == "brick_1"
+                material = "brick_1" if wad else "reyond-studio/brick_1"
                 relative = f"texture-wads/reyond-studio-presets-{profile_id}.wad" if wad else f"textures/{material}{runtime_suffix}"
                 resource = project / relative
                 if wad:
                     assert resource.read_bytes()[:4] == (b"WAD2" if profile == 2 else b"WAD3")
                     lumps = wad_contents(resource)
-                    assert material in lumps and len(lumps) == 134
+                    assert material in lumps and len(lumps) == 134 + len(legacy_lumps)
+                    if legacy_material:
+                        assert all(lumps[name] == data for name, data in legacy_lumps.items())
+                        assert lumps[material][16:] == lumps[legacy_material][16:]
                 if profile == 3:
                     assert resource.read_bytes()[:32].rstrip(b"\0").decode() == material
                 if profile <= 1:
                     script = f"reyond-studio-presets-{profile_id}"
                     assert script in (project / "scripts/shaderlist.txt").read_text()
                     assert f"textures/{material}.tga" in (project / f"scripts/{script}.shader").read_text()
+                if studio()["projectPreset"] != key:
+                    click(f"texture-studio/project/preset/{key}")
                 wait(lambda: studio()["projectPreset"] == key and studio()["previewReady"] and not studio()["busy"]
                      and studio().get("projectMaterialReady", True))
                 click("texture-studio/project/apply")
@@ -262,7 +316,7 @@ def main():
                 seed = locate("texture-studio/seed")
                 ui.click(seed["x"] + 30, seed["y"] + seed["height"] * .5)
                 ui.key("a", ("ctrl",))
-                ui.text("8128")
+                ui.text("21991" if legacy_wad else "8128")
                 ui.key("enter")
                 wait(lambda: studio()["revision"] != previous and studio()["previewReady"] and not studio()["busy"])
                 if profile == 0 and sys.platform.startswith("linux"):
@@ -286,14 +340,23 @@ def main():
                 if wad:
                     new_lumps = wad_contents(resource)
                     assert new_lumps.pop(material) != lumps.pop(material)
+                    if legacy_material:
+                        assert new_lumps.pop(legacy_material) != lumps.pop(legacy_material)
                     assert new_lumps == lumps
                 assert faces(map_file) == applied
+                click("texture-studio/project/offer")
+                click("texture-studio/project/import")
+                wait(lambda: not studio()["busy"])
+                assert not studio()["error"], studio()["error"]
+                assert hashlib.sha256(resource.read_bytes()).hexdigest() == changed[relative]
                 from PIL import ImageGrab
                 x, y = ui.position()
                 scale_x, scale_y = getattr(ui, "scale", (1, 1))
                 ImageGrab.grab(bbox=(x, y, x + round(int(width) * scale_x),
                                      y + round(int(height) * scale_y))).save(output / "project-presets.png")
                 print(f"PASS {args.profile}: imported 134 native presets, applied one to selected brushes, and updated it in place")
+                if legacy_wad:
+                    print("PASS legacy WAD migration preserves each original lump and updates its alias with the named material")
                 return
 
             if args.input_stall_helper:
@@ -372,13 +435,13 @@ def main():
                 manifest_file, = folder.glob("*.reyond.json")
                 asset_stem = manifest_file.name.removesuffix(".reyond.json")
                 manifest = json.loads(manifest_file.read_bytes())
-                runtime_file = folder / (asset_stem + runtime_suffix)
+                runtime_file = shared_wad if wad else folder / (asset_stem + runtime_suffix)
                 source_file = folder / (asset_stem + ".rbtex.json")
                 assert hashlib.sha256(source_file.read_bytes()).hexdigest() == manifest["sourceHash"]
                 if args.interrupt_apply == "before-asset":
                     assert not runtime_file.exists()
                 else:
-                    assert hashlib.sha256(runtime_file.read_bytes()).hexdigest() == manifest["runtimeHash"]
+                    assert hashlib.sha256(runtime_bytes(runtime_file, manifest["material"])).hexdigest() == manifest["runtimeHash"]
 
                 log.write(b"\n--- Restart after interrupted Apply ---\n")
                 log.flush()
@@ -401,7 +464,7 @@ def main():
                 wait(lambda: not live()["globalWidgets"]["texture-studio/render-state"]["busy"])
                 save_when(lambda rows: bool(rows) and all(row[1].endswith(generated) for row in rows))
                 assert list(folder.glob("*.reyond.json")) == [manifest_file]
-                assert hashlib.sha256(runtime_file.read_bytes()).hexdigest() == manifest["runtimeHash"]
+                assert hashlib.sha256(runtime_bytes(runtime_file, manifest["material"])).hexdigest() == manifest["runtimeHash"]
                 print(f"PASS restart after {args.interrupt_apply} interruption preserves map and retries the same asset")
                 return
 
@@ -581,7 +644,7 @@ def main():
                 if state["error"]:
                     raise RuntimeError(state["error"])
                 return next((manifest for manifest in folder.glob("*.reyond.json") if
-                             (folder / (manifest.name.removesuffix(".reyond.json") + runtime_suffix)).is_file()), None)
+                             (shared_wad if wad else folder / (manifest.name.removesuffix(".reyond.json") + runtime_suffix)).is_file()), None)
 
             edit("Deselect All", selection=True)
             wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["faceCount"] == 0)
@@ -590,9 +653,10 @@ def main():
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
             asset_name = manifest["material"]
             stem = folder / Path(asset_name).name
-            runtime_texture = stem.with_suffix(runtime_suffix)
+            runtime_texture = shared_wad if wad else stem.with_suffix(runtime_suffix)
             source = stem.with_suffix(".rbtex.json")
-            assert hashlib.sha256(runtime_texture.read_bytes()).hexdigest() == manifest["runtimeHash"]
+            assert hashlib.sha256(runtime_bytes(runtime_texture, asset_name)).hexdigest() == manifest["runtimeHash"]
+            assert re.fullmatch(r"[a-z]+_\d+", stem.name)
             assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest["sourceHash"]
             if wad:
                 content = runtime_texture.read_bytes()
@@ -701,7 +765,7 @@ def main():
                 assert restored_source.read_bytes() == saved_copy.read_bytes()
                 assert map_file.read_bytes() == (output / "applied.map").read_bytes()
                 moved_texture = moved / runtime_texture.relative_to(old_runtime)
-                assert hashlib.sha256(moved_texture.read_bytes()).hexdigest() == manifest["runtimeHash"]
+                assert hashlib.sha256(runtime_bytes(moved_texture, asset_name)).hexdigest() == manifest["runtimeHash"]
                 print("PASS reopening the map after moving its project preserves the relative WAD and editable graph")
                 return
             if args.profile != "fte" or args.three_faces:

@@ -357,6 +357,22 @@ static void executeAction(const Action& a, bool down = true)
   if(traceAction(cmd))return;
   command((cmd + "\n").c_str());
 }
+static bool dispatchFlightKey(int key, bool inScene)
+{
+  if (ctrlHeld || !inScene || popupOpen || ImGui::GetIO().WantTextInput || sceneDrag
+      || cvars->GetFloat("ca_brush_view") != 0)
+    return false;
+  constexpr char flight[] = "wsadqx";
+  for (int i = 0; i < 6; ++i)
+  {
+    const char name[2] = {flight[i], 0};
+    if (key != input->GetKeyCode(name, nullptr)) continue;
+    moveHeld[i] = true;
+    sceneContextCandidate = false;
+    return true;
+  }
+  return false;
+}
 static bool dispatchAction(int key, bool down, bool inScene, int targetView=-1, bool lessonHistory=false)
 {
   initActions();
@@ -386,22 +402,7 @@ static bool dispatchAction(int key, bool down, bool inScene, int targetView=-1, 
         return false;
   const Action* chosen = nullptr;
   // Flight modifiers change speed instead of disabling held movement shortcuts.
-  if (
-    !ctrlHeld && inScene && !popupOpen && !ImGui::GetIO().WantTextInput && !sceneDrag
-    && cvars->GetFloat("ca_brush_view") == 0)
-  {
-    const char* flight = "wsadqx";
-    for (int i = 0; i < 6; i++)
-    {
-      char name[2] = {flight[i], 0};
-      if (key == input->GetKeyCode(name, nullptr))
-      {
-        moveHeld[i] = true;
-        sceneContextCandidate = false;
-        return true;
-      }
-    }
-  }
+  if (dispatchFlightKey(key, inScene)) return true;
   if(tourActive&&!lessonHistory)return false;
   for (auto& a : actions)
   {

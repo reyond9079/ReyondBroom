@@ -16,4 +16,7 @@ for name in rock45_solid_valid rock45_single_undo rock45_seed_repeat rock45_deta
  grep -q "TRANSFORM_PASS $name" console.txt
 done
 grep -q 'FTEBROOM_GEOM_COMPLETE' console.txt
+for name in sculpt46_raise_face_center_pointer sculpt46_lower_face_center_pointer sculpt46_pointer_strokes_undo; do
+ grep -q "TRANSFORM_PASS $name" console.txt
+done
 echo "PASS: $test"

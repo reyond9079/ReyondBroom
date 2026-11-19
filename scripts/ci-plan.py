@@ -84,7 +84,9 @@ RULES = [
     (['native/ftebroom_cursor.h', 'patches/*cursor*'], {'viewport'}),
     (['native/ftebroom_texture_studio.h', 'native/ftebroom_texture_project.h', 'native/texture/project_presets.h',
       'scripts/test-texture-studio-ui.py', 'tests/texture-studio-core.cpp'], {'resources', 'ui'}),
-    (['qc/fb_sculpt.qc'], {'viewport', 'placement'}),
+    (['qc/fb_sculpt.qc', 'qc/fb_sweep.qc', 'qc/fb_generators_tests.qc',
+      'scripts/test-rock-linux.sh', 'tests/rock45.cfg'], {'viewport', 'placement'}),
+    (['qc/fb_view_options.qc', 'qc/fb_view_options_tests.qc'], {'viewport', 'render'}),
     (['patches/*resource*', 'patches/*mapasset*'], {'resources'}),
     (['patches/*grid*', 'patches/*render*', 'patches/*shader*'], {'render'}),
     (['native/ftebroom_map_mod*', 'native/ftebroom_map_panel*',
@@ -398,6 +400,17 @@ ENTITY_LINK_COLOR_HOST_SCOPES = {
 
 
 PROJECT_PRESET_HOST_SCOPES = {
+    'native/ftebroom.cpp': ({'input'}, [
+        ('    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()&&!textureStudioFocused())))\n'
+         '      dispatchAction(key, down, inScene, hit, tourActive&&tourStep==tourGridStep);\n',
+         '    if (!inJam && !soundKeyboardEvent(key, down))\n'
+         '    {\n'
+         '      if (down && textureStudioFocused())\n'
+         '        dispatchFlightKey(key, inScene || sceneLook || textureStudioDocked());\n'
+         '      else if (!down || (!runUiNavigation() && !plantFocused() && !worldArchitectFocused()))\n'
+         '        dispatchAction(key, down, inScene, hit, tourActive && tourStep == tourGridStep);\n'
+         '    }\n'),
+    ]),
     'qc/csaddon.qc': ({'render'}, [
         ('static void() perf_renderscene =\n{\n'
          '    if(checkbuiltin(editor_shader_clock))editor_shader_clock(gettime(0));\n\trenderscene();\n};\n',

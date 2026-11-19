@@ -24,11 +24,44 @@ static rbTexture::Json studioParseProjectManifest(const std::string& bytes, int 
   rbTexture::require(manifest.value("version", 0) == 1 &&
     manifest.value("profile", "") == rbTexture::projectProfileId(profile) &&
     manifest.at("files").is_object(), "project", "The Texture Studio project manifest is invalid.");
+  if (auto names = manifest.find("catalogNames"); names != manifest.end()) {
+    rbTexture::require(names->is_object(), "project", "The project preset names are invalid.");
+    for (const auto& name : *names)
+      rbTexture::require(name.is_string() && rbTexture::projectNumberedName(name.get_ref<const std::string&>()),
+        "project", "The project has an invalid preset name.");
+  }
   return manifest;
 }
 
 static rbTexture::Json studioProjectManifest(const std::filesystem::path& root, int profile) {
   return studioParseProjectManifest(studioProjectManifestBytes(root, profile), profile);
+}
+
+static bool studioLegacyCatalog(const rbTexture::Json& manifest) {
+  return manifest.value("legacyCatalog", false) ||
+    (!manifest.contains("catalogNames") && !manifest.contains("generated") && !manifest.at("files").empty());
+}
+
+static std::string studioPresetMaterial(int profile, const rbTexture::ProjectPreset& preset,
+    const rbTexture::Json& names, bool legacy) {
+  if (auto it = names.find(preset.key); it != names.end()) {
+    const auto name = it->get<std::string>();
+    rbTexture::require(rbTexture::projectNumberedName(name), "project", "The project has an invalid preset name.");
+    return rbTexture::projectMaterialPath(profile, name);
+  }
+  return legacy ? rbTexture::legacyProjectPresetMaterial(profile, preset) : rbTexture::projectPresetMaterial(profile, preset);
+}
+
+static std::string studioPresetMaterial(const rbTexture::ProjectPreset& preset) {
+  const auto& s = textureStudio;
+  return studioPresetMaterial(gameProfile, preset, s.projectNames, s.projectLegacy);
+}
+
+static void studioProjectStatus(const rbTexture::Json& manifest) {
+  auto& s = textureStudio;
+  s.projectNames = manifest.value("catalogNames", rbTexture::Json::object());
+  s.projectLegacy = studioLegacyCatalog(manifest);
+  s.projectImported = s.projectLegacy || !s.projectNames.empty();
 }
 
 static std::string studioProjectOwnedFile(const std::filesystem::path& path, const rbTexture::Json& checksum) {
@@ -57,15 +90,10 @@ static void studioRefreshProjectScope(bool force = false) {
   }
   s.projectRoot = std::move(root);
   s.projectProfile = gameProfile;
-  s.projectOffer = true;
-  s.projectImported = false;
-  if (!s.projectRoot.empty()) {
-    const auto bytes = studioProjectManifestBytes(s.projectRoot, gameProfile);
-    if (!bytes.empty()) {
-      studioParseProjectManifest(bytes, gameProfile);
-      s.projectImported = true;
-    }
-  }
+  studioProjectStatus(studioParseProjectManifest({}, gameProfile));
+  if (!s.projectRoot.empty()) studioProjectStatus(studioProjectManifest(s.projectRoot, gameProfile));
+  s.projectOffer = !s.projectRoot.empty() && s.projectNames.empty() &&
+    !s.promptedProjects.count({gameProfile, s.projectRoot});
 }
 
 static const rbTexture::ProjectPreset* studioProjectPresetByKey(const std::string& key) {
@@ -76,17 +104,54 @@ static const rbTexture::ProjectPreset* studioProjectPresetByKey(const std::strin
 
 static const rbTexture::ProjectPreset* studioProjectPresetForMaterial(std::string_view material) {
   if (!material.compare(0, 9, "textures/")) material.remove_prefix(9);
-  if (material.substr(0, 4) != "rbs_" && material.substr(0, 15) != "reyond-studio/p") return nullptr;
-  static const auto catalogs = [] {
-    std::array<std::map<std::string, const rbTexture::ProjectPreset*, std::less<>>, 5> result;
-    for (int profile = 0; profile < int(result.size()); ++profile)
-      for (const auto& preset : rbTexture::projectPresets())
-        result[profile].emplace(rbTexture::projectPresetMaterial(profile, preset), &preset);
-    return result;
-  }();
-  const auto& catalog = catalogs.at(gameProfile);
-  const auto found = catalog.find(material);
-  return found == catalog.end() ? nullptr : found->second;
+  if (!textureStudio.projectImported) return nullptr;
+  const auto basename = material.substr(material.find_last_of('/') + 1);
+  if (!rbTexture::projectNumberedName(basename) && material.substr(0, 4) != "rbs_" &&
+      material.substr(0, 15) != "reyond-studio/p") return nullptr;
+  for (const auto& preset : rbTexture::projectPresets())
+    if (studioPresetMaterial(preset) == material || (textureStudio.projectLegacy &&
+        rbTexture::legacyProjectPresetMaterial(gameProfile, preset) == material)) return &preset;
+  return nullptr;
+}
+
+static std::set<std::string> studioProjectMaterialInventory() {
+  std::set<std::string> used;
+  for (const auto& [name, entry] : materials) used.insert(name);
+  return used;
+}
+
+static std::string studioNextMaterialName(int profile, const std::string& word, const std::set<std::string>& used) {
+  for (int suffix = 1; suffix <= 9999; ++suffix) {
+    const auto name = word + "_" + std::to_string(suffix);
+    if (!used.count("textures/" + rbTexture::projectMaterialPath(profile, name))) return name;
+  }
+  throw rbTexture::Error("project", "There are no free numbers for this material name.");
+}
+
+static void studioReadProjectWad(rbTexture::ProjectPresetFiles& lumps, const std::filesystem::path& root,
+    int profile, const rbTexture::Json& manifest) {
+  if (!rbTexture::projectUsesWad(profile)) return;
+  const auto relative = rbTexture::projectPresetWad(profile);
+  const auto path = studioProjectPath(root, relative);
+  if (!std::filesystem::exists(path)) return;
+  const auto& files = manifest.at("files");
+  rbTexture::require(files.contains(relative), "project", "The project already has a WAD with the preset library name.");
+  lumps = rbTexture::projectWadLumps(studioProjectOwnedFile(path, files.at(relative)), profile);
+}
+
+static std::string studioProjectShaderScript(int profile, const rbTexture::Json& manifest) {
+  std::set<std::string> names;
+  const auto assigned = manifest.value("catalogNames", rbTexture::Json::object());
+  for (const auto& preset : rbTexture::projectPresets()) {
+    if (assigned.contains(preset.key)) names.insert(studioPresetMaterial(profile, preset, assigned, false));
+    if (studioLegacyCatalog(manifest)) names.insert(rbTexture::legacyProjectPresetMaterial(profile, preset));
+  }
+  for (const auto& name : manifest.value("generated", rbTexture::Json::object()))
+    if (name.is_string() && rbTexture::projectNumberedName(name.get_ref<const std::string&>()))
+      names.insert(rbTexture::projectMaterialPath(profile, name.get<std::string>()));
+  std::string script;
+  for (const auto& name : names) script += rbTexture::projectShaderEntry(profile, name);
+  return script;
 }
 
 static std::string studioProjectWadReference(const std::filesystem::path& root, int profile) {
@@ -106,13 +171,13 @@ static void studioBeginProjectBake(const rbTexture::ProjectPreset* selected = nu
   rbTexture::require(!s.projectJob.valid(), "project", "Finish or cancel the current project operation.");
   const auto profile = s.projectProfile;
   auto bytes = studioProjectManifestBytes(s.projectRoot, profile);
-  rbTexture::require(selected ? !bytes.empty() : bytes.empty(), "project",
-    selected ? "Import the presets before updating a material." : "The presets are already imported.");
+  rbTexture::require(!selected || s.projectImported, "project", "Import the presets before updating a material.");
   if (!selected && rbTexture::projectUsesWad(profile) && !documentFile.empty())
     studioProjectWadReference(s.projectRoot, profile);
   std::string palette = profile == 2 ? q1Palette() : profile == 3 ? q2Palette() :
                         profile == 4 ? studioGoldSrcPalette() : std::string{};
   auto progress = std::make_shared<TextureStudioState::ProjectProgress>();
+  progress->total = selected ? 1 : rbTexture::projectPresets().size();
   s.projectProgress = progress;
   std::optional<rbTexture::Document> doc;
   if (selected) doc = textureStudioDoc();
@@ -121,7 +186,8 @@ static void studioBeginProjectBake(const rbTexture::ProjectPreset* selected = nu
   s.playing = false;
   s.projectJob = std::async(std::launch::async, [root = s.projectRoot, profile, epoch = organizationMapEpoch,
       selected, doc = std::move(doc), existing = std::move(bytes), palette = std::move(palette), progress,
-      assets = selected ? s.assets : rbTexture::Assets{}, originals = s.assetFolder, frame = s.frame]() {
+      assets = selected ? s.assets : rbTexture::Assets{}, originals = s.assetFolder, frame = s.frame,
+      used = studioProjectMaterialInventory()]() mutable {
     TextureStudioState::ProjectBake result{root, profile, epoch, existing, selected ? selected->key : "", {}};
     auto manifest = studioParseProjectManifest(existing, profile);
     const auto paletteHash = palette.empty() ? std::string{} : ftebroom::sha256(palette);
@@ -130,22 +196,25 @@ static void studioBeginProjectBake(const rbTexture::ProjectPreset* selected = nu
     const auto wad = rbTexture::projectPresetWad(profile);
     const bool usesWad = rbTexture::projectUsesWad(profile);
     rbTexture::ProjectPresetFiles lumps;
-    if (selected && usesWad)
-      lumps = rbTexture::projectWadLumps(studioProjectOwnedFile(studioProjectPath(root, wad),
-        manifest.at("files").at(wad)), profile);
-    const auto evaluate = [&](const rbTexture::ProjectPreset& preset, const rbTexture::Document& source,
-        const rbTexture::Assets& inputs, unsigned imageFrame) {
+    studioReadProjectWad(lumps, root, profile, manifest);
+    const bool legacy = studioLegacyCatalog(manifest);
+    auto names = manifest.value("catalogNames", rbTexture::Json::object());
+    const auto folder = rbTexture::projectPresetStorage(profile);
+    const auto evaluate = [&](const std::string& material, const rbTexture::Document& source,
+        const rbTexture::Assets& inputs, unsigned imageFrame, const std::string& alias = "") {
       rbTexture::require(!progress->cancel, "project", "Preset generation cancelled.");
       const auto plan = rbTexture::compile(source, {}, inputs);
       const auto threads = std::clamp(std::thread::hardware_concurrency(), 1u, 4u);
       const auto evaluation = rbTexture::evaluate(plan, source.resolution(), &progress->cancel,
         rbTexture::memoryBudget, selected ? threads : 1, imageFrame);
-      rbTexture::projectEncodePreset(result.files, lumps, profile, preset, evaluation, palette);
-      ++progress->finished;
+      rbTexture::projectEncodeMaterial(result.files, lumps, profile, material, evaluation, palette);
+      if (!alias.empty() && alias != material)
+        rbTexture::projectEncodeMaterial(result.files, lumps, profile, alias, evaluation, palette);
     };
     if (selected) {
-      evaluate(*selected, *doc, assets, frame);
-      const auto folder = rbTexture::projectPresetStorage(profile);
+      evaluate(studioPresetMaterial(profile, *selected, names, legacy), *doc, assets, frame,
+        legacy ? rbTexture::legacyProjectPresetMaterial(profile, *selected) : "");
+      ++progress->finished;
       result.files.emplace(folder + selected->key + ".rbtex.json", doc->save());
       for (const auto& reference : doc->source.at("assetReferences")) {
         const auto hash = rbTexture::idField(reference, "sha256", "assets");
@@ -153,11 +222,58 @@ static void studioBeginProjectBake(const rbTexture::ProjectPreset* selected = nu
       }
       manifest["frames"][selected->key] = frame;
     } else {
-      for (const auto& preset : rbTexture::projectPresets()) evaluate(preset, preset.document(), {}, 0);
-      if (profile <= 1)
-        result.files.emplace("scripts/" + rbTexture::projectPresetShaders(profile) + ".shader",
-          rbTexture::projectShaderText(profile));
+      auto reserved = used;
+      for (const auto& preset : rbTexture::projectPresets())
+        reserved.insert("textures/" + rbTexture::projectPresetMaterial(profile, preset));
+      for (const auto& [name, bytes] : lumps) {
+        used.insert("textures/" + name);
+        reserved.insert("textures/" + name);
+      }
+      for (const auto& preset : rbTexture::projectPresets()) {
+        rbTexture::require(!progress->cancel, "project", "Preset generation cancelled.");
+        if (!names.contains(preset.key)) {
+          auto name = preset.name;
+          const auto occupied = [&](const std::string& candidate) {
+            const auto material = rbTexture::projectMaterialPath(profile, candidate);
+            return used.count("textures/" + material) ||
+              (!usesWad && std::filesystem::exists(studioProjectPath(root, rbTexture::projectPresetImagePath(profile, material))));
+          };
+          const auto word = name.substr(0, name.find('_'));
+          while (occupied(name)) {
+            reserved.insert("textures/" + rbTexture::projectMaterialPath(profile, name));
+            name = studioNextMaterialName(profile, word, reserved);
+          }
+          reserved.insert("textures/" + rbTexture::projectMaterialPath(profile, name));
+          names[preset.key] = name;
+        }
+        const auto material = studioPresetMaterial(profile, preset, names, false);
+        const auto path = rbTexture::projectPresetImagePath(profile, material);
+        const auto source = folder + preset.key + ".rbtex.json";
+        const auto& owned = manifest.at("files");
+        const bool installed = usesWad ? lumps.count(material) != 0 :
+          owned.contains(path) && std::filesystem::is_regular_file(studioProjectPath(root, path)) &&
+          (profile != 1 || (std::filesystem::is_regular_file(studioProjectPath(root, "textures/" + material + "_norm.tga")) &&
+                           std::filesystem::is_regular_file(studioProjectPath(root, "textures/" + material + "_luma.tga"))));
+        if (!installed) {
+          const auto alias = rbTexture::legacyProjectPresetMaterial(profile, preset);
+          if (usesWad && legacy && lumps.count(alias)) {
+            auto lump = lumps.at(alias);
+            lump.replace(0, 16, material + std::string(16 - material.size(), '\0'));
+            lumps.emplace(material, std::move(lump));
+          } else if (owned.contains(source)) {
+            const auto custom = rbTexture::open(studioProjectOwnedFile(studioProjectPath(root, source), owned.at(source)));
+            const auto customFrame = manifest.contains("frames") ? manifest.at("frames").value(preset.key, 0u) : 0u;
+            evaluate(material, custom, rbTexture::loadAssets(custom, root / folder), customFrame);
+          } else evaluate(material, preset.document(), {}, 0);
+        }
+        ++progress->finished;
+      }
+      manifest["catalogNames"] = std::move(names);
+      manifest["legacyCatalog"] = legacy;
     }
+    if (profile <= 1)
+      result.files.emplace("scripts/" + rbTexture::projectPresetShaders(profile) + ".shader",
+        studioProjectShaderScript(profile, manifest));
     if (usesWad) result.files.emplace(wad, ftebroom::quake1::mipWad(lumps, profile == 4));
     size_t totalBytes = 0;
     for (const auto& [path, content] : result.files) {
@@ -200,7 +316,7 @@ static void studioInstallProjectBake(TextureStudioState::ProjectBake& bake) {
   const auto before = studioProjectManifestBytes(bake.root, bake.profile);
   rbTexture::require(before == bake.manifest, "project", "The project preset library changed during generation.");
   const auto owned = studioParseProjectManifest(before, bake.profile).at("files");
-  if (bake.preset.empty() && bake.profile <= 1) {
+  if (bake.profile <= 1 && bake.files.count("scripts/" + rbTexture::projectPresetShaders(bake.profile) + ".shader")) {
     const auto name = std::string("scripts/shaderlist.txt");
     const auto path = studioProjectPath(bake.root, name);
     std::string list;
@@ -227,16 +343,19 @@ static void studioInstallProjectBake(TextureStudioState::ProjectBake& bake) {
     const auto path = studioProjectPath(bake.root, name);
     std::optional<std::string> previous;
     if (fs::exists(path)) {
-      if (owned.contains(name)) previous = studioProjectOwnedFile(path, owned.at(name));
-      else {
-        previous = ftebroom::bb::readFile(path);
-        if (*previous != bytes && name != "scripts/shaderlist.txt")
-          throw rbTexture::Error("project", "The project already has a different file named " + path.filename().u8string() + ".");
-      }
+      previous = ftebroom::bb::readFile(path);
       if (*previous == bytes) continue;
+      if (owned.contains(name)) {
+        if (ftebroom::sha256(*previous) != owned.at(name))
+          throw rbTexture::Error("project", "A Texture Studio project file changed outside the editor: " + path.filename().u8string());
+      } else if (name != "scripts/shaderlist.txt")
+        throw rbTexture::Error("project", "The project already has a different file named " + path.filename().u8string() + ".");
     }
     writes.push_back({path, &bytes, std::move(previous)});
   }
+  std::stable_partition(writes.begin(), writes.end(), [](const Write& item) {
+    return item.path.extension() == ".json";
+  });
   size_t written = 0;
   try {
     for (const auto& item : writes) {
@@ -273,7 +392,7 @@ static void studioProjectTick() {
     auto bake = s.projectJob.get();
     if (cancelled || !s.open || jamEditing() || bake.root != s.projectRoot || bake.profile != gameProfile) return;
     studioInstallProjectBake(bake);
-    s.projectImported = true;
+    studioProjectStatus(studioProjectManifest(bake.root, bake.profile));
     s.projectOffer = false;
     if (rbTexture::projectUsesWad(bake.profile)) {
       if (bake.preset.empty() && !documentFile.empty() && bake.mapEpoch == organizationMapEpoch)
@@ -302,7 +421,7 @@ static void studioProjectTick() {
 static void studioApplyProjectPreset(const rbTexture::ProjectPreset& preset) {
   const auto& s = textureStudio;
   const auto profile = gameProfile;
-  const auto material = rbTexture::projectPresetMaterial(profile, preset);
+  const auto material = studioPresetMaterial(preset);
   const bool wad = rbTexture::projectUsesWad(profile);
   const auto relative = wad ? rbTexture::projectPresetWad(profile) : rbTexture::projectPresetImagePath(profile, material);
   rbTexture::require(std::filesystem::is_regular_file(studioProjectPath(s.projectRoot, relative)), "project",

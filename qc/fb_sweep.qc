@@ -178,21 +178,56 @@ void fb_sweep_move(vector pixel,int alt,int view)
         float step=max(0.01,cvar("ftebroom_rotate_step"));angle=rint(angle/step)*step;
         fb_sweep_quaternion=fb_sweep_before_quaternion;fb_sweep_qw=fb_sweep_before_qw;fb_sweep_rotate(axis,angle);
     }
-    if(oldOffset!=fb_sweep_offset || oldRotation!=fb_sweep_quaternion || oldScale!=fb_sweep_scale || oldW!=fb_sweep_qw)fb_sweep_build();
+    if(oldOffset!=fb_sweep_offset || oldRotation!=fb_sweep_quaternion || oldScale!=fb_sweep_scale || oldW!=fb_sweep_qw)
+        fb_sweep_valid=FALSE;
 }
-void fb_sweep_up(vector pixel,int alt,int view){fb_sweep_move(pixel,alt,view);fb_sweep_drag=0;fb_active=FALSE;}
+void fb_sweep_up(vector pixel,int alt,int view)
+{
+    int dragging=fb_sweep_drag;
+    fb_sweep_move(pixel,alt,view);fb_sweep_drag=0;fb_active=FALSE;
+    if(dragging)fb_sweep_build();
+}
+void fb_sweep_draw_solid(fb_poly_t *poly,int textured)
+{
+    if(textured)for(int f=0;f<poly->nf;f++){
+        fb_poly_face_t *face=&poly->faces[f];
+        vector size=drawgetimagesize(face->attr.shadername);
+        size_x=max(1,size_x);size_y=max(1,size_y);
+        R_BeginPolygon(face->attr.shadername,3);
+        for(int p=0;p<face->count;p++){
+            vector point=poly->vertices[poly->indices[face->start+p]];
+            R_PolygonVertex(point,[(point*face->attr.sdir+face->attr.sbias)/size_x,
+                (point*face->attr.tdir+face->attr.tbias)/size_y,0],'1 1 1',1);
+        }
+        R_EndPolygon();
+    }
+    for(int e=0;e<poly->ne;e++){
+        fb_poly_edge_t edge=poly->edges[e];
+        fb_visual_line(poly->vertices[edge.a],poly->vertices[edge.b],'1 0.8 0',.85,.85,TRUE);
+    }
+}
 void fb_sweep_draw()
 {
     if(cvar("ftebroom_tool")!=FB_TOOL_SWEEP || !fb_sweep_count)return;
-    shaderforname("ftebroom/sweepwire","{\n{\nmap $whiteimage\nblendfunc blend\nrgbgen vertex\nalphagen vertex\n}\n}");
-    if(fb_sweep_valid)for(int i=0;i<fb_sweep_solid_count;i++) {
-        fb_poly_t *poly=&fb_sweep_solids[i];brushface_t faces[64];for(int f=0;f<poly->nf;f++)faces[f]=poly->faces[f].attr;
-        DrawQCBrushTextured(faces,poly->nf,'1 1 1',0.55);DrawQCBrushWireframe(faces,poly->nf,"ftebroom/sweepwire",'1 0.8 0',0.8);
+    // Use the cached windings and edges instead of reconstructing every
+    // convex solid twice per frame in each viewport.
+    if(fb_sweep_valid && !fb_sweep_drag){
+        int stride=max(1,ceil((float)fb_sweep_solid_count/64));
+        int textured=!cvar("ca_brush_view") && fb_sweep_solid_count<=32;
+        for(int i=0;i<fb_sweep_solid_count;i+=stride)fb_sweep_draw_solid(&fb_sweep_solids[i],textured);
     }
     fb_affine_t cap;fb_sweep_map(1,&cap);
-    for(int f=0;f<fb_sweep_count;f++)for(int p=0;p<fb_sweep_faces[f].count;p++) {
+    for(int f=0;f<min(64,fb_sweep_count);f++)for(int p=0;p<fb_sweep_faces[f].count;p++) {
         fb_sweep_face_t *face=&fb_sweep_faces[f];
         fb_visual_line(fb_affine_point(&cap,face->points[p]),fb_affine_point(&cap,face->points[(p+1)%face->count]),'1 0.8 0',1,1,TRUE);
+    }
+    if(fb_sweep_drag) {
+        vector previous=fb_sweep_center;
+        for(int step=1;step<=16;step++) {
+            fb_affine_t sample;fb_sweep_map((float)step/16,&sample);
+            vector point=fb_affine_point(&sample,fb_sweep_center);
+            fb_visual_line(previous,point,'1 0.8 0',.85,.85,TRUE);previous=point;
+        }
     }
     for(int axis=0;axis<3;axis++)for(int s=0;s<48;s++) {
         vector color='0.2 0.4 1';if(axis==0)color='1 0.2 0.2';if(axis==1)color='0.2 1 0.2';

@@ -72,6 +72,18 @@ void fb_viewopts_tag_tests()
     brush_select(1,brush);fb_filter_prepare();fb_render_faces_prepare();fb_viewopts_expect(fb_render_allowed(node,FB_PICK_LOCKED) && fb_viewopts_face_count(node)==6,"selected_brush_overrides_all_hidden_face_tags");
     fb_incremental_settings();int geometry=fb_grid_geometry_epoch;fb_incremental_settings();
     fb_viewopts_expect(fb_grid_geometry_epoch==geometry,"unchanged_filter_and_selection_do_not_rebuild_geometry_each_frame");
+    cvar_set("ftebroom_hidden_tags","0");fb_selection_clear();
+    brush_get(1,brush,faces,6,&contents);
+    for(int liquidFace=0;liquidFace<6;liquidFace++)faces[liquidFace].shadername=liquidFace==5?"*waterskip":"*water";
+    fb_tx_begin("Water with an invisible contact face");
+    brush=brush_history_edit(1,brush,faces,6,contents);fb_tx_commit();fb_selection_clear();
+    fb_createbox('0 768 384','128 128 128');fb_selection_clear();
+    fb_document_tick();fb_filter_prepare();node=fb_document_brush_node(1,brush);
+    fb_render_faces_prepare();
+    fb_viewopts_expect(fb_render_allowed(node,FB_PICK_LOCKED) && fb_viewopts_face_count(node)==5,
+        "water_skip_contact_face_not_submitted");
+    brush_select(1,brush);fb_filter_prepare();fb_render_faces_prepare();
+    fb_viewopts_expect(fb_viewopts_face_count(node)==5,"selected_water_keeps_skip_face_invisible");
     fb_selection_clear();cvar_set("ftebroom_hidden_tags",ftos(savedMask));cvar_set("ftebroom_classic_map",ftos(savedClassic));cvar_set("ftebroom_grid_alpha",ftos(savedAlpha));cvar_set("ca_grid",ftos(savedGrid));cvar_set("ca_brush_view",ftos(savedView));cvar_set("ftebroom_render_faces",ftos(savedFaces));cvar_set("ftebroom_show_brushes",ftos(savedBrushes));fb_filter_prepare();
 }
 float fb_viewopts_testcommand()

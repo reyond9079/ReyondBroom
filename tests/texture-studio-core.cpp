@@ -43,6 +43,7 @@ void checkProjectPresets() {
     ProjectPresetFiles files, lumps;
     for (const auto& preset : presets) {
       const auto name = projectPresetMaterial(profile, preset);
+      check(projectNumberedName(preset.name), "Project presets use recognizable numbered names");
       check(names.insert(name).second, "Each profile gives every preset a unique material name");
       check(name.size() <= (projectUsesWad(profile) ? 15 : 31), "Material fits its on-disk format");
       if (profile <= 1)

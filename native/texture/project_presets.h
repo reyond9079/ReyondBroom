@@ -12,6 +12,7 @@ struct ProjectPreset {
   const char* label;
   int family;
   unsigned index;
+  std::string name;
 
   Document document() const {
     return family < 0 ? builtinPreset(index, "project-" + key)
@@ -19,14 +20,39 @@ struct ProjectPreset {
   }
 };
 
+inline std::string projectMaterialWord(std::string label, std::string fallback = {}) {
+  for (auto& c : label) {
+    if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+    else if (c < 'a' || c > 'z') c = ' ';
+  }
+  const auto surrounded = " " + label + " ";
+  for (const char* kind : {"brick", "plaster", "concrete", "ceramic", "porcelain", "tile", "gravel", "basalt",
+                          "rubber", "water", "foam", "lava", "oil", "metal", "steel", "iron", "wood",
+                          "stone", "sand", "mud", "snow", "ice", "grass", "moss", "paint", "energy", "glass"}) {
+    if (surrounded.find(" " + std::string(kind) + " ") != std::string::npos) return kind;
+  }
+  if (!fallback.empty()) return fallback;
+  const auto start = label.find_first_not_of(' ');
+  return start == std::string::npos ? "material" : label.substr(start, std::min(size_t(10), label.find(' ', start) - start));
+}
+
 inline const std::vector<ProjectPreset>& projectPresets() {
   static const auto presets = [] {
     std::vector<ProjectPreset> result;
+    std::map<std::string, unsigned> counts;
+    const auto name = [&](const char* label, const char* fallback) {
+      const auto word = projectMaterialWord(label, fallback);
+      return word + "_" + std::to_string(++counts[word]);
+    };
+    const char* builtinKinds[]{"brick", "ceramic", "hazard", "concrete", "gravel", "panel", "basalt",
+      "rubber", "water", "foam", "lava", "oil", "energy", "display"};
     for (unsigned index = 0; index < presetNames.size(); ++index)
-      result.push_back({"builtin-" + std::to_string(index), presetNames[index], -1, index});
+      result.push_back({"builtin-" + std::to_string(index), presetNames[index], -1, index, name(presetNames[index], builtinKinds[index])});
     for (unsigned family = 0; family < std::size(catalogRecipes); ++family)
-      for (unsigned index = 0; index < std::size(catalogRecipes[family]); ++index)
-        result.push_back({recipeId(family, index), catalogRecipes[family][index].name, int(family), index});
+      for (unsigned index = 0; index < std::size(catalogRecipes[family]); ++index) {
+        const auto* label = catalogRecipes[family][index].name;
+        result.push_back({recipeId(family, index), label, int(family), index, name(label, recipeCategoryIds[family])});
+      }
     return result;
   }();
   return presets;
@@ -40,7 +66,22 @@ inline std::string projectProfileId(int profile) {
   return ids[profile];
 }
 
+inline std::string projectMaterialPath(int profile, const std::string& name) {
+  return projectUsesWad(profile) ? name : "reyond-studio/" + name;
+}
+
+inline bool projectNumberedName(std::string_view name) {
+  const auto separator = name.find('_');
+  return name.size() <= 15 && separator != name.npos && separator > 0 && separator + 1 < name.size() &&
+    name.substr(0, separator).find_first_not_of("abcdefghijklmnopqrstuvwxyz") == name.npos &&
+    name.substr(separator + 1).find_first_not_of("0123456789") == name.npos;
+}
+
 inline std::string projectPresetMaterial(int profile, const ProjectPreset& preset) {
+  return projectMaterialPath(profile, preset.name);
+}
+
+inline std::string legacyProjectPresetMaterial(int profile, const ProjectPreset& preset) {
   const auto hash = ftebroom::sha256(projectProfileId(profile) + "/" + preset.key);
   return projectUsesWad(profile) ? "rbs_" + hash.substr(0, 11) : "reyond-studio/p" + hash.substr(0, 14);
 }
@@ -84,9 +125,8 @@ inline ProjectPresetFiles projectWadLumps(const std::string& archive, int profil
   return lumps;
 }
 
-inline void projectEncodePreset(ProjectPresetFiles& files, ProjectPresetFiles& lumps, int profile,
-    const ProjectPreset& preset, const Evaluation& evaluation, const std::string& palette) {
-  const auto material = projectPresetMaterial(profile, preset);
+inline void projectEncodeMaterial(ProjectPresetFiles& files, ProjectPresetFiles& lumps, int profile,
+    const std::string& material, const Evaluation& evaluation, const std::string& palette) {
   const auto& base = *evaluation.outputs.at("baseColor");
   if (profile == 2 || profile == 3 || profile == 4) {
     auto opaque = base;
@@ -113,10 +153,14 @@ inline void projectEncodePreset(ProjectPresetFiles& files, ProjectPresetFiles& l
   }
 }
 
-inline std::string projectShaderText(int profile) {
-  std::string shaders;
-  for (const auto& preset : projectPresets()) {
-    const auto material = "textures/" + projectPresetMaterial(profile, preset);
+inline void projectEncodePreset(ProjectPresetFiles& files, ProjectPresetFiles& lumps, int profile,
+    const ProjectPreset& preset, const Evaluation& evaluation, const std::string& palette) {
+  projectEncodeMaterial(files, lumps, profile, projectPresetMaterial(profile, preset), evaluation, palette);
+}
+
+inline std::string projectShaderEntry(int profile, const std::string& name) {
+    const auto material = "textures/" + name;
+    std::string shaders;
     shaders += material + "\n{\n qer_editorimage " + material + ".tga\n";
     if (profile == 1) {
       shaders += " fte_program defaultwall\n diffusemap " + material + ".tga\n normalmap " + material
@@ -126,7 +170,12 @@ inline std::string projectShaderText(int profile) {
       shaders += " {\n  map " + material + ".tga\n  alphaFunc GE128\n  depthWrite\n }\n"
         " {\n  map $lightmap\n  blendFunc filter\n  depthFunc equal\n }\n}\n";
     }
-  }
+    return shaders;
+}
+
+inline std::string projectShaderText(int profile) {
+  std::string shaders;
+  for (const auto& preset : projectPresets()) shaders += projectShaderEntry(profile, projectPresetMaterial(profile, preset));
   return shaders;
 }
 

@@ -40,6 +40,7 @@ struct TextureStudioState {
     unsigned projectFrame = 0;
   };
   struct ProjectProgress {
+    size_t total = 0;
     std::atomic<bool> cancel{false};
     std::atomic<size_t> finished{0};
   };
@@ -92,10 +93,13 @@ struct TextureStudioState {
   std::filesystem::path projectRoot, projectDestination;
   int projectProfile = -1, projectFamily = -2;
   bool projectOffer = true, projectImported = false;
+  bool docked = false;
+  std::set<std::pair<int, std::filesystem::path>> promptedProjects;
+  rbTexture::Json projectNames = rbTexture::Json::object();
+  bool projectLegacy = false;
   std::string projectPreset;
   std::shared_ptr<ProjectProgress> projectProgress;
   std::future<ProjectBake> projectJob;
-  std::vector<std::filesystem::path> created;
   Apply apply = Apply::none;
 };
 
@@ -104,6 +108,10 @@ static TextureStudioState textureStudio;
 static bool textureStudioFocused() {
   const auto& s = textureStudio;
   return s.open && (s.focused || s.focus) && !jamEditing();
+}
+
+static bool textureStudioDocked() {
+  return textureStudio.docked && !bbActive;
 }
 
 static const rbTexture::Document& textureStudioDoc() {
@@ -245,7 +253,6 @@ static void textureStudioShow() {
   auto& s = textureStudio;
   if (!s.document) studioNew();
   else if (!s.open && !s.result) studioSchedule();
-  if (!s.open) s.projectOffer = true;
   s.open = true;
   s.focus = true;
 }
@@ -300,15 +307,6 @@ static void studioVideoChanged() {
   if (s.open && s.result && s.result->revision == s.revision) studioUpload();
 }
 
-static void studioRollback() {
-  auto& s = textureStudio;
-  for (auto it = s.created.rbegin(); it != s.created.rend(); ++it) {
-    std::error_code error;
-    std::filesystem::remove(*it, error);
-    if (error) s.error = "Unable to remove an incomplete generated asset: " + it->filename().u8string();
-  }
-  s.created.clear();
-}
 
 static bool studioProfileAllowsApply() { return gameProfile >= 0 && gameProfile <= 4; }
 
@@ -521,68 +519,117 @@ static rbTexture::Image studioSurfacePreview(const rbTexture::Image& color, rbTe
 static void studioInstall() {
   auto& s = textureStudio;
   const auto& graph = textureStudioDoc();
-  const auto& image = *s.result->image.outputs.at("baseColor");
   const auto source = graph.save();
   const auto digest = ftebroom::jam::sha256(source);
-  const bool quake3 = s.profile == 0, quake1 = s.profile == 2, quake2 = s.profile == 3, goldsrc = s.profile == 4;
-  const bool wad = quake1 || goldsrc;
-  std::string palette;
-  if (quake1) palette = q1Palette();
-  if (quake2) palette = q2Palette();
-  if (goldsrc) palette = studioGoldSrcPalette();
+  const int profile = s.profile;
+  const bool wad = rbTexture::projectUsesWad(profile);
+  const auto palette = profile == 2 ? q1Palette() : profile == 3 ? q2Palette() :
+    profile == 4 ? studioGoldSrcPalette() : std::string{};
   const auto paletteHash = palette.empty() ? std::string{} : ftebroom::sha256(palette);
-  // An earlier editor may have installed an upper-left TGA at the old name.
-  const auto encoding = quake3 ? "/tga/lower-left" : "";
-  const auto hash = ftebroom::sha256(digest + "/frame/" + std::to_string(s.frame) + "/palette/" + paletteHash + encoding);
-  const auto id = wad ? "rb_" + hash.substr(0, 12) : hash.substr(0, quake2 ? 16 : 20);
-  const auto name = wad ? id : "reyond-studio/" + id;
-  const auto format = quake1 ? rbTexture::IndexedFormat::wad2 :
-    goldsrc ? rbTexture::IndexedFormat::wad3 : rbTexture::IndexedFormat::wal;
-  const auto origin = quake3 ? rbTexture::TgaOrigin::lowerLeft : rbTexture::TgaOrigin::upperLeft;
-  const auto imageBytes = palette.empty() ? rbTexture::tga(image, origin) : rbTexture::indexed(image, name, palette, format);
-  s.material = "textures/" + name;
+  const auto key = ftebroom::sha256(digest + "/frame/" + std::to_string(s.frame) + "/palette/" + paletteHash);
   const auto root = std::filesystem::canonical(s.destination);
-  const std::filesystem::path relative = wad ? "texture-wads" : "textures/reyond-studio";
-  const auto folder = root / relative;
-  if (std::filesystem::weakly_canonical(folder) != folder)
-    throw std::runtime_error("The generated-texture folder must be inside the real game texture directory.");
-  std::filesystem::create_directories(folder);
-  studioCopyOriginals(folder);
-  const auto insert = [&](std::string suffix, const std::string& bytes) {
-    const auto file = folder / (id + suffix);
-    if (std::filesystem::weakly_canonical(file) != file)
-      throw std::runtime_error("The generated asset path points through a filesystem link.");
-    if (std::filesystem::exists(file)) {
-      if (ftebroom::bb::readFile(file) != bytes)
-        throw std::runtime_error("A different asset already uses this content name.");
-      return;
-    }
-    ftebroom::bb::atomicWrite(file, bytes);
-    s.created.push_back(file);
+  const auto previous = studioProjectManifestBytes(root, profile);
+  auto library = studioParseProjectManifest(previous, profile);
+  const bool legacy = studioLegacyCatalog(library);
+  library["legacyCatalog"] = legacy;
+  rbTexture::require(library.value("palette", paletteHash) == paletteHash, "project",
+    "The game palette changed since the materials were imported.");
+  auto generated = library.value("generated", rbTexture::Json::object());
+  const auto archive = rbTexture::projectPresetWad(profile);
+  const auto folder = std::string(wad ? "texture-wads/" : "textures/reyond-studio/");
+  rbTexture::ProjectPresetFiles lumps;
+  auto id = generated.value(key, std::string{});
+  std::string unfinishedLump;
+  const auto pendingMaterialMatches = [&](const std::string& name) {
+    const auto path = studioProjectPath(root, folder + name + ".reyond.json");
+    if (!std::filesystem::is_regular_file(path)) return false;
+    const auto saved = rbTexture::parseJson(ftebroom::bb::readFile(path, 65536));
+    return saved.value("sourceHash", "") == digest && saved.value("frame", 0u) == s.frame &&
+      saved.value("paletteSha256", "") == paletteHash;
   };
-  const auto manifest = rbTexture::Json{
+  if (wad) {
+    const auto archivePath = studioProjectPath(root, archive);
+    if (std::filesystem::is_regular_file(archivePath)) {
+      const auto bytes = ftebroom::bb::readFile(archivePath);
+      const auto committedHash = library.at("files").value(archive, std::string{});
+      lumps = rbTexture::projectWadLumps(bytes, profile);
+      if (ftebroom::sha256(bytes) != committedHash) {
+        // A previous Apply may have installed the WAD just before the editor stopped.
+        for (const auto& [name, lump] : lumps) {
+          if (!rbTexture::projectNumberedName(name) || !pendingMaterialMatches(name)) continue;
+          auto committed = lumps;
+          committed.erase(name);
+          const bool original = committedHash.empty() ? committed.empty() :
+            ftebroom::sha256(ftebroom::quake1::mipWad(committed, profile == 4)) == committedHash;
+          if (!original) continue;
+          id = name;
+          unfinishedLump = lump;
+          break;
+        }
+        rbTexture::require(!unfinishedLump.empty(), "project",
+          "The Texture Studio WAD changed outside the editor.");
+      }
+    }
+  }
+  const auto nameExists = [&](const std::string& name) {
+    return wad ? lumps.count(name) != 0 : std::filesystem::is_regular_file(studioProjectPath(root,
+      rbTexture::projectPresetImagePath(profile, rbTexture::projectMaterialPath(profile, name))));
+  };
+  s.wadReference = wad && s.apply != TextureStudioState::Apply::asset ? studioProjectWadReference(root, profile) : "";
+  if (unfinishedLump.empty() && rbTexture::projectNumberedName(id) && nameExists(id)) {
+    s.material = "textures/" + rbTexture::projectMaterialPath(profile, id);
+    return;
+  }
+  if (!rbTexture::projectNumberedName(id)) {
+    const auto category = rbTexture::projectMaterialWord(graph.source.value("name", std::string{}));
+    auto used = studioProjectMaterialInventory();
+    for (const auto& [name, content] : lumps) used.insert("textures/" + name);
+    for (const auto& name : generated) if (name.is_string())
+      used.insert("textures/" + rbTexture::projectMaterialPath(profile, name.get<std::string>()));
+    for (;;) {
+      id = studioNextMaterialName(profile, category, used);
+      used.insert("textures/" + rbTexture::projectMaterialPath(profile, id));
+      const auto pending = studioProjectPath(root, folder + id + ".reyond.json");
+      if (std::filesystem::exists(pending)) {
+        if (pendingMaterialMatches(id)) break;
+      } else if (!nameExists(id)) break;
+    }
+  }
+  generated[key] = id;
+  library["generated"] = std::move(generated);
+  library["palette"] = paletteHash;
+  const auto name = rbTexture::projectMaterialPath(profile, id);
+  s.material = "textures/" + name;
+  TextureStudioState::ProjectBake bake{root, profile, s.epoch, previous, id, {}};
+  rbTexture::projectEncodeMaterial(bake.files, lumps, profile, name, s.result->image, palette);
+  rbTexture::require(unfinishedLump.empty() || unfinishedLump == lumps.at(name), "project",
+    "The interrupted Texture Studio WAD entry does not match the regenerated texture.");
+  const auto hash = ftebroom::sha256(wad ? lumps.at(name) :
+    bake.files.at(rbTexture::projectPresetImagePath(profile, name)));
+  const auto sidecar = rbTexture::Json{
     {"version", 1}, {"generatorVersion", rbTexture::generatorVersion}, {"profile", gameProfileName()},
     {"material", s.material}, {"sourceHash", digest}, {"frame", s.frame}, {"paletteSha256", paletteHash},
-    {"identity", ftebroom::jam::sha256(rbTexture::renderIdentity(graph))}, {"runtimeHash", ftebroom::jam::sha256(imageBytes)}};
-  insert(".rbtex.json", graph.save());
-  insert(".reyond.json", manifest.dump(2) + "\n");
-  // Publish the discoverable texture only after its editable source and manifest are in place.
-  insert(wad ? ".wad" : quake2 ? ".wal" : ".tga", imageBytes);
-  s.wadReference.clear();
+    {"identity", ftebroom::jam::sha256(rbTexture::renderIdentity(graph))}, {"runtimeHash", hash}};
+  bake.files.emplace(folder + id + ".rbtex.json", source);
+  bake.files.emplace(folder + id + ".reyond.json", sidecar.dump(2) + "\n");
+  for (const auto& reference : graph.source.at("assetReferences")) {
+    const auto sha = rbTexture::idField(reference, "sha256", "assets");
+    bake.files.emplace(folder + rbTexture::imageRelativePath(sha), rbTexture::readOriginal(s.assetFolder, reference));
+  }
+  if (wad) bake.files.emplace(archive, ftebroom::quake1::mipWad(lumps, profile == 4));
+  if (profile <= 1)
+    bake.files.emplace("scripts/" + rbTexture::projectPresetShaders(profile) + ".shader",
+      studioProjectShaderScript(profile, library));
+  for (const auto& [path, bytes] : bake.files) library["files"][path] = ftebroom::sha256(bytes);
+  bake.files.emplace(studioProjectManifestLocation(profile), library.dump(2) + "\n");
+  studioInstallProjectBake(bake);
+  if (s.projectRoot == root) studioProjectStatus(library);
   if (wad) {
-    if (s.apply != TextureStudioState::Apply::asset) {
-      const auto file = folder / (id + ".wad");
-      auto reference = file.lexically_relative(documentFile.parent_path());
-      if (reference.empty()) reference = relative / file.filename();
-      s.wadReference = reference.generic_u8string();
-      rbTexture::require(s.wadReference.find_first_of(";\"\r\n") == std::string::npos, "wad",
-        "Choose a map location without WAD separators or quotes in its path.");
-    }
     q1IndexAssets();
     resetMaterialBrowser();
     publishMaterialTags();
     cvars->SetFloat("ftebroom_material_count", float(materials.size()));
-  } else command("fs_flush\nftebroom_assets_ready\n");
+  } else command("fs_restart\nftebroom_assets_ready\n");
 }
 
 static void studioApplyTick() {
@@ -598,7 +645,6 @@ static void studioApplyTick() {
   if (s.apply == A::asset) {
     if (s.result && s.result->revision == s.revision && s.result->fullSize) {
       studioInstall();
-      s.created.clear();
       s.apply = A::none;
       s.message = "Created " + s.material + ".";
     }
@@ -614,7 +660,6 @@ static void studioApplyTick() {
   const bool ack = int(cvars->GetFloat("ftebroom_texture_apply_ack")) == s.ticket;
   if (!ack && ImGui::GetTime() < s.deadline) return;
   if (!ack && s.apply == A::commit) {
-    s.created.clear();
     throw std::runtime_error("Apply was not acknowledged. The generated asset remains available.");
   }
   char value[80]{};
@@ -634,7 +679,6 @@ static void studioApplyTick() {
     const auto faceMaterial = s.profile == 1 ? s.material : s.material.substr(sizeof("textures/") - 1);
     studioQCSend("commit", faceMaterial);
   } else if (s.apply == A::commit && (status == "applied" || status == "unchanged")) {
-    s.created.clear();
     s.apply = A::none;
     s.message = "Material applied. Undo restores the previous face materials.";
   } else {
@@ -711,7 +755,6 @@ static void studioTick() {
   } catch (const std::exception& e) {
     s.error = e.what();
     s.apply = TextureStudioState::Apply::none;
-    studioRollback();
   }
   if (!s.inputJob.valid() || s.inputJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
   const bool cancelled = *s.inputCancel;
@@ -778,11 +821,13 @@ static std::string studioMaterialId(std::string_view material) {
   if (material.substr(0, prefix.size()) == prefix) material.remove_prefix(prefix.size());
   const bool indexed = gameProfile == 2 || gameProfile == 4;
   if (indexed) {
+    if (rbTexture::projectNumberedName(material)) return std::string(material);
     if (material.size() != 15 || material.substr(0, 3) != "rb_") return {};
   } else {
     constexpr std::string_view folder = "reyond-studio/";
     if (material.substr(0, folder.size()) != folder) return {};
     material.remove_prefix(folder.size());
+    if (rbTexture::projectNumberedName(material)) return std::string(material);
     if (material.size() != (gameProfile == 3 ? 16 : 20)) return {};
   }
   const auto digest = material.substr(indexed ? 3 : 0);
@@ -793,8 +838,15 @@ static std::string studioMaterialId(std::string_view material) {
 static void studioChooseProjectPreset(const rbTexture::ProjectPreset& preset);
 
 static bool textureStudioHasMaterialSource(std::string_view material) {
-  return !jamEditing() && studioProfileAllowsApply() &&
-    (!studioMaterialId(material).empty() || studioProjectPresetForMaterial(material));
+  if (jamEditing() || !studioProfileAllowsApply()) return false;
+  try {
+    studioRefreshProjectScope();
+    if (studioProjectPresetForMaterial(material)) return true;
+    const auto id = studioMaterialId(material);
+    if (id.empty() || textureStudio.projectRoot.empty()) return false;
+    const auto folder = rbTexture::projectUsesWad(gameProfile) ? "texture-wads/" : "textures/reyond-studio/";
+    return std::filesystem::is_regular_file(studioProjectPath(textureStudio.projectRoot, folder + id + ".rbtex.json"));
+  } catch (const std::exception&) { return false; }
 }
 
 static void textureStudioShowMaterialSource(std::string_view material) {
@@ -1242,7 +1294,11 @@ static void studioExportDialog() {
   using F = StudioExport;
   static int format = int(F::png8), quality = 92;
   static bool masked = false;
-  static char textureName[32] = "studio_brick";
+  static char textureName[32]{};
+  if (ImGui::IsWindowAppearing()) {
+    const auto word = rbTexture::projectMaterialWord(textureStudioDoc().source.value("name", std::string{}));
+    std::snprintf(textureName, sizeof textureName, "%s_1", word.c_str());
+  }
   static constexpr const char* formatNames =
     "PNG 8-bit\0PNG 16-bit\0TGA\0JPEG\0Quake WAD2\0Half-Life WAD3\0Quake II WAL\0Quake III PK3\0FTE material PK3\0";
   ImGui::Combo("Format", &format, formatNames);
@@ -1272,6 +1328,17 @@ static void studioExportDialog() {
   const bool dryRun = ImGui::Button("Dry run");
   runUiRecordGlobal("texture-studio/export-dry-run");
   ImGui::EndDisabled();
+  if (ready && !bbActive && !s.projectRoot.empty() && s.result->image.outputs.count("baseColor")) {
+    ImGui::SameLine();
+    if (ImGui::Button("Save to project")) {
+      studioAction([&] {
+        if (const auto* preset = studioProjectPresetByKey(s.projectPreset); preset && s.projectImported)
+          studioBeginProjectBake(preset);
+        else studioBeginApply(true);
+      });
+      if (s.apply != TextureStudioState::Apply::none || s.projectJob.valid()) ImGui::CloseCurrentPopup();
+    }
+  }
   ImGui::SameLine();
   if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
   static std::string manifestStamp, manifestText, manifestHash;
@@ -2289,8 +2356,8 @@ static void studioModeTabs(bool applying) {
 static void studioProjectPrompt(bool busy) {
   auto& s = textureStudio;
   if (s.projectJob.valid()) {
-    ImGui::TextUnformatted(s.projectImported ? "Updating project material…" : "Importing project presets…");
-    const auto total = s.projectImported ? size_t(1) : rbTexture::projectPresets().size();
+    const auto total = s.projectProgress->total;
+    ImGui::TextUnformatted(total == 1 ? "Updating project material…" : "Importing project presets…");
     ImGui::ProgressBar(float(s.projectProgress->finished) / float(total), {-1, 0});
     if (ImGui::Button("Cancel")) {
       s.projectProgress->cancel = true;
@@ -2299,19 +2366,41 @@ static void studioProjectPrompt(bool busy) {
     runUiRecordGlobal("texture-studio/project/cancel");
     return;
   }
-  if (s.projectRoot.empty() || s.projectImported) return;
-  if (s.projectOffer)
-    ImGui::TextWrapped("Import %zu built-in presets into the %s project?", rbTexture::projectPresets().size(),
-      gameProfileName());
+  if (s.projectRoot.empty()) return;
+  constexpr const char* title = "Import Texture Studio presets";
   ImGui::BeginDisabled(busy);
-  if (ImGui::Button("Import presets")) studioAction([] { studioBeginProjectBake(); });
-  runUiRecordGlobal("texture-studio/project/import");
-  if (s.projectOffer) {
-    ImGui::SameLine();
-    if (ImGui::Button("Later")) s.projectOffer = false;
-    runUiRecordGlobal("texture-studio/project/later");
-  }
+  if (ImGui::Button("Import all presets…")) s.projectOffer = true;
+  runUiRecordGlobal("texture-studio/project/offer");
   ImGui::EndDisabled();
+  if (s.projectOffer && !busy &&
+      !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+    ImGui::OpenPopup(title);
+  if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    const auto dismissOffer = [&] {
+      s.promptedProjects.insert({s.projectProfile, s.projectRoot});
+      s.projectOffer = false;
+      ImGui::CloseCurrentPopup();
+    };
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 360 * uiScale());
+    const auto format = s.projectProfile == 2 ? "one shared WAD2" : s.projectProfile == 4 ? "one shared WAD3" :
+      s.projectProfile == 3 ? "WAL textures" : "TGA textures and shaders";
+    ImGui::Text("Import all %zu presets into %s?", rbTexture::projectPresets().size(), gameProfileName());
+    ImGui::TextUnformatted(format);
+    if (s.projectImported) ImGui::TextUnformatted("Existing project edits will be kept.");
+    ImGui::PopTextWrapPos();
+    ImGui::BeginDisabled(busy);
+    if (ImGui::Button("Import all presets")) {
+      studioAction([] { studioBeginProjectBake(); });
+      if (s.projectJob.valid()) dismissOffer();
+    }
+    runUiRecordGlobal("texture-studio/project/import");
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Later")) dismissOffer();
+    runUiRecordGlobal("texture-studio/project/later");
+    if (!s.error.empty()) ImGui::TextWrapped("%s", s.error.c_str());
+    ImGui::EndPopup();
+  }
 }
 
 static void studioProjectGallery(bool busy) {
@@ -2366,7 +2455,7 @@ static void studioProjectGallery(bool busy) {
         runUiRecordGlobal("texture-studio/project/preset/" + preset.key);
         const bool hovered = ImGui::IsItemHovered();
         if (click) studioAction([&] { studioChooseProjectPreset(preset); });
-        const auto material = s.projectImported ? "textures/" + rbTexture::projectPresetMaterial(gameProfile, preset) : "";
+        const auto material = s.projectImported ? "textures/" + studioPresetMaterial(preset) : "";
         const auto handle = !material.empty() ? thumbnail(material) :
           studioFindThumbnail("project-" + preset.key, [&preset] { return preset.document(); }, ImGui::IsItemVisible());
         auto* drawList = ImGui::GetWindowDrawList();
@@ -2391,7 +2480,7 @@ static void textureStudioPanel() {
   auto& s = textureStudio;
   studioTick();
   studioThumbnailTick();
-  if (s.open) studioAction([&] { studioRefreshProjectScope(s.projectOffer && s.focus); });
+  if (s.open) studioAction([&] { studioRefreshProjectScope(s.focus); });
   studioProjectTick();
   if (!s.open || jamEditing()) return;
   if (s.previewMode == TextureStudioState::surface && s.apply == TextureStudioState::Apply::none &&
@@ -2450,6 +2539,7 @@ static void textureStudioPanel() {
   const bool contentVisible = ImGui::Begin(bbActive ? "Texture Studio###Model Texture Studio" : "Texture Studio", &s.open,
     bbActive ? ImGuiWindowFlags_NoDocking : ImGuiWindowFlags_None);
   s.focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+  s.docked = ImGui::GetCurrentWindowRead()->DockIsActive;
   if (contentVisible) {
     const auto nextButton = [](const char* label) {
       const auto& style = ImGui::GetStyle();
@@ -2469,9 +2559,11 @@ static void textureStudioPanel() {
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
         {"busy", s.job.valid() || s.inputJob.valid() || s.projectJob.valid() || s.apply != TextureStudioState::Apply::none},
         {"projectImported", s.projectImported}, {"projectPreset", s.projectPreset},
+        {"projectAvailable", !s.projectRoot.empty()}, {"projectOfferPending", s.projectOffer},
+        {"cameraForward", cvars->GetFloat("ftebroom_forward")},
         {"projectMaterialReady", [&] {
           const auto* preset = studioProjectPresetByKey(s.projectPreset);
-          return preset && materials.count("textures/" + rbTexture::projectPresetMaterial(gameProfile, *preset)) != 0;
+          return preset && materials.count("textures/" + studioPresetMaterial(*preset)) != 0;
         }()},
         {"docked", window->DockIsActive},
         {"readingSource", s.inputJob.valid()}, {"readOnly", textureStudioDoc().readOnly}, {"error", s.error}

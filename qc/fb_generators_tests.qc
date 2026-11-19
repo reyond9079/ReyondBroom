@@ -717,6 +717,34 @@ return TRUE;
         int sculptTest_cancelHistory=history;fb_tx_begin("Cancelled stroke");fb_sculpt_stroke=TRUE;fb_sculpt_changed=TRUE;fb_sculpt_at([6064,0,sculptTest_top],'0 0 1');fb_tool_activate(FB_TOOL_CLIP);
         fb_transform_expect(!fb_sculpt_stroke&&!fb_tx_depth&&history==sculptTest_cancelHistory&&cvar("ftebroom_tool")==FB_TOOL_CLIP,"sculpt45_tool_change_cancels");fb_tool_deactivate();return TRUE;
     }
+    if(argv(1)=="sculpt46"){
+        fb_cancel();fb_selection_clear();
+        fb_createbox('7200 0 64','256 256 128');
+        int sculpt46Model=selectedbrushes[0].model,sculpt46Id=selectedbrushes[0].id,sculpt46History=history;
+        fb_tool_activate(FB_TOOL_SCULPT);
+        cvar_set("ca_brush_view","3");cvar_set("ca_brush_viewsize","512");
+        fb_view_centers[3]='7200 0 64';fb_view_prepare();
+        cvar_set("ftebroom_sculpt_radius","16");cvar_set("ftebroom_sculpt_intensity","8");
+        cvar_set("ftebroom_sculpt_prevent_collapse","1");cvar_set("ftebroom_sculpt_mode","0");
+        vector sculpt46Pixel=project('7200 0 64');sculpt46Pixel_z=0;
+        vector sculpt46Original[2],sculpt46Raised[2],sculpt46Lowered[2];
+        brush_getfacepoints(sculpt46Model,sculpt46Id,0,sculpt46Original,2);
+        fb_tool_pointer_down(sculpt46Pixel,0,3);fb_tool_pointer_up(sculpt46Pixel,0,3);
+        sculpt46Id=selectedbrushes[0].id;
+        brush_getfacepoints(sculpt46Model,sculpt46Id,0,sculpt46Raised,2);
+        fb_transform_expect(history!=sculpt46History && sculpt46Raised[1][2]>sculpt46Original[1][2]+7.9 &&
+           sculpt46Raised[0]==sculpt46Original[0],"sculpt46_raise_face_center_pointer");
+        cvar_set("ftebroom_sculpt_mode","1");
+        int sculpt46RaisedHistory=history;
+        fb_tool_pointer_down(sculpt46Pixel,0,3);fb_tool_pointer_up(sculpt46Pixel,0,3);
+        sculpt46Id=selectedbrushes[0].id;
+        brush_getfacepoints(sculpt46Model,sculpt46Id,0,sculpt46Lowered,2);
+        fb_transform_expect(history!=sculpt46RaisedHistory && vlen(sculpt46Lowered[0]-sculpt46Original[0])<.01 &&
+           vlen(sculpt46Lowered[1]-sculpt46Original[1])<.01,"sculpt46_lower_face_center_pointer");
+        brush_undo();brush_undo();
+        fb_transform_expect(history==sculpt46History,"sculpt46_pointer_strokes_undo");
+        fb_tool_deactivate();cvar_set("ca_brush_view","0");return TRUE;
+    }
     if(argv(1)=="rock45") {
         fb_cancel();fb_selection_clear();fb_createbox('0 0 256','512 512 512');fb_document_tick();int rockHistory=history;
         cvar_set("ftebroom_rock_segments","10");cvar_set("ftebroom_rock_seed","1337");cvar_set("ftebroom_rock_hollow","0");cvar_set("ftebroom_rock_group","0");

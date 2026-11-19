@@ -6,6 +6,7 @@ var float autocvar_ftebroom_sculpt_intensity=2;
 var float autocvar_ftebroom_sculpt_mode=0;
 var float autocvar_ftebroom_sculpt_prevent_collapse=1;
 int fb_sculpt_stroke,fb_sculpt_changed,fb_sculpt_hit;
+int fb_sculpt_model,fb_sculpt_id,fb_sculpt_face;
 vector fb_sculpt_center,fb_sculpt_normal,fb_sculpt_pixel;
 float fb_sculpt_time;
 enum : int { FB_SCULPT_WRITE_FAILED=-1, FB_SCULPT_INVALID_SAMPLE=-2 };
@@ -43,12 +44,11 @@ int fb_sculpt_at(vector center,vector normal)
             for(int i=0;i<nv;i++)if(vlen(vertices[i].point-point)<.001){index=i;break;}
             if(index<0){index=nv++;vertices[index].point=point;vertices[index].limit=1000000;}
             mapping[mapped++]=index;
-            if(!protect)continue;
             int front=FALSE;float limit=1000000;
             for(int f=0;f<poly->nf;f++) {
                 brushface_t *face=&poly->faces[f].attr;float dot=face->planenormal*normal;
                 if(dot>.001&&fabs(point*face->planenormal-face->planedist)<.01)front=TRUE;
-                if(dot<-.001){float thickness=(face->planedist-point*face->planenormal)/(-dot);if(thickness>.001)limit=min(limit,max(0,thickness-1));}
+                if(protect && dot<-.001){float thickness=(face->planedist-point*face->planenormal)/(-dot);if(thickness>.001)limit=min(limit,max(0,thickness-1));}
             }
             if(!front)vertices[index].fixed=TRUE;
             vertices[index].limit=min(vertices[index].limit,limit);
@@ -69,8 +69,8 @@ int fb_sculpt_at(vector center,vector normal)
             }
             if(weights>0)displacement=(total/weights-height)*bound(0,intensity/8,1)*fb_sculpt_falloff(distance,radius);
         } else {
-            if(height<-.001||height>depth)continue;
-            displacement=(mode==1?-1:1)*intensity*fb_sculpt_falloff(distance,radius)*(1-bound(0,height/depth,1));
+            if(fabs(height)>depth)continue;
+            displacement=(mode==1?-1:1)*intensity*fb_sculpt_falloff(distance,radius)*(1-fabs(height)/depth);
         }
         if(protect)displacement=max(displacement,-vertex->limit);
         vertex->delta=displacement;
@@ -100,6 +100,33 @@ int fb_sculpt_at(vector center,vector normal)
     }
     return changed;
 }
+// A convex brush has no interior face vertices. On an unsubdivided surface
+// move the hit plane when its corners lie outside the brush radius.
+int fb_sculpt_face_at(int model,int id,int face,vector center)
+{
+    int mode=bound(0,autocvar_ftebroom_sculpt_mode,2);
+    if(mode==2)return 0;
+    brushface_t attributes[64];int contents;
+    int count=brush_get(model,id,attributes,64,&contents);
+    if(count<4 || count>64 || face<0 || face>=count)return 0;
+    vector normal=attributes[face].planenormal;
+    float amount=bound(.1,autocvar_ftebroom_sculpt_intensity,1024);
+    if(mode==1){
+        if(autocvar_ftebroom_sculpt_prevent_collapse)for(int f=0;f<count;f++){
+            float oppose=-normal*attributes[f].planenormal;
+            if(oppose>.001)amount=min(amount,max(0,(attributes[f].planedist-center*attributes[f].planenormal)/oppose-1));
+        }
+        amount=-amount;
+    }
+    if(fabs(amount)<.001)return 0;
+    attributes[face].planedist+=amount;
+    fb_poly_t result={0};
+    int valid=fb_poly_from_faces(attributes,count,&result);
+    fb_poly_free(&result);
+    if(!valid)return FB_SCULPT_INVALID_SAMPLE;
+    if(!brush_history_edit(model,id,attributes,count,contents))return FB_SCULPT_WRITE_FAILED;
+    return 1;
+}
 void fb_sculpt_finish(int apply)
 {
     if(fb_sculpt_stroke){fb_sculpt_stroke=FALSE;if(apply&&fb_sculpt_changed)fb_tx_commit();else fb_tx_cancel();fb_document_tick();}
@@ -107,17 +134,25 @@ void fb_sculpt_finish(int apply)
 }
 void fb_sculpt_pick(vector pixel)
 {
-    fb_sculpt_hit=FALSE;fb_pick(pixel);
-    for(int i=0;i<fb_hit_count;i++)if(fb_hits[i].kind==FB_HIT_BRUSH){fb_sculpt_center=fb_hits[i].point;fb_sculpt_normal=fb_hits[i].normal;fb_sculpt_hit=TRUE;break;}
+    fb_sculpt_hit=FALSE;
+    int orthographic=cvar("ca_brush_view")!=0;
+    fb_pick_query(unproject(pixel),unproject(pixel+[0,0,orthographic?1:8192]),pixel,0,FB_HIT_BRUSH,orthographic);
+    if(fb_hit_count){
+        fb_hit_t hit=fb_hits[0];
+        fb_sculpt_center=hit.point;fb_sculpt_normal=hit.normal;fb_sculpt_hit=TRUE;
+        fb_sculpt_model=hit.model;fb_sculpt_id=hit.id;fb_sculpt_face=hit.face-1;
+    }
 }
 void fb_sculpt_sample()
 {
     int result=fb_sculpt_at(fb_sculpt_center,fb_sculpt_normal);
+    if(!result)result=fb_sculpt_face_at(fb_sculpt_model,fb_sculpt_id,fb_sculpt_face,fb_sculpt_center);
     if(result==FB_SCULPT_WRITE_FAILED){fb_sculpt_finish(FALSE);return;}
     // An invalid hull was rejected before touching any brushes in this sample.
     if(result==FB_SCULPT_INVALID_SAMPLE)return;
     if(result>0)fb_sculpt_changed=TRUE;
-    else cvar_set("ftebroom_selection_status","No vertices inside the sculpt brush: increase Radius or use subdivided brush terrain");
+    else if(autocvar_ftebroom_sculpt_mode==2)
+        cvar_set("ftebroom_selection_status","No uneven vertices to smooth here. Increase Radius or subdivide the terrain.");
 }
 void fb_sculpt_down(vector pixel)
 {
@@ -139,7 +174,7 @@ void fb_sculpt_up(vector pixel)
 }
 void fb_sculpt_draw()
 {
-    if(cvar("ftebroom_tool")!=FB_TOOL_SCULPT||cvar("ca_brush_view")||!fb_sculpt_hit)return;
+    if(cvar("ftebroom_tool")!=FB_TOOL_SCULPT||!fb_sculpt_hit)return;
     vector helper='0 0 1';if(fabs(fb_sculpt_normal_z)>.75)helper='1 0 0';
     vector u=normalize(crossproduct(helper,fb_sculpt_normal)),v=crossproduct(fb_sculpt_normal,u);
     vector colour='0.35 1 .55';if(autocvar_ftebroom_sculpt_mode==1)colour='1 .35 .35';if(autocvar_ftebroom_sculpt_mode==2)colour='.35 .65 1';

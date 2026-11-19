@@ -50,10 +50,16 @@ void fb_filter_materials_load()
     string line;while((line=fgets(file))){int count=tokenize(line);if(count>=2){fb_shader_tags[argv(0)]=stoi(argv(1));fb_shader_previews[argv(0)]=argv(2);fb_shader_opacity[argv(0)]=count>=4?stof(argv(3)):1.0;fb_shader_masked[argv(0)]=stoi(argv(4));fb_shader_blend[argv(0)]=argv(5);fb_shader_alpha_test[argv(0)]=argv(6);fb_shader_loose[argv(0)]=count>=8?stoi(argv(7)):0i;}}
     fclose(file);fb_filter_epoch++;
 }
+int fb_liquid_skip_name(string name)
+{
+    return name=="*waterskip" || name=="*slimeskip" || name=="*lavaskip";
+}
+int fb_liquid_skip(string material){return fb_liquid_skip_name(fb_material_key(material));}
 int fb_filter_face_tags(brushface_t *face,int contents)
 {
     string name=fb_material_preview_key(face->shadername);int tags=0;
     if(fb_shader_tags)tags=fb_shader_tags[name];
+    if(fb_liquid_skip_name(name))tags|=FB_TAG_CAULK|FB_TAG_LIQUID;
     if(substring(name,0,7)=="common/") {
         if(strstrofs(name,"clip",7)>=0)tags|=FB_TAG_CLIP;
         if(strstrofs(name,"caulk",7)>=0)tags|=FB_TAG_CAULK;
@@ -352,7 +358,7 @@ int fb_render_append_brush(int n,int vertexOffset)
         float brushRadius=hasBounds==2?vlen(brushBounds[1]-brushBounds[0])*0.5+0.1:1000000000.0;
         int firstFace=fb_render_face_count;
         for(int f=0;f<min(count,64);f++) {
-            if(!fb_filter_face_visible(n,f,&faces[f],contents))continue;
+            if(fb_liquid_skip(faces[f].shadername) || !fb_filter_face_visible(n,f,&faces[f],contents))continue;
             int vertices=brush_getfacepoints(fb_nodes[n].model,fb_nodes[n].id,f+1,points,64);
             if(vertices<3 || vertices>64)continue;
             if(fb_render_face_count==fb_render_face_capacity) {
@@ -543,7 +549,7 @@ void fb_uv_draw()
     int node=fb_document_brush_node(fb_uv_model,fb_uv_id);if(!fb_render_allowed(node,FB_PICK_LOCKED))return;
     for(int f=0;f<fb_uv_count;f++){
         int count=fb_uv_points_count[f];if(count<3 || count>64)continue;
-        brushface_t face=fb_uv_preview[f];if(!fb_filter_face_visible(node,f,&face,fb_uv_contents))continue;int tags=fb_filter_face_tags(&face,fb_uv_contents);
+        brushface_t face=fb_uv_preview[f];if(fb_liquid_skip(face.shadername) || !fb_filter_face_visible(node,f,&face,fb_uv_contents))continue;int tags=fb_filter_face_tags(&face,fb_uv_contents);
         if(node<fb_filter_tag_count && (fb_filter_tags[node]&FB_TAG_TRIGGER))tags|=FB_TAG_TRIGGER;
         float alpha=fb_surface_opacity(face.shadername,tags),shade=fb_surface_shade(face.planenormal);
         if(alpha==1 && (vector)getproperty(VF_ORIGIN)*face.planenormal<face.planedist-.01)continue;

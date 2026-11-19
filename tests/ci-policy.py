@@ -498,8 +498,17 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('/approvals', commands[-2])
         self.assertIn('check-texture-studio-release.py', commands[-2])
         self.assertIn('--publication-authorized', commands[-2])
+        self.assertIn('--owner "$GITHUB_REPOSITORY_OWNER"', commands[-2])
         self.assertIn('.targetCommitish == $sha', commands[-1])
         self.assertIn('gh release upload', commands[-1])
+        self.assertGreater(commands[-1].index('gh release edit'), commands[-1].index('gh release upload'))
+        self.assertIn('--draft=false', commands[-1])
+        importer = jobs['import-rb23-evidence']
+        self.assertEqual(importer['permissions'], {'contents': 'read', 'actions': 'read'})
+        self.assertIn('github.actor == github.repository_owner', importer['if'])
+        self.assertIn('qa/rb-23/evidence', importer['steps'][1]['run'])
+        self.assertEqual(importer['steps'][-1]['with']['name'], 'rb23-release-evidence')
+        self.assertIn('check-texture-studio-release.py', importer['steps'][-2]['run'])
 
     def test_gates_and_caches_are_wired_without_fuzzy_restores(self):
         import yaml

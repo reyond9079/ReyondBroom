@@ -4,7 +4,7 @@ run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
   workflow_dispatch:
     inputs:
       version:
-        description: Version without v; draft release must already exist
+        description: Version without v
         required: true
       base_tag:
         description: Compatible engine/dependency base for Windows and SDL2
@@ -54,6 +54,10 @@ run-name: Release ${{ inputs.version }} @ ${{ github.sha }}
         description: Successful run containing Texture Studio acceptance at the exact checkout revision
         type: string
         default: ''
+      rb23_evidence_commit:
+        description: Child commit containing reviewed Texture Studio evidence for this checkout
+        type: string
+        default: ''
       rb23_candidate_run_id:
         description: Successful native build run for the exact Texture Studio candidate
         type: string
@@ -73,7 +77,7 @@ jobs:
     if: >-
       inputs.rb21_candidate_run_id == '' && inputs.rb21_evidence_run_id == '' &&
       inputs.rb21_evidence_commit == '' && inputs.rb23_candidate_run_id == '' &&
-      inputs.rb23_evidence_run_id == ''
+      inputs.rb23_evidence_run_id == '' && inputs.rb23_evidence_commit == ''
     uses: ./.github/workflows/ci-plan.yml
     with:
       base: ${{ inputs.validation_base }}
@@ -400,9 +404,13 @@ jobs:
     - name: Verify Texture Studio graph, formats and release guard
       run: |
         & ./deps/texture-studio-core.exe qa/texture-studio/fixtures
+        if ($LASTEXITCODE) { exit $LASTEXITCODE }
         & ./deps/texture-studio-properties.exe
+        if ($LASTEXITCODE) { exit $LASTEXITCODE }
         python tests/check-texture-studio-formats.py qa/texture-studio/fixtures
+        if ($LASTEXITCODE) { exit $LASTEXITCODE }
         python tests/texture-studio-cli.py deps/texture-studio.exe
+        if ($LASTEXITCODE) { exit $LASTEXITCODE }
         python tests/texture-studio-release-gate.py
     - name: Check selected plant_core unit 1
       if: inputs.rb10_checks || fromJSON(needs.plan.outputs.plan).flags.plant_core
@@ -530,7 +538,7 @@ jobs:
 
   verify-rb23-release:
     if: >-
-      inputs.rb21_evidence_commit == '' &&
+      inputs.rb21_evidence_commit == '' && inputs.rb23_evidence_commit == '' &&
       (inputs.rb23_candidate_run_id != '' || inputs.rb23_evidence_run_id != '' ||
        inputs.rb21_candidate_run_id != '' || inputs.rb21_evidence_run_id != '')
     runs-on: ubuntu-24.04
@@ -578,7 +586,7 @@ jobs:
       run: |
         python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-evidence" \
           --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . --publish --publication-authorized \
-          --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
+          --owner "$GITHUB_REPOSITORY_OWNER" --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
 
   upload-draft:
     needs: verify-rb23-release
@@ -620,13 +628,76 @@ jobs:
           '
         python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-evidence" \
           --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . --publish --publication-authorized \
-          --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
-    - name: Upload the validated packages to the existing draft
+          --owner "$GITHUB_REPOSITORY_OWNER" --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
+    - name: Publish the verified prerelease
       shell: bash
       run: |
+        tag="v$VERSION"
+        if ! gh release view "$tag" --json isDraft,targetCommitish > "$RUNNER_TEMP/rb23-release.json"; then
+          gh release create "$tag" --target "$GITHUB_SHA" --title "ReyondBroom $VERSION" \
+            --draft --prerelease --generate-notes
+        fi
         gh release view "v$VERSION" --json isDraft,targetCommitish |
           jq -e --arg sha "$GITHUB_SHA" '.isDraft and .targetCommitish == $sha'
-        gh release upload "v$VERSION" "$RUNNER_TEMP/rb23-packages"/release-packages-{Windows-x64,Linux-x64,Linux-SDL2-x64}/* --clobber
+        gh release upload "$tag" "$RUNNER_TEMP/rb23-packages"/release-packages-{Windows-x64,Linux-x64,Linux-SDL2-x64}/* --clobber
+        gh release edit "$tag" --draft=false --prerelease --latest=false
+        gh release view "$tag" --json isDraft,isPrerelease,url |
+          jq -e 'select(.isDraft == false and .isPrerelease == true) | .url'
+
+  import-rb23-evidence:
+    if: >-
+      inputs.rb23_evidence_commit != '' && inputs.rb23_evidence_run_id == '' &&
+      inputs.rb21_evidence_commit == '' && github.actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PROOF_COMMIT: ${{ inputs.rb23_evidence_commit }}
+      CANDIDATE_RUN: ${{ inputs.rb23_candidate_run_id }}
+      BUILD_HASH: ${{ inputs.rb23_build_sha256 }}
+      VERSION: ${{ inputs.version }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Verify the candidate and extract its evidence
+      shell: bash
+      run: |
+        test "$GITHUB_REF" = refs/heads/main
+        [[ "$PROOF_COMMIT" =~ ^[0-9a-f]{40}$ && "$CANDIDATE_RUN" =~ ^[0-9]+$ ]]
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" |
+          jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" '
+            .head_sha == $sha and .head_repository.full_name == $repo and
+            .status == "completed" and .conclusion == "success"
+          '
+        git fetch --no-tags --depth=2 origin "$PROOF_COMMIT"
+        test "$(git rev-list --parents -n1 "$PROOF_COMMIT")" = "$PROOF_COMMIT $GITHUB_SHA"
+        proof="$PROOF_COMMIT:qa/rb-23/evidence"
+        manifest="$RUNNER_TEMP/rb23-proof-files.txt"
+        git ls-tree -r "$proof" > "$manifest"
+        test -s "$manifest"
+        awk '$1 != "100644" || $2 != "blob" {exit 1}' "$manifest"
+        mkdir "$RUNNER_TEMP/rb23-acceptance"
+        git archive "$proof" | tar -x -C "$RUNNER_TEMP/rb23-acceptance"
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: release-packages-*
+        github-token: ${{ github.token }}
+        run-id: ${{ env.CANDIDATE_RUN }}
+        path: ${{ runner.temp }}/rb23-packages
+    - name: Verify the evidence against the actual package bytes
+      run: |
+        python3 scripts/check-texture-studio-release.py --evidence "$RUNNER_TEMP/rb23-acceptance" \
+          --source "$GITHUB_SHA" --build "$BUILD_HASH" --repository . \
+          --packages "$RUNNER_TEMP/rb23-packages" --version "$VERSION"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: rb23-release-evidence
+        path: ${{ runner.temp }}/rb23-acceptance
+        if-no-files-found: error
+        retention-days: 7
 
   import-rb21-evidence:
     if: inputs.rb21_evidence_commit != '' && inputs.rb21_evidence_run_id == '' && github.actor == github.repository_owner

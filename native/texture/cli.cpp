@@ -123,6 +123,10 @@ struct Options {
   unsigned variation = 0;
   unsigned exportFrames = 0;
   uint32_t seed = 24058;
+  bool seedProvided = false;
+  std::string familyInput;
+  std::optional<uint32_t> familyShade, familyAccent, familyScale;
+  std::optional<int> familyWear;
 };
 
 Options options(int argc, char** argv) {
@@ -142,6 +146,31 @@ Options options(int argc, char** argv) {
     const std::string value(argv[++arg]);
     if (key == "--out") out.out = value;
     else if (key == "--profile") out.profile = value;
+    else if (key == "--from-family" || key == "--family-shade" || key == "--family-accent" ||
+             key == "--family-scale" || key == "--family-wear") {
+      ts::require(out.command == "family", "family", "Use family settings with the family command.");
+      if (key == "--from-family") {
+        ts::require(!value.empty(), "family", "Choose an existing family directory.");
+        out.familyInput = value;
+      } else {
+        const bool color = key == "--family-shade" || key == "--family-accent";
+        int setting = 0;
+        const auto end = value.data() + value.size();
+        const auto parsed = std::from_chars(value.data(), end, setting, color ? 16 : 10);
+        ts::require(parsed.ec == std::errc{} && parsed.ptr == end, "family", "Expected a valid family setting.");
+        if (color) {
+          ts::require(value.size() == 6 && setting >= 0 && setting <= 0xffffff,
+            "family", "Use a six-digit RGB hex color.");
+          (key == "--family-shade" ? out.familyShade : out.familyAccent) = uint32_t(setting);
+        } else if (key == "--family-scale") {
+          ts::require(setting >= 25 && setting <= 200, "family", "Choose a pattern frequency from 25 to 200 percent.");
+          out.familyScale = unsigned(setting);
+        } else {
+          ts::require(setting >= -50 && setting <= 50, "family", "Choose a wear adjustment from -50 to 50 percent.");
+          out.familyWear = setting;
+        }
+      }
+    }
     else if (key == "--palette") out.palette = value;
     else if (key == "--license") out.license = value;
     else if (key == "--preset") out.preset = value;
@@ -171,8 +200,9 @@ Options options(int argc, char** argv) {
       } else if (key == "--seed") {
         ts::require(out.command == "new" || out.command == "family", "seed", "Use --seed with new or family.");
         out.seed = number;
+        out.seedProvided = true;
       } else {
-        ts::require(out.command == "new" && number > 0 && number <= std::size(ts::curatedVariations),
+        ts::require(out.command == "new" && number > 0 && number <= ts::maxCatalogVariations,
           "variation", "Use --variation 1 to 4 with a catalog preset.");
         out.variation = number;
       }
@@ -190,14 +220,42 @@ void generateFamily(const Options& args) {
   });
   ts::require(entry != std::end(ts::textureFamilies), "family", "Choose the name or ID of a texture family.");
   const auto index = size_t(entry - std::begin(ts::textureFamilies));
-  ts::Json manifest{{"schemaVersion", 1}, {"family", entry->id}, {"name", entry->name}, {"seed", args.seed},
-    {"shared", {{"shade", entry->shade}, {"accent", entry->accent}, {"detail", entry->settings.detail},
-      {"bump", entry->settings.bump}, {"roughness", entry->settings.roughness}, {"scalePercent", entry->settings.scalePercent}}},
+  const auto existing = args.familyInput.empty() ? fs::path{} : fs::canonical(path(args.familyInput));
+  const auto openMember = [&](size_t role) {
+    const auto name = std::string(ts::familyRoles[role]) + ".rbtex.json";
+    const auto source = existing / fs::u8path(name);
+    ts::require(fs::canonical(source) == source, "family", "A family source points through a link.");
+    auto doc = ts::open(read(source));
+    const auto identity = ts::familyIdentity(doc);
+    ts::require(!doc.readOnly && identity == std::make_pair(index, role), "family", "A source has the wrong family or role.");
+    return doc;
+  };
+  auto controls = existing.empty() ? ts::defaultFamilyControls(index, args.seed) :
+    ts::readFamilyControls(openMember(0), index);
+  if (args.seedProvided) controls.seed = args.seed;
+  if (args.familyShade) controls.shade = *args.familyShade;
+  if (args.familyAccent) controls.accent = *args.familyAccent;
+  if (args.familyScale) controls.scale = *args.familyScale;
+  if (args.familyWear) controls.wear = float(*args.familyWear) / 100.f;
+  ts::Json manifest{{"schemaVersion", 1}, {"family", entry->id}, {"name", entry->name}, {"seed", controls.seed},
+    {"shared", {{"shade", controls.shade}, {"accent", controls.accent}, {"detail", entry->settings.detail},
+      {"bump", entry->settings.bump}, {"roughness", entry->settings.roughness},
+      {"scalePercent", controls.scale}, {"wear", controls.wear}}},
     {"materials", ts::Json::array()}};
   std::unique_ptr<OutputFolder> output;
   if (!args.dryRun) output = std::make_unique<OutputFolder>(path(args.out));
+  std::set<std::string> copied;
   for (size_t role = 0; role < std::size(ts::familyRoles); ++role) {
-    const auto doc = ts::familyMaterial(index, role, args.seed);
+    auto doc = existing.empty() ? ts::familyMaterial(index, role, controls) : openMember(role);
+    if (!existing.empty()) {
+      ts::refreshFamilyMember(doc, controls);
+      const auto assets = ts::loadAssets(doc, existing);
+      ts::compile(doc, {}, assets);
+      if (output) for (const auto& reference : doc.source.at("assetReferences")) {
+        const auto name = ts::imageRelativePath(ts::idField(reference, "sha256", "assets"));
+        if (copied.insert(name).second) output->write(name, ts::readOriginal(existing, reference));
+      }
+    }
     const auto filename = std::string(ts::familyRoles[role]) + ".rbtex.json";
     const auto bytes = doc.save();
     if (output) output->write(filename, bytes);
@@ -379,7 +437,7 @@ int main(int argc, char** argv) try {
           const std::string id = ts::recipeId(category, index);
           if (args.preset == id || args.preset == ts::catalogRecipes[category][index].name) {
             auto doc = ts::catalogPreset(category, index, "cli-" + id);
-            if (args.variation) ts::applyCuratedVariation(doc, ts::curatedVariations[args.variation - 1]);
+            if (args.variation) ts::applyCatalogVariation(doc, category, index, args.variation);
             return doc;
           }
         }

@@ -101,12 +101,14 @@ void checkCatalog(const fs::path& previews) {
         };
         auto variantFolder = previews / "variants" / id;
         fs::create_directories(variantFolder);
-        for (size_t i = 0; i < std::size(curatedVariations); ++i) {
+        std::set<std::string> colors{png(*base.outputs.at("baseColor"))};
+        for (size_t variation = 1; variation <= catalogVariationCount(category, index); ++variation) {
           auto variant = doc;
-          applyCuratedVariation(variant, curatedVariations[i]);
+          applyCatalogVariation(variant, category, index, variation);
           const auto result = evaluate(compile(variant), previewSize);
-          if (!different(result)) throw std::runtime_error(id + " has a no-op curated variation.");
-          write(variantFolder / (std::to_string(i + 1) + ".png"), png(*result.outputs.at("baseColor")));
+          auto color = png(*result.outputs.at("baseColor"));
+          if (!colors.insert(color).second) throw std::runtime_error(id + " has identical catalog variations.");
+          write(variantFolder / (std::to_string(variation) + ".png"), color);
           ++curated;
         }
         unsigned workingControls = 0;
@@ -304,6 +306,33 @@ int main(int argc, char** argv) try {
   if (argc != 2) return 2;
   using namespace ts;
   checkMaterialFinishes();
+  auto wall = familyMaterial(1, 0, 42);
+  auto trim = familyMaterial(1, 4, 42);
+  auto settings = readFamilyControls(wall, 1);
+  settings.shade = 0x535452;
+  settings.accent = 0x9a8e81;
+  settings.scale = 82;
+  settings.wear = .15f;
+  settings.seed = 61;
+  findNode(wall, "pigment")["parameters"]["high"] = { .3, .2, .1, 1. };
+  const auto custom = findNode(wall, "pigment")["parameters"]["high"];
+  wall.source["rootSeed"] = 313u;
+  refreshFamilyMember(wall, settings);
+  refreshFamilyMember(trim, settings);
+  auto sharedWall = familyMaterial(1, 0, settings);
+  auto sharedTrim = familyMaterial(1, 4, settings);
+  check(wall.seed() == 313u && trim.seed() == sharedTrim.seed(), "Family applies seed to inherited members only");
+  check(findNode(wall, "pigment")["parameters"]["high"] == custom, "Family preserves the local palette override");
+  check(findNode(wall, "pigment")["parameters"]["low"] == findNode(sharedWall, "pigment")["parameters"]["low"],
+    "Family updates the inherited palette");
+  check(findNode(trim, "damage")["parameters"] == findNode(sharedTrim, "damage")["parameters"],
+    "Family updates shared wear");
+  check(findNode(trim, "pattern")["parameters"] == findNode(sharedTrim, "pattern")["parameters"],
+    "Family updates inherited pattern scale");
+  static_cast<void>(compile(wall));
+  refreshFamilyMember(wall, settings, true);
+  check(wall.seed() == sharedWall.seed() && wall.source["graph"] == sharedWall.source["graph"],
+    "Family override reset restores the inherited graph parameters");
   Pcg32 pcg(42, 54);
   for (uint32_t expected : {0xa15c02b7u, 0x7b47f409u, 0xba1d3330u, 0x83d2f293u, 0xbfa4784bu, 0xcbed606eu})
     check(pcg.next() == expected, "PCG32 reference vector");

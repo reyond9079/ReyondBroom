@@ -6,6 +6,8 @@ Use **Save As** to create a .rbtex.json source or **Save preset** to add a copy 
 
 Preview the selected channel flat or tiled with a UV grid, seam markers and pixel values. Orbit or pan the sphere and cube to inspect the material's relief under two lighting setups. **Selected surface** uses a selected map face with its existing UV projection. **Game profile** uses the active indexed export palette where applicable. **Dry run** in Export encodes the current result and shows its exact byte count and SHA-256 without creating a file. In Node Graph, drag a card to move it and drag a typed output pin to a compatible input. Choose a node from the dropdown to center its card. Select group members with Ctrl-click or the node checkbox, then use **Group nodes** to retain shared parameters and seed streams. Groups expose their typed links in the same canvas and connection dropdowns. Ctrl+Z and Ctrl+Y apply to the focused Texture Studio window.
 
+Each built-in recipe has four named alternatives. They vary features that fit the material, such as firing and mortar in masonry, enamel tone and sheen in smooth panels, or wave shape and reflection in water. **New → Texture families** provides six coordinated sets of eight surfaces. Open **Family settings** on the Quick tab to set the palette, seed, pattern frequency and wear for the current family member. Applying those settings preserves values you edited locally. **Reset local overrides** restores the values inherited from the family.
+
 **Generate & Apply** captures the selected faces before baking. The Quake 1 and Half-Life paths attach a WAD in the same undo step. Quake II writes a WAL. Quake III and FTE Custom write a namespaced TGA. These paths preserve the selected face projections. With an empty selection, **Generate Asset** writes the material and its source to the game directory without touching the map. Right-click a generated material in the Material Browser and choose **Edit Texture Studio source** to reopen its graph. **Apply to model texture** replaces the active procedural texture slot as one model history edit. The slot keeps its UUID and UV dimensions. A model texture can carry up to 16 MiB of original image data. Its **Texture Studio** button reopens the saved source.
 
 ## Headless usage
@@ -17,6 +19,7 @@ texture-studio new brick.rbtex.json
 texture-studio new panel.rbtex.json --preset "Luminous Panel"
 texture-studio new plate.rbtex.json --preset metal-diamond-plate --variation 2 --seed 42
 texture-studio family industrial-bunker --seed 42 --out bunker
+texture-studio family industrial-bunker --from-family bunker --family-shade 384046 --family-scale 115 --family-wear 12 --out bunker-revised
 texture-studio validate brick.rbtex.json
 texture-studio render brick.rbtex.json --threads 4 --out preview
 texture-studio new ripples.rbtex.json --preset "Water Ripples"
@@ -31,6 +34,8 @@ texture-studio unpack material.rbtexpkg --out restored
 ```
 
 The indexed profiles use a local 768-byte palette supplied through `--palette`. The Quake III profile accepts `--jpeg 92` for an opaque static texture and `--pk3` for a runtime archive. The FTE material adapter uses the engine's defaultwall program with explicit Normal and Emissive inputs. Use `--frame` for a specific frame. To export an animation as WAD2, WAD3, WAL or a Quake III shader, use `export --all-frames`. Set `--frames` when a target needs resampling and acknowledge changes to loop duration with `--accept-rate-change`. The manifest identifies the first material and maps exported frames to the source.
+
+Use `family --from-family` to apply shared settings to all eight sources. The command copies their local edits and referenced originals into a new output directory.
 
 ## Verification
 

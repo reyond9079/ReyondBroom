@@ -2,6 +2,7 @@
 #pragma once
 
 #include "presets.h"
+#include "catalog_stains.h"
 
 namespace ftebroom::textureStudio {
 
@@ -13,6 +14,7 @@ struct MaterialRecipe {
   Pattern pattern, detail, composition;
   unsigned scale, detailScale;
   uint32_t shadow, highlight;
+  unsigned surfaceKind = 0;
 };
 
 struct SurfaceFinish {
@@ -42,22 +44,22 @@ inline constexpr MaterialRecipe catalogRecipes[][10]{
     {"cracked-slab", "Cracked Slab", Pattern::cracks, Pattern::fbm, Pattern::multiply, 6, 21, 0x292a2c, 0xb1a99b},
     {"chipped-panel", "Chipped Concrete Panel", Pattern::tiles, Pattern::worley, Pattern::minimum, 4, 44, 0x615b54, 0xaaa294},
     {"wet-bunker", "Wet Bunker", Pattern::fbm, Pattern::veins, Pattern::minimum, 16, 10, 0x303330, 0x666a60},
-    {"aggregate", "Exposed Aggregate", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 32, 61, 0x58534d, 0xc3b8a9},
+    {"aggregate", "Exposed Aggregate", Pattern::aggregate, Pattern::white, Pattern::scalarMix, 25, 61, 0x45403a, 0xc5b6a4, unsigned(AggregateKind::exposedConcrete)},
     {"patched", "Patched Concrete", Pattern::fbm, Pattern::ridged, Pattern::scalarMix, 9, 13, 0x626361, 0xb4b1a6},
     {"stained-ceiling", "Stained Concrete Ceiling", Pattern::gradient, Pattern::worley, Pattern::scalarMix, 8, 16, 0x787269, 0xc7bbaa},
     {"expansion-floor", "Expansion-joint Floor", Pattern::tiles, Pattern::gradient, Pattern::scalarMix, 3, 29, 0x545350, 0x9e9791},
-    {"reinforced-damage", "Reinforced Concrete Damage", Pattern::materialGrain, Pattern::grate, Pattern::scalarMix, 20, 13, 0x504c45, 0xa79887}
+    {"reinforced-damage", "Reinforced Concrete Damage", Pattern::installedSurface, Pattern::grate, Pattern::scalarMix, 4, 13, 0x3d352d, 0xb6ac99, unsigned(InstalledKind::spalledConcrete)}
   },
   {
     {"running-brick", "Warm Running Brick", Pattern::bricks, Pattern::gradient, Pattern::multiply, 6, 43, 0x272423, 0xb87950},
     {"flemish-brick", "Flemish Brick", Pattern::flemish, Pattern::streaks, Pattern::scalarMix, 6, 22, 0x704939, 0xb38b72},
     {"broken-brick", "Broken Brick", Pattern::bricks, Pattern::cracks, Pattern::minimum, 6, 13, 0x4e3e35, 0xbb896d},
     {"rough-stone", "Rough Stonework", Pattern::stonework, Pattern::ridged, Pattern::minimum, 7, 10, 0x4d4d46, 0xa29d8e},
-    {"ashlar", "Ashlar Blocks", Pattern::tiles, Pattern::veins, Pattern::difference, 4, 34, 0x777165, 0xb9af9e},
+    {"ashlar", "Ashlar Blocks", Pattern::installedSurface, Pattern::veins, Pattern::difference, 6, 34, 0x736b60, 0xd1c3ad, unsigned(InstalledKind::limestone)},
     {"cobblestone", "Rounded Cobblestone", Pattern::stonework, Pattern::worley, Pattern::multiply, 7, 18, 0x49453c, 0x8d8575},
     {"mortar-rubble", "Mortar and Rubble", Pattern::stonework, Pattern::cracks, Pattern::minimum, 18, 8, 0x4e5048, 0xa1a294},
     {"gothic-block", "Gothic Block", Pattern::flemish, Pattern::rings, Pattern::minimum, 4, 11, 0x424343, 0x8e8c83},
-    {"basalt-blocks", "Basalt Blocks", Pattern::tiles, Pattern::ridged, Pattern::multiply, 9, 17, 0x383935, 0x73736d},
+    {"basalt-blocks", "Basalt Blocks", Pattern::installedSurface, Pattern::ridged, Pattern::multiply, 9, 17, 0x282826, 0x888680, unsigned(InstalledKind::basalt)},
     {"arch-trim", "Worn Arch Trim", Pattern::archBand, Pattern::cracks, Pattern::multiply, 11, 16, 0x504740, 0xb3a89a}
   },
   {
@@ -65,10 +67,10 @@ inline constexpr MaterialRecipe catalogRecipes[][10]{
     {"cracked-paint", "Cracked Paint", Pattern::cracks, Pattern::gradient, Pattern::minimum, 24, 14, 0x706864, 0xc5bab0},
     {"square-ceramic", "Porcelain Squares", Pattern::tiles, Pattern::gradient, Pattern::maximum, 6, 41, 0x51675e, 0xaebfb3},
     {"subway", "Subway Tile", Pattern::bricks, Pattern::veins, Pattern::maximum, 5, 20, 0x625b55, 0xeee4d7},
-    {"mosaic", "Mosaic Tile", Pattern::tiles, Pattern::checker, Pattern::multiply, 24, 24, 0x4b676a, 0x9abcb1},
+    {"mosaic", "Mosaic Tile", Pattern::installedSurface, Pattern::checker, Pattern::multiply, 14, 24, 0x3b504a, 0x8fa499, unsigned(InstalledKind::mosaic)},
     {"stained-grout", "Stained Grout", Pattern::tiles, Pattern::worley, Pattern::difference, 7, 31, 0x5c6d69, 0xa9b8a9},
     {"painted-brick", "Painted Brick", Pattern::bricks, Pattern::streaks, Pattern::maximum, 7, 36, 0x576e63, 0xa1b1a4},
-    {"terrazzo", "Terrazzo", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 35, 47, 0x8e8075, 0xd8cfad},
+    {"terrazzo", "Terrazzo", Pattern::aggregate, Pattern::white, Pattern::scalarMix, 19, 47, 0x393637, 0xe0d2b8, unsigned(AggregateKind::terrazzo)},
     {"acoustic", "Acoustic Tile", Pattern::tiles, Pattern::rivets, Pattern::difference, 5, 42, 0x747068, 0xc8c1b5},
     {"insulation", "Damaged Insulation", Pattern::streaks, Pattern::cracks, Pattern::maximum, 35, 9, 0x806749, 0xbda47b}
   },
@@ -79,81 +81,81 @@ inline constexpr MaterialRecipe catalogRecipes[][10]{
     {"diamond-plate", "Diamond Plate", Pattern::diamond, Pattern::fibers, Pattern::minimum, 9, 23, 0x515551, 0xa1a9a6},
     {"perforated-sheet", "Perforated Sheet", Pattern::rivets, Pattern::gradient, Pattern::difference, 25, 35, 0x303332, 0xa1a8a4},
     {"corrugated-sheet", "Corrugated Sheet", Pattern::stripes, Pattern::fbm, Pattern::maximum, 14, 17, 0x626963, 0xb7bdb9},
-    {"riveted", "Riveted Plate", Pattern::grate, Pattern::rivets, Pattern::maximum, 4, 9, 0x4c4841, 0x9c9a88},
-    {"welded", "Welded Seam", Pattern::stripes, Pattern::streaks, Pattern::multiply, 1, 41, 0x5f5a58, 0xa8a5a0},
+    {"riveted", "Riveted Plate", Pattern::formedMetal, Pattern::rivets, Pattern::maximum, 9, 9, 0x3e3d34, 0xa29d8c, unsigned(MetalForm::riveted)},
+    {"welded", "Welded Seam", Pattern::formedMetal, Pattern::streaks, Pattern::multiply, 5, 41, 0x464542, 0xa6a7a4, unsigned(MetalForm::weld)},
     {"cast-metal", "Cast Metal", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 24, 52, 0x494744, 0x8d8982},
     {"rust-flakes", "Rust Flakes", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 27, 28, 0x412c1f, 0x9b633e}
   },
   {
     {"modular-wall", "Modular Wall", Pattern::panels, Pattern::grate, Pattern::difference, 3, 20, 0x2c3943, 0x6c8d9d},
-    {"service-hatch", "Service Hatch", Pattern::rectangle, Pattern::rivets, Pattern::maximum, 12, 6, 0x343537, 0x8c8f92},
+    {"service-hatch", "Service Hatch", Pattern::formedMetal, Pattern::rivets, Pattern::maximum, 11, 6, 0x2e3435, 0xa4aaa6, unsigned(MetalForm::hatch)},
     {"recessed-panel", "Recessed Panel", Pattern::rectangle, Pattern::grate, Pattern::minimum, 27, 11, 0x232830, 0x616c77},
-    {"vent-grille", "Vent Grille", Pattern::grate, Pattern::streaks, Pattern::minimum, 18, 44, 0x262e30, 0x93a09d},
-    {"conduit-plate", "Conduit Plate", Pattern::veins, Pattern::rectangle, Pattern::maximum, 5, 21, 0x4f4132, 0x8aa8a0},
-    {"cable-tray", "Cable Tray", Pattern::stripes, Pattern::grate, Pattern::minimum, 11, 19, 0x23252f, 0x6c78a9},
-    {"access-door", "Access Door", Pattern::rectangle, Pattern::arrow, Pattern::difference, 19, 22, 0x37483e, 0x7a9d69},
+    {"vent-grille", "Vent Grille", Pattern::formedMetal, Pattern::streaks, Pattern::minimum, 9, 44, 0x242928, 0xa39f91, unsigned(MetalForm::slotted)},
+    {"conduit-plate", "Conduit Plate", Pattern::formedMetal, Pattern::rectangle, Pattern::maximum, 4, 21, 0x383831, 0xa1aaa3, unsigned(MetalForm::conduit)},
+    {"cable-tray", "Cable Tray", Pattern::formedMetal, Pattern::grate, Pattern::minimum, 7, 19, 0x343633, 0xb5bab6, unsigned(MetalForm::tray)},
+    {"access-door", "Access Door", Pattern::formedMetal, Pattern::arrow, Pattern::difference, 5, 22, 0x343b31, 0x8c9b7e, unsigned(MetalForm::hatch)},
     {"armored-floor", "Armored Floor", Pattern::tiles, Pattern::rivets, Pattern::maximum, 6, 33, 0x2c2929, 0x7a8285},
-    {"ceiling-module", "Ceiling Module", Pattern::checker, Pattern::grate, Pattern::maximum, 8, 23, 0x2b353d, 0x819390},
+    {"ceiling-module", "Ceiling Module", Pattern::formedMetal, Pattern::grate, Pattern::maximum, 14, 23, 0x2c302e, 0xb6b9b2, unsigned(MetalForm::slotted)},
     {"laboratory", "Laboratory Panel", Pattern::tiles, Pattern::streaks, Pattern::scalarMix, 4, 45, 0x606e77, 0xc5d4d6}
   },
   {
     {"planks", "Timber Planks", Pattern::boardJoints, Pattern::fibers, Pattern::multiply, 6, 38, 0x66482c, 0xbb986e},
-    {"parquet", "Parquet", Pattern::checker, Pattern::streaks, Pattern::difference, 12, 32, 0x654636, 0xa88158},
+    {"parquet", "Parquet", Pattern::installedSurface, Pattern::streaks, Pattern::difference, 4, 32, 0x594231, 0xbd9e72, unsigned(InstalledKind::parquet)},
     {"plywood", "Plywood", Pattern::materialGrain, Pattern::ridged, Pattern::minimum, 37, 12, 0x876c4c, 0xc5a782},
     {"end-grain", "End Grain", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 28, 23, 0x775637, 0xc3a17a},
     {"weathered", "Weathered Boards", Pattern::boardJoints, Pattern::cracks, Pattern::multiply, 8, 24, 0x433729, 0x867662},
     {"painted-boards", "Painted Boards", Pattern::boardJoints, Pattern::worley, Pattern::maximum, 9, 26, 0x445a57, 0x83918a},
     {"burned", "Burned Wood", Pattern::cracks, Pattern::streaks, Pattern::minimum, 17, 46, 0x211e20, 0x68564d},
-    {"bark", "Bark Slabs", Pattern::materialGrain, Pattern::veins, Pattern::multiply, 32, 10, 0x49392a, 0x907455},
-    {"crate", "Crate Panel", Pattern::rectangle, Pattern::streaks, Pattern::maximum, 32, 39, 0x6c5237, 0xad9067},
+    {"bark", "Bark Slabs", Pattern::fibrousSurface, Pattern::veins, Pattern::multiply, 14, 10, 0x322b25, 0x8b7864, unsigned(FibrousKind::bark)},
+    {"crate", "Crate Panel", Pattern::installedSurface, Pattern::streaks, Pattern::maximum, 6, 39, 0x60452e, 0xc6a778, unsigned(InstalledKind::crate)},
     {"split", "Split Timber", Pattern::veins, Pattern::cracks, Pattern::minimum, 19, 6, 0x694d37, 0xa68a6d}
   },
   {
     {"soil", "Loose Soil", Pattern::fbm, Pattern::worley, Pattern::difference, 17, 35, 0x3c2c24, 0x997256},
-    {"gravel", "Mixed Gravel", Pattern::worley, Pattern::ridged, Pattern::multiply, 24, 11, 0x54483d, 0x9a826d},
-    {"sand", "Sand Ripples", Pattern::veins, Pattern::white, Pattern::scalarMix, 13, 70, 0x937c5d, 0xd3c0a0},
+    {"gravel", "Mixed Gravel", Pattern::aggregate, Pattern::ridged, Pattern::multiply, 19, 11, 0x3e372f, 0xb7aa98, unsigned(AggregateKind::gravel)},
+    {"sand", "Sand Ripples", Pattern::aggregate, Pattern::white, Pattern::scalarMix, 9, 70, 0x8a7657, 0xd6c6aa, unsigned(AggregateKind::windSand)},
     {"mud", "Muddy Ground", Pattern::worley, Pattern::fbm, Pattern::minimum, 13, 9, 0x352821, 0x837251},
     {"cracked-earth", "Cracked Earth", Pattern::cracks, Pattern::ridged, Pattern::difference, 13, 22, 0x593f29, 0xbc8c63},
-    {"asphalt", "Dense Asphalt", Pattern::materialGrain, Pattern::ridged, Pattern::minimum, 43, 23, 0x383935, 0x6c6b65},
-    {"damaged-asphalt", "Damaged Asphalt", Pattern::cracks, Pattern::white, Pattern::multiply, 11, 53, 0x282a2c, 0x777277},
+    {"asphalt", "Dense Asphalt", Pattern::aggregate, Pattern::ridged, Pattern::minimum, 51, 23, 0x242424, 0x777674, unsigned(AggregateKind::asphalt)},
+    {"damaged-asphalt", "Damaged Asphalt", Pattern::aggregate, Pattern::white, Pattern::multiply, 41, 53, 0x242322, 0x77716b, unsigned(AggregateKind::damagedAsphalt)},
     {"snow", "Snow Crust", Pattern::worley, Pattern::white, Pattern::minimum, 22, 52, 0xadb6b6, 0xeeece5},
-    {"leaf-litter", "Leaf Litter", Pattern::spots, Pattern::fibers, Pattern::difference, 19, 33, 0x4f392b, 0xa97f44},
-    {"rock-scree", "Rock Scree", Pattern::cracks, Pattern::worley, Pattern::maximum, 34, 14, 0x535058, 0xa89e93}
+    {"leaf-litter", "Leaf Litter", Pattern::leafLitter, Pattern::fibers, Pattern::difference, 12, 33, 0x332a23, 0xc09658},
+    {"rock-scree", "Rock Scree", Pattern::aggregate, Pattern::worley, Pattern::maximum, 10, 14, 0x363232, 0xb8aa9c, unsigned(AggregateKind::scree)}
   },
   {
     {"granite", "Speckled Granite", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 38, 52, 0x626261, 0xc6bdb2},
     {"stratified", "Stratified Rock", Pattern::materialGrain, Pattern::ridged, Pattern::scalarMix, 22, 14, 0x4e4a4c, 0xba9277},
     {"sandstone", "Layered Sandstone", Pattern::materialGrain, Pattern::ridged, Pattern::multiply, 34, 21, 0x695444, 0xc6a77d},
-    {"marble", "Marble Veins", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 13, 14, 0x515558, 0xe5e6ec},
+    {"marble", "Marble Veins", Pattern::fibrousSurface, Pattern::fbm, Pattern::scalarMix, 3, 14, 0x5c5b5b, 0xf0eeea, unsigned(FibrousKind::marble)},
     {"ice", "Fractured Ice", Pattern::cracks, Pattern::veins, Pattern::maximum, 12, 19, 0x64828b, 0xc5d3d0},
-    {"moss", "Cushion Moss", Pattern::worley, Pattern::fbm, Pattern::maximum, 19, 29, 0x3b412c, 0x77845a},
+    {"moss", "Cushion Moss", Pattern::aggregate, Pattern::fbm, Pattern::maximum, 17, 29, 0x2e321c, 0x6f8149, unsigned(AggregateKind::moss)},
     {"lichen", "Lichen Patches", Pattern::worley, Pattern::cracks, Pattern::maximum, 31, 19, 0x4c5040, 0xa0a085},
-    {"roots", "Exposed Roots", Pattern::veins, Pattern::streaks, Pattern::difference, 7, 25, 0x342d27, 0x7a624e},
+    {"roots", "Exposed Roots", Pattern::fibrousSurface, Pattern::streaks, Pattern::difference, 4, 25, 0x302922, 0x947454, unsigned(FibrousKind::roots)},
     {"cliff", "Cliff Face", Pattern::ridged, Pattern::cracks, Pattern::difference, 11, 19, 0x474349, 0xa99b8a},
     {"salt", "Salt Crust", Pattern::cracks, Pattern::white, Pattern::scalarMix, 19, 54, 0x837c7c, 0xe4dbca}
   },
   {
     {"pores", "Skin Pores", Pattern::worley, Pattern::fbm, Pattern::scalarMix, 42, 16, 0x724739, 0xc89276},
-    {"flesh", "Flesh Veins", Pattern::veins, Pattern::cracks, Pattern::difference, 5, 26, 0x612930, 0xbc7a73},
-    {"scar", "Scar Tissue", Pattern::streaks, Pattern::veins, Pattern::maximum, 31, 14, 0x743638, 0xc18b84},
-    {"bone", "Bone Plates", Pattern::hex, Pattern::cracks, Pattern::multiply, 6, 18, 0x7b6655, 0xd7c7a4},
+    {"flesh", "Flesh Veins", Pattern::fibrousSurface, Pattern::cracks, Pattern::difference, 4, 26, 0x784d50, 0xca9690, unsigned(FibrousKind::veins)},
+    {"scar", "Scar Tissue", Pattern::fibrousSurface, Pattern::veins, Pattern::maximum, 6, 14, 0x83524e, 0xd9a998, unsigned(FibrousKind::scar)},
+    {"bone", "Bone Plates", Pattern::fibrousSurface, Pattern::cracks, Pattern::multiply, 5, 18, 0x5d4c3e, 0xd5c4a2, unsigned(FibrousKind::scutes)},
     {"chitin", "Chitin", Pattern::rings, Pattern::cracks, Pattern::difference, 20, 23, 0x3a2829, 0x794435},
-    {"infestation", "Root Infestation", Pattern::veins, Pattern::worley, Pattern::multiply, 9, 22, 0x372b33, 0x72644f},
+    {"infestation", "Root Infestation", Pattern::fibrousSurface, Pattern::worley, Pattern::multiply, 7, 22, 0x2e2528, 0xa99b77, unsigned(FibrousKind::roots)},
     {"slime-membrane", "Slime Membrane", Pattern::worley, Pattern::ridged, Pattern::difference, 19, 31, 0x2e5048, 0x7ba581},
-    {"tendons", "Tendons", Pattern::veins, Pattern::streaks, Pattern::maximum, 11, 41, 0x592932, 0xb98270},
-    {"cells", "Alien Cells", Pattern::hex, Pattern::spots, Pattern::difference, 8, 12, 0x4b3250, 0xa181aa},
-    {"biomechanical", "Biomechanical Wall", Pattern::grate, Pattern::veins, Pattern::difference, 7, 15, 0x2e2935, 0x7e7184}
+    {"tendons", "Tendons", Pattern::fibrousSurface, Pattern::streaks, Pattern::maximum, 16, 41, 0x624b47, 0xc5a58f, unsigned(FibrousKind::tendon)},
+    {"cells", "Alien Cells", Pattern::fibrousSurface, Pattern::spots, Pattern::difference, 8, 12, 0x322942, 0xb089ad, unsigned(FibrousKind::cells)},
+    {"biomechanical", "Biomechanical Wall", Pattern::fibrousSurface, Pattern::veins, Pattern::difference, 7, 15, 0x211b20, 0x897478, unsigned(FibrousKind::ribs)}
   },
   {
     {"water", "Woven Water Ripples", Pattern::flow, Pattern::gradient, Pattern::scalarMix, 4, 7, 0x214863, 0x6fa2b3},
     {"toxic", "Toxic Fluid", Pattern::flow, Pattern::worley, Pattern::multiply, 8, 17, 0x253924, 0x9ac04d},
-    {"lava", "Veined Lava Crust", Pattern::flow, Pattern::cracks, Pattern::difference, 6, 12, 0x4b2d23, 0xe58d37},
+    {"lava", "Veined Lava Crust", Pattern::flow, Pattern::cracks, Pattern::difference, 6, 12, 0x2e2622, 0xbf722e},
     {"sludge", "Deep Sludge", Pattern::flow, Pattern::ridged, Pattern::minimum, 5, 12, 0x323f2d, 0x6e7948},
     {"oil", "Oil Film", Pattern::flow, Pattern::streaks, Pattern::maximum, 5, 35, 0x282235, 0xa17998},
     {"acid", "Acid Bubbles", Pattern::flow, Pattern::rivets, Pattern::difference, 7, 21, 0x315047, 0xb5dd88},
     {"field", "Energy Field", Pattern::flow, Pattern::checker, Pattern::maximum, 11, 16, 0x283b72, 0x5db5c6},
     {"plasma", "Plasma Grid", Pattern::flow, Pattern::grate, Pattern::scalarMix, 10, 12, 0x492b55, 0xbb81dd},
-    {"molten", "Molten Metal", Pattern::flow, Pattern::fbm, Pattern::minimum, 7, 20, 0x5a3833, 0xedbe5b},
+    {"molten", "Molten Metal", Pattern::flow, Pattern::fbm, Pattern::minimum, 4, 20, 0x421f1a, 0xd59742},
     {"flowing", "Flowing Slime", Pattern::flow, Pattern::veins, Pattern::difference, 6, 17, 0x36431b, 0x79b056}
   },
   {
@@ -163,22 +165,22 @@ inline constexpr MaterialRecipe catalogRecipes[][10]{
     {"warning", "Warning Panel", Pattern::rectangle, Pattern::stripes, Pattern::multiply, 20, 10, 0x30342e, 0xf0c351},
     {"rust-drip", "Rust Drip", Pattern::streaks, Pattern::worley, Pattern::minimum, 51, 16, 0x573320, 0xb77f54},
     {"water-streak", "Water Streak", Pattern::streaks, Pattern::gradient, Pattern::multiply, 16, 20, 0x3e4645, 0x5f6d5d},
-    {"impact", "Impact Mark", Pattern::polygon, Pattern::cracks, Pattern::minimum, 13, 15, 0x3a383b, 0x838089},
-    {"crack-overlay", "Crack Overlay", Pattern::cracks, Pattern::veins, Pattern::minimum, 21, 11, 0x3d4042, 0x71727b},
+    {"impact", "Impact Mark", Pattern::circle, Pattern::cracks, Pattern::minimum, 13, 15, 0x3a383b, 0x838089},
+    {"crack-overlay", "Crack Overlay", Pattern::fibrousSurface, Pattern::veins, Pattern::minimum, 5, 11, 0x161412, 0x494039, unsigned(FibrousKind::fracture)},
     {"leak", "Leak Stain", Pattern::worley, Pattern::streaks, Pattern::multiply, 9, 34, 0x484238, 0x82715f},
-    {"grime", "Grime Edge", Pattern::rectangle, Pattern::worley, Pattern::difference, 11, 25, 0x343e37, 0x747c64}
+    {"grime", "Grime Edge", Pattern::fibrousSurface, Pattern::worley, Pattern::difference, 11, 25, 0x273025, 0x68704f, unsigned(FibrousKind::grime)}
   },
   {
-    {"industrial-trim", "Industrial Trim", Pattern::grate, Pattern::streaks, Pattern::maximum, 6, 30, 0x333d3e, 0x839b9b},
-    {"gothic-trim", "Gothic Trim", Pattern::archBand, Pattern::flemish, Pattern::maximum, 15, 4, 0x4d4645, 0xaa9687},
-    {"pipe-border", "Pipe Border", Pattern::stripes, Pattern::rivets, Pattern::multiply, 5, 10, 0x344448, 0x849e9e},
-    {"cable-border", "Cable Border", Pattern::veins, Pattern::grate, Pattern::multiply, 10, 8, 0x414052, 0x868195},
+    {"industrial-trim", "Industrial Trim", Pattern::formedMetal, Pattern::streaks, Pattern::maximum, 6, 30, 0x353d3b, 0x9ba8a0, unsigned(MetalForm::slotted)},
+    {"gothic-trim", "Gothic Trim", Pattern::installedSurface, Pattern::flemish, Pattern::maximum, 22, 4, 0x736654, 0xb6a189, unsigned(InstalledKind::voussoirs)},
+    {"pipe-border", "Pipe Border", Pattern::formedMetal, Pattern::rivets, Pattern::multiply, 5, 10, 0x313838, 0x9fa9a7, unsigned(MetalForm::pipes)},
+    {"cable-border", "Cable Border", Pattern::formedMetal, Pattern::grate, Pattern::multiply, 5, 8, 0x29282a, 0x998d78, unsigned(MetalForm::cables)},
     {"floor-border", "Floor Border", Pattern::stripes, Pattern::tiles, Pattern::minimum, 3, 12, 0x4b4444, 0xaa9e8c},
     {"door-frame", "Door Frame", Pattern::rectangle, Pattern::tiles, Pattern::difference, 18, 6, 0x343e46, 0x8798a0},
     {"terminal", "Terminal Display", Pattern::digit, Pattern::flow, Pattern::multiply, 2, 20, 0x293235, 0x86ceab},
     {"status", "Status Lights", Pattern::rivets, Pattern::flow, Pattern::multiply, 8, 6, 0x344137, 0x90b955},
-    {"grille-strip", "Grille Strip", Pattern::grate, Pattern::stripes, Pattern::difference, 21, 7, 0x393739, 0x969298},
-    {"beam-trim", "Structural Beam Trim", Pattern::rectangle, Pattern::rivets, Pattern::minimum, 29, 18, 0x444e55, 0x9da7a1}
+    {"grille-strip", "Grille Strip", Pattern::formedMetal, Pattern::stripes, Pattern::difference, 18, 7, 0x33312f, 0xafa9a1, unsigned(MetalForm::slotted)},
+    {"beam-trim", "Structural Beam Trim", Pattern::formedMetal, Pattern::rivets, Pattern::minimum, 5, 18, 0x343838, 0x9ca6a5, unsigned(MetalForm::beam)}
   }
 };
 
@@ -241,7 +243,7 @@ inline SurfaceFinish surfaceFinish(size_t category, size_t index) {
     case 4: return {G::mineral, W::runoff, .93f, .52f, .37f, .72f, 0x202823};
     case 5: return {G::stone, W::pits, .72f, .87f, .92f, .52f, 0x585049};
     case 6: return {G::mineral, W::chips, .99f, .83f, .45f, .86f, 0x7a786e};
-    case 7: return {G::mineral, W::deposits, .99f, .79f, .33f, .92f, 0x796342};
+    case 7: return {G::mineral, W::deposits, .71f, .79f, .33f, .49f, 0x796342};
     case 8: return {G::mineral, W::scratches, .77f, .64f, .49f, .85f, 0xb3a99d};
     case 2:
     case 9: return {G::stone, W::chips, .96f, .85f, .87f, .83f, 0x696257};
@@ -264,7 +266,8 @@ inline SurfaceFinish surfaceFinish(size_t category, size_t index) {
     return {G::brushed, index == 5 || index == 6 ? W::runoff : W::scratches,
       .76f, index == 0 ? .29f : .46f, index == 0 ? .31f : .57f, .75f, index == 5 ? 0x665a4eu : 0xbeb9b1u};
   case 4:
-    return {G::brushed, index == 9 ? W::scratches : W::chips, index == 9 ? .6f : .92f, .55f, .55f, .80f, 0x9b9182};
+    return {G::brushed, index == 3 || index == 8 ? W::deposits : W::chips,
+      index == 6 ? .78f : .56f, .55f, .55f, .62f, 0x8b8476};
   case 5:
     if (index == 3) return {G::endGrain, W::scratches, .63f, .67f, .67f, .44f, 0xac8b68};
     if (index == 5) return {G::wood, W::chips, .98f, .64f, .64f, .92f, 0xb09a7c};
@@ -295,6 +298,37 @@ inline SurfaceFinish surfaceFinish(size_t category, size_t index) {
   }
 }
 
+static_assert(std::size(catalogStains::palettes) == std::size(catalogRecipes));
+static_assert(std::size(catalogStains::palettes[0]) == std::size(catalogRecipes[0]));
+
+inline Json catalogColor(uint32_t hex, float alpha) {
+  return Json{fromSrgb(float((hex >> 16) & 255) / 255), fromSrgb(float((hex >> 8) & 255) / 255),
+    fromSrgb(float(hex & 255) / 255), alpha};
+}
+
+inline void setCatalogStain(Document& doc, size_t category, size_t index, StainShape shape) {
+  auto& mask = findNode(doc, "stain-mask")["parameters"];
+  if (shape == catalogStains::clean) {
+    mask["amount"] = 0.f;
+    return;
+  }
+  const auto& palette = *catalogStains::palettes[category][index];
+  const auto& treatment = catalogStains::treatments[unsigned(shape)];
+  mask["shape"] = unsigned(shape);
+  mask["period"] = std::clamp(int(palette.period) + int(index % 3) - 1 + treatment.periodOffset, 2, 32);
+  mask["coverage"] = unit(palette.coverage + treatment.coverage - .52f);
+  mask["amount"] = palette.strength * treatment.strength;
+  mask["horizontal"] = palette.horizontal && !(category == 3 && index == 5);
+  findNode(doc, "stain-pigment")["parameters"]["rgba"] = catalogColor(palette.pigments[treatment.pigment], 1);
+  findNode(doc, "stain-edge-pigment")["parameters"]["rgba"] = catalogColor(palette.pigments[treatment.edge], 1);
+  const float roughness = findNode(doc, "roughness")["parameters"]["value"].get<float>();
+  findNode(doc, "stain-roughness")["parameters"]["value"] =
+    std::clamp(roughness + treatment.roughnessOffset, .09f, .98f);
+  // Push the existing relief gently toward either a recess or a raised deposit.
+  findNode(doc, "stain-relief-target")["parameters"]["value"] = treatment.reliefSign > 0 ? 1.f : 0.f;
+  findNode(doc, "stain-relief-offset")["parameters"]["weight"] = palette.relief * std::abs(treatment.reliefSign);
+}
+
 inline Document catalogPreset(size_t category, size_t index, std::string id) {
   require(category < std::size(catalogRecipes) && index < std::size(catalogRecipes[0]),
     "preset", "Unknown catalog recipe.");
@@ -306,12 +340,24 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   const auto preset = recipeId(category, index);
   source["provenance"]["preset"] = preset;
   const bool liquid = category == 9;
+  const bool clearWater = liquid && index == 0;
+  const bool lava = liquid && index == 2;
+  const bool oilFilm = liquid && index == 4;
+  const bool foam = liquid && index == 5;
+  const bool discharge = liquid && (index == 6 || index == 7);
+  const bool authoredSurface = recipe.pattern == Pattern::aggregate || recipe.pattern == Pattern::installedSurface ||
+    recipe.pattern == Pattern::fibrousSurface || recipe.pattern == Pattern::formedMetal;
+  const bool polishedMarble = category == 7 && index == 3;
+  const bool profiledDecal = category == 10 && (index == 7 || index == 9);
+  const bool clayCracks = category == 6 && index == 4;
+  const auto& stains = catalogStains::selection[category][index];
+  const bool stained = stains[0] != catalogStains::clean || stains[1] != catalogStains::clean;
   const bool marking = category == 10;
   const bool activeDisplay = category == 11 && (index == 6 || index == 7);
   const bool naturalDetail = !liquid && !marking && !activeDisplay;
   const bool weatheredBrick = category == 1 && (index == 0 || index == 2);
   const bool repointedBrick = weatheredBrick && index == 2;
-  source["provenance"]["catalogVersion"] = weatheredBrick ? 6 : naturalDetail ? 4 : 2;
+  source["provenance"]["catalogVersion"] = authoredSurface || lava || foam || discharge || clayCracks || category == 4 ? 8 : 7;
   auto& nodes = source["graph"]["nodes"] = Json::array();
   auto& edges = source["graph"]["edges"] = Json::array();
   auto& outputs = source["outputs"] = Json::object();
@@ -326,6 +372,7 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   const auto add = [&](const char* id, Pattern pattern, unsigned scale, int row) {
     const auto& type = recipeContract(pattern);
     auto parameters = recipePattern(pattern, scale);
+    if (row == 0 && authoredSurface) parameters["kind"] = recipe.surfaceKind;
     if (pattern == Pattern::materialGrain) {
       parameters["kind"] = unsigned(finish.grain);
       if (naturalDetail) parameters["naturalDetail"] = 1;
@@ -340,10 +387,19 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       parameters["mortar"] = index == 6 ? .13 : .073;
       parameters["irregularity"] = index == 5 ? .83 : .67;
     }
-    if (pattern == Pattern::stripes && category == 3 && index == 7) {
-      parameters["duty"] = .11;
-      parameters["feather"] = .042;
-      parameters["slant"] = 0;
+    if (pattern == Pattern::circle && marking && index == 6) {
+      parameters["radius"] = .25;
+      parameters["feather"] = .048;
+      parameters["edgeWear"] = .91;
+    }
+    if (pattern == Pattern::cracks && (clayCracks ||
+        (category == 7 && index == 4) || (marking && index == 7))) {
+      parameters["width"] = marking ? .12 : index == 4 ? .084 : .059;
+      parameters["jitter"] = .91;
+      if (clayCracks) parameters["erosion"] = .89;
+    }
+    if (pattern == Pattern::stripes && marking && index == 0) {
+      parameters["slant"] = 6;
     }
     if (pattern == Pattern::tiles && category == 0 && index == 8) {
       parameters["grout"] = .032;
@@ -370,8 +426,9 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       edges.push_back(wire("wear", "value", id, "variation"));
     }
     if (pattern == Pattern::flow) {
-      static constexpr unsigned liquidStyles[]{4, 1, 2, 1, 1, 2, 3, 3, 2, 1};
+      static constexpr unsigned liquidStyles[]{5, 1, 8, 1, 6, 7, 9, 10, 6, 1};
       parameters["style"] = category == 9 ? liquidStyles[index] : 3;
+      if (clearWater) parameters["crossChop"] = .44f;
       if (source["animation"]["frames"] == 1) {
         source["animation"]["frames"] = 16;
         nodes.push_back(node("time", "Time", Json::object(), 0, 1));
@@ -379,7 +436,8 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       edges.push_back(wire("time", "value", id, "phase"));
     }
     if (parameters.contains("period"))
-      expose({row ? "Detail frequency" : "Pattern frequency", id, "period", pattern == Pattern::materialGrain ? 2.f : 1.f,
+      expose({row ? "Detail frequency" : "Pattern frequency", id, "period",
+        pattern == Pattern::leafLitter ? 3.f : (row == 0 && authoredSurface) || pattern == Pattern::materialGrain ? 2.f : 1.f,
         pattern == Pattern::flow ? 32.f : 64.f, 1});
     else if (parameters.contains("columns")) {
       const bool checker = pattern == Pattern::checker;
@@ -400,7 +458,8 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   };
   add("pattern", recipe.pattern, recipe.scale, 0);
   add("detail", recipe.detail, recipe.detailScale, 1);
-  const bool pieceLayout = recipe.pattern == Pattern::bricks || recipe.pattern == Pattern::flemish ||
+  const bool leaves = recipe.pattern == Pattern::leafLitter;
+  const bool pieceLayout = authoredSurface || leaves || recipe.pattern == Pattern::bricks || recipe.pattern == Pattern::flemish ||
     recipe.pattern == Pattern::boardJoints;
   if (pieceLayout) {
     constexpr std::array<const char*, 3> names{"piece-relief", "piece-face", "piece-tone"};
@@ -446,14 +505,15 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     nodes.push_back(node("grain", "ChannelUnpack", {{"channel", 3}}, 2, 2));
     edges.push_back(wire("pattern", "data", "grain", "data"));
   } else {
-    Json grain = {{"kind", unsigned(finish.grain)}, {"period", std::min(recipe.detailScale, 60u)}};
+    Json grain = {{"kind", unsigned(polishedMarble ? GrainKind::polished : finish.grain)}, {"period", std::min(recipe.detailScale, 60u)}};
     if (naturalDetail) grain["naturalDetail"] = 1;
     nodes.push_back(node("grain", "MaterialGrain", std::move(grain), 1, 2));
   }
   const bool paintedSteel = category == 3 && index == 2;
   const unsigned wearFrequency = paintedSteel ? 19u : finish.wear == WearKind::chips ? 9u + recipe.scale % 10u :
     finish.wear == WearKind::deposits ? 8u : std::min(52u, recipe.detailScale);
-  Json wear = {{"kind", unsigned(finish.wear)}, {"period", wearFrequency}, {"density", finish.density}};
+  const float wearDensity = clearWater || oilFilm || activeDisplay || (category == 4 && index == 9) ? 0.f : finish.density;
+  Json wear = {{"kind", unsigned(finish.wear)}, {"period", wearFrequency}, {"density", wearDensity}};
   if (naturalDetail) wear["naturalDetail"] = 1;
   auto damage = node("damage", "SurfaceWear", std::move(wear), 1, 3);
   if (naturalDetail) damage["seedIdentity"] = preset + "-wear";
@@ -462,36 +522,75 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   connect("damage", "intact", "value");
   const bool physicalJoint = recipe.pattern == Pattern::bricks || recipe.pattern == Pattern::flemish ||
     recipe.pattern == Pattern::tiles || recipe.pattern == Pattern::boardJoints || recipe.pattern == Pattern::panels ||
-    recipe.pattern == Pattern::stonework || (category == 0 && index == 2);
-  const bool gentleStructure = recipe.pattern == Pattern::materialGrain || recipe.pattern == Pattern::gradient ||
-    recipe.pattern == Pattern::fbm || recipe.pattern == Pattern::ridged || recipe.pattern == Pattern::streaks;
+    recipe.pattern == Pattern::stonework || recipe.pattern == Pattern::installedSurface || (category == 0 && index == 2);
+  const bool gentleStructure = !clayCracks && (recipe.pattern == Pattern::materialGrain || recipe.pattern == Pattern::gradient ||
+    recipe.pattern == Pattern::fbm || recipe.pattern == Pattern::ridged || recipe.pattern == Pattern::streaks);
   const bool stone = recipe.pattern == Pattern::stonework;
   const bool wetStone = category == 1 && index == 5;
   const bool peeledPlaster = category == 2 && (index == 0 || index == 1 || index == 6);
   const bool boardConcrete = category == 0 && index == 1;
-  const float structuralWeight = category == 0 && index == 9 ? 0.f :
+  const float structuralWeight = authoredSurface || clayCracks ? 0.f :
     recipe.pattern == Pattern::archBand ? .15f : pieceLayout || stone ? .12f :
     gentleStructure ? .27f : physicalJoint ? .32f : .62f;
-  mixScalar("structure", relief, "composite", liquid || activeDisplay ? .38f : structuralWeight, 3, 0);
-  mixScalar("surface", "structure", "grain", liquid || activeDisplay ? .12f :
-    weatheredBrick ? .11f : woodBoards ? .47f : stone ? .22f : gentleStructure ? .62f : .40f, 4, 1);
-  mixScalar("worn-relief", "surface", "intact", finish.relief * (liquid || marking ? .06f : weatheredBrick ? .09f : .22f), 5, 1);
-  const auto rgb = [](uint32_t hex, float alpha) {
-    return Json{fromSrgb(float((hex >> 16) & 255) / 255), fromSrgb(float((hex >> 8) & 255) / 255),
-      fromSrgb(float(hex & 255) / 255), alpha};
-  };
+  mixScalar("structure", relief, "composite", clearWater ? .20f : liquid || activeDisplay ? .38f : structuralWeight, 3, 0);
+  mixScalar("surface", "structure", "grain", clearWater ? 0.f : liquid || activeDisplay ? .12f :
+    polishedMarble ? .02f : authoredSurface ? .11f : weatheredBrick ? .11f : leaves ? .16f : woodBoards ? .47f : stone ? .22f :
+    category == 6 && (index == 4 || index == 6) ? .24f : gentleStructure ? .62f : .40f, 4, 1);
+  mixScalar("worn-relief", "surface", "intact", finish.relief * (clearWater || polishedMarble ? 0.f : authoredSurface || liquid || marking ? .06f : weatheredBrick ? .09f : .22f), 5, 1);
+  const auto rgb = catalogColor;
   const bool decal = marking && index != 0;
-  const bool tilePigment = category == 2 && index == 4;
   const bool cementJoint = ((category == 1 || category == 2) && physicalJoint) ||
-    (category == 0 && (index == 1 || index == 3 || index == 8));
+    (category == 0 && (index == 1 || index == 3 || index == 8)) || (category == 5 && index == 1) ||
+    (category == 11 && index == 1);
   const bool firedClay = category == 1 && index < 3;
   const bool wearDecal = decal && (index == 4 || index == 5 || index == 8);
   if (stone) levels("piece-tone", "pattern", .59f, .92f, 3, 3);
-  const char* tonalStructure = tilePigment ? "detail" : pieceLayout || stone ? "piece-tone" : "structure";
-  mixScalar("tone", "grain", tonalStructure, liquid || marking || activeDisplay || tilePigment ? .90f :
-    weatheredBrick ? .76f : firedClay ? .60f : stone ? .44f : woodBoards ? .55f : boardConcrete ? .28f :
+  if (lava) {
+    nodes.push_back(node("lava-heat", "Invert", Json::object(), 3, 10));
+    connect("pattern", "lava-heat", "value");
+    levels("fissure-glow", "lava-heat", .87f, .998f, 4, 10);
+  }
+  if (discharge) levels("ionized-gas", "pattern", .14f, .92f, 4, 10);
+  const char* tonalStructure = lava || oilFilm || foam || discharge ? "pattern" : pieceLayout || stone ? "piece-tone" : "structure";
+  mixScalar("tone", "grain", tonalStructure, authoredSurface ? .97f : clayCracks ? .83f : liquid || marking || activeDisplay ? .90f :
+    weatheredBrick ? .76f : leaves ? .93f : firedClay ? .60f : stone ? (category == 6 ? .78f : .44f) :
+    woodBoards ? .55f : boardConcrete ? .28f :
     finish.grain == GrainKind::marble ? .14f : gentleStructure || cementJoint ? .22f : category == 5 ? .28f : .48f, 4, 0);
   Json pigment = {{"low", rgb(recipe.shadow, 1)}, {"high", rgb(recipe.highlight, 1)}};
+  if (category == 2 && index == 7) {
+    pigment["midtones"] = Json{rgb(0x675246, 1), rgb(0xa99786, 1), rgb(0x514d48, 1),
+      rgb(0xd9cdb6, 1), rgb(0xbbaf99, 1)};
+  }
+  if (category == 8 && index == 1) {
+    pigment["midtones"] = Json{rgb(0x6b5257, 1), rgb(0x8e5754, 1), rgb(0xbb7972, 1)};
+  }
+  if (category == 3 && index == 7) {
+    pigment["midtones"] = Json{rgb(0x6c6055, 1), rgb(0x767a7d, 1), rgb(0x9d9b8e, 1)};
+  }
+  if (discharge) {
+    pigment["low"] = rgb(index == 6 ? 0x151b2c : 0x201321, 1);
+    pigment["high"] = rgb(index == 6 ? 0x376b91 : 0x744682, 1);
+  }
+  if (foam) {
+    pigment["low"] = rgb(0x273e31, 1);
+    pigment["midtones"] = Json{rgb(0x3f6650, 1), rgb(0x809867, 1)};
+    pigment["high"] = rgb(0xc3cc9a, 1);
+  }
+  if (clearWater) {
+    pigment["low"] = rgb(0x385a6b, 1);
+    pigment["high"] = rgb(0x4b7181, 1);
+  }
+  if (lava) {
+    pigment["low"] = rgb(0x2b2725, 1);
+    pigment["high"] = rgb(0x63564d, 1);
+  }
+  if (oilFilm) {
+    pigment["low"] = rgb(0x22232d, 1);
+    pigment["midtones"] = Json{rgb(0x51445a, 1), rgb(0x586979, 1), rgb(0x728479, 1),
+      rgb(0x9b865b, 1), rgb(0x765569, 1)};
+    pigment["high"] = rgb(0x292a36, 1);
+  }
+  if (leaves) pigment["midtones"] = Json{rgb(0x67412a, 1), rgb(0x8f5834, 1), rgb(0x8d7748, 1)};
   if (weatheredBrick) {
     pigment["midtones"] = repointedBrick ?
       Json{rgb(0x865247u, 1), rgb(0xa66a50u, 1), rgb(0x8b7663u, 1)} :
@@ -533,9 +632,10 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     colorLayer = "with-rim";
   }
   if (cementJoint || woodBoards) {
-    const uint32_t mortarLow = repointedBrick ? 0x675d4du : weatheredBrick ? 0x51483au : woodBoards ? 0x362b22u : wetStone ? 0x3a362bu : category == 0 ? 0x4a4841u :
+    const bool woodSeams = woodBoards || (category == 5 && index == 1);
+    const uint32_t mortarLow = repointedBrick ? 0x675d4du : weatheredBrick ? 0x51483au : woodSeams ? 0x362b22u : wetStone ? 0x3a362bu : category == 0 ? 0x4a4841u :
       category == 1 && index >= 3 ? 0x454238u : 0x63594cu;
-    const uint32_t mortarHigh = repointedBrick ? 0xc1b7a4u : weatheredBrick ? 0xb0a28au : woodBoards ? 0x5c4e40u : wetStone ? 0x676252u : category == 0 ? 0x747066u :
+    const uint32_t mortarHigh = repointedBrick ? 0xc1b7a4u : weatheredBrick ? 0xb0a28au : woodSeams ? 0x5c4e40u : wetStone ? 0x676252u : category == 0 ? 0x747066u :
       category == 1 && index >= 3 ? 0x7c7366u : 0x958777u;
     nodes.push_back(node("mortar", "ColorRamp", {{"low", rgb(mortarLow, 1)}, {"high", rgb(mortarHigh, 1)}}, 5, 2));
     if (weatheredBrick) {
@@ -571,20 +671,19 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     const auto wearColor = repointedBrick ? 0x7f6f61u : finish.wearColor;
     nodes.push_back(node("worn-pigment", "ConstantColor", {{"rgba", rgb(wearColor, 1)}}, 5, 3));
   }
-  const float wearContrast = weatheredBrick ? .14f : firedClay ? .28f : stone ? .32f : woodBoards ? .44f : finish.wearContrast;
+  const float wearContrast = polishedMarble ? .08f : authoredSurface ? .32f * finish.wearContrast : weatheredBrick ? .14f : firedClay ? .28f : stone ? .32f : woodBoards ? .44f : finish.wearContrast;
   blend("with-wear", colorLayer, "worn-pigment", layeredWear ? "open-damage" : "damage", wearContrast, 1);
   colorLayer = "with-wear";
   if (category == 0 && index == 9) {
-    combine("exposed-rebar", "Multiply", "detail", "damage", 4, 3);
-    nodes.push_back(node("rebar-color", "ConstantColor", {{"rgba", rgb(0x635143, 1)}}, 5, 5));
-    blend("with-rebar", colorLayer, "rebar-color", "exposed-rebar", .93f, 2);
+    nodes.push_back(node("rebar-color", "ConstantColor", {{"rgba", rgb(0x694739, 1)}}, 5, 5));
+    blend("with-rebar", colorLayer, "rebar-color", "piece-face", .92f, 2);
     colorLayer = "with-rebar";
   }
-  if (category == 4 || (category == 3 && index == 2) || (category == 5 && index == 5)) {
+  if ((category == 4 && index != 9) || (category == 3 && index == 2) || (category == 5 && index == 5)) {
     nodes.push_back(node("scuffs", "SurfaceWear", {{"kind", unsigned(WearKind::scratches)},
       {"period", std::min(36u, recipe.detailScale)}, {"density", .68}}, 1, 5));
     nodes.push_back(node("scuff-pigment", "ConstantColor", {{"rgba", rgb(0xbdb29e, 1)}}, 5, 6));
-    blend("with-scuffs", colorLayer, "scuff-pigment", "scuffs", .48f, 6);
+    blend("with-scuffs", colorLayer, "scuff-pigment", "scuffs", category == 4 ? .25f : .48f, 6);
     colorLayer = "with-scuffs";
   }
   const char* heightLayer = "worn-relief";
@@ -609,14 +708,54 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       heightLayer = "repointed-relief";
     }
   }
+  if (stained) {
+    auto stain = node("stain-mask", "Stain", defaultParameters(Kernel::stain), 3, 12);
+    stain["seedIdentity"] = preset + "-stain";
+    nodes.push_back(std::move(stain));
+    if (liquid) {
+      connect("time", "stain-mask", "phase");
+    } else {
+      constant("stain-phase", 0, 2, 12);
+      connect("stain-phase", "stain-mask", "phase");
+    }
+    for (const char* id : {"stain-core", "stain-edge"}) {
+      const bool core = std::string_view(id) == "stain-core";
+      nodes.push_back(node(id, "ChannelUnpack", {{"channel", core ? 0 : 1}}, 4, core ? 12 : 13));
+      edges.push_back(wire("stain-mask", "data", id, "data"));
+    }
+    const bool structural = category == 1 || category == 5 || (category == 2 && pieceLayout);
+    const float stainOpacity = authoredSurface ? .59f : weatheredBrick ? .67f : leaves ? .61f : structural ? .73f : .92f;
+    nodes.push_back(node("stain-pigment", "ConstantColor", defaultParameters(Kernel::color), 5, 12));
+    nodes.push_back(node("stain-edge-pigment", "ConstantColor", defaultParameters(Kernel::color), 5, 13));
+    const char* core = "stain-core";
+    const char* rim = "stain-edge";
+    if (category == 2 && index == 5) {
+      // Grout wicks moisture. The glaze only catches a faint residue in comparison.
+      constant("glaze-residue", .13f, 4, 14);
+      mixScalar("near-joints", "glaze-residue", "joint-mask", .87f, 4, 15);
+      combine("joint-stain-core", "Multiply", core, "near-joints", 5, 11);
+      combine("joint-stain-rim", "Multiply", rim, "near-joints", 5, 12);
+      core = "joint-stain-core";
+      rim = "joint-stain-rim";
+    }
+    blend("with-stain-edge", colorLayer, "stain-edge-pigment", rim, stainOpacity * .62f, 12);
+    blend("with-stains", "with-stain-edge", "stain-pigment", core, stainOpacity, 13);
+    colorLayer = "with-stains";
+    constant("stain-relief-target", 0, 5, 14);
+    mixScalar("stain-relief-offset", heightLayer, "stain-relief-target", .1f, 6, 14);
+    maskedScalar("stained-relief", heightLayer, "stain-relief-offset", core, 7, 14);
+    heightLayer = "stained-relief";
+  }
   if (decal) {
-    const char* mask = "pattern";
+    const char* mask = profiledDecal ? "piece-face" : "pattern";
     if (recipe.pattern == Pattern::cracks) {
       nodes.push_back(node("crack-mask", "Invert", Json::object(), 3, 2));
       connect("pattern", "crack-mask", "value");
       mask = "crack-mask";
     } else if (wearDecal) {
-      mask = "damage";
+      combine("stain-decal-opacity", "Maximum", "damage", "stain-core", 6, 2);
+      combine("stain-decal-edge", "Maximum", "stain-decal-opacity", "stain-edge", 7, 2);
+      mask = "stain-decal-edge";
     }
     if (!wearDecal) {
       combine("marking-opacity", "Multiply", mask, "intact", 6, 2);
@@ -629,11 +768,12 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   } else channel("baseColor", colorLayer, "color");
   channel("height", heightLayer, "value");
   const bool metal = category == 3 || category == 4;
-  Json normal = {{"strength", weatheredBrick ? 3.4f : .65f + 1.7f * finish.relief}, {"invertY", false}};
-  if (weatheredBrick) normal["referenceSize"] = 256;
+  Json normal = {{"strength", polishedMarble ? .46f : weatheredBrick ? 3.4f : authoredSurface ? 2.55f : .65f + 1.7f * finish.relief}, {"invertY", false}};
+  if (weatheredBrick || clearWater || authoredSurface) normal["referenceSize"] = 256;
   nodes.push_back(node("normal", "HeightToNormal", std::move(normal), 7, 3));
   nodes.push_back(node("ao", "HeightToAO", {{"strength", .8f + finish.relief}}, 7, 4));
-  constant("roughness", wetStone ? .38f : finish.roughness, 4, 4);
+  constant("roughness", polishedMarble ? .27f : category == 2 && index == 7 ? .37f :
+    wetStone ? .38f : finish.roughness, 4, 4);
   mixScalar("micro-roughness", "roughness", "grain", metal ? .22f : .16f, 5, 4);
   if (naturalDetail) {
     const bool damp = category == 0 && index == 4;
@@ -659,7 +799,12 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     combine("stone-ao", "Multiply", "ao", "joint-ao", 8, 9);
     channel("ao", "stone-ao", "value");
   } else channel("ao", "ao", "value");
-  channel("roughness", "worn-roughness", "value");
+  if (stained) {
+    constant("stain-roughness", .5f, 5, 15);
+    const char* roughnessMask = category == 2 && index == 5 ? "joint-stain-core" : "stain-core";
+    maskedScalar("stained-roughness", "worn-roughness", "stain-roughness", roughnessMask, 7, 15);
+    channel("roughness", "stained-roughness", "value");
+  } else channel("roughness", clearWater ? "roughness" : "worn-roughness", "value");
   if (metal) {
     const bool painted = category == 4 || index == 2;
     const bool oxidized = category == 3 && (index == 1 || index == 9);
@@ -674,14 +819,20 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     channel("metalness", "worn-metalness", "value");
     expose({"Metalness", "metalness", "value", 0, 1, 0});
   }
-  if ((category == 4 && index >= 6) || (liquid && index >= 5) || (category == 11 && (index == 6 || index == 7))) {
+  if (lava || (liquid && index >= 6) || activeDisplay) {
     nodes.push_back(node("glow", "ColorRamp",
-      {{"low", {0,0,0,1}}, {"high", rgb(recipe.highlight, 1)}}, 4, 5));
-    edges.push_back(wire("composite", "value", "glow", "value"));
+      {{"low", {0,0,0,1}}, {"high", rgb(lava ? 0xff9837u : recipe.highlight, 1)}}, 4, 5));
+    connect(lava ? "fissure-glow" : discharge ? "ionized-gas" : "composite", "glow", "value");
     channel("emissive", "glow", "color");
   }
   expose({"Detail influence", "surface", "weight", 0, 1, 0});
-  expose({"Wear density", "damage", "density", 0, 1, 0});
+  if (wearDensity > 0.f) expose({"Wear density", "damage", "density", 0, 1, 0});
+  if (stained) {
+    expose({"Stain frequency", "stain-mask", "period", 2, 32, 1});
+    expose({"Stain coverage", "stain-mask", "coverage", 0, 1, 0});
+    expose({"Stain strength", "stain-mask", "amount", 0, 1, 0});
+    setCatalogStain(doc, category, index, stains[0]);
+  }
   expose({"Bump strength", "normal", "strength", 0, 8, 0});
   expose({"Roughness", "roughness", "value", 0, 1, 0});
   return doc;
@@ -693,12 +844,132 @@ struct RecipeVariation {
   unsigned scalePercent;
 };
 
-inline constexpr RecipeVariation curatedVariations[]{
-  {"Clean and fine", .29f, .9f, .32f, 135},
-  {"Deep relief", .74f, 3.6f, .61f, 78},
-  {"Weathered", .89f, 2.7f, .91f, 115},
-  {"Broad and soft", .46f, .5f, .69f, 63}
+struct FlowVariation {
+  const char* name;
+  unsigned period;
+  float amplitude, normalStrength, roughness, crossChop;
 };
+
+inline constexpr FlowVariation waterVariations[]{
+  {"Fine wind ripples", 8, .49f, 2.1f, .19f, .30f},
+  {"Long swell", 2, .62f, 2.9f, .12f, .16f},
+  {"Crossing ripples", 4, .92f, 2.6f, .16f, .91f},
+  {"Broken wind chop", 6, .98f, 3.15f, .18f, .64f},
+};
+inline constexpr FlowVariation oilVariations[]{
+  {"Wide film bands", 3, .79f, 1.15f, .17f, 0.f},
+  {"Broken film bands", 8, .91f, 1.8f, .22f, 0.f},
+  {"Still film", 2, .35f, .75f, .11f, 0.f},
+  {"Fine interference bands", 12, .60f, 1.25f, .18f, 0.f},
+};
+
+inline constexpr size_t maxCatalogVariations = catalogStains::Choices{}.size() - 1;
+static_assert(std::size(waterVariations) == maxCatalogVariations && std::size(oilVariations) == maxCatalogVariations);
+
+struct CatalogFinish {
+  const char* name;
+  unsigned frequency;
+  float brightness, warmth, roughness;
+};
+
+// These finishes change the substrate or manufacture. They keep the recipe's
+// existing damage and never add another stain mask.
+inline constexpr CatalogFinish catalogFinishes[][4]{
+  {{"Fine cast", 123, .98f, -.018f, -.05f}, {"Pale mineral mix", 100, 1.14f, .019f, .025f},
+    {"Coarse cast", 81, .97f, .043f, .06f}, {"Dark mineral mix", 106, .88f, -.027f, .04f}},
+  {{"Fine courses", 128, .99f, .027f, -.015f}, {"Cool stone batch", 100, 1.08f, -.054f, -.02f},
+    {"Broad courses", 77, .95f, .017f, .035f}, {"Dark stone batch", 100, .86f, -.013f, .045f}},
+  {{"Fine finish", 121, .98f, -.021f, -.04f}, {"Ivory finish", 100, 1.13f, .055f, -.055f},
+    {"Paler cool finish", 105, 1.10f, -.039f, .025f}, {"Matte finish", 100, .92f, .011f, .10f}},
+  {{"Fine machined finish", 125, 1.03f, -.020f, -.065f}, {"Satin steel", 100, 1.12f, -.04f, -.12f},
+    {"Matte steel", 100, .92f, .019f, .12f}, {"Dark steel", 100, .83f, -.012f, .03f}},
+  {{"Satin enamel", 100, 1.04f, -.016f, -.12f}, {"Warm enamel", 100, 1.11f, .054f, -.035f},
+    {"Cool enamel", 100, 1.02f, -.062f, -.03f}, {"Matte enamel", 100, .90f, .006f, .12f}},
+  {{"Fine grain", 126, 1.04f, .022f, -.04f}, {"Light timber", 100, 1.14f, .042f, -.035f},
+    {"Mature timber", 100, .87f, .021f, .04f}, {"Dry timber", 92, .99f, -.049f, .08f}},
+  {{"Finer surface", 129, 1.02f, -.012f, -.022f}, {"Paler sediment", 100, 1.13f, .024f, .038f},
+    {"Coarser surface", 75, .93f, .028f, .075f}, {"Dark sediment", 100, .85f, -.026f, .025f}},
+  {{"Fine structure", 124, 1.01f, -.020f, -.022f}, {"Pale surface", 100, 1.17f, .026f, -.015f},
+    {"Broad structure", 75, .97f, .022f, .045f}, {"Cool surface", 100, .92f, -.051f, .03f}},
+  {{"Fine structure", 128, 1.03f, -.024f, -.035f}, {"Muted pigment", 100, 1.11f, -.040f, .035f},
+    {"Broad structure", 76, .97f, .031f, .065f}, {"Dark pigment", 100, .87f, .032f, -.025f}},
+  {{"Finer flow", 128, .96f, -.025f, -.052f}, {"Slow broad flow", 76, 1.08f, .028f, -.033f},
+    {"Bright surface", 108, 1.14f, -.034f, -.08f}, {"Dark surface", 100, .86f, .031f, .055f}},
+  {{"Fine pigment", 119, .96f, -.017f, -.055f}, {"Pale pigment", 100, 1.17f, .016f, .035f},
+    {"Dark pigment", 100, .83f, -.014f, .09f}, {"Warm pigment", 104, .98f, .057f, .025f}},
+  {{"Satin finish", 100, 1.07f, -.016f, -.105f}, {"Warm finish", 100, 1.09f, .048f, -.040f},
+    {"Cool finish", 100, 1.03f, -.052f, -.035f}, {"Matte finish", 100, .89f, .012f, .13f}},
+};
+static_assert(std::size(catalogFinishes) == std::size(catalogRecipes));
+
+inline size_t catalogVariationCount(size_t, size_t) { return maxCatalogVariations; }
+
+inline size_t stainVariationCount(size_t category, size_t index) {
+  const auto& choices = catalogStains::selection[category][index];
+  return std::count_if(choices.begin() + 1, choices.end(),
+    [](StainShape shape) { return shape != catalogStains::clean; });
+}
+
+// Index zero opens the default recipe. Alternate indices are contiguous and one-based.
+inline const char* catalogVariationName(size_t category, size_t index, size_t variation) {
+  if (variation == 0) return "Default";
+  if (category == 9 && index == 0) return waterVariations[variation - 1].name;
+  if (category == 9 && index == 4) return oilVariations[variation - 1].name;
+  const auto stains = stainVariationCount(category, index);
+  if (variation > stains) return catalogFinishes[category][variation - stains - 1].name;
+  return catalogStains::treatments[unsigned(catalogStains::selection[category][index][variation])].name;
+}
+
+inline void scaleExposedPattern(Document& doc, unsigned percent, bool includeLayout) {
+  for (const auto& binding : doc.source["exposedParameters"]) {
+    const auto key = binding["key"].get<std::string>();
+    const auto id = binding["node"].get<std::string>();
+    if ((id != "pattern" && id != "detail") || key == "digit") continue;
+    if (!includeLayout && key != "period" && key != "columns") continue;
+    auto& value = findNode(doc, id)["parameters"][key];
+    const double low = binding["min"], high = binding["max"];
+    const unsigned step = binding["step"];
+    double scaled = value.get<double>() * percent / 100;
+    if (step) {
+      scaled = low + std::round((scaled - low) / step) * step;
+      value = unsigned(std::clamp(scaled, low, high));
+    } else value = std::clamp(scaled, low, high);
+  }
+}
+
+inline void applyCatalogFinish(Document& doc, const CatalogFinish& finish) {
+  auto& pigment = findNode(doc, "pigment")["parameters"];
+  const auto tint = [&](Json& color) {
+    auto rgba = color.get<Pixel>();
+    const float balance[]{1.f + finish.warmth, 1.f, 1.f - finish.warmth};
+    for (unsigned i = 0; i < 3; ++i) rgba[i] = unit(rgba[i] * finish.brightness * balance[i]);
+    color = rgba;
+  };
+  tint(pigment["low"]);
+  tint(pigment["high"]);
+  if (pigment.contains("midtones")) for (auto& color : pigment["midtones"]) tint(color);
+  auto& roughness = findNode(doc, "roughness")["parameters"]["value"];
+  roughness = std::clamp(roughness.get<float>() + finish.roughness, .06f, .98f);
+  if (finish.frequency != 100) scaleExposedPattern(doc, finish.frequency, false);
+}
+
+inline void applyCatalogVariation(Document& doc, size_t category, size_t index, size_t variation) {
+  require(variation > 0 && variation <= catalogVariationCount(category, index),
+    "variation", "This catalog preset does not offer that variation.");
+  if (category == 9 && (index == 0 || index == 4)) {
+    const auto& wave = index == 0 ? waterVariations[variation - 1] : oilVariations[variation - 1];
+    auto& pattern = findNode(doc, "pattern")["parameters"];
+    pattern["period"] = wave.period;
+    pattern["amplitude"] = wave.amplitude;
+    if (index == 0) pattern["crossChop"] = wave.crossChop;
+    findNode(doc, "normal")["parameters"]["strength"] = wave.normalStrength;
+    findNode(doc, "roughness")["parameters"]["value"] = wave.roughness;
+  } else {
+    const auto stains = stainVariationCount(category, index);
+    if (variation <= stains) setCatalogStain(doc, category, index, catalogStains::selection[category][index][variation]);
+    else applyCatalogFinish(doc, catalogFinishes[category][variation - stains - 1]);
+  }
+}
 
 inline void applyCuratedVariation(Document& doc, const RecipeVariation& settings) {
   auto& surface = findNode(doc, "surface")["parameters"];
@@ -709,19 +980,7 @@ inline void applyCuratedVariation(Document& doc, const RecipeVariation& settings
   roughness["value"] = settings.roughness;
   auto& damage = findNode(doc, "damage")["parameters"]["density"];
   damage = std::clamp(damage.get<float>() + .36f * (settings.detail - .65f), 0.f, 1.f);
-  for (const auto& binding : doc.source["exposedParameters"]) {
-    const auto key = binding["key"].get<std::string>();
-    const auto id = binding["node"].get<std::string>();
-    if ((id != "pattern" && id != "detail") || key == "digit") continue;
-    auto& value = findNode(doc, id)["parameters"][key];
-    const double low = binding["min"], high = binding["max"];
-    const unsigned step = binding["step"];
-    double scaled = value.get<double>() * settings.scalePercent / 100;
-    if (step) {
-      scaled = low + std::round((scaled - low) / step) * step;
-      value = unsigned(std::clamp(scaled, low, high));
-    } else value = std::clamp(scaled, low, high);
-  }
+  scaleExposedPattern(doc, settings.scalePercent, true);
 }
 
 struct TextureFamily {
@@ -751,16 +1010,36 @@ inline constexpr TextureFamily textureFamilies[]{
     {{{8,9},{8,3},{8,7},{8,4},{11,3},{8,8},{8,5},{9,6}}}},
 };
 
-inline Document familyMaterial(size_t index, size_t role, uint32_t root) {
+struct FamilyControls {
+  uint32_t seed, shade, accent;
+  unsigned scale;
+  float wear;
+};
+
+inline FamilyControls defaultFamilyControls(size_t index, uint32_t seed) {
+  const auto& family = textureFamilies[index];
+  return {seed, family.shade, family.accent, family.settings.scalePercent, 0.f};
+}
+
+inline Document familyMaterial(size_t index, size_t role, FamilyControls controls) {
   require(index < std::size(textureFamilies) && role < std::size(familyRoles), "family", "Unknown family member.");
+  require(controls.shade <= 0xffffff && controls.accent <= 0xffffff &&
+    controls.scale >= 25 && controls.scale <= 200 && controls.wear >= -.5f && controls.wear <= .5f,
+    "family", "Family colors, scale or wear are out of range.");
   const auto& family = textureFamilies[index];
   const auto& [category, recipe] = family.recipes[role];
   const auto name = std::string(family.id) + "-" + familyRoles[role];
   auto doc = catalogPreset(category, recipe, name);
-  applyCuratedVariation(doc, family.settings);
+  auto settings = family.settings;
+  settings.scalePercent = controls.scale;
+  applyCuratedVariation(doc, settings);
+  auto& density = findNode(doc, "damage")["parameters"]["density"];
+  density = unit(density.get<float>() + controls.wear);
   doc.source["name"] = std::string(family.name) + " / " + familyRoles[role];
-  doc.source["rootSeed"] = uint32_t(stableSeed(root, name));
-  doc.source["provenance"]["family"] = {{"id", family.id}, {"role", familyRoles[role]}, {"seed", root}, {"version", 2}};
+  doc.source["rootSeed"] = uint32_t(stableSeed(controls.seed, name));
+  doc.source["provenance"]["family"] = {{"id", family.id}, {"role", familyRoles[role]}, {"seed", controls.seed},
+    {"version", 3}, {"shade", controls.shade}, {"accent", controls.accent}, {"scalePercent", controls.scale},
+    {"wear", controls.wear}};
   auto& pigment = findNode(doc, "pigment")["parameters"];
   const auto tint = [&](const char* key, uint32_t hex, float weight) {
     auto rgba = pigment[key].get<Pixel>();
@@ -770,9 +1049,70 @@ inline Document familyMaterial(size_t index, size_t role, uint32_t root) {
     }
     pigment[key] = rgba;
   };
-  tint("low", family.shade, .72f);
-  tint("high", family.accent, role == 7 ? .4f : .72f);
+  tint("low", controls.shade, .72f);
+  tint("high", controls.accent, role == 7 ? .4f : .72f);
   return doc;
+}
+
+inline Document familyMaterial(size_t index, size_t role, uint32_t seed) {
+  require(index < std::size(textureFamilies), "family", "Unknown texture family.");
+  return familyMaterial(index, role, defaultFamilyControls(index, seed));
+}
+
+inline std::optional<std::pair<size_t, size_t>> familyIdentity(const Document& doc) {
+  const auto& provenance = doc.source.at("provenance");
+  if (!provenance.contains("family")) return std::nullopt;
+  const auto& saved = provenance.at("family");
+  if (!saved.is_object() || !saved.contains("id") || !saved.contains("role")) return std::nullopt;
+  for (size_t index = 0; index < std::size(textureFamilies); ++index)
+    if (saved["id"] == textureFamilies[index].id)
+      for (size_t role = 0; role < std::size(familyRoles); ++role)
+        if (saved["role"] == familyRoles[role]) return {{index, role}};
+  return std::nullopt;
+}
+
+inline FamilyControls readFamilyControls(const Document& doc, size_t index) {
+  const auto& saved = doc.source.at("provenance").at("family");
+  const auto seed = uint32_t(integer(member(saved, "seed", "family"), 0, UINT32_MAX, "family.seed"));
+  if (!saved.contains("scalePercent")) return defaultFamilyControls(index, seed);
+  return {seed,
+    uint32_t(integer(member(saved, "shade", "family"), 0, 0xffffff, "family.shade")),
+    uint32_t(integer(member(saved, "accent", "family"), 0, 0xffffff, "family.accent")),
+    unsigned(integer(member(saved, "scalePercent", "family"), 25, 200, "family.scalePercent")),
+    number(member(saved, "wear", "family"), -.5f, .5f, "family.wear")};
+}
+
+inline void refreshFamilyMember(Document& doc, FamilyControls controls, bool resetOverrides = false) {
+  const auto identity = familyIdentity(doc);
+  require(bool(identity), "family", "This source does not belong to a built-in family.");
+  const auto [index, role] = *identity;
+  auto previous = familyMaterial(index, role, readFamilyControls(doc, index));
+  auto next = familyMaterial(index, role, controls);
+  auto& nextInfo = next.source["provenance"]["family"];
+  auto& overrides = nextInfo["overrides"] = Json::array();
+  if (doc.seed() == previous.seed() || resetOverrides) doc.source["rootSeed"] = next.seed();
+  else overrides.push_back("rootSeed");
+  auto& nodes = doc.source["graph"]["nodes"];
+  const auto inherit = [&](std::string_view id, const std::string& key) {
+    const auto& previousNode = findNode(previous, id);
+    const auto& nextParams = findNode(next, id)["parameters"];
+    auto current = std::find_if(nodes.begin(), nodes.end(), [&](const Json& entry) {
+      return entry["id"] == id && entry["type"] == previousNode["type"];
+    });
+    if (current == nodes.end() || !(*current)["parameters"].contains(key)) return;
+    auto& value = (*current)["parameters"][key];
+    if (value == previousNode["parameters"][key] || resetOverrides) value = nextParams[key];
+    else overrides.push_back(std::string(id) + "/" + key);
+  };
+  inherit("pigment", "low");
+  inherit("pigment", "high");
+  inherit("damage", "density");
+  for (const auto& binding : next.source["exposedParameters"]) {
+    const auto id = binding["node"].get<std::string>();
+    const auto key = binding["key"].get<std::string>();
+    if ((id == "pattern" || id == "detail") && key != "digit") inherit(id, key);
+  }
+  doc.source["provenance"]["family"] = std::move(nextInfo);
 }
 
 } // namespace ftebroom::textureStudio

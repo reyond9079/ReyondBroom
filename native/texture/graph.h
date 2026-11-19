@@ -15,10 +15,16 @@ enum class Kernel { unknown, constant, color, image, noise, bricks, tiles, check
                     rotate90, directionalBlur, hsv, posterize, pixelate, dither, normalBlend,
                     uv, uvSample, warp, directionalWarp, histogram, channelPack, channelUnpack, retroShade,
                     panels, distance, slopeBlur, colorize, palette, quantize, materialGrain, surfaceWear, boardJoints,
-                    stonework, archBand, scalarBlend, brickLayout, flemishLayout, boardLayout, stoneBrickLayout, masonryBrickLayout };
+                    stonework, archBand, scalarBlend, brickLayout, flemishLayout, boardLayout, stoneBrickLayout, masonryBrickLayout,
+                    stain, leafLitter, aggregate, installedSurface, fibrousSurface, formedMetal };
 
 enum class GrainKind { mineral, stone, wood, brushed, sand, fibers, polished, endGrain, bedded, marble, count };
 enum class WearKind { pits, chips, runoff, scratches, deposits, count };
+enum class StainShape { specks, runoff, flakes, deposits, blooms, scuffs, film, bands, count };
+enum class AggregateKind { exposedConcrete, terrazzo, gravel, scree, asphalt, moss, damagedAsphalt, windSand, count };
+enum class InstalledKind { limestone, basalt, mosaic, parquet, spalledConcrete, crate, voussoirs, count };
+enum class FibrousKind { bark, marble, roots, veins, scar, scutes, cells, tendon, fracture, grime, ribs, count };
+enum class MetalForm { riveted, weld, conduit, tray, slotted, pipes, cables, beam, hatch, count };
 
 struct Pin { const char* name; Port type; };
 struct Contract {
@@ -50,6 +56,12 @@ inline const std::vector<Contract>& contracts() {
     {"Veins", Kernel::veins, {"value", Port::scalar}, {}},
     {"MaterialGrain", Kernel::materialGrain, {"value", Port::scalar}, {}},
     {"SurfaceWear", Kernel::surfaceWear, {"value", Port::scalar}, {}},
+    {"Stain", Kernel::stain, {"data", Port::packed}, {{"phase", Port::scalar}}},
+    {"LeafLitter", Kernel::leafLitter, {"data", Port::packed}, {}},
+    {"Aggregate", Kernel::aggregate, {"data", Port::packed}, {}},
+    {"InstalledSurface", Kernel::installedSurface, {"data", Port::packed}, {}},
+    {"FibrousSurface", Kernel::fibrousSurface, {"data", Port::packed}, {}},
+    {"FormedMetal", Kernel::formedMetal, {"data", Port::packed}, {}},
     {"BoardJoints", Kernel::boardJoints, {"value", Port::scalar}, {}},
     {"Stonework", Kernel::stonework, {"value", Port::scalar}, {}},
     {"ArchBand", Kernel::archBand, {"value", Port::scalar}, {}},
@@ -147,6 +159,13 @@ inline Json defaultParameters(Kernel kernel) {
     case Kernel::streaks: return {{"columns", 32}, {"rows", 4}, {"contrast", 2}};
     case Kernel::materialGrain: return {{"kind", 0}, {"period", 24}};
     case Kernel::surfaceWear: return {{"kind", 0}, {"period", 16}, {"density", .4}};
+    case Kernel::stain:
+      return {{"shape", 3}, {"period", 5}, {"coverage", .45}, {"amount", .5}, {"horizontal", false}};
+    case Kernel::leafLitter: return {{"period", 16}};
+    case Kernel::aggregate:
+    case Kernel::installedSurface:
+    case Kernel::fibrousSurface:
+    case Kernel::formedMetal: return {{"kind", 0}, {"period", 8}};
     case Kernel::boardJoints: return {{"columns", 6}, {"seams", 1}, {"width", .025}};
     case Kernel::boardLayout: return {{"columns", 6}, {"seams", 1}, {"width", .064}, {"irregularity", .55}};
     case Kernel::stonework: return {{"period", 9}, {"mortar", .08}, {"roundness", .5}};
@@ -288,6 +307,7 @@ inline void parameters(Node& node, const Json& params) {
     node.p[0] = count("period", 1, 128);
     node.p[1] = range("jitter", 0, 1);
     node.p[2] = range("width", .005f, .25f);
+    if (params.contains("erosion")) node.p[3] = range("erosion", 0, 1);
     break;
   case Kernel::streaks:
   case Kernel::fibers:
@@ -306,6 +326,27 @@ inline void parameters(Node& node, const Json& params) {
     node.p[2] = range("density", 0, 1);
     if (params.contains("naturalDetail")) node.p[3] = range("naturalDetail", 0, 1);
     break;
+  case Kernel::stain:
+    node.p[0] = count("shape", 0, unsigned(StainShape::count) - 1);
+    node.p[1] = count("period", 2, 32);
+    node.p[2] = range("coverage", 0, 1);
+    node.p[3] = range("amount", 0, 1);
+    require(member(params, "horizontal", path).is_boolean(), path + ".horizontal", "Expected a boolean.");
+    node.p[4] = params["horizontal"].get<bool>() ? 1.f : 0.f;
+    break;
+  case Kernel::leafLitter: node.p[0] = count("period", 3, 64); break;
+  case Kernel::aggregate:
+  case Kernel::installedSurface:
+  case Kernel::fibrousSurface:
+  case Kernel::formedMetal: {
+    const auto kernel = node.spec->kernel;
+    const unsigned kinds = kernel == Kernel::aggregate ? unsigned(AggregateKind::count) :
+      kernel == Kernel::installedSurface ? unsigned(InstalledKind::count) :
+      kernel == Kernel::fibrousSurface ? unsigned(FibrousKind::count) : unsigned(MetalForm::count);
+    node.p[0] = count("kind", 0, kinds - 1);
+    node.p[1] = count("period", 2, 64);
+    break;
+  }
   case Kernel::boardJoints:
   case Kernel::boardLayout:
     node.p[0] = count("columns", 1, 64);
@@ -404,6 +445,7 @@ inline void parameters(Node& node, const Json& params) {
     node.p[0] = range("radius", .015f, .475f);
     node.p[1] = range("feather", .001f, .05f);
     if (node.spec->kernel == Kernel::polygon) node.p[2] = count("sides", 3, 12);
+    if (node.spec->kernel == Kernel::circle && params.contains("edgeWear")) node.p[3] = range("edgeWear", 0, 1);
     break;
   case Kernel::rings:
     node.p[0] = count("period", 1, 64);
@@ -457,7 +499,8 @@ inline void parameters(Node& node, const Json& params) {
     node.p[0] = count("period", 1, 32);
     node.p[1] = count("cycles", 1, 8);
     node.p[2] = range("amplitude", 0, 1);
-    if (params.contains("style")) node.p[3] = count("style", 0, 4);
+    if (params.contains("style")) node.p[3] = count("style", 0, 10);
+    if (params.contains("crossChop")) node.p[4] = range("crossChop", 0, 1);
     break;
   case Kernel::clamp:
     node.p[0] = range("low", 0, 1);

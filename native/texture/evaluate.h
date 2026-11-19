@@ -399,6 +399,122 @@ inline float naturalWear(WearKind kind, int frequency, float density, uint64_t s
   return surfaceWear(kind, frequency, density, seed, u, v);
 }
 
+// Separate the core of a stain from its rim or smaller satellite deposits.
+// Integral lattice periods keep both layers continuous across tile edges.
+inline Pixel surfaceStain(const Node& node, uint64_t seed, float u, float v, float phase) {
+  const auto shape = StainShape(int(node.p[0]));
+  const int n = int(node.p[1]);
+  const float coverage = node.p[2], amount = node.p[3];
+  if (amount == 0.f || coverage == 0.f) return {0, 0, 0, 1};
+  if (node.p[4] != 0.f) std::swap(u, v);
+  u = frac(u + phase);
+  v = frac(v - phase);
+  const auto noise = [seed](unsigned salt, int columns, int rows, float x, float y) {
+    return valueNoise(seed + salt, columns, rows, x, y);
+  };
+  const float field = noise(1, n, n, u, v);
+  const float grain = noise(2, n * 8, n * 8, u, v);
+  const float drift = (noise(3, n * 2, n * 2, u, v) - .5f) * .70f / n;
+  const float threshold = .70f - .37f * coverage;
+  float core = 0.f, fringe = 0.f;
+  const auto deposit = [&](float value, float softness) {
+    core = softThreshold(threshold, threshold + softness, value);
+    fringe = softThreshold(threshold - .13f, threshold - .03f, value) *
+      (1.f - softThreshold(threshold + softness * .20f, threshold + softness, value));
+  };
+  switch (shape) {
+  case StainShape::specks:
+    core = mineralMarks(seed + 4, n * 2, coverage * (.35f + .65f * field), u, v, .12f, .34f, 1.14f);
+    fringe = mineralMarks(seed + 5, n * 4, coverage * field, u, v, .10f, .31f, 1.02f);
+    break;
+  case StainShape::runoff: {
+    const float seep = noise(4, n * 3, std::max(2, n / 2), u + .22f * drift, v);
+    const float trail = noise(5, n * 10, std::max(2, n / 2), u + .10f * drift, v);
+    deposit(.54f * seep + .29f * field + .17f * trail, .19f);
+    core *= .46f + .54f * trail;
+    fringe *= .30f + .70f * seep;
+    break;
+  }
+  case StainShape::flakes: {
+    const float adhesion = noise(4, n * 2, n * 2, u + drift, v - drift);
+    deposit(.42f * field + .40f * adhesion + .18f * grain, .075f);
+    fringe *= .38f + .62f * grain;
+    break;
+  }
+  case StainShape::deposits:
+    deposit(.66f * noise(4, n, n, u + drift, v - drift) +
+      .23f * noise(5, n * 3, n * 3, u, v) + .11f * grain, .24f);
+    break;
+  case StainShape::blooms: {
+    const float islands = noise(4, n * 2, n, u + drift, v);
+    deposit(.56f * field + .29f * islands + .15f * grain, .12f);
+    core *= .56f + .44f * grain;
+    fringe = std::max(.65f * fringe, mineralMarks(seed + 5, n * 3,
+      coverage * field, u, v, .15f, .34f, 1.44f));
+    break;
+  }
+  case StainShape::scuffs: {
+    const float abrasion = noise(4, n * 6, n * 2, u + v, v);
+    deposit(.62f * field + .26f * abrasion + .12f * grain, .21f);
+    const float hairlines = noise(5, n * 17, n * 2, u + v, v);
+    core *= (.42f + .58f * hairlines);
+    fringe *= .68f;
+    break;
+  }
+  case StainShape::film: {
+    const float pool = .59f * field + .29f * noise(4, n * 2, n * 2, u + drift, v - drift) + .12f * grain;
+    deposit(pool, .27f);
+    fringe = softThreshold(.01f, .10f, .10f - std::abs(pool - threshold)) *
+      (.40f + .60f * noise(5, n * 3, n * 3, u, v));
+    break;
+  }
+  case StainShape::bands: {
+    const float band = noise(4, n * 3, n, u + .23f * drift, v);
+    const float bed = noise(5, n * 6, n, u + .23f * drift, v);
+    deposit(.50f * band + .27f * field + .23f * bed, .16f);
+    fringe *= .50f + .50f * bed;
+    break;
+  }
+  case StainShape::count: break;
+  }
+  return {amount * core, amount * fringe * (1.f - core), 0.f, 1.f};
+}
+
+inline Pixel fallenLeaves(uint64_t seed, int period, float u, float v) {
+  const float x = u * period, y = v * period;
+  float height = .16f, tone = .11f, face = 0.f;
+  for (int j = int(y) - 1; j <= int(y) + 1; ++j) {
+    for (int i = int(x) - 1; i <= int(x) + 1; ++i) {
+      const unsigned a = wrap(i, period), b = wrap(j, period);
+      const float size = lattice(seed, a, b);
+      if (size < .10f) continue;
+      const float dx = x - i - lattice(seed + 1, a, b);
+      const float dy = y - j - lattice(seed + 2, a, b);
+      if (dx * dx + dy * dy > .61f) continue;
+      const float turn = lattice(seed + 3, a, b);
+      const float c = cycleSine(turn + .25f), s = cycleSine(turn);
+      const float along = (dx * c + dy * s) / mix(.36f, .77f, size);
+      const float across = (dy * c - dx * s) / mix(.14f, .31f, lattice(seed + 4, a, b));
+      if (std::abs(along) >= 1.f || std::abs(across) >= 1.f) continue;
+      const float rim = (1.f - along * along) * (.80f + .10f * cycleSine(along * 2.4f));
+      const float blade = softThreshold(0.f, .20f, rim - std::abs(across));
+      const float vein = 1.f - softThreshold(.015f, .12f, std::abs(across));
+      const float crease = cycleSine(along * 4.2f - std::abs(across) * .61f);
+      const float profile = .34f + .28f * lattice(seed + 5, a, b) +
+        .14f * across * across + .022f * vein + .014f * crease;
+      const float raised = mix(.16f, profile, blade);
+      if (raised <= height) continue;
+      height = raised;
+      face = blade;
+      tone = mix(.11f, .20f + .66f * lattice(seed + 6, a, b) +
+        .055f * vein + .028f * crease - .09f * std::abs(across), blade);
+    }
+  }
+  return {height, face, tone, 1.f};
+}
+
+#include "physical_surfaces.h"
+
 inline float roundedStone(uint64_t seed, int period, float mortar, float roundness, float irregularity,
                           float u, float v) {
   u = frac(u);
@@ -886,6 +1002,13 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
     const float original = surfaceWear(kind, frequency, node.p[2], seed, u, v);
     return scalar(node.p[3] > 0.f ? mix(original, naturalWear(kind, frequency, node.p[2], seed, u, v), node.p[3]) : original);
   }
+  case Kernel::stain:
+    return surfaceStain(node, seed, u, v, input[0] ? input[0]->sample(x, y)[0] : 0.f);
+  case Kernel::leafLitter: return fallenLeaves(seed, int(node.p[0]), u, v);
+  case Kernel::aggregate: return granularSurface(AggregateKind(int(node.p[0])), int(node.p[1]), seed, u, v);
+  case Kernel::installedSurface: return installedSurface(InstalledKind(int(node.p[0])), int(node.p[1]), seed, u, v);
+  case Kernel::fibrousSurface: return fibrousSurface(FibrousKind(int(node.p[0])), int(node.p[1]), seed, u, v);
+  case Kernel::formedMetal: return formedMetal(MetalForm(int(node.p[0])), int(node.p[1]), seed, u, v);
   case Kernel::brickLayout:
   case Kernel::flemishLayout: return brickLayout(node, seed, u, v, input[0]->sample(x, y)[0]);
   case Kernel::stoneBrickLayout: return stoneBrickLayout(node, seed, u, v, input[0]->sample(x, y)[0]);
@@ -950,6 +1073,20 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
     return scalar(.09f + .91f * profile * cut * joint * material);
   }
   case Kernel::cracks: {
+    if (node.p[3] > 0.f) {
+      const int period = int(node.p[0]);
+      const float erosion = node.p[3];
+      const float drift = .22f * erosion;
+      const float along = u + drift * (valueNoise(seed + 3, 4, 6, u, v) - .5f);
+      const float across = v + drift * (valueNoise(seed + 4, 6, 4, u, v) - .5f);
+      const auto distances = cellularDistances(seed, period, node.p[1], along, across);
+      const float fragments = valueNoise(seed + 5, period * 5, u, v);
+      const float breadth = node.p[2] * mix(.44f, 1.48f, fragments);
+      const float ridge = (distances[1] - distances[0]) / breadth;
+      const float plate = .12f + .46f * softThreshold(0.f, .91f, ridge) +
+        .16f * softThreshold(.21f, 1.31f, ridge) + .13f * (fragments - .5f);
+      return scalar(plate);
+    }
     const auto distances = cellularDistances(seed, int(node.p[0]), node.p[1], u, v);
     return scalar((distances[1] - distances[0]) / node.p[2]);
   }
@@ -987,6 +1124,28 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   case Kernel::flow: {
     const float phase = input[0]->sample(x, y)[0] * node.p[1];
     const int patch = int(node.p[0]);
+    if (node.p[3] == 7) return scalar(liquidFoam(patch, seed, u, v, phase));
+    if (node.p[3] == 8) return scalar(coolingCrust(patch, seed, u, v, phase));
+    if (node.p[3] == 9 || node.p[3] == 10)
+      return scalar(dischargeFilaments(patch, seed, u, v, phase, node.p[3] == 9));
+    if (node.p[3] == 5) {
+      const float swell = gradientNoise(seed + 1, patch, u - phase, v);
+      const float eddy = node.p[2] * 1.3f * (gradientNoise(seed, 3, u + .14f * cycleSine(phase), v) - .5f);
+      const float wave = u * patch + v * 2 - phase + eddy;
+      const float wind = cycleSine(wave) + .23f * cycleSine(wave * 2.f + .2f);
+      const float crest = gradientNoise(seed + 2, 3, u, v + .12f * cycleSine(phase));
+      const float chop = cycleSine(2.f * u - (patch + 3.f) * v + phase * 2.f + eddy * 1.4f + crest) *
+        (.28f + .72f * softThreshold(.25f, .72f, crest));
+      const float fine = cycleSine(u * (patch * 3.f) + 7.f * v - 3.f * phase + .78f * swell + eddy);
+      return scalar(.50f + .13f * wind + .11f * node.p[4] * chop + .041f * fine + .13f * (swell - .5f));
+    }
+    if (node.p[3] == 6) {
+      const float large = valueNoise(seed, patch, u + phase, v);
+      const float drift = .46f * node.p[2] * (large - .5f);
+      const float stretch = valueNoise(seed + 1, patch * 2, patch, u - .33f * drift, v - phase + drift);
+      const float fringe = gradientNoise(seed + 2, patch * 3, u + phase, v + drift);
+      return scalar(.54f * large + .34f * stretch + .12f * fringe);
+    }
     if (node.p[3] == 4) {
       const float drift = gradientNoise(seed, 4, u, v) * node.p[2];
       const float longWave = cycleSine(u * patch + v * 3.f - phase + drift);
@@ -1080,6 +1239,11 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   }
   case Kernel::circle: {
     const float a = u - .5f, b = v - .5f;
+    if (node.p[3] > 0.f) {
+      const float drift = node.p[3] * (.16f * (valueNoise(seed, 13, u, v) - .5f) +
+        .04f * (valueNoise(seed + 1, 38, u, v) - .5f));
+      return scalar(.5f + (node.p[0] + drift - std::sqrt(a * a + b * b)) / node.p[1]);
+    }
     return scalar(.5f + (node.p[0] - std::sqrt(a * a + b * b)) / node.p[1]);
   }
   case Kernel::polygon: {

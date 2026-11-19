@@ -499,7 +499,8 @@ def main():
             click("texture-studio/preset-search")
             ui.text("Flemish Brick")
             before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
-            click("texture-studio/recipe/masonry-flemish-brick")
+            click("texture-studio/recipe/masonry-flemish-brick/variants")
+            click("texture-studio/recipe/masonry-flemish-brick/variants/1")
             wait(model_ready)
             click("texture-studio/layers-tab")
             before = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
@@ -511,6 +512,8 @@ def main():
             graph = wait(lambda: json.loads(material_file.read_text(encoding="utf-8")))
             assert graph["provenance"]["preset"] == "masonry-flemish-brick"
             nodes = {node["id"]: node for node in graph["graph"]["nodes"]}
+            assert nodes["stain-mask"]["parameters"]["shape"] == 0  # Speckled
+            assert nodes["stain-mask"]["parameters"]["amount"] > 0
             selected = nodes[graph["outputs"]["baseColor"]["node"]]
             assert selected["type"] == "Blend" and selected["label"] == "Color layer"
             print("PASS native preset search, layer editor, and saved source share the same graph")

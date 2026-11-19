@@ -49,7 +49,6 @@ struct TextureStudioState {
   std::set<std::string> groupSelection;
   std::set<std::string> parameterLocks;
   std::array<char, 96> presetSearch{};
-  int catalogVariation = 0;
   int libraryFilter = 0;
   bool libraryLoaded = false;
   std::set<std::string> favorites;
@@ -1228,8 +1227,58 @@ static void studioParameter(const rbTexture::Json& binding) {
   }
 }
 
+static void studioFamilyControls() {
+  const auto id = rbTexture::familyIdentity(textureStudioDoc());
+  if (!id) return;
+  const auto [family, role] = *id;
+  static rbTexture::FamilyControls draft{};
+  if (ImGui::Button("Family settings…")) {
+    draft = rbTexture::readFamilyControls(textureStudioDoc(), family);
+    ImGui::OpenPopup("Texture family settings");
+  }
+  runUiRecordGlobal("texture-studio/family-settings");
+  if (!ImGui::BeginPopup("Texture family settings")) return;
+  ImGui::Text("%s / %s", rbTexture::textureFamilies[family].name, rbTexture::familyRoles[role]);
+  const auto colorControl = [](const char* name, uint32_t& hex) {
+    float rgb[]{float((hex >> 16) & 255) / 255.f, float((hex >> 8) & 255) / 255.f, float(hex & 255) / 255.f};
+    if (!ImGui::ColorEdit3(name, rgb)) return;
+    hex = (uint32_t(std::round(255.f * std::clamp(rgb[0], 0.f, 1.f))) << 16) |
+      (uint32_t(std::round(255.f * std::clamp(rgb[1], 0.f, 1.f))) << 8) |
+      uint32_t(std::round(255.f * std::clamp(rgb[2], 0.f, 1.f)));
+  };
+  colorControl("Shadow color", draft.shade);
+  colorControl("Accent color", draft.accent);
+  ImGui::InputScalar("Family seed", ImGuiDataType_U32, &draft.seed, nullptr, nullptr, "%u");
+  int scale = int(draft.scale);
+  if (ImGui::SliderInt("Pattern frequency", &scale, 25, 200, "%d%%", ImGuiSliderFlags_AlwaysClamp))
+    draft.scale = unsigned(scale);
+  ImGui::SliderFloat("Wear adjustment", &draft.wear, -.5f, .5f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+  const auto& info = textureStudioDoc().source["provenance"]["family"];
+  if (info.contains("overrides") && info["overrides"].is_array() && !info["overrides"].empty()) {
+    ImGui::TextUnformatted("Local overrides");
+    for (size_t index = 0; index < std::min<size_t>(info["overrides"].size(), 20); ++index) {
+      const auto& item = info["overrides"][index];
+      if (item.is_string()) ImGui::BulletText("%s", item.get<std::string>().c_str());
+    }
+  }
+  const bool update = ImGui::Button("Apply shared settings");
+  runUiRecordGlobal("texture-studio/family-settings/apply");
+  ImGui::SameLine();
+  const bool reset = ImGui::Button("Reset local overrides");
+  if (update || reset) {
+    studioAction([&] {
+      auto doc = textureStudioDoc();
+      rbTexture::refreshFamilyMember(doc, draft, reset);
+      studioEdit(std::move(doc));
+      ImGui::CloseCurrentPopup();
+    });
+  }
+  ImGui::EndPopup();
+}
+
 static void studioQuick() {
   auto& s = textureStudio;
+  studioFamilyControls();
   const auto animation = textureStudioDoc().source.at("animation");
   const auto frames = animation.at("frames").get<int>();
   if (frames > 1) {
@@ -2154,7 +2203,6 @@ static void textureStudioPanel() {
     ImGui::BeginDisabled(applying);
     if (ImGui::Button("New")) {
       s.presetSearch.fill(0);
-      s.catalogVariation = 0;
       studioAction(studioLoadLibrary);
       ImGui::OpenPopup("New source?");
     }
@@ -2234,15 +2282,6 @@ static void textureStudioPanel() {
       runUiRecordGlobal("texture-studio/preset-search");
       ImGui::SetNextItemWidth(180);
       ImGui::Combo("Show", &s.libraryFilter, "All presets\0Favorites\0Recently used\0");
-      ImGui::SetNextItemWidth(180);
-      const auto choice = s.catalogVariation > 0 ? rbTexture::curatedVariations[s.catalogVariation - 1].name : "Default";
-      if (ImGui::BeginCombo("Catalog variation", choice)) {
-        if (ImGui::Selectable("Default", s.catalogVariation == 0)) s.catalogVariation = 0;
-        for (size_t i = 0; i < std::size(rbTexture::curatedVariations); ++i)
-          if (ImGui::Selectable(rbTexture::curatedVariations[i].name, s.catalogVariation == int(i + 1)))
-            s.catalogVariation = int(i + 1);
-        ImGui::EndCombo();
-      }
       const auto lowercase = [](std::string value) {
         for (char& c : value) if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
         return value;
@@ -2271,6 +2310,45 @@ static void textureStudioPanel() {
           if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", saved ? "Remove from favorites" : "Add to favorites");
           ImGui::PopID();
         };
+        const auto matchesRole = [&](const rbTexture::TextureFamily& entry, const char* role) {
+          return permitted(std::string(entry.id) + "-" + role) &&
+            lowercase(std::string(entry.name) + " " + role).find(query) != std::string::npos;
+        };
+        const auto matchesFamily = [&](const rbTexture::TextureFamily& entry) {
+          return std::any_of(std::begin(rbTexture::familyRoles), std::end(rbTexture::familyRoles),
+            [&](const char* role) { return matchesRole(entry, role); });
+        };
+        if (std::any_of(std::begin(rbTexture::textureFamilies), std::end(rbTexture::textureFamilies), matchesFamily) &&
+            (!query.empty() || s.libraryFilter || ImGui::CollapsingHeader("Texture families"))) {
+          static uint32_t familySeed = 24058;
+          ImGui::SetNextItemWidth(140);
+          ImGui::InputScalar("Family seed##new", ImGuiDataType_U32, &familySeed, nullptr, nullptr, "%u");
+          runUiRecordGlobal("texture-studio/family-seed");
+          for (size_t family = 0; family < std::size(rbTexture::textureFamilies); ++family) {
+            const auto& entry = rbTexture::textureFamilies[family];
+            if (!matchesFamily(entry)) continue;
+            ImGui::PushID(entry.id);
+            if (ImGui::TreeNodeEx(entry.name, query.empty() ? 0 : ImGuiTreeNodeFlags_DefaultOpen)) {
+              for (size_t role = 0; role < std::size(rbTexture::familyRoles); ++role) {
+                const auto id = std::string(entry.id) + "-" + rbTexture::familyRoles[role];
+                if (!matchesRole(entry, rbTexture::familyRoles[role])) continue;
+                matched = true;
+                const auto width = studioPresetThumbnail(id, [family, role] {
+                  return rbTexture::familyMaterial(family, role, 24058u);
+                });
+                if (ImGui::Selectable(rbTexture::familyRoles[role], false, 0, {width, 32 * uiScale()})) {
+                  selected = rbTexture::familyMaterial(family, role, familySeed);
+                  selected->source["documentId"] = ftebroom::bb::uuid();
+                  selectedId = id;
+                }
+                runUiRecordGlobal("texture-studio/family/" + id);
+                favorite(id);
+              }
+              ImGui::TreePop();
+            }
+            ImGui::PopID();
+          }
+        }
         if (!query.empty() || s.libraryFilter || ImGui::CollapsingHeader("Featured", ImGuiTreeNodeFlags_DefaultOpen)) {
           for (unsigned preset = 0; preset < rbTexture::presetNames.size(); ++preset) {
             const auto id = "featured-" + std::to_string(preset);
@@ -2295,14 +2373,41 @@ static void textureStudioPanel() {
               const auto id = rbTexture::recipeId(category, index);
               if (!permitted(id) || (!categoryMatches && lowercase(name).find(query) == std::string::npos)) continue;
               matched = true;
-              const auto width = studioPresetThumbnail(id, [category, index] { return rbTexture::catalogPreset(category, index, "thumbnail"); });
-              if (ImGui::Selectable(name, false, 0, {width, 32 * uiScale()})) {
+              const auto count = rbTexture::catalogVariationCount(category, index);
+              const auto width = studioPresetThumbnail(id, [category, index] {
+                return rbTexture::catalogPreset(category, index, "thumbnail");
+              });
+              const auto variantsWidth = count ? ImGui::CalcTextSize("Variants").x +
+                2.f * ImGui::GetStyle().FramePadding.x + ImGui::GetStyle().ItemSpacing.x : 0.f;
+              const auto choose = [&](size_t variation) {
                 selected = rbTexture::catalogPreset(category, index, ftebroom::bb::uuid());
+                if (variation) rbTexture::applyCatalogVariation(*selected, category, index, variation);
                 selectedId = id;
-                if (s.catalogVariation > 0)
-                  rbTexture::applyCuratedVariation(*selected, rbTexture::curatedVariations[s.catalogVariation - 1]);
-              }
+              };
+              if (ImGui::Selectable(name, false, 0, {std::max(1.f, width - variantsWidth), 32 * uiScale()}))
+                choose(0);
               runUiRecordGlobal("texture-studio/recipe/" + id);
+              if (count) {
+                ImGui::SameLine();
+                ImGui::PushID(id.c_str());
+                if (ImGui::SmallButton("Variants")) ImGui::OpenPopup("Catalog variants");
+                runUiRecordGlobal("texture-studio/recipe/" + id + "/variants");
+                if (ImGui::BeginPopup("Catalog variants")) {
+                  for (size_t variation = 1; variation <= count; ++variation) {
+                    studioPresetThumbnail(id + "#" + std::to_string(variation), [category, index, variation] {
+                      auto doc = rbTexture::catalogPreset(category, index, "thumbnail");
+                      rbTexture::applyCatalogVariation(doc, category, index, variation);
+                      return doc;
+                    });
+                    const float labelWidth = 160.f * uiScale();
+                    if (ImGui::Selectable(rbTexture::catalogVariationName(category, index, variation),
+                        false, 0, {labelWidth, 32 * uiScale()})) choose(variation);
+                    runUiRecordGlobal("texture-studio/recipe/" + id + "/variants/" + std::to_string(variation));
+                  }
+                  ImGui::EndPopup();
+                }
+                ImGui::PopID();
+              }
               favorite(id);
             }
           }

@@ -304,7 +304,7 @@ def run(executable, root):
         check_windows_publish_retry(executable, animation, root / "locked-output")
     catalog_animation = root / "catalog-ripples.rbtex.json"
     assert invoke("new", catalog_animation, "--preset", "liquids-water", "--seed", 42)[0] == 0
-    assert json.loads(catalog_animation.read_text(encoding="utf-8"))["provenance"]["catalogVersion"] == 2
+    assert json.loads(catalog_animation.read_text(encoding="utf-8"))["provenance"]["catalogVersion"] == 7
     # Keep the exact cross-platform goldens for a saved version 1 graph after the catalog upgrade.
     legacy = Path(__file__).resolve().parent / "fixtures/texture-studio/catalog-v1-water.rbtex.json"
     for frame, expected in (
@@ -375,6 +375,18 @@ def run(executable, root):
         corpus.add(json.dumps(variant_source["graph"], sort_keys=True))
     assert len(corpus) == 4
     assert invoke("new", root / "rejected-variant", "--preset", "metal-diamond-plate", "--variation", 5)[0] != 0
+    for variation in range(1, 5):
+        path = root / f"water-{variation}.rbtex.json"
+        assert invoke("new", path, "--preset", "liquids-water", "--variation", variation)[0] == 0
+        source_data = json.loads(path.read_text(encoding="utf-8"))
+        assert all(node["type"] != "Stain" for node in source_data["graph"]["nodes"])
+        assert invoke("validate", path)[0] == 0
+    for variation in range(1, 5):
+        path = root / f"laboratory-{variation}.rbtex.json"
+        assert invoke("new", path, "--preset", "tech-laboratory", "--variation", variation)[0] == 0
+        source_data = json.loads(path.read_text(encoding="utf-8"))
+        assert all(node["type"] != "Stain" for node in source_data["graph"]["nodes"])
+        assert invoke("validate", path)[0] == 0
     roles = {"wall", "floor", "ceiling", "panel", "trim", "door", "damaged", "marking"}
     for family in ("gothic-fortress", "industrial-bunker", "retro-laboratory", "brutalist-city",
                    "abandoned-facility", "alien-infestation"):
@@ -396,6 +408,36 @@ def run(executable, root):
             assert source["rootSeed"] == member["seed"]
             assert source["provenance"]["family"]["id"] == family
         assert invoke(*family_args)[0] != 0
+
+    previous = root / "industrial-bunker"
+    wall_path = previous / "wall.rbtex.json"
+    wall = json.loads(wall_path.read_text(encoding="utf-8"))
+    local_color = [.3, .2, .1, 1.]
+    next(node for node in wall["graph"]["nodes"] if node["id"] == "pigment")["parameters"]["high"] = local_color
+    wall["rootSeed"] = 312
+    asset = {**reference, "path": original_copy.relative_to(imported.parent).as_posix()}
+    family_original = previous / asset["path"]
+    family_original.parent.mkdir(exist_ok=True)
+    family_original.write_bytes(loose)
+    wall["assetReferences"] = [asset]
+    wall_bytes = json.dumps(wall).encode("utf-8")
+    wall_path.write_bytes(wall_bytes)
+    synced = root / "industrial-revised"
+    code, result = invoke("family", "industrial-bunker", "--out", synced, "--from-family", previous,
+                          "--family-scale", 85, "--family-shade", "404d54", "--family-wear", 12, "--seed", 10)
+    assert code == 0, result
+    assert wall_path.read_bytes() == wall_bytes
+    assert (synced / asset["path"]).read_bytes() == loose
+    wall_updated = json.loads((synced / "wall.rbtex.json").read_text(encoding="utf-8"))
+    assert wall_updated["rootSeed"] == 312
+    assert next(node for node in wall_updated["graph"]["nodes"] if node["id"] == "pigment")["parameters"]["high"] == local_color
+    assert set(wall_updated["provenance"]["family"]["overrides"]) == {"rootSeed", "pigment/high"}
+    assert result["manifest"]["shared"]["scalePercent"] == 85
+    assert result["manifest"]["shared"]["shade"] == 0x404D54
+    assert result["manifest"]["seed"] == 10
+    assert invoke("validate", synced / "wall.rbtex.json")[0] == 0
+    assert invoke("family", "retro-laboratory", "--out", root / "wrong-family", "--from-family", previous)[0] != 0
+    assert not (root / "wrong-family").exists()
 
     reference["path"] = original_copy.relative_to(imported.parent).as_posix()
     imported.write_text(json.dumps(document), encoding="utf-8")

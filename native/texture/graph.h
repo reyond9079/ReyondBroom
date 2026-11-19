@@ -15,7 +15,7 @@ enum class Kernel { unknown, constant, color, image, noise, bricks, tiles, check
                     rotate90, directionalBlur, hsv, posterize, pixelate, dither, normalBlend,
                     uv, uvSample, warp, directionalWarp, histogram, channelPack, channelUnpack, retroShade,
                     panels, distance, slopeBlur, colorize, palette, quantize, materialGrain, surfaceWear, boardJoints,
-                    stonework, archBand, scalarBlend, brickLayout, flemishLayout, boardLayout, stoneBrickLayout };
+                    stonework, archBand, scalarBlend, brickLayout, flemishLayout, boardLayout, stoneBrickLayout, masonryBrickLayout };
 
 enum class GrainKind { mineral, stone, wood, brushed, sand, fibers, polished, endGrain, bedded, marble, count };
 enum class WearKind { pits, chips, runoff, scratches, deposits, count };
@@ -58,6 +58,7 @@ inline const std::vector<Contract>& contracts() {
     {"BrickLayout", Kernel::brickLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
     {"FlemishLayout", Kernel::flemishLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
     {"StoneBrickLayout", Kernel::stoneBrickLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
+    {"MasonryBrickLayout", Kernel::masonryBrickLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
     {"BoardLayout", Kernel::boardLayout, {"data", Port::packed}, {}},
     {"Tiles", Kernel::tiles, {"value", Port::scalar}, {}},
     {"Checker", Kernel::checker, {"value", Port::scalar}, {}},
@@ -157,6 +158,8 @@ inline Json defaultParameters(Kernel kernel) {
     case Kernel::ridged: return {{"period", 4}, {"octaves", 4}, {"gain", .5}, {"lacunarity", 2}};
     case Kernel::bricks:
     case Kernel::flemish: return {{"columns", 4}, {"rows", 8}, {"mortar", .1}, {"bevel", .06}, {"wear", .28}};
+    case Kernel::masonryBrickLayout:
+      return {{"columns", 6}, {"rows", 14}, {"mortar", .108}, {"bevel", .121}, {"wear", .53}, {"irregularity", .78}};
     case Kernel::stoneBrickLayout:
       return {{"columns", 4}, {"rows", 8}, {"mortar", .064}, {"bevel", .145}, {"wear", .43}, {"irregularity", .82}};
     case Kernel::brickLayout:
@@ -348,6 +351,7 @@ inline void parameters(Node& node, const Json& params) {
   case Kernel::brickLayout:
   case Kernel::flemishLayout:
   case Kernel::stoneBrickLayout:
+  case Kernel::masonryBrickLayout:
     node.p[0] = count("columns", 1, 64);
     node.p[1] = count("rows", 2, 64);
     node.p[2] = range("mortar", 0.01f, 0.4f);
@@ -417,10 +421,15 @@ inline void parameters(Node& node, const Json& params) {
     node.p[0] = count("radius", 1, 12);
     node.p[1] = range("threshold", 0, 1);
     break;
-  case Kernel::ramp:
+  case Kernel::ramp: {
     node.first = rgba(member(params, "low", path), path + ".low");
     node.last = rgba(member(params, "high", path), path + ".high");
+    if (const auto midtones = params.find("midtones"); midtones != params.end()) {
+      require(midtones->is_array() && midtones->size() <= 8, path + ".midtones", "Use up to eight intermediate colors.");
+      for (const auto& color : *midtones) node.palette.push_back(rgba(color, path + ".midtones"));
+    }
     break;
+  }
   case Kernel::blend: {
     node.p[0] = range("opacity", 0, 1);
     auto enabled = params.find("enabled");
@@ -530,6 +539,7 @@ inline void parameters(Node& node, const Json& params) {
     auto& value = member(params, "invertY", path);
     require(value.is_boolean(), path + ".invertY", "Expected a Boolean.");
     node.p[1] = value.get<bool>() ? -1.f : 1.f;
+    if (params.contains("referenceSize")) node.p[2] = count("referenceSize", 64, 8192);
     break;
   }
   case Kernel::ao:

@@ -249,27 +249,33 @@ void checkMaterialFinishes() {
         "Changing the repeat count keeps the pigment mask aligned with the same layout");
     }
   }
-  const auto cut = compile(catalogPreset(1, 2, "cut-stone"));
+  const auto cut = compile(catalogPreset(1, 2, "repointed-brick"));
   const auto& stoneBrick = pattern(cut);
-  check(stoneBrick.spec->kernel == Kernel::stoneBrickLayout,
-    "Broken Brick uses the weathered stone layout");
-  const auto stoneCourse = straightSpan(.5f, int(stoneBrick.p[1]), seed + 1, 0, .27f * stoneBrick.p[5]);
+  check(stoneBrick.spec->kernel == Kernel::masonryBrickLayout,
+    "Broken Brick uses the worn masonry layout");
+  const auto stoneCourse = straightSpan(.5f, int(stoneBrick.p[1]), seed + 1, 0, .23f * stoneBrick.p[5]);
   const float stoneBed = frac(stoneCourse.start / stoneBrick.p[1]);
   std::array<float, 2> grainRange{1.f, 0.f};
   for (unsigned i = 0; i < 128; ++i) {
     const float t = float(i) / 128;
-    check(stoneBrickLayout(stoneBrick, seed, t, stoneBed, .5f)[1] == 0.f,
+    check(masonryBrickLayout(stoneBrick, seed, t, stoneBed, .5f)[1] == 0.f,
       "A chipped stone face preserves the horizontal course line");
-    check(stoneBrickLayout(stoneBrick, seed, 0.f, t, .5f) == stoneBrickLayout(stoneBrick, seed, 1.f, t, .5f) &&
-      stoneBrickLayout(stoneBrick, seed, t, 0.f, .5f) == stoneBrickLayout(stoneBrick, seed, t, 1.f, .5f),
+    check(masonryBrickLayout(stoneBrick, seed, 0.f, t, .5f) == masonryBrickLayout(stoneBrick, seed, 1.f, t, .5f) &&
+      masonryBrickLayout(stoneBrick, seed, t, 0.f, .5f) == masonryBrickLayout(stoneBrick, seed, t, 1.f, .5f),
       "Weathered blocks and their local detail meet at tile boundaries");
-    const auto face = stoneBrickLayout(stoneBrick, seed, .24f, t, .5f);
+    const auto face = masonryBrickLayout(stoneBrick, seed, .24f, t, .5f);
     if (face[1] > .9f) {
       grainRange[0] = std::min(grainRange[0], face[3]);
       grainRange[1] = std::max(grainRange[1], face[3]);
     }
   }
   check(grainRange[1] - grainRange[0] > .28f, "Stone faces vary within each block");
+  const auto warm = catalogPreset(1, 0, "fired-clay");
+  auto options = warm;
+  auto& colors = findNode(options, "pigment")["parameters"];
+  check(colors["midtones"].size() == 3, "Aged bricks use several ceramic hues across independently colored faces");
+  colors["midtones"][0] = {2,0,0,1};
+  reject([&]{compile(options);}, "Number is outside its supported range");
   const Resolution unevenTile{139, 109};
   const auto wholeStone = evaluate(cut, unevenTile, nullptr, memoryBudget, 1);
   const auto tiledStone = evaluateTiles(cut, unevenTile, memoryBudget, 0, 2, nullptr);
@@ -479,6 +485,16 @@ int main(int argc, char** argv) try {
   check(std::abs(seamNormal[0] + .5f) < 1e-6f &&
     seamNormal == samplePreviewData(signedNormals, 1, .5f),
     "Preview filters signed normals across the texture seam");
+  Image relief{{256, 1}, Port::scalar, std::vector<Pixel>(256, scalar(0))};
+  std::fill(relief.pixels.begin() + 130, relief.pixels.end(), scalar(1));
+  const PreviewSurface seam{{0,0,1}, {1,0,0}, {0,1,0}, .5f, .5f};
+  const auto sideLight = normalized({1,0,.22f});
+  check(reliefVisibility(relief, seam, sideLight, 1.f) < .6f &&
+    reliefVisibility(relief, seam, sideLight, 0.f) == 1.f,
+    "A raised brick shades the neighboring mortar in preview");
+  const auto parallax = displaceCubeSurface(seam, relief, sideLight, 1.f);
+  check(parallax.u < seam.u && displaceCubeSurface(seam, relief, sideLight, 0.f).u == seam.u,
+    "Cube preview shifts lower surfaces at an oblique angle without changing the flat setting");
   const auto sphere = materialPreview(a, false);
   const auto cube = materialPreview(a, true);
   check(sphere.pixels.front()[3] == 0 && cube.pixels.front()[3] == 0,

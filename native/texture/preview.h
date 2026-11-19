@@ -80,6 +80,61 @@ inline Pixel samplePreviewData(const Image& data, float u, float v) {
   return result;
 }
 
+inline Pixel samplePreviewNormal(const Image& normals, float u, float v, float footprint) {
+  const float radiusX = footprint > .5f / normals.size.width ? footprint : 0.f;
+  const float radiusY = footprint > .5f / normals.size.height ? footprint : 0.f;
+  if (radiusX == 0.f && radiusY == 0.f) return samplePreviewData(normals, u, v);
+  const auto a = samplePreviewData(normals, u - radiusX, v - radiusY);
+  const auto b = samplePreviewData(normals, u + radiusX, v - radiusY);
+  const auto c = samplePreviewData(normals, u - radiusX, v + radiusY);
+  const auto d = samplePreviewData(normals, u + radiusX, v + radiusY);
+  return {(a[0] + b[0] + c[0] + d[0]) * .25f, (a[1] + b[1] + c[1] + d[1]) * .25f,
+          (a[2] + b[2] + c[2] + d[2]) * .25f, 1.f};
+}
+
+inline PreviewSurface displaceCubeSurface(PreviewSurface surface, const Image& height,
+                                         PreviewVector view, float relief) {
+  if (relief <= 0.f) return surface;
+  const float border = std::min({surface.u, surface.v, 1.f - surface.u, 1.f - surface.v});
+  const float fade = softThreshold(.002f, .047f, border);
+  const float scale = .022f * std::min(relief, 3.f) * fade / std::max(.26f, dot(surface.n, view));
+  const float du = -scale * dot(surface.t, view);
+  const float dv = scale * dot(surface.b, view);
+  if (std::abs(du) + std::abs(dv) < .00001f) return surface;
+
+  constexpr float step = 1.f / 8.f;
+  float depth = 0.f;
+  float gap = 1.f - samplePreviewData(height, surface.u, surface.v)[0];
+  for (int i = 1; i <= 8 && gap > 0.f; ++i) {
+    const float nextDepth = i * step;
+    const float nextGap = 1.f - nextDepth - samplePreviewData(height,
+      surface.u + du * nextDepth, surface.v + dv * nextDepth)[0];
+    depth = nextGap > 0.f ? nextDepth : depth + step * gap / (gap - nextGap);
+    gap = nextGap;
+  }
+  surface.u += du * depth;
+  surface.v += dv * depth;
+  return surface;
+}
+
+inline float reliefVisibility(const Image& height, const PreviewSurface& surface, PreviewVector light, float relief) {
+  const float du = dot(light, surface.t), dv = -dot(light, surface.b);
+  const float tangent = std::sqrt(du * du + dv * dv);
+  const float elevation = dot(light, surface.n);
+  if (tangent < .01f || elevation <= 0.f || relief <= 0.f) return 1.f;
+  const float source = samplePreviewData(height, surface.u, surface.v)[0];
+  const float rise = elevation / (tangent * .025f * std::min(relief, 4.f));
+  float blocker = 0.f;
+  // Follow the light across the tiled height map. Lower mortar can fall into shadow
+  // even when its normal points directly toward the light.
+  for (float distance : {.0038f, .0075f, .013f, .022f}) {
+    const auto h = samplePreviewData(height, surface.u + distance * du / tangent,
+      surface.v + distance * dv / tangent)[0];
+    blocker = std::max(blocker, h - source - distance * rise);
+  }
+  return 1.f - .68f * softThreshold(.032f, .22f, blocker);
+}
+
 inline float fresnelFalloff(float cosine) {
   const float grazing = 1.f - unit(cosine);
   const float square = grazing * grazing;
@@ -109,6 +164,7 @@ inline Image materialPreview(const Evaluation& image, bool cube, const std::atom
     return found == image.outputs.end() ? nullptr : found->second.get();
   };
   const auto* normals = find("normal");
+  const auto* height = find("height");
   const auto* gloss = find("roughness");
   const auto* metal = find("metalness");
   const auto* ambient = find("ao");
@@ -133,13 +189,15 @@ inline Image materialPreview(const Evaluation& image, bool cube, const std::atom
       const float b = 2.30f * ((.5f - (y + .5f) / edge) / camera.zoom + camera.panY);
       const auto sample = cube ? cubeSurface(a, b, view, right, up) : sphereSurface(a, b, view, right, up);
       if (!sample) continue;
-      const auto& surface = *sample;
+      const auto surface = cube && height ? displaceCubeSurface(*sample, *height, view, camera.relief) : *sample;
       const auto sampleData = [&](const Image* data, Pixel fallback) {
         if (!data) return fallback;
         return samplePreviewData(*data, surface.u, surface.v);
       };
       const auto albedo = sampleColor(color, surface.u, surface.v);
-      const auto bump = sampleData(normals, {0,0,1,1});
+      const float footprint = std::min(.013f,
+        .49f / (edge * camera.zoom * std::max(.43f, dot(surface.n, view))));
+      const auto bump = normals ? samplePreviewNormal(*normals, surface.u, surface.v, footprint) : Pixel{0,0,1,1};
       const auto normal = normalized(surface.t * (bump[0]*camera.relief) +
         surface.b * (bump[1]*camera.relief) + surface.n * bump[2]);
       const float noL = unit(dot(light, normal));
@@ -149,16 +207,17 @@ inline Image materialPreview(const Evaluation& image, bool cube, const std::atom
       const float metalness = sampleData(metal, {0,0,0,1})[0];
       const float ao = sampleData(ambient, {1,0,0,1})[0];
       const auto glow = sampleData(emission, {0,0,0,1});
+      const float visibility = height ? reliefVisibility(*height, surface, light, camera.relief) : 1.f;
       const float spec = previewHighlight(noL, noV, noH, std::max(highlightRoughness, roughness));
       const auto reflectedView = normal * (2.f * noV) + view * -1.f;
       const float sky = unit(.5f + .5f * reflectedView.y);
       const float environment = mix(.045f, .4f, mix(sky * sky, .5f, roughness));
       const float ambientFresnel = fresnelFalloff(noV) * (1.f - .65f * roughness);
-      const float diffuse = (1.f - metalness) * (ao * ambientLight + noL * directLight);
+      const float diffuse = (1.f - metalness) * (ao * ambientLight + noL * directLight * visibility);
       auto& pixel = result.pixels[y * edge + x];
       for (size_t c = 0; c < 3; ++c) {
         const float f0 = mix(.04f, albedo[c], metalness);
-        const float direct = spec * mix(f0, 1.f, directFresnel);
+        const float direct = spec * visibility * mix(f0, 1.f, directFresnel);
         const float indirect = ao * environment * mix(f0, 1.f, ambientFresnel);
         pixel[c] = unit(albedo[c] * diffuse * (1.f - f0) +
           direct / (1.f + direct) + indirect + glow[c]);

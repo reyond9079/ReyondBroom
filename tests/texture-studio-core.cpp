@@ -202,18 +202,52 @@ void checkMaterialFinishes() {
   }
   check(bare > 0 && painted > bare, "Chipped steel contains both coatings");
   const auto masonry = compile(catalogPreset(1, 1, "flemish"));
-  const auto brickPattern = std::find_if(masonry.nodes.begin(), masonry.nodes.end(), [](const Node& item) {
-    return item.id == "pattern";
-  });
-  check(brickPattern != masonry.nodes.end() && brickPattern->p[5] > 0, "Flemish bond enables irregularity");
+  const auto timber = compile(catalogPreset(5, 4, "boards"));
+  const auto pattern = [](const Plan& plan) -> const Node& {
+    const auto found = std::find_if(plan.nodes.begin(), plan.nodes.end(), [](const Node& item) {
+      return item.id == "pattern";
+    });
+    check(found != plan.nodes.end(), "Physical layout node exists");
+    return *found;
+  };
+  const auto& brick = pattern(masonry);
+  const auto& board = pattern(timber);
+  check(brick.spec->kernel == Kernel::flemishLayout && board.spec->kernel == Kernel::boardLayout,
+    "Current masonry and timber use coupled masks and relief from their layout");
+  const auto course = straightSpan(.5f, int(brick.p[1]), seed + 1, 0, .075f * brick.p[5]);
+  const auto plank = straightSpan(.5f, int(board.p[0]), seed + 1, 0, .20f * board.p[3]);
+  const float bed = frac(course.start / brick.p[1]);
+  const float longEdge = frac(plank.start / board.p[0]);
   for (unsigned i = 0; i < 256; ++i) {
     const float t = float(i) / 256;
-    check(handLaidBrick(*brickPattern, seed, 0.f, t, .5f) == handLaidBrick(*brickPattern, seed, 1.f, t, .5f) &&
-      handLaidBrick(*brickPattern, seed, t, 0.f, .5f) == handLaidBrick(*brickPattern, seed, t, 1.f, .5f),
+    check(brickLayout(brick, seed, 0.f, t, .5f) == brickLayout(brick, seed, 1.f, t, .5f) &&
+      brickLayout(brick, seed, t, 0.f, .5f) == brickLayout(brick, seed, t, 1.f, .5f),
       "Irregular brick geometry meets across tile edges");
+    check(boardLayout(board, seed, 0.f, t) == boardLayout(board, seed, 1.f, t) &&
+      boardLayout(board, seed, t, 0.f) == boardLayout(board, seed, t, 1.f),
+      "Timber geometry meets across tile edges");
+    check(brickLayout(brick, seed, t, bed, .5f)[1] == 0.f &&
+      boardLayout(board, seed, longEdge, t)[1] == 0.f,
+      "Course beds and long plank seams stay straight");
     check(roundedStone(seed, 7, .073f, .88f, .83f, 0.f, t) == roundedStone(seed, 7, .073f, .88f, .83f, 1.f, t) &&
       roundedStone(seed, 7, .073f, .88f, .83f, t, 0.f) == roundedStone(seed, 7, .073f, .88f, .83f, t, 1.f),
       "Rounded stone geometry meets across tile edges");
+  }
+  const auto clean = brickLayout(brick, seed, .09f, .055f, 0.f);
+  const auto worn = brickLayout(brick, seed, .09f, .055f, 1.f);
+  check(clean[2] == worn[2] && clean[1] == worn[1] && clean[0] > worn[0],
+    "Changing surface relief preserves the pigment and mortar mask");
+  for (auto doc : {catalogPreset(1, 1, "brick-layout-test"), catalogPreset(5, 4, "board-layout-test")}) {
+    doc.source["outputs"]["packedData"] = {{"node", "pattern"}, {"port", "data"}};
+    doc.source["outputs"]["opacity"] = {{"node", "joint-mask"}, {"port", "value"}};
+    findNode(doc, "pattern")["parameters"]["columns"] = 11;
+    const auto result = evaluate(compile(doc), {128,128});
+    const auto& layout = result.outputs.at("packedData")->pixels;
+    const auto& joints = result.outputs.at("opacity")->pixels;
+    for (size_t pixel = 0; pixel < layout.size(); ++pixel) {
+      check(joints[pixel][0] == 1.f - layout[pixel][1],
+        "Changing the repeat count keeps the pigment mask aligned with the same layout");
+    }
   }
   auto invalid = steel;
   findNode(invalid, "damage")["parameters"]["kind"] = unsigned(WearKind::count);

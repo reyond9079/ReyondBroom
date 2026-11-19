@@ -460,6 +460,107 @@ inline float handLaidBrick(const Node& node, uint64_t seed, float u, float v, fl
   return mix(.065f + .07f * grit, clay, bevel);
 }
 
+struct JointSpan {
+  int index;
+  float start, end;
+};
+
+inline JointSpan straightSpan(float position, int count, uint64_t seed, unsigned lane, float offset) {
+  const auto boundary = [&](int index) {
+    return float(index) + offset * (lattice(seed, wrap(index, count), lane) - .5f);
+  };
+  int index = int(std::floor(position));
+  if (position < boundary(index)) --index;
+  else if (position >= boundary(index + 1)) ++index;
+  return {index, boundary(index), boundary(index + 1)};
+}
+
+inline Pixel brickLayout(const Node& node, uint64_t seed, float u, float v, float variation) {
+  const int columns = int(node.p[0]), rows = int(node.p[1]);
+  const float uneven = node.p[5];
+  const float y = frac(v) * rows;
+  // A joint has one position along the entire course and is shared by both courses.
+  const auto course = straightSpan(y, rows, seed + 1, 0, .075f * uneven);
+  const unsigned row = wrap(course.index, rows);
+  const float x = frac(u) * columns + (row % 2 ? .5f : 0.f);
+  const auto brick = straightSpan(x, columns, seed + 2, row, .18f * uneven);
+  const unsigned column = wrap(brick.index, columns);
+  float start = brick.start, end = brick.end;
+  bool stretcher = false;
+  if (node.spec->kernel == Kernel::flemishLayout) {
+    const float header = mix(start, end, 1.f / 3.f + .064f * uneven * (lattice(seed + 3, column, row) - .5f));
+    stretcher = x >= header;
+    if (stretcher) start = header;
+    else end = header;
+  }
+  const float side = std::min(x - start, end - x) * float(rows) / columns;
+  const float bed = std::min(y - course.start, course.end - y);
+  const float edge = std::min(side, bed);
+  const float grit = valueNoise(seed + 4, columns * 16, rows * 9, u, v);
+  const float chip = valueNoise(seed + 5, columns * 9, rows * 6, u, v);
+  const float corner = 1.f - softThreshold(.025f, .14f, std::max(side, bed));
+  const float worn = uneven * (.034f * corner + .042f * softThreshold(.68f, .95f, chip) + .019f * (grit - .5f));
+  const float joint = node.p[2] * .5f;
+  const float lip = edge - joint - worn;
+  const float face = softThreshold(-.009f, .009f, lip);
+  const float raised = softThreshold(-.006f, node.p[3], lip);
+  const float pigment = lattice(seed + 6, column * 2 + unsigned(stretcher), row);
+  const float height = mix(.07f + .042f * grit, .88f + .055f * (grit - .5f) +
+    .060f * (pigment - .5f) - .12f * node.p[4] * variation, raised);
+  return {height, face, pigment, 1.f};
+}
+
+inline float plankFiber(uint64_t seed, float u, float v) {
+  const float knotX = mix(.20f, .80f, lattice(seed, 0, 0));
+  const float knotY = mix(.14f, .86f, lattice(seed + 1, 0, 0));
+  const float dx = u - knotX, dy = v - knotY;
+  const float d = dx * dx * 22.f + dy * dy * 180.f;
+  const float knot = softThreshold(.23f, .64f, lattice(seed + 2, 0, 0));
+  const float bend = knot * .078f * (1.f - softThreshold(.12f, 1.1f, d)) *
+    std::clamp(dx * 16.f, -1.f, 1.f);
+  const float run = valueNoise(seed + 3, 6, 2, u, v);
+  const float fiberU = u + bend + .025f * (run - .5f);
+  const float seasonal = valueNoise(seed + 4, 17, 3, fiberU, v);
+  const float latewood = valueNoise(seed + 5, 42, 5, fiberU, v);
+  const float etched = softThreshold(.58f, .91f, .70f * latewood + .30f * seasonal);
+  const float fine = valueNoise(seed + 6, 97, 14, fiberU, v);
+  const float heart = (1.f - softThreshold(.05f, .40f, d)) * knot;
+  const float split = (1.f - softThreshold(.004f, .018f, std::abs(dx + .10f * dy))) *
+    (1.f - softThreshold(.026f, .16f, std::abs(dy))) * knot;
+  return unit(.48f + .43f * (seasonal - .5f) + .25f * (fine - .5f) -
+    .24f * etched - .38f * heart - .22f * split);
+}
+
+inline Pixel boardLayout(const Node& node, uint64_t seed, float u, float v) {
+  const int columns = int(node.p[0]), seams = int(node.p[1]);
+  const float x = frac(u) * columns;
+  const auto plank = straightSpan(x, columns, seed + 1, 0, .20f * node.p[3]);
+  const unsigned board = wrap(plank.index, columns);
+  const float width = node.p[2];
+  const float edge = std::min(x - plank.start, plank.end - x);
+  const float fibers = valueNoise(seed + 2, columns * 12, 17, u, v);
+  const float abrasion = node.p[3] * width * .18f * (fibers - .5f);
+  const float lip = edge - width * .25f - abrasion;
+  float face = softThreshold(-width * .08f, width * .12f, lip);
+  float raised = softThreshold(-width * .08f, width * .62f, lip);
+  unsigned length = 0;
+  float along = frac(v);
+  if (seams > 0) {
+    const float y = along * seams + lattice(seed + 3, board, 0);
+    length = wrap(int(std::floor(y)), seams);
+    along = frac(y);
+    const float endLip = std::min(along, 1.f - along) - width * .049f;
+    face *= softThreshold(-width * .027f, width * .032f, endLip);
+    raised *= softThreshold(-width * .027f, width * .16f, endLip);
+  }
+  const float pigment = lattice(seed + 4, board, length);
+  const float localU = (x - plank.start) / (plank.end - plank.start);
+  const uint64_t grainSeed = seed ^ (UINT64_C(0xa24baed4963ee407) * (1 + board + columns * length));
+  const float grain = seams == 0 ? fibers : plankFiber(grainSeed, localU, along);
+  const float height = mix(.09f, .88f + .09f * (pigment - .5f) + .039f * (grain - .5f), raised);
+  return {height, face, pigment, grain};
+}
+
 inline Pixel rasterPixel(const Raster& image, int x, int y) {
   const size_t offset = (size_t(wrap(y, int(image.size.height))) * image.size.width
     + size_t(wrap(x, int(image.size.width)))) * 4;
@@ -624,6 +725,9 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
     const float original = surfaceWear(kind, frequency, node.p[2], seed, u, v);
     return scalar(node.p[3] > 0.f ? mix(original, naturalWear(kind, frequency, node.p[2], seed, u, v), node.p[3]) : original);
   }
+  case Kernel::brickLayout:
+  case Kernel::flemishLayout: return brickLayout(node, seed, u, v, input[0]->sample(x, y)[0]);
+  case Kernel::boardLayout: return boardLayout(node, seed, u, v);
   case Kernel::boardJoints: {
     if (node.p[3] > 0.f) {
       const int columns = int(node.p[0]);
@@ -1186,7 +1290,7 @@ inline Evaluation evaluate(const Plan& plan, Resolution size,
                            const std::atomic<bool>* cancelled = nullptr, size_t budget = memoryBudget,
                            unsigned threads = 1, unsigned frame = 0, NodeCache* cache = nullptr) {
   require(size.width > 0 && size.width <= maxDimension && size.height > 0 && size.height <= maxDimension,
-    "resolution", "The render size is outside the 1Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРЎв„ў8192 range.");
+    "resolution", "The render size is outside the 1Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р Р‹Р Р†РІР‚С›РЎС›Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљР’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р В Р вЂ№Р В Р Р‹Р Р†РІР‚С›РЎС›8192 range.");
   require(threads > 0 && threads <= maxThreads, "threads", "Choose 1 to 16 CPU workers.");
   require(plan.frames > 0 && (plan.loop || frame < plan.frames), "frame", "Frame is outside the animation range.");
   const float time = plan.frames == 1 ? 0.f : plan.loop ? float(frame % plan.frames) / plan.frames

@@ -15,7 +15,7 @@ enum class Kernel { unknown, constant, color, image, noise, bricks, tiles, check
                     rotate90, directionalBlur, hsv, posterize, pixelate, dither, normalBlend,
                     uv, uvSample, warp, directionalWarp, histogram, channelPack, channelUnpack, retroShade,
                     panels, distance, slopeBlur, colorize, palette, quantize, materialGrain, surfaceWear, boardJoints,
-                    stonework, archBand, scalarBlend };
+                    stonework, archBand, scalarBlend, brickLayout, flemishLayout, boardLayout };
 
 enum class GrainKind { mineral, stone, wood, brushed, sand, fibers, polished, endGrain, bedded, marble, count };
 enum class WearKind { pits, chips, runoff, scratches, deposits, count };
@@ -55,6 +55,9 @@ inline const std::vector<Contract>& contracts() {
     {"ArchBand", Kernel::archBand, {"value", Port::scalar}, {}},
     {"Bricks", Kernel::bricks, {"value", Port::scalar}, {{"variation", Port::scalar}}},
     {"FlemishBricks", Kernel::flemish, {"value", Port::scalar}, {{"variation", Port::scalar}}},
+    {"BrickLayout", Kernel::brickLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
+    {"FlemishLayout", Kernel::flemishLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
+    {"BoardLayout", Kernel::boardLayout, {"data", Port::packed}, {}},
     {"Tiles", Kernel::tiles, {"value", Port::scalar}, {}},
     {"Checker", Kernel::checker, {"value", Port::scalar}, {}},
     {"Stripes", Kernel::stripes, {"value", Port::scalar}, {}},
@@ -143,6 +146,7 @@ inline Json defaultParameters(Kernel kernel) {
     case Kernel::materialGrain: return {{"kind", 0}, {"period", 24}};
     case Kernel::surfaceWear: return {{"kind", 0}, {"period", 16}, {"density", .4}};
     case Kernel::boardJoints: return {{"columns", 6}, {"seams", 1}, {"width", .025}};
+    case Kernel::boardLayout: return {{"columns", 6}, {"seams", 1}, {"width", .064}, {"irregularity", .55}};
     case Kernel::stonework: return {{"period", 9}, {"mortar", .08}, {"roundness", .5}};
     case Kernel::archBand: return {{"period", 11}, {"width", .115}};
     case Kernel::fibers: return {{"columns", 45}, {"rows", 5}, {"contrast", 2}};
@@ -152,6 +156,9 @@ inline Json defaultParameters(Kernel kernel) {
     case Kernel::ridged: return {{"period", 4}, {"octaves", 4}, {"gain", .5}, {"lacunarity", 2}};
     case Kernel::bricks:
     case Kernel::flemish: return {{"columns", 4}, {"rows", 8}, {"mortar", .1}, {"bevel", .06}, {"wear", .28}};
+    case Kernel::brickLayout:
+    case Kernel::flemishLayout:
+      return {{"columns", 4}, {"rows", 8}, {"mortar", .075}, {"bevel", .035}, {"wear", .28}, {"irregularity", .55}};
     case Kernel::tiles: return {{"columns", 4}, {"rows", 4}, {"grout", .08}, {"bevel", .04}};
     case Kernel::checker: return {{"columns", 8}, {"rows", 8}};
     case Kernel::stripes: return {{"period", 4}, {"duty", .5}, {"feather", .015}, {"slant", 0}};
@@ -294,6 +301,7 @@ inline void parameters(Node& node, const Json& params) {
     if (params.contains("naturalDetail")) node.p[3] = range("naturalDetail", 0, 1);
     break;
   case Kernel::boardJoints:
+  case Kernel::boardLayout:
     node.p[0] = count("columns", 1, 64);
     node.p[1] = count("seams", 0, 4);
     node.p[2] = range("width", .005f, .12f);
@@ -334,6 +342,8 @@ inline void parameters(Node& node, const Json& params) {
   }
   case Kernel::bricks:
   case Kernel::flemish:
+  case Kernel::brickLayout:
+  case Kernel::flemishLayout:
     node.p[0] = count("columns", 1, 64);
     node.p[1] = count("rows", 2, 64);
     node.p[2] = range("mortar", 0.01f, 0.4f);
@@ -500,7 +510,7 @@ inline void parameters(Node& node, const Json& params) {
     node.p[0] = range("strength", 0, 1);
     if (node.spec->kernel == Kernel::directionalWarp) node.p[1] = range("angle", -180, 180);
     break;
-  case Kernel::channelUnpack: node.p[0] = count("channel", 0, 2); break;
+  case Kernel::channelUnpack: node.p[0] = count("channel", 0, 3); break;
   case Kernel::retroShade:
     require(member(params, "enabled", path).is_boolean(), path + ".enabled", "Expected a Boolean.");
     node.p[0] = params["enabled"].get<bool>() ? 1.f : 0.f;

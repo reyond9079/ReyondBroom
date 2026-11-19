@@ -37,52 +37,52 @@ inline constexpr const char* recipeCategoryIds[]{
 
 inline constexpr MaterialRecipe catalogRecipes[][10]{
   {
-    {"poured", "Poured Concrete", Pattern::fbm, Pattern::gradient, Pattern::scalarMix, 6, 36, 0x555554, 0xaaa69b},
-    {"board-formed", "Board-formed Concrete", Pattern::boardJoints, Pattern::streaks, Pattern::scalarMix, 8, 43, 0x626362, 0xa6a69b},
+    {"poured", "Poured Concrete", Pattern::fbm, Pattern::gradient, Pattern::scalarMix, 6, 36, 0x62615d, 0xa49e93},
+    {"board-formed", "Board-formed Concrete", Pattern::boardJoints, Pattern::streaks, Pattern::scalarMix, 8, 43, 0x62635f, 0xa29e91},
     {"cracked-slab", "Cracked Slab", Pattern::cracks, Pattern::fbm, Pattern::multiply, 6, 21, 0x292a2c, 0xb1a99b},
-    {"chipped-panel", "Chipped Concrete Panel", Pattern::tiles, Pattern::worley, Pattern::minimum, 4, 44, 0x4c4946, 0xb4aba0},
-    {"wet-bunker", "Wet Bunker", Pattern::fbm, Pattern::veins, Pattern::minimum, 16, 10, 0x252e2c, 0x66706b},
+    {"chipped-panel", "Chipped Concrete Panel", Pattern::tiles, Pattern::worley, Pattern::minimum, 4, 44, 0x615b54, 0xaaa294},
+    {"wet-bunker", "Wet Bunker", Pattern::fbm, Pattern::veins, Pattern::minimum, 16, 10, 0x303330, 0x666a60},
     {"aggregate", "Exposed Aggregate", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 32, 61, 0x58534d, 0xc3b8a9},
     {"patched", "Patched Concrete", Pattern::fbm, Pattern::ridged, Pattern::scalarMix, 9, 13, 0x626361, 0xb4b1a6},
-    {"stained-ceiling", "Stained Concrete Ceiling", Pattern::gradient, Pattern::worley, Pattern::scalarMix, 8, 16, 0x77715f, 0xc8bc9e},
+    {"stained-ceiling", "Stained Concrete Ceiling", Pattern::gradient, Pattern::worley, Pattern::scalarMix, 8, 16, 0x787269, 0xc7bbaa},
     {"expansion-floor", "Expansion-joint Floor", Pattern::tiles, Pattern::gradient, Pattern::scalarMix, 3, 29, 0x545350, 0x9e9791},
     {"reinforced-damage", "Reinforced Concrete Damage", Pattern::materialGrain, Pattern::grate, Pattern::scalarMix, 20, 13, 0x504c45, 0xa79887}
   },
   {
-    {"running-brick", "Warm Running Brick", Pattern::bricks, Pattern::gradient, Pattern::multiply, 4, 43, 0x4d3025, 0xba704c},
-    {"flemish-brick", "Flemish Brick", Pattern::flemish, Pattern::streaks, Pattern::scalarMix, 6, 22, 0x5b3627, 0xc88860},
-    {"broken-brick", "Broken Brick", Pattern::bricks, Pattern::cracks, Pattern::minimum, 8, 13, 0x4d3331, 0xa8766b},
-    {"rough-stone", "Rough Stonework", Pattern::stonework, Pattern::ridged, Pattern::minimum, 7, 10, 0x4b4b45, 0xada99c},
-    {"ashlar", "Ashlar Blocks", Pattern::tiles, Pattern::veins, Pattern::difference, 4, 34, 0x797161, 0xc1bc98},
-    {"cobblestone", "Rounded Cobblestone", Pattern::stonework, Pattern::worley, Pattern::multiply, 7, 18, 0x424548, 0xaaa08d},
-    {"mortar-rubble", "Mortar and Rubble", Pattern::stonework, Pattern::cracks, Pattern::minimum, 18, 8, 0x4c4c43, 0xa5a994},
-    {"gothic-block", "Gothic Block", Pattern::flemish, Pattern::rings, Pattern::minimum, 4, 11, 0x353841, 0x9f9ba3},
-    {"basalt-blocks", "Basalt Blocks", Pattern::tiles, Pattern::ridged, Pattern::multiply, 9, 17, 0x292b31, 0x77747b},
+    {"running-brick", "Warm Running Brick", Pattern::bricks, Pattern::gradient, Pattern::multiply, 4, 43, 0x694638, 0xa98770},
+    {"flemish-brick", "Flemish Brick", Pattern::flemish, Pattern::streaks, Pattern::scalarMix, 6, 22, 0x704939, 0xb38b72},
+    {"broken-brick", "Broken Brick", Pattern::bricks, Pattern::cracks, Pattern::minimum, 8, 13, 0x654b42, 0xa77d6a},
+    {"rough-stone", "Rough Stonework", Pattern::stonework, Pattern::ridged, Pattern::minimum, 7, 10, 0x4d4d46, 0xa29d8e},
+    {"ashlar", "Ashlar Blocks", Pattern::tiles, Pattern::veins, Pattern::difference, 4, 34, 0x777165, 0xb9af9e},
+    {"cobblestone", "Rounded Cobblestone", Pattern::stonework, Pattern::worley, Pattern::multiply, 7, 18, 0x49453c, 0x8d8575},
+    {"mortar-rubble", "Mortar and Rubble", Pattern::stonework, Pattern::cracks, Pattern::minimum, 18, 8, 0x4e5048, 0xa1a294},
+    {"gothic-block", "Gothic Block", Pattern::flemish, Pattern::rings, Pattern::minimum, 4, 11, 0x424343, 0x8e8c83},
+    {"basalt-blocks", "Basalt Blocks", Pattern::tiles, Pattern::ridged, Pattern::multiply, 9, 17, 0x383935, 0x73736d},
     {"arch-trim", "Worn Arch Trim", Pattern::archBand, Pattern::cracks, Pattern::multiply, 11, 16, 0x504740, 0xb3a89a}
   },
   {
-    {"peeling", "Peeling Plaster", Pattern::fbm, Pattern::ridged, Pattern::scalarMix, 7, 39, 0xb0a88a, 0xe4d9bb},
-    {"cracked-paint", "Cracked Paint", Pattern::cracks, Pattern::gradient, Pattern::minimum, 24, 14, 0x56515a, 0xd8d1d4},
-    {"square-ceramic", "Porcelain Squares", Pattern::tiles, Pattern::gradient, Pattern::maximum, 6, 41, 0x455d56, 0xb7ddd2},
+    {"peeling", "Peeling Plaster", Pattern::fbm, Pattern::ridged, Pattern::scalarMix, 7, 39, 0xa49b89, 0xd5c9b8},
+    {"cracked-paint", "Cracked Paint", Pattern::cracks, Pattern::gradient, Pattern::minimum, 24, 14, 0x706864, 0xc5bab0},
+    {"square-ceramic", "Porcelain Squares", Pattern::tiles, Pattern::gradient, Pattern::maximum, 6, 41, 0x51675e, 0xaebfb3},
     {"subway", "Subway Tile", Pattern::bricks, Pattern::veins, Pattern::maximum, 5, 20, 0x625b55, 0xeee4d7},
-    {"mosaic", "Mosaic Tile", Pattern::tiles, Pattern::checker, Pattern::multiply, 24, 24, 0x426365, 0x8fc1b8},
-    {"stained-grout", "Stained Grout", Pattern::tiles, Pattern::worley, Pattern::difference, 7, 31, 0x526766, 0xa3c0b1},
-    {"painted-brick", "Painted Brick", Pattern::bricks, Pattern::streaks, Pattern::maximum, 7, 36, 0x475c5d, 0x8ababa},
+    {"mosaic", "Mosaic Tile", Pattern::tiles, Pattern::checker, Pattern::multiply, 24, 24, 0x4b676a, 0x9abcb1},
+    {"stained-grout", "Stained Grout", Pattern::tiles, Pattern::worley, Pattern::difference, 7, 31, 0x5c6d69, 0xa9b8a9},
+    {"painted-brick", "Painted Brick", Pattern::bricks, Pattern::streaks, Pattern::maximum, 7, 36, 0x576e63, 0xa1b1a4},
     {"terrazzo", "Terrazzo", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 35, 47, 0x8e8075, 0xd8cfad},
-    {"acoustic", "Acoustic Tile", Pattern::tiles, Pattern::rivets, Pattern::difference, 5, 42, 0x5f5a54, 0xd3ccb7},
-    {"insulation", "Damaged Insulation", Pattern::streaks, Pattern::cracks, Pattern::maximum, 35, 9, 0x78593d, 0xe2ba7d}
+    {"acoustic", "Acoustic Tile", Pattern::tiles, Pattern::rivets, Pattern::difference, 5, 42, 0x747068, 0xc8c1b5},
+    {"insulation", "Damaged Insulation", Pattern::streaks, Pattern::cracks, Pattern::maximum, 35, 9, 0x806749, 0xbda47b}
   },
   {
-    {"steel", "Brushed Steel", Pattern::materialGrain, Pattern::gradient, Pattern::scalarMix, 56, 21, 0x818487, 0xc0c4c4},
-    {"oxidized", "Oxidized Iron", Pattern::materialGrain, Pattern::gradient, Pattern::scalarMix, 15, 32, 0x4d3d33, 0x8c6850},
-    {"chipped-steel", "Painted Chipped Steel", Pattern::gradient, Pattern::streaks, Pattern::scalarMix, 7, 30, 0x3a565a, 0x779594},
-    {"diamond-plate", "Diamond Plate", Pattern::diamond, Pattern::fibers, Pattern::minimum, 9, 23, 0x2b2c33, 0xbbc0c5},
-    {"perforated-sheet", "Perforated Sheet", Pattern::rivets, Pattern::gradient, Pattern::difference, 25, 35, 0x151d20, 0xa0b4bb},
-    {"corrugated-sheet", "Corrugated Sheet", Pattern::stripes, Pattern::fbm, Pattern::maximum, 14, 17, 0x303738, 0xa5b2a6},
+    {"steel", "Brushed Steel", Pattern::materialGrain, Pattern::gradient, Pattern::scalarMix, 56, 21, 0x888c89, 0xb6bcba},
+    {"oxidized", "Oxidized Iron", Pattern::materialGrain, Pattern::gradient, Pattern::scalarMix, 15, 32, 0x46392f, 0x83604c},
+    {"chipped-steel", "Painted Chipped Steel", Pattern::gradient, Pattern::streaks, Pattern::scalarMix, 7, 30, 0x45595c, 0x78918b},
+    {"diamond-plate", "Diamond Plate", Pattern::diamond, Pattern::fibers, Pattern::minimum, 9, 23, 0x515551, 0xa1a9a6},
+    {"perforated-sheet", "Perforated Sheet", Pattern::rivets, Pattern::gradient, Pattern::difference, 25, 35, 0x303332, 0xa1a8a4},
+    {"corrugated-sheet", "Corrugated Sheet", Pattern::stripes, Pattern::fbm, Pattern::maximum, 14, 17, 0x626963, 0xb7bdb9},
     {"riveted", "Riveted Plate", Pattern::grate, Pattern::rivets, Pattern::maximum, 4, 9, 0x4c4841, 0x9c9a88},
     {"welded", "Welded Seam", Pattern::stripes, Pattern::streaks, Pattern::multiply, 1, 41, 0x5f5a58, 0xa8a5a0},
     {"cast-metal", "Cast Metal", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 24, 52, 0x494744, 0x8d8982},
-    {"rust-flakes", "Rust Flakes", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 27, 28, 0x522f22, 0xb77b51}
+    {"rust-flakes", "Rust Flakes", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 27, 28, 0x412c1f, 0x9b633e}
   },
   {
     {"modular-wall", "Modular Wall", Pattern::panels, Pattern::grate, Pattern::difference, 3, 20, 0x2c3943, 0x6c8d9d},
@@ -97,37 +97,37 @@ inline constexpr MaterialRecipe catalogRecipes[][10]{
     {"laboratory", "Laboratory Panel", Pattern::tiles, Pattern::streaks, Pattern::scalarMix, 4, 45, 0x606e77, 0xc5d4d6}
   },
   {
-    {"planks", "Timber Planks", Pattern::boardJoints, Pattern::fibers, Pattern::multiply, 6, 38, 0x584027, 0xbe9161},
-    {"parquet", "Parquet", Pattern::checker, Pattern::streaks, Pattern::difference, 12, 32, 0x54301f, 0xb16d39},
-    {"plywood", "Plywood", Pattern::materialGrain, Pattern::ridged, Pattern::minimum, 37, 12, 0x735331, 0xd1a977},
-    {"end-grain", "End Grain", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 28, 23, 0x65432e, 0xd1ad7e},
-    {"weathered", "Weathered Boards", Pattern::boardJoints, Pattern::cracks, Pattern::multiply, 8, 24, 0x49443e, 0x9c9083},
-    {"painted-boards", "Painted Boards", Pattern::boardJoints, Pattern::worley, Pattern::maximum, 9, 26, 0x3b5257, 0x769098},
+    {"planks", "Timber Planks", Pattern::boardJoints, Pattern::fibers, Pattern::multiply, 6, 38, 0x66482c, 0xbb986e},
+    {"parquet", "Parquet", Pattern::checker, Pattern::streaks, Pattern::difference, 12, 32, 0x654636, 0xa88158},
+    {"plywood", "Plywood", Pattern::materialGrain, Pattern::ridged, Pattern::minimum, 37, 12, 0x876c4c, 0xc5a782},
+    {"end-grain", "End Grain", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 28, 23, 0x775637, 0xc3a17a},
+    {"weathered", "Weathered Boards", Pattern::boardJoints, Pattern::cracks, Pattern::multiply, 8, 24, 0x433729, 0x867662},
+    {"painted-boards", "Painted Boards", Pattern::boardJoints, Pattern::worley, Pattern::maximum, 9, 26, 0x445a57, 0x83918a},
     {"burned", "Burned Wood", Pattern::cracks, Pattern::streaks, Pattern::minimum, 17, 46, 0x211e20, 0x68564d},
-    {"bark", "Bark Slabs", Pattern::materialGrain, Pattern::veins, Pattern::multiply, 32, 10, 0x453020, 0x9d7658},
-    {"crate", "Crate Panel", Pattern::rectangle, Pattern::streaks, Pattern::maximum, 32, 39, 0x634624, 0xb58a54},
-    {"split", "Split Timber", Pattern::veins, Pattern::cracks, Pattern::minimum, 19, 6, 0x5a3822, 0xb58c6f}
+    {"bark", "Bark Slabs", Pattern::materialGrain, Pattern::veins, Pattern::multiply, 32, 10, 0x49392a, 0x907455},
+    {"crate", "Crate Panel", Pattern::rectangle, Pattern::streaks, Pattern::maximum, 32, 39, 0x6c5237, 0xad9067},
+    {"split", "Split Timber", Pattern::veins, Pattern::cracks, Pattern::minimum, 19, 6, 0x694d37, 0xa68a6d}
   },
   {
     {"soil", "Loose Soil", Pattern::fbm, Pattern::worley, Pattern::difference, 17, 35, 0x3c2c24, 0x997256},
-    {"gravel", "Mixed Gravel", Pattern::worley, Pattern::ridged, Pattern::multiply, 24, 11, 0x423d40, 0x9d8e81},
-    {"sand", "Sand Ripples", Pattern::veins, Pattern::white, Pattern::scalarMix, 13, 70, 0x92724d, 0xdcc89a},
+    {"gravel", "Mixed Gravel", Pattern::worley, Pattern::ridged, Pattern::multiply, 24, 11, 0x54483d, 0x9a826d},
+    {"sand", "Sand Ripples", Pattern::veins, Pattern::white, Pattern::scalarMix, 13, 70, 0x937c5d, 0xd3c0a0},
     {"mud", "Muddy Ground", Pattern::worley, Pattern::fbm, Pattern::minimum, 13, 9, 0x352821, 0x837251},
     {"cracked-earth", "Cracked Earth", Pattern::cracks, Pattern::ridged, Pattern::difference, 13, 22, 0x593f29, 0xbc8c63},
-    {"asphalt", "Dense Asphalt", Pattern::materialGrain, Pattern::ridged, Pattern::minimum, 43, 23, 0x35353b, 0x6c6e76},
+    {"asphalt", "Dense Asphalt", Pattern::materialGrain, Pattern::ridged, Pattern::minimum, 43, 23, 0x383935, 0x6c6b65},
     {"damaged-asphalt", "Damaged Asphalt", Pattern::cracks, Pattern::white, Pattern::multiply, 11, 53, 0x282a2c, 0x777277},
-    {"snow", "Snow Crust", Pattern::worley, Pattern::white, Pattern::minimum, 22, 52, 0xa9b4bb, 0xe9e9ed},
+    {"snow", "Snow Crust", Pattern::worley, Pattern::white, Pattern::minimum, 22, 52, 0xadb6b6, 0xeeece5},
     {"leaf-litter", "Leaf Litter", Pattern::spots, Pattern::fibers, Pattern::difference, 19, 33, 0x4f392b, 0xa97f44},
     {"rock-scree", "Rock Scree", Pattern::cracks, Pattern::worley, Pattern::maximum, 34, 14, 0x535058, 0xa89e93}
   },
   {
-    {"granite", "Speckled Granite", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 38, 52, 0x5c5e62, 0xcbbdba},
+    {"granite", "Speckled Granite", Pattern::materialGrain, Pattern::white, Pattern::scalarMix, 38, 52, 0x626261, 0xc6bdb2},
     {"stratified", "Stratified Rock", Pattern::materialGrain, Pattern::ridged, Pattern::scalarMix, 22, 14, 0x4e4a4c, 0xba9277},
     {"sandstone", "Layered Sandstone", Pattern::materialGrain, Pattern::ridged, Pattern::multiply, 34, 21, 0x695444, 0xc6a77d},
     {"marble", "Marble Veins", Pattern::materialGrain, Pattern::fbm, Pattern::scalarMix, 13, 14, 0x515558, 0xe5e6ec},
-    {"ice", "Fractured Ice", Pattern::cracks, Pattern::veins, Pattern::maximum, 12, 19, 0x3a7388, 0xb4dede},
-    {"moss", "Cushion Moss", Pattern::worley, Pattern::fbm, Pattern::maximum, 19, 29, 0x343a26, 0x72984c},
-    {"lichen", "Lichen Patches", Pattern::worley, Pattern::cracks, Pattern::maximum, 31, 19, 0x444b35, 0x9ea17c},
+    {"ice", "Fractured Ice", Pattern::cracks, Pattern::veins, Pattern::maximum, 12, 19, 0x64828b, 0xc5d3d0},
+    {"moss", "Cushion Moss", Pattern::worley, Pattern::fbm, Pattern::maximum, 19, 29, 0x3b412c, 0x77845a},
+    {"lichen", "Lichen Patches", Pattern::worley, Pattern::cracks, Pattern::maximum, 31, 19, 0x4c5040, 0xa0a085},
     {"roots", "Exposed Roots", Pattern::veins, Pattern::streaks, Pattern::difference, 7, 25, 0x342d27, 0x7a624e},
     {"cliff", "Cliff Face", Pattern::ridged, Pattern::cracks, Pattern::difference, 11, 19, 0x474349, 0xa99b8a},
     {"salt", "Salt Crust", Pattern::cracks, Pattern::white, Pattern::scalarMix, 19, 54, 0x837c7c, 0xe4dbca}
@@ -309,7 +309,7 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   const bool marking = category == 10;
   const bool activeDisplay = category == 11 && (index == 6 || index == 7);
   const bool naturalDetail = !liquid && !marking && !activeDisplay;
-  source["provenance"]["catalogVersion"] = naturalDetail ? 3 : 2;
+  source["provenance"]["catalogVersion"] = naturalDetail ? 4 : 2;
   auto& nodes = source["graph"]["nodes"] = Json::array();
   auto& edges = source["graph"]["edges"] = Json::array();
   auto& outputs = source["outputs"] = Json::object();
@@ -330,8 +330,8 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     }
     if (pattern == Pattern::boardJoints) {
       parameters["seams"] = category == 0 ? 0 : 1;
-      parameters["width"] = category == 0 ? .067 : .064;
-      parameters["irregularity"] = category == 0 ? .37 : .70;
+      parameters["width"] = category == 0 ? .058 : .073;
+      parameters["irregularity"] = category == 0 ? .26 : .56;
     }
     if (pattern == Pattern::stonework) {
       parameters["roundness"] = index == 5 ? .88 : .26;
@@ -349,7 +349,12 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       parameters["rows"] = 2;
     }
     if (pattern == Pattern::bricks || pattern == Pattern::flemish) {
-      parameters["irregularity"] = category == 2 && index == 3 ? .16 : index == 2 ? 1.0 : .70;
+      const bool ceramic = category == 2 && index == 3;
+      if (row == 0) {
+        parameters["mortar"] = ceramic ? .056 : .080;
+        parameters["bevel"] = ceramic ? .019 : .039;
+        parameters["irregularity"] = ceramic ? .14 : category == 1 && index == 2 ? .92 : .54;
+      } else parameters["irregularity"] = .70;
       if (!std::any_of(nodes.begin(), nodes.end(), [](const Json& entry) { return entry["id"] == "wear"; }))
         nodes.push_back(node("wear", "GradientNoise", recipePattern(Pattern::gradient, 37), 0));
       edges.push_back(wire("wear", "value", id, "variation"));
@@ -377,13 +382,28 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       expose({row ? "Detail digit" : "Digit", id, "digit", 0, 9, 1});
     else if (pattern == Pattern::arrow)
       expose({row ? "Detail length" : "Arrow length", id, "length", .2f, .9f, 0});
-    nodes.push_back(node(id, type.type, std::move(parameters), 1, row));
+    const char* kernel = type.type;
+    if (row == 0 && pattern == Pattern::bricks) kernel = "BrickLayout";
+    if (row == 0 && pattern == Pattern::flemish) kernel = "FlemishLayout";
+    if (row == 0 && pattern == Pattern::boardJoints) kernel = "BoardLayout";
+    nodes.push_back(node(id, kernel, std::move(parameters), 1, row));
   };
   add("pattern", recipe.pattern, recipe.scale, 0);
   add("detail", recipe.detail, recipe.detailScale, 1);
+  const bool pieceLayout = recipe.pattern == Pattern::bricks || recipe.pattern == Pattern::flemish ||
+    recipe.pattern == Pattern::boardJoints;
+  if (pieceLayout) {
+    constexpr std::array<const char*, 3> names{"piece-relief", "piece-face", "piece-tone"};
+    constexpr std::array<int, 3> rows{0, 6, 7};
+    for (unsigned i = 0; i < names.size(); ++i) {
+      nodes.push_back(node(names[i], "ChannelUnpack", {{"channel", i}}, 2, rows[i]));
+      edges.push_back(wire("pattern", "data", names[i], "data"));
+    }
+  }
+  const char* relief = pieceLayout ? "piece-relief" : "pattern";
   nodes.push_back(node("composite", recipeContract(recipe.composition).type,
     defaultParameters(recipe.composition), 2, 1));
-  edges.push_back(wire("pattern", "value", "composite", "a"));
+  edges.push_back(wire(relief, "value", "composite", "a"));
   edges.push_back(wire("detail", "value", "composite", "b"));
   const auto connect = [&](const char* from, const char* to, const char* port) {
     edges.push_back(wire(from, "value", to, port));
@@ -411,9 +431,15 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     nodes.push_back(node(id, "Levels", {{"low", low}, {"high", high}, {"gamma", 1}}, col, row));
     connect(input, id, "value");
   };
-  Json grain = {{"kind", unsigned(finish.grain)}, {"period", std::min(recipe.detailScale, 60u)}};
-  if (naturalDetail) grain["naturalDetail"] = 1;
-  nodes.push_back(node("grain", "MaterialGrain", std::move(grain), 1, 2));
+  const bool woodBoards = category == 5 && recipe.pattern == Pattern::boardJoints;
+  if (woodBoards) {
+    nodes.push_back(node("grain", "ChannelUnpack", {{"channel", 3}}, 2, 2));
+    edges.push_back(wire("pattern", "data", "grain", "data"));
+  } else {
+    Json grain = {{"kind", unsigned(finish.grain)}, {"period", std::min(recipe.detailScale, 60u)}};
+    if (naturalDetail) grain["naturalDetail"] = 1;
+    nodes.push_back(node("grain", "MaterialGrain", std::move(grain), 1, 2));
+  }
   const bool paintedSteel = category == 3 && index == 2;
   const unsigned wearFrequency = paintedSteel ? 19u : finish.wear == WearKind::chips ? 9u + recipe.scale % 10u :
     finish.wear == WearKind::deposits ? 8u : std::min(52u, recipe.detailScale);
@@ -429,14 +455,14 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     recipe.pattern == Pattern::stonework || (category == 0 && index == 2);
   const bool gentleStructure = recipe.pattern == Pattern::materialGrain || recipe.pattern == Pattern::gradient ||
     recipe.pattern == Pattern::fbm || recipe.pattern == Pattern::ridged || recipe.pattern == Pattern::streaks;
-  const bool woodBoards = category == 5 && recipe.pattern == Pattern::boardJoints;
   const bool stone = recipe.pattern == Pattern::stonework;
   const bool wetStone = category == 1 && index == 5;
   const bool peeledPlaster = category == 2 && (index == 0 || index == 1 || index == 6);
   const bool boardConcrete = category == 0 && index == 1;
   const float structuralWeight = category == 0 && index == 9 ? 0.f :
-    recipe.pattern == Pattern::archBand ? .15f : stone ? .12f : gentleStructure ? .27f : physicalJoint ? .32f : .62f;
-  mixScalar("structure", "pattern", "composite", liquid || activeDisplay ? .38f : structuralWeight, 3, 0);
+    recipe.pattern == Pattern::archBand ? .15f : pieceLayout || stone ? .12f :
+    gentleStructure ? .27f : physicalJoint ? .32f : .62f;
+  mixScalar("structure", relief, "composite", liquid || activeDisplay ? .38f : structuralWeight, 3, 0);
   mixScalar("surface", "structure", "grain", liquid || activeDisplay ? .12f :
     woodBoards ? .47f : stone ? .22f : gentleStructure ? .62f : .40f, 4, 1);
   mixScalar("worn-relief", "surface", "intact", finish.relief * (liquid || marking ? .06f : .22f), 5, 1);
@@ -450,13 +476,10 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     (category == 0 && (index == 1 || index == 3 || index == 8));
   const bool firedClay = category == 1 && index < 3;
   const bool wearDecal = decal && (index == 4 || index == 5 || index == 8);
-  if (firedClay || stone || woodBoards || boardConcrete)
-    levels("piece-tone", "pattern", firedClay ? .60f : stone ? .59f : .78f,
-      firedClay ? .91f : stone ? .92f : .99f, 3, 3);
-  const bool pieceTone = firedClay || stone || woodBoards || boardConcrete;
-  const char* tonalStructure = tilePigment ? "detail" : pieceTone ? "piece-tone" : "structure";
+  if (stone) levels("piece-tone", "pattern", .59f, .92f, 3, 3);
+  const char* tonalStructure = tilePigment ? "detail" : pieceLayout || stone ? "piece-tone" : "structure";
   mixScalar("tone", "grain", tonalStructure, liquid || marking || activeDisplay || tilePigment ? .90f :
-    firedClay ? .61f : stone ? .47f : woodBoards ? .25f : boardConcrete ? .38f :
+    firedClay ? .60f : stone ? .44f : woodBoards ? .55f : boardConcrete ? .28f :
     finish.grain == GrainKind::marble ? .14f : gentleStructure || cementJoint ? .22f : category == 5 ? .28f : .48f, 4, 0);
   nodes.push_back(node("pigment", "ColorRamp",
     {{"low", rgb(recipe.shadow, 1)}, {"high", rgb(recipe.highlight, 1)}}, 5, 0));
@@ -473,32 +496,37 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       {"period", firedClay ? 14u : 10u}, {"density", .85}, {"naturalDetail", 1}}, 1, 6);
     age["seedIdentity"] = preset + "-age";
     nodes.push_back(std::move(age));
-    const auto low = firedClay ? 0x655b4du : woodBoards ? 0x4d4337u : 0x5d5d54u;
-    const auto high = firedClay ? 0xc5a589u : woodBoards ? 0xa09380u : 0xb1a99au;
+    const auto low = firedClay ? 0x746150u : woodBoards ? 0x584e42u : 0x626056u;
+    const auto high = firedClay ? 0xa28f7cu : woodBoards ? 0x968877u : 0xaaa092u;
     nodes.push_back(node("aged-pigment", "ColorRamp",
       {{"low", rgb(low, 1)}, {"high", rgb(high, 1)}}, 5, 8));
     connect("grain", "aged-pigment", "value");
-    blend("with-age", colorLayer, "aged-pigment", "age", woodBoards ? .76f : .67f, 8);
+    blend("with-age", colorLayer, "aged-pigment", "age", woodBoards ? .45f : .49f, 8);
     colorLayer = "with-age";
   }
-  if (cementJoint) {
-    const uint32_t mortarLow = wetStone ? 0x3a362bu : category == 0 ? 0x484740u :
-      category == 1 && index >= 3 ? 0x454238u : 0x51483cu;
-    const uint32_t mortarHigh = wetStone ? 0x676252u : category == 0 ? 0x77756au :
-      category == 1 && index >= 3 ? 0x7c7366u : 0x978875u;
+  if (cementJoint || woodBoards) {
+    const uint32_t mortarLow = woodBoards ? 0x362b22u : wetStone ? 0x3a362bu : category == 0 ? 0x4a4841u :
+      category == 1 && index >= 3 ? 0x454238u : 0x63594cu;
+    const uint32_t mortarHigh = woodBoards ? 0x5c4e40u : wetStone ? 0x676252u : category == 0 ? 0x747066u :
+      category == 1 && index >= 3 ? 0x7c7366u : 0x958777u;
     nodes.push_back(node("mortar", "ColorRamp", {{"low", rgb(mortarLow, 1)}, {"high", rgb(mortarHigh, 1)}}, 5, 2));
     connect("grain", "mortar", "value");
-    nodes.push_back(node("grooves", "Invert", Json::object(), 2, 4));
-    connect("pattern", "grooves", "value");
-    levels("joint-mask", "grooves", stone ? .68f : .57f, stone ? .95f : .90f, 3, 4);
+    if (pieceLayout) {
+      nodes.push_back(node("joint-mask", "Invert", Json::object(), 3, 4));
+      connect("piece-face", "joint-mask", "value");
+    } else {
+      nodes.push_back(node("grooves", "Invert", Json::object(), 2, 4));
+      connect("pattern", "grooves", "value");
+      levels("joint-mask", "grooves", stone ? .68f : .57f, stone ? .95f : .90f, 3, 4);
+    }
     blend("with-joints", colorLayer, "mortar", "joint-mask", 1, 0);
     colorLayer = "with-joints";
   }
   const bool layeredWear = paintedSteel || peeledPlaster;
   if (layeredWear) {
-    const uint32_t edge = paintedSteel ? 0x58402eu : 0x74614cu;
-    const uint32_t substrateLow = paintedSteel ? 0x343839u : 0x847662u;
-    const uint32_t substrateHigh = paintedSteel ? 0x939498u : 0xc1ac8fu;
+    const uint32_t edge = paintedSteel ? 0x604b3eu : 0x827262u;
+    const uint32_t substrateLow = paintedSteel ? 0x464947u : 0x877b70u;
+    const uint32_t substrateHigh = paintedSteel ? 0x9fa29du : 0xb9aa96u;
     nodes.push_back(node("wear-edge", "ConstantColor", {{"rgba", rgb(edge, 1)}}, 5, 9));
     levels("wear-halo", "damage", .12f, .52f, 3, 5);
     levels("open-damage", "damage", .48f, .89f, 4, 6);

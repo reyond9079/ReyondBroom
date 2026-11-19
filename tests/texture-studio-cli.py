@@ -61,6 +61,42 @@ def run(executable, root):
     assert invoke("new", source)[0] == 0
     assert invoke("new", source)[0] != 0
     assert invoke("validate", source)[1]["state"] == "valid"
+    assert invoke("validate", source, "--backend", "cpu")[0] == 0
+    for command, document, arguments, diagnostic in (
+        ("validate", root / "missing.rbtex.json", (), "missing or too large"),
+        ("render", source, ("--backend", "gpu"), "CPU reference backend"),
+        ("render", source, ("--frame", "-1"), "unsigned whole number"),
+        ("render", source, ("--frame", "1x"), "unsigned whole number"),
+        ("render", source, ("--threads", "0"), "1 to 16 CPU workers"),
+        ("render", source, ("--seed", "1"), "Use --seed with new or family"),
+        ("render", source, ("--variation", "1"), "Use --variation"),
+        ("render", source, ("--texture", "mortar"), "at most 15 bytes"),
+        ("import", source, ("--texture", "overlong-texture"), "at most 15 bytes"),
+        ("render", source, ("--pk3", "--dry-run"), "Quake III"),
+        ("render", source, ("--jpeg", "80", "--dry-run"), "JPEG export requires"),
+        ("export", source, ("--profile", "fte-diffuse", "--jpeg", "80", "--dry-run"), "JPEG export requires"),
+        ("export", source, ("--profile", "q3-baseline", "--jpeg", "0"), "JPEG quality"),
+        ("render", source, ("--masked", "--dry-run"), "require the GoldSrc"),
+        ("export", source, ("--profile", "q1-baseline", "--masked", "--dry-run"), "require the GoldSrc"),
+        ("export", source, ("--frames", "1"), "2 to 64 frames"),
+        ("export", source, ("--frames", "65"), "2 to 64 frames"),
+        ("export", source, ("--frames", "2", "--dry-run"), "with export --all-frames"),
+        ("render", source, ("--all-frames", "--accept-rate-change", "--dry-run"), "with export --all-frames"),
+        ("render", source, ("--all-frames", "--frame", "1", "--dry-run"), "Use --all-frames with render"),
+        ("export", source, ("--all-frames", "--profile", "q3-baseline", "--dry-run"), "at least two frames"),
+        ("bundle", source, (), "new .rbtexpkg file"),
+        ("bundle", source, ("--dry-run", "--out", root / "blocked.rbtexpkg"), "new .rbtexpkg file"),
+        ("family", "industrial-bunker", (), "destination directory"),
+        ("render", source, (), "output directory"),
+        ("render", source, ("--out", str(root) + "/."), "new output directory"),
+        ("render", source, ("--out", str(root) + "/.."), "new output directory"),
+        ("unknown", source, ("--dry-run",), "Unknown action"),
+        ("new", root / "invalid-variant.rbtex.json", ("--variation", "0"), "Use --variation"),
+        ("new", root / "invalid-variant.rbtex.json", ("--variation", "5"), "Use --variation"),
+        ("new", root / "invalid-variant.rbtex.json", ("--variation", "1"), "Choose a catalog recipe"),
+    ):
+        status, error = invoke(command, document, *arguments)
+        assert status != 0 and diagnostic in error["message"], (command, arguments, error)
     palette = root / "grayscale.lmp"
     palette.write_bytes(bytes(value for value in range(256) for _ in range(3)))
 
@@ -104,6 +140,14 @@ def run(executable, root):
         assert invoke("unpack", installed, "--out", restored)[0] == 0
         assert invoke("validate", restored / "source.rbtex.json")[0] == 0
         assert (restored / indexed_ref["path"]).read_bytes() == original.read_bytes()
+        if encoding == "wal":
+            original_source = indexed_source.read_bytes()
+            for invalid_character in ("/", "G"):
+                indexed_ref["palette"] = invalid_character + "0" * 1535
+                indexed_source.write_text(json.dumps(indexed_doc), encoding="utf-8")
+                status, error = invoke("validate", indexed_source)
+                assert status != 0 and "non-hexadecimal" in error["message"]
+            indexed_source.write_bytes(original_source)
 
     texture_path = "textures/custom/mortar.tga"
     assert export("q3-baseline", "q3", "custom/mortar")[0] == 0
@@ -186,6 +230,32 @@ def run(executable, root):
     assert invoke("unpack", package, "--out", root / "unpacked")[0] == 0
     assert (root / "unpacked/source.rbtex.json").read_bytes() == imported.read_bytes()
     assert (root / "unpacked" / reference["path"]).read_bytes() == loose
+
+    source_entry = zipfile.ZipInfo("source.rbtex.json")
+    source_entry.create_system = 3
+    source_entry.external_attr = 0o100644 << 16
+    archive_path = root / "regular-file-mode.rbtexpkg"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(source_entry, imported.read_bytes())
+        archive.writestr(reference["path"], loose)
+    assert invoke("unpack", archive_path, "--out", root / "regular-file-mode")[0] == 0
+
+    for name, body, attributes, diagnostic in (
+        ("entry-too-large", bytes(16 * 1024 * 1024 + 1), 0, "size or compression budget"),
+        ("compression-ratio", bytes(1024 * 1024), 0, "size or compression budget"),
+        ("directory-attribute", b"{}", (0o100644 << 16) | 0x10, "link or directory"),
+        ("reparse-attribute", b"{}", (0o100644 << 16) | 0x400, "link or directory"),
+    ):
+        archive_path, destination = root / (name + ".rbtexpkg"), root / name
+        entry = zipfile.ZipInfo("source.rbtex.json")
+        entry.create_system = 3
+        entry.external_attr = attributes
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr(entry, body, compress_type=zipfile.ZIP_DEFLATED)
+        status, error = invoke("unpack", archive_path, "--out", destination)
+        assert status != 0 and diagnostic in error["message"], (name, error)
+        assert not destination.exists() and not destination.with_name(name + ".incoming").exists()
+
     for member in ("../outside.txt", "unreferenced.txt"):
         bad = root / "bad.rbtexpkg"
         with zipfile.ZipFile(bad, "w") as archive:
@@ -207,6 +277,18 @@ def run(executable, root):
 
     animation = root / "ripples.rbtex.json"
     assert invoke("new", animation, "--preset", "Water Ripples")[0] == 0
+    status, planned_render = invoke("render", animation, "--all-frames", "--dry-run", "--out", root / "dry-animation")
+    assert status == 0 and planned_render["state"] == "planned" and not (root / "dry-animation").exists()
+    for profile, options, diagnostic in (
+        ("fte-rich", (), "Choose an animation profile"),
+        ("q3-baseline", ("--frame", "1"), "Use an opaque, looping source"),
+        ("q3-baseline", ("--jpeg", "80"), "Use an opaque, looping source"),
+        ("goldsrc-baseline", ("--masked",), "Use an opaque, looping source"),
+        ("q2-baseline", ("--frames", "32"), "Use --frames"),
+        ("q3-baseline", ("--frames", "8", "--name", "../escape"), "safe namespaced texture name"),
+    ):
+        status, error = invoke("export", animation, "--all-frames", "--profile", profile, "--dry-run", *options)
+        assert status != 0 and diagnostic in error["message"], (profile, options, error)
     for frame in (0, 5, 16):
         assert invoke("render", animation, "--frame", frame, "--out", root / f"frame-{frame}")[0] == 0
     first, middle, wrap = ((root / f"frame-{f}/baseColor.png").read_bytes() for f in (0, 5, 16))

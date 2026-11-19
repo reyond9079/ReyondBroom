@@ -49,11 +49,7 @@ class SubgraphExpander {
 
   Scope expand(const Json& scope, const std::string& where, const std::string& identity, bool keepSeeds = false) {
     Scope result;
-    const auto& members = member(scope, "nodes", where);
-    const auto& links = member(scope, "edges", where);
-    require(members.is_array() && members.size() <= maxNodes && links.is_array() && links.size() <= maxEdges,
-      where, "The subgraph has too many nodes or connections.");
-    for (const auto& entry : members) {
+    for (const auto& entry : scope.at("nodes")) {
       const auto id = idField(entry, "id", where);
       const auto at = where + ".nodes." + id;
       const auto type = idField(entry, "type", at);
@@ -64,7 +60,6 @@ class SubgraphExpander {
       auto& ports = present.first->second;
       const auto tier = identity + "/" + id;
       if (type != "Subgraph" || version != 1) {
-        require(nodes.size() < maxNodes, at, "The expanded graph exceeds its node limit.");
         // Instance paths supply stable independent seeds without leaking UI labels into the hash.
         ports.id = identity.empty() ? id : "group-" + ftebroom::sha256(tier).substr(0, 57);
         auto node = entry;
@@ -82,11 +77,7 @@ class SubgraphExpander {
       const bool keep = properties.value("keepSeeds", false);
       const auto inside = expand(graph, at + ".subgraph." + definition, tier, keep && (identity.empty() || keepSeeds));
       stack.erase(definition);
-      const auto& inputs = member(graph, "inputs", at);
-      const auto& outputs = member(graph, "outputs", at);
-      require(inputs.is_array() && inputs.size() <= 64 && outputs.is_object() && outputs.size() <= 16, at,
-        "A subgraph has too many inputs or outputs.");
-      for (const auto& connection : inputs) {
+      for (const auto& connection : graph.at("inputs")) {
         const auto pin = idField(connection, "name", at);
         const auto destination = input(inside, idField(connection, "node", at), idField(connection, "port", at), at);
         auto& aliases = ports.inputs[pin];
@@ -95,12 +86,13 @@ class SubgraphExpander {
         projectedInputs += destination.size();
         aliases.insert(aliases.end(), destination.begin(), destination.end());
       }
+      const auto& outputs = graph.at("outputs");
       for (auto item = outputs.begin(); item != outputs.end(); ++item) {
         require(identifier(item.key()), at, "The subgraph has an invalid output name.");
         ports.outputs.emplace(item.key(), output(inside, idField(*item, "node", at), idField(*item, "port", at), at));
       }
     }
-    for (const auto& link : links) {
+    for (const auto& link : scope.at("edges")) {
       const auto from = output(result, idField(link, "fromNode", where), idField(link, "fromPort", where), where);
       for (const auto& to : input(result, idField(link, "toNode", where), idField(link, "toPort", where), where))
         addEdge(from, to, where);
@@ -129,6 +121,10 @@ public:
   }
 
   Expanded finish(const Json& graph, const Json& targets) {
+    const auto& members = member(graph, "nodes", "graph");
+    const auto& links = member(graph, "edges", "graph");
+    require(members.is_array() && members.size() <= maxNodes && links.is_array() && links.size() <= maxEdges,
+      "graph", "The graph has too many nodes or connections.");
     const auto scope = expand(graph, "graph", "");
     auto outputs = Json::object();
     require(targets.is_object(), "outputs", "Connect at least one output.");
@@ -192,15 +188,18 @@ inline void groupNodes(Document& doc, const std::set<std::string>& selected,
     }
     external.push_back(std::move(connection));
   }
-  for (auto& output : doc.source.at("outputs")) {
+  auto documentOutputs = doc.source.at("outputs");
+  for (auto& output : documentOutputs) {
     const auto from = output["node"].get<std::string>();
     if (selected.count(from)) output = {{"node", id}, {"port", expose(from, output["port"].get<std::string>())}};
   }
   require(!outputs.empty() && outputs.size() <= 16 && inputs.size() <= 64, "graph",
     "A group needs an outgoing connection and can expose up to 16 outputs and 64 inputs.");
+  const auto existingGroups = graph.find("groups");
+  if (existingGroups != graph.end() && !existingGroups->is_null())
+    require(existingGroups->is_object() && existingGroups->size() < 128 && !existingGroups->contains(id),
+      "graph", "Choose a new subgraph definition ID.");
   auto& groups = graph["groups"];
-  if (groups.is_null()) groups = Json::object();
-  require(groups.is_object() && groups.size() < 128 && !groups.contains(id), "graph", "Choose a new subgraph definition ID.");
   groups[id] = {{"label", label}, {"nodes", std::move(inside)}, {"edges", std::move(internal)},
     {"inputs", std::move(inputs)}, {"outputs", std::move(outputs)}};
   remaining.push_back({{"id", id}, {"type", "Subgraph"}, {"version", 1}, {"position", center},
@@ -210,6 +209,7 @@ inline void groupNodes(Document& doc, const std::set<std::string>& selected,
   }
   graph["nodes"] = std::move(remaining);
   graph["edges"] = std::move(external);
+  doc.source["outputs"] = std::move(documentOutputs);
 }
 
 } // namespace ftebroom::textureStudio

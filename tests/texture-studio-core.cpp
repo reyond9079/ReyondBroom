@@ -25,6 +25,8 @@ template<class F> void reject(F action, std::string_view expected) {
   throw std::runtime_error("Expected a validation error.");
 }
 
+#include "texture-studio-subgraphs.h"
+
 void write(const fs::path& file, const std::string& value) {
   std::ofstream out(file, std::ios::binary);
   out.write(value.data(), value.size());
@@ -298,6 +300,7 @@ int main(int argc, char** argv) try {
   revisedGroup.source["graph"]["nodes"][0] = node("strength", "ConstantColor", defaultParameters(Kernel::color), 0);
   revisedGroup.source["graph"]["edges"][0]["fromPort"] = "color";
   reject([&]{compile(revisedGroup);}, "types are incompatible");
+  checkSubgraphBoundaries(grouped);
   std::set<std::string> recipeImages;
   for (unsigned i = 0; i < presetNames.size(); ++i) {
     const auto doc = builtinPreset(i, "preset-test");
@@ -432,6 +435,16 @@ int main(int argc, char** argv) try {
     "Duplicated managed layers keep independent constant inputs");
   check(hidden->pixels != evaluate(compile(layered), {32,32}).outputs.at("baseColor")->pixels,
     "The separately edited duplicate changes the composed pixels");
+  reject([&] { duplicateLayer(layered, layers(layered), 2, "missing"); }, "Choose a layer");
+  reject([&] { duplicateLayer(layered, layers(layered), 0, "bad/id"); }, "Choose a layer");
+  auto proceduralLayer = layered;
+  for (auto& edge : proceduralLayer.source["graph"]["edges"])
+    if (edge["toNode"] == "amber-layer" && edge["toPort"] == "top") edge["fromNode"] = "clay";
+  duplicateLayer(proceduralLayer, layers(proceduralLayer), 0, "procedural-copy");
+  const auto& layerEdges = proceduralLayer.source["graph"]["edges"];
+  check(std::count(layerEdges.begin(), layerEdges.end(), wire("clay", "color", "procedural-copy", "top")) == 1,
+    "Duplicating a layer preserves its procedural input link");
+  compile(proceduralLayer);
   NodeCache cache(4 * 1024 * 1024);
   auto preview = evaluate(compile(brick), {128,128}, nullptr, memoryBudget, 1, 0, &cache);
   auto adjusted = brick;
@@ -512,6 +525,16 @@ int main(int argc, char** argv) try {
   write(path / "brick.wad3", indexed(cutout, "{brick", palette, IndexedFormat::wad3, true));
   reject([&] { indexed(cutout, "brick", palette, IndexedFormat::wad2); }, "opaque");
   reject([&] { indexed(albedo, "../escape", palette, IndexedFormat::wal); }, "name");
+  reject([&] { indexed(albedo, "{", palette, IndexedFormat::wad3, true); }, "name");
+  auto invalidColor = albedo;
+  invalidColor.type = Port::scalar;
+  reject([&] { indexed(invalidColor, "brick", palette, IndexedFormat::wad2); }, "complete Base Color");
+  invalidColor.type = Port::color;
+  invalidColor.pixels.pop_back();
+  reject([&] { indexed(invalidColor, "brick", palette, IndexedFormat::wad2); }, "complete Base Color");
+  reject([&] { indexedMips(albedo, palette.substr(1), 256, false); }, "selected game profile");
+  for (const unsigned count : {0u, 257u})
+    reject([&] { indexedMips(albedo, palette, count, false); }, "selected game profile");
   std::cout << "PASS Texture Studio seed, graph, sampling, color, history, memory, and PNG fixtures\n";
   return 0;
 } catch (const std::exception& e) {

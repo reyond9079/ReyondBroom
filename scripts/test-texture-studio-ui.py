@@ -345,7 +345,7 @@ def main():
                 def matches(material):
                     if not applied:
                         return material.endswith(selected_texture)
-                    return material == generated if profile in (0, 3) else material.endswith(generated)
+                    return material.endswith(generated) if profile == 1 else material == generated
                 if not args.three_faces:
                     return all(matches(row[1]) if applied else row[1].endswith(original_texture) for row in rows)
                 return sum(matches(row[1]) for row in rows) == 3 and all(

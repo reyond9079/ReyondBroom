@@ -568,9 +568,8 @@ static void studioApplyTick() {
   } else if (s.apply == A::verify && status == "checked") {
     studioInstall();
     s.apply = A::commit;
-    // Quake II and III compilers add the textures/ directory to .map face names.
-    const bool relativeName = s.profile == 0 || s.profile == 3;
-    const auto faceMaterial = relativeName ? s.material.substr(sizeof("textures/") - 1) : s.material;
+    // Quake II and III resolve relative paths. Quake and GoldSrc use bare WAD names.
+    const auto faceMaterial = s.profile == 1 ? s.material : s.material.substr(sizeof("textures/") - 1);
     studioQCSend("commit", faceMaterial);
   } else if (s.apply == A::commit && (status == "applied" || status == "unchanged")) {
     s.created.clear();

@@ -121,11 +121,19 @@ jobs:
           }
           if test -f /etc/apt/apt-mirrors.txt; then
             installed=false
-            for mirror in https://archive.ubuntu.com/ubuntu https://mirrors.edge.kernel.org/ubuntu https://azure.archive.ubuntu.com/ubuntu; do
+            ubuntu_sources=/etc/apt/sources.list.d/ubuntu.sources
+            original_sources="$RUNNER_TEMP/ubuntu.sources"
+            if test -f "$ubuntu_sources"; then cp "$ubuntu_sources" "$original_sources"; fi
+            for mirror in https://mirrors.edge.kernel.org/ubuntu https://archive.ubuntu.com/ubuntu https://azure.archive.ubuntu.com/ubuntu; do
               if ! curl --silent --show-error --fail --location --connect-timeout 6 --max-time 12 --output /dev/null "$mirror/dists/noble/InRelease"; then
                 continue
               fi
               printf '%s/\n' "$mirror" | sudo tee /etc/apt/apt-mirrors.txt
+              if test -f "$original_sources"; then
+                # The signed noble-security suite is mirrored too. Keep both suites on reachable HTTPS.
+                sed -E "s|https?://security\.ubuntu\.com/ubuntu/?|$mirror/|g" "$original_sources" |
+                  sudo tee "$ubuntu_sources" >/dev/null
+              fi
               if install_tools; then installed=true; break; fi
             done
             test "$installed" = true

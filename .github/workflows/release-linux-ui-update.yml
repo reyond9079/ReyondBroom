@@ -237,7 +237,9 @@ jobs:
       run: |
         engine=deps/editor-engine/engine/release-editor/fteqw-gl64
         if test "$PLATFORM" = Linux-SDL2-x64; then engine=deps/editor-engine/engine/release-sdl2/fteqw-glsdl2_64; fi
-        python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --csprogs csaddon.dat --texture-cli deps/texture-studio --engine "$engine" --engine-source deps/editor-engine --version "$VERSION" --output out/release
+        qa_args=()
+        if test "$GITHUB_REF" != refs/heads/main; then qa_args+=(--test-only); fi
+        python scripts/package-native-update.py --platform "$PLATFORM" --base-runtime base/*-$PLATFORM.tar.gz --base-sources base/*-Sources.zip --module deps/fteplug_ftebroom_amd64.so --csprogs csaddon.dat --texture-cli deps/texture-studio --engine "$engine" --engine-source deps/editor-engine --version "$VERSION" --output out/release "${qa_args[@]}"
         (cd out/release && sha256sum -c ./*.sha256)
     - name: Materialize selected validation scope
       shell: bash
@@ -478,7 +480,9 @@ jobs:
     - name: Package runtime and complete corresponding sources
       shell: msys2 {0}
       run: |
-        python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --texture-cli deps/texture-studio.exe --engine deps/editor-engine/engine/release-editor/fteglqw64.exe --engine-source deps/editor-engine --audio-dir tools/audio --version "$VERSION" --output out/release
+        qa_args=()
+        if test "$GITHUB_REF" != refs/heads/main; then qa_args+=(--test-only); fi
+        python scripts/package-native-update.py --platform Windows-x64 --base-runtime base/*-Windows-x64.zip --base-sources base/*-Sources.zip --module audio-qa/fteplug_ftebroom_x64.dll --csprogs csaddon.dat --texture-cli deps/texture-studio.exe --engine deps/editor-engine/engine/release-editor/fteglqw64.exe --engine-source deps/editor-engine --audio-dir tools/audio --version "$VERSION" --output out/release "${qa_args[@]}"
         (cd out/release && sha256sum -c ./*.sha256)
     - name: Materialize selected validation scope
       shell: pwsh
@@ -567,6 +571,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
             jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" '
               .head_sha == $sha and .head_repository.full_name == $repo and
+              .head_branch == "main" and
               .status == "completed" and .conclusion == "success"
             '
         done
@@ -670,6 +675,7 @@ jobs:
         gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" |
           jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" '
             .head_sha == $sha and .head_repository.full_name == $repo and
+            .head_branch == "main" and
             .status == "completed" and .conclusion == "success"
           '
         git fetch --no-tags --depth=2 origin "$PROOF_COMMIT"

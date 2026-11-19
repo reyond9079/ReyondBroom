@@ -331,15 +331,30 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                     ui.scroll(2 if y<top+3 else -2)
                 raise AssertionError(f"Could not scroll {key} fully into view")
 
-            def endpoint(name,key,value):
+            def pixel_delta(first,last):
+                return sum(ImageChops.difference(first,last).convert("L").histogram()[9:])
+
+            def endpoint(name,key,value,previous=None):
                 wait(lambda:live()["widgets"][key]["value"]==value and fitted())
-                ui.move(10,120)
-                view = preview()
-                view.save(out/f"{name}-{value:+d}.png")
                 click("character/save")
                 wait(lambda:not state()["dirty"])
                 saved = json.loads(path.read_text(encoding="utf-8"))
                 assert saved["morphs"]==dict(baseline,**{name:value}),name
+
+                # The fitted revision is published before the engine presents the
+                # texture. Capture after the saved endpoint and wait for actual
+                # changed pixels on slower software renderers.
+                ui.move(10,120)
+                if previous is None:
+                    view = preview()
+                else:
+                    def presented():
+                        if live()["widgets"][key]["value"]!=value or not fitted():
+                            return None
+                        frame = preview()
+                        return frame if pixel_delta(previous,frame)>=5 else None
+                    view = wait(presented,timeout=12)
+                view.save(out/f"{name}-{value:+d}.png")
                 return view
 
             def test_controls():
@@ -358,8 +373,8 @@ def exercise(root, out, compile_assets, document_only=False, startup_placement=F
                         ui.orbit(left,y,right)
                     else:
                         ui.drag_slider(left,y,right,lambda: live()["widgets"][key]["value"]==1)
-                    last = endpoint(name,key,1)
-                    changed = sum(ImageChops.difference(first,last).convert("L").histogram()[9:])
+                    last = endpoint(name,key,1,first)
+                    changed = pixel_delta(first,last)
                     check(changed>=5,f"{name} has independent -1/+1 slider values and {changed} changed pixels")
                     results[name] = {"minimum":-1,"maximum":1,"pixelsChanged":changed}
                     (out/"endpoint-results.json").write_text(json.dumps(results,indent=2)+"\n")

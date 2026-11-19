@@ -568,7 +568,10 @@ static void studioApplyTick() {
   } else if (s.apply == A::verify && status == "checked") {
     studioInstall();
     s.apply = A::commit;
-    studioQCSend("commit", s.material);
+    // Quake II and III compilers add the textures/ directory to .map face names.
+    const bool relativeName = s.profile == 0 || s.profile == 3;
+    const auto faceMaterial = relativeName ? s.material.substr(sizeof("textures/") - 1) : s.material;
+    studioQCSend("commit", faceMaterial);
   } else if (s.apply == A::commit && (status == "applied" || status == "unchanged")) {
     s.created.clear();
     s.apply = A::none;

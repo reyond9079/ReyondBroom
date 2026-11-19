@@ -342,11 +342,14 @@ def main():
                 if len(rows) < 3:
                     return False
                 generated = asset_name.removeprefix("textures/")
+                def matches(material):
+                    if not applied:
+                        return material.endswith(selected_texture)
+                    return material == generated if profile in (0, 3) else material.endswith(generated)
                 if not args.three_faces:
-                    return all(row[1].endswith(generated if applied else original_texture) for row in rows)
-                changed = generated if applied else selected_texture
-                return sum(row[1].endswith(changed) for row in rows) == 3 and all(
-                    row[1].endswith((changed, original_texture)) for row in rows)
+                    return all(matches(row[1]) if applied else row[1].endswith(original_texture) for row in rows)
+                return sum(matches(row[1]) for row in rows) == 3 and all(
+                    matches(row[1]) or row[1].endswith(original_texture) for row in rows)
 
             unchanged = save_when(lambda rows: expected_textures(rows, False))
             shutil.copy2(map_file, output / "before-apply.map")

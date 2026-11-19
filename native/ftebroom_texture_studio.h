@@ -2464,7 +2464,7 @@ static void textureStudioPanel() {
         {"theme", uiEffectiveTheme()}, {"scale", uiScale()},
         {"faceCount", int(cvars->GetFloat("ftebroom_face_count"))},
         {"catalogThumbnails", std::count_if(s.thumbnails.begin(), s.thumbnails.end(),
-                                              [](const auto& entry) { return entry.second != 0; })},
+          [](const auto& entry) { return entry.second != 0 && entry.first.rfind("project-", 0) != 0; })},
         {"previewMode", int(s.previewMode)}, {"hasSurface", !s.surfaceData.empty()},
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
         {"busy", s.job.valid() || s.inputJob.valid() || s.projectJob.valid() || s.apply != TextureStudioState::Apply::none},

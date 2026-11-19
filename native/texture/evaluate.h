@@ -510,6 +510,95 @@ inline Pixel brickLayout(const Node& node, uint64_t seed, float u, float v, floa
   return {height, face, pigment, 1.f};
 }
 
+struct StoneFace {
+  float depth;
+  float grain;
+  float erosion;
+};
+
+inline float stoneFissure(uint64_t seed, float u, float v) {
+  float fracture = 0.f;
+  for (unsigned strike = 0; strike < 2; ++strike) {
+    if (lattice(seed, strike, 0) < .23f) continue;
+    const float x = u - mix(.20f, .80f, lattice(seed, strike, 1));
+    const float y = v - mix(.23f, .77f, lattice(seed, strike, 2));
+    const float length = mix(.11f, .24f, lattice(seed, strike, 3));
+    const float slope = mix(.65f, 1.95f, lattice(seed, strike, 4)) *
+      (lattice(seed, strike, 5) < .5f ? -1.f : 1.f);
+    const float across = y - x * slope - .28f * std::max(0.f, x);
+    const float taper = 1.f - softThreshold(length * .65f, length, std::abs(x));
+    const float line = 1.f - softThreshold(.003f, .013f, std::abs(across));
+    const float chippedSide = softThreshold(.004f, .025f, across) *
+      (1.f - softThreshold(.032f, .091f, across));
+    fracture = std::max(fracture, taper * (line * .68f + chippedSide * .32f));
+  }
+  return fracture;
+}
+
+inline StoneFace stoneBrickFace(uint64_t seed, float u, float v, float aspect) {
+  const int across = std::clamp(int(aspect * 4.f + .5f), 4, 24);
+  const float warp = .087f * (valueNoise(seed, across, 5, u, v) - .5f);
+  const float x = u + warp / aspect, y = v - .69f * warp;
+  const float coarse = valueNoise(seed + 1, across, 5, x, y);
+  const float bed = valueNoise(seed + 2, across, 13, x, y + .085f * coarse);
+  const float broken = valueNoise(seed + 3, across * 2, 9, x, y);
+  const float sand = valueNoise(seed + 4, across * 7, 34, u, v);
+  const float spall = softThreshold(.58f, .85f, .58f * coarse + .42f * broken);
+  const float pores = mineralMarks(seed + 5, 8, .64f, 1.5f * x, y, .10f, .31f, .97f);
+  const float pinholes = mineralMarks(seed + 12, 21, .80f, 1.5f * x, y, .095f, .29f, 1.20f);
+  const float embedded = mineralMarks(seed + 19, 14, .56f, x, y, .09f, .28f, 1.08f);
+  const float cleft = stoneFissure(seed + 27, x, y);
+  const float mottling = softThreshold(.31f, .72f, .72f * coarse + .28f * broken);
+  const float depth = .38f * (coarse - .5f) + .23f * (bed - .5f) + .20f * (sand - .5f) -
+    .47f * spall - .39f * pores - .20f * pinholes + .19f * embedded - .21f * cleft;
+  const float grain = unit(.24f + .67f * mottling + .24f * (bed - .5f) + .31f * (sand - .5f) -
+    .37f * spall - .48f * pores - .27f * pinholes + .25f * embedded - .29f * cleft);
+  return {depth, grain, .58f * spall + .27f * pores + .12f * pinholes + .13f * (broken - .5f)};
+}
+
+inline Pixel stoneBrickLayout(const Node& node, uint64_t seed, float u, float v, float variation) {
+  const int columns = int(node.p[0]), rows = int(node.p[1]);
+  const float irregularity = node.p[5], wear = node.p[4];
+  const float y = frac(v) * rows;
+  const auto course = straightSpan(y, rows, seed + 1, 0, .27f * irregularity);
+  const unsigned row = wrap(course.index, rows);
+  const float offset = (row % 2 ? .5f : 0.f) + .29f * irregularity * (lattice(seed + 2, 0, row) - .5f);
+  const float x = frac(u) * columns + offset;
+  const auto block = straightSpan(x, columns, seed + 3, row, .69f * irregularity);
+  const unsigned column = wrap(block.index, columns);
+  const uint64_t faceSeed = seed ^ (UINT64_C(0x94d049bb133111eb) * (1 + column + columns * row));
+
+  const float localX = (x - block.start) / (block.end - block.start);
+  const float localY = (y - course.start) / (course.end - course.start);
+  const float width = float(rows) / columns;
+  const float side = std::min(x - block.start, block.end - x) * width;
+  const float bed = std::min(y - course.start, course.end - y);
+  const float radius = node.p[3] * mix(.45f, 1.21f, lattice(faceSeed + 1, 0, 0));
+  const float cornerX = std::max(0.f, radius - side), cornerY = std::max(0.f, radius - bed);
+  const float rounded = std::min(side, bed) -
+    (std::sqrt(cornerX * cornerX + cornerY * cornerY) - std::max(cornerX, cornerY));
+  const float aspect = (block.end - block.start) * width / (course.end - course.start);
+  const auto surface = stoneBrickFace(faceSeed + 20, localX, localY, std::max(.5f, aspect));
+  const bool upright = side < bed;
+  const unsigned edge = upright ? unsigned(localX > .5f) : 2u + unsigned(localY > .5f);
+  const float along = upright ? localY : localX;
+  const float chipCenter = mix(.14f, .86f, lattice(faceSeed + 8, edge, 0));
+  const float chipWidth = mix(.037f, .134f, lattice(faceSeed + 8, edge, 1));
+  const float chipDepth = .31f * softThreshold(.18f, .89f, lattice(faceSeed + 8, edge, 2));
+  const float chip = chipDepth * (1.f - softThreshold(.08f, 1.f, std::abs(along - chipCenter) / chipWidth));
+  const float chips = wear * (chip + .13f * surface.erosion + .046f * (variation - .5f));
+  const float lip = rounded - node.p[2] * .5f - chips;
+  const float coverage = softThreshold(-.011f, .012f, lip);
+  const float bevel = node.p[3] * mix(.68f, 1.35f, lattice(faceSeed + 2, 0, 0));
+  const float shoulder = softThreshold(-.017f, bevel, lip);
+  const float piece = lattice(faceSeed + 3, 0, 0);
+  const float tilt = (localX - .5f) * (lattice(faceSeed + 4, 0, 0) - .5f) +
+    (localY - .5f) * (lattice(faceSeed + 5, 0, 0) - .5f);
+  const float top = .79f + .16f * (piece - .5f) + .20f * tilt + (.38f + .18f * wear) * surface.depth;
+  const float mortar = .11f + .043f * valueNoise(seed + 7, columns * 22, rows * 15, u, v);
+  return {unit(mix(mortar, top, shoulder)), coverage, piece, surface.grain};
+}
+
 inline float plankFiber(uint64_t seed, float u, float v) {
   const float knotX = mix(.20f, .80f, lattice(seed, 0, 0));
   const float knotY = mix(.14f, .86f, lattice(seed + 1, 0, 0));
@@ -727,6 +816,7 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   }
   case Kernel::brickLayout:
   case Kernel::flemishLayout: return brickLayout(node, seed, u, v, input[0]->sample(x, y)[0]);
+  case Kernel::stoneBrickLayout: return stoneBrickLayout(node, seed, u, v, input[0]->sample(x, y)[0]);
   case Kernel::boardLayout: return boardLayout(node, seed, u, v);
   case Kernel::boardJoints: {
     if (node.p[3] > 0.f) {
@@ -1167,9 +1257,10 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
     return {nx / length, ny / length, 1.f / length, 1.f};
   }
   case Kernel::ao: {
+    const int radius = std::max(1, int(node.p[1]));
     const float height = input[0]->sample(x, y)[0];
-    const float sides = input[0]->sample(x - 1, y)[0] + input[0]->sample(x + 1, y)[0];
-    const float ends = input[0]->sample(x, y - 1)[0] + input[0]->sample(x, y + 1)[0];
+    const float sides = input[0]->sample(x - radius, y)[0] + input[0]->sample(x + radius, y)[0];
+    const float ends = input[0]->sample(x, y - radius)[0] + input[0]->sample(x, y + radius)[0];
     return scalar(1.f - std::max(0.f, (sides + ends) * .25f - height) * node.p[0]);
   }
   case Kernel::unknown: break;
@@ -1187,8 +1278,8 @@ inline int samplingRadius(const Node& node) {
     case Kernel::uvSample:
     case Kernel::pixelate: return -1;
     case Kernel::normal:
-    case Kernel::ao:
     case Kernel::edge: return 1;
+    case Kernel::ao: return std::max(1, int(node.p[1]));
     case Kernel::distance:
     case Kernel::blur:
     case Kernel::dilate:
@@ -1290,7 +1381,7 @@ inline Evaluation evaluate(const Plan& plan, Resolution size,
                            const std::atomic<bool>* cancelled = nullptr, size_t budget = memoryBudget,
                            unsigned threads = 1, unsigned frame = 0, NodeCache* cache = nullptr) {
   require(size.width > 0 && size.width <= maxDimension && size.height > 0 && size.height <= maxDimension,
-    "resolution", "The render size is outside the 1Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р Р‹Р Р†РІР‚С›РЎС›Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљР’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р В Р вЂ№Р В Р Р‹Р Р†РІР‚С›РЎС›8192 range.");
+    "resolution", "The render size is outside the 1Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р Р†Р вЂљРЎвЂєР РЋРЎвЂєР В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р Р‹Р Р†РІР‚С›РЎС›Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р Р†Р вЂљРЎвЂєР РЋРЎвЂєР В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљР’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р В Р вЂ№Р В Р вЂ Р Р†Р вЂљРЎвЂєР РЋРЎвЂєР В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћвЂ“Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљР’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р Р‹Р Р†Р вЂљРЎвЂќР В Р’В Р В Р вЂ№Р В Р Р‹Р Р†Р вЂљРЎвЂќР В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљР’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р Р‹Р Р†РІР‚С›РЎС›Р В Р’В Р вЂ™Р’В Р В Р’В Р В РІР‚в„–Р В Р’В Р В РІР‚В Р В Р вЂ Р В РІР‚С™Р РЋРІР‚С”Р В Р Р‹Р РЋРІР‚С”Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РІР‚вЂњР В Р’В Р вЂ™Р’В Р В РІР‚в„ўР вЂ™Р’В Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљРІвЂћвЂ“Р В Р’В Р вЂ™Р’В Р В Р’В Р Р†Р вЂљР’В Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р Р‹Р Р†Р вЂљРЎвЂќР В Р’В Р В Р вЂ№Р В Р Р‹Р Р†Р вЂљРЎвЂќ8192 range.");
   require(threads > 0 && threads <= maxThreads, "threads", "Choose 1 to 16 CPU workers.");
   require(plan.frames > 0 && (plan.loop || frame < plan.frames), "frame", "Frame is outside the animation range.");
   const float time = plan.frames == 1 ? 0.f : plan.loop ? float(frame % plan.frames) / plan.frames

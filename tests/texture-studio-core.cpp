@@ -249,6 +249,32 @@ void checkMaterialFinishes() {
         "Changing the repeat count keeps the pigment mask aligned with the same layout");
     }
   }
+  const auto cut = compile(catalogPreset(1, 2, "cut-stone"));
+  const auto& stoneBrick = pattern(cut);
+  check(stoneBrick.spec->kernel == Kernel::stoneBrickLayout,
+    "Broken Brick uses the weathered stone layout");
+  const auto stoneCourse = straightSpan(.5f, int(stoneBrick.p[1]), seed + 1, 0, .27f * stoneBrick.p[5]);
+  const float stoneBed = frac(stoneCourse.start / stoneBrick.p[1]);
+  std::array<float, 2> grainRange{1.f, 0.f};
+  for (unsigned i = 0; i < 128; ++i) {
+    const float t = float(i) / 128;
+    check(stoneBrickLayout(stoneBrick, seed, t, stoneBed, .5f)[1] == 0.f,
+      "A chipped stone face preserves the horizontal course line");
+    check(stoneBrickLayout(stoneBrick, seed, 0.f, t, .5f) == stoneBrickLayout(stoneBrick, seed, 1.f, t, .5f) &&
+      stoneBrickLayout(stoneBrick, seed, t, 0.f, .5f) == stoneBrickLayout(stoneBrick, seed, t, 1.f, .5f),
+      "Weathered blocks and their local detail meet at tile boundaries");
+    const auto face = stoneBrickLayout(stoneBrick, seed, .24f, t, .5f);
+    if (face[1] > .9f) {
+      grainRange[0] = std::min(grainRange[0], face[3]);
+      grainRange[1] = std::max(grainRange[1], face[3]);
+    }
+  }
+  check(grainRange[1] - grainRange[0] > .28f, "Stone faces vary within each block");
+  const Resolution unevenTile{139, 109};
+  const auto wholeStone = evaluate(cut, unevenTile, nullptr, memoryBudget, 1);
+  const auto tiledStone = evaluateTiles(cut, unevenTile, memoryBudget, 0, 2, nullptr);
+  check(tiledStone && wholeStone.outputs.at("ao")->pixels == tiledStone->outputs.at("ao")->pixels,
+    "Both AO radii agree across internal tiles and both texture seams");
   auto invalid = steel;
   findNode(invalid, "damage")["parameters"]["kind"] = unsigned(WearKind::count);
   reject([&]{compile(invalid);}, "Integer is outside its supported range");

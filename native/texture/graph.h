@@ -15,7 +15,7 @@ enum class Kernel { unknown, constant, color, image, noise, bricks, tiles, check
                     rotate90, directionalBlur, hsv, posterize, pixelate, dither, normalBlend,
                     uv, uvSample, warp, directionalWarp, histogram, channelPack, channelUnpack, retroShade,
                     panels, distance, slopeBlur, colorize, palette, quantize, materialGrain, surfaceWear, boardJoints,
-                    stonework, archBand, scalarBlend, brickLayout, flemishLayout, boardLayout };
+                    stonework, archBand, scalarBlend, brickLayout, flemishLayout, boardLayout, stoneBrickLayout };
 
 enum class GrainKind { mineral, stone, wood, brushed, sand, fibers, polished, endGrain, bedded, marble, count };
 enum class WearKind { pits, chips, runoff, scratches, deposits, count };
@@ -57,6 +57,7 @@ inline const std::vector<Contract>& contracts() {
     {"FlemishBricks", Kernel::flemish, {"value", Port::scalar}, {{"variation", Port::scalar}}},
     {"BrickLayout", Kernel::brickLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
     {"FlemishLayout", Kernel::flemishLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
+    {"StoneBrickLayout", Kernel::stoneBrickLayout, {"data", Port::packed}, {{"variation", Port::scalar}}},
     {"BoardLayout", Kernel::boardLayout, {"data", Port::packed}, {}},
     {"Tiles", Kernel::tiles, {"value", Port::scalar}, {}},
     {"Checker", Kernel::checker, {"value", Port::scalar}, {}},
@@ -156,6 +157,8 @@ inline Json defaultParameters(Kernel kernel) {
     case Kernel::ridged: return {{"period", 4}, {"octaves", 4}, {"gain", .5}, {"lacunarity", 2}};
     case Kernel::bricks:
     case Kernel::flemish: return {{"columns", 4}, {"rows", 8}, {"mortar", .1}, {"bevel", .06}, {"wear", .28}};
+    case Kernel::stoneBrickLayout:
+      return {{"columns", 4}, {"rows", 8}, {"mortar", .064}, {"bevel", .145}, {"wear", .43}, {"irregularity", .82}};
     case Kernel::brickLayout:
     case Kernel::flemishLayout:
       return {{"columns", 4}, {"rows", 8}, {"mortar", .075}, {"bevel", .035}, {"wear", .28}, {"irregularity", .55}};
@@ -344,6 +347,7 @@ inline void parameters(Node& node, const Json& params) {
   case Kernel::flemish:
   case Kernel::brickLayout:
   case Kernel::flemishLayout:
+  case Kernel::stoneBrickLayout:
     node.p[0] = count("columns", 1, 64);
     node.p[1] = count("rows", 2, 64);
     node.p[2] = range("mortar", 0.01f, 0.4f);
@@ -528,7 +532,10 @@ inline void parameters(Node& node, const Json& params) {
     node.p[1] = value.get<bool>() ? -1.f : 1.f;
     break;
   }
-  case Kernel::ao: node.p[0] = range("strength", 0, 8); break;
+  case Kernel::ao:
+    node.p[0] = range("strength", 0, 8);
+    if (params.contains("radius")) node.p[1] = count("radius", 1, 16);
+    break;
   case Kernel::unknown: break;
   }
 }

@@ -15,7 +15,7 @@ enum class Kernel { unknown, constant, color, image, noise, bricks, tiles, check
                     rotate90, directionalBlur, hsv, posterize, pixelate, dither, normalBlend,
                     uv, uvSample, warp, directionalWarp, histogram, channelPack, channelUnpack, retroShade,
                     panels, distance, slopeBlur, colorize, palette, quantize, materialGrain, surfaceWear, boardJoints,
-                    stonework, archBand };
+                    stonework, archBand, scalarBlend };
 
 enum class GrainKind { mineral, stone, wood, brushed, sand, fibers, polished, endGrain, bedded, marble, count };
 enum class WearKind { pits, chips, runoff, scratches, deposits, count };
@@ -77,6 +77,8 @@ inline const std::vector<Contract>& contracts() {
       {{"a", Port::scalar}, {"b", Port::scalar}}},
     {"Add", Kernel::add, {"value", Port::scalar}, {{"a", Port::scalar}, {"b", Port::scalar}}},
     {"ScalarMix", Kernel::scalarMix, {"value", Port::scalar}, {{"a", Port::scalar}, {"b", Port::scalar}}},
+    {"ScalarBlend", Kernel::scalarBlend, {"value", Port::scalar},
+      {{"a", Port::scalar}, {"b", Port::scalar}, {"mask", Port::scalar}}},
     {"Minimum", Kernel::minimum, {"value", Port::scalar}, {{"a", Port::scalar}, {"b", Port::scalar}}},
     {"Maximum", Kernel::maximum, {"value", Port::scalar}, {{"a", Port::scalar}, {"b", Port::scalar}}},
     {"Difference", Kernel::difference, {"value", Port::scalar}, {{"a", Port::scalar}, {"b", Port::scalar}}},
@@ -231,7 +233,7 @@ struct Node {
   std::string id;
   const Contract* spec;
   std::string seedIdentity;
-  std::array<float, 5> p{};
+  std::array<float, 6> p{};
   Pixel first{}, last{};
   std::vector<Pixel> palette;
   std::array<int, 3> inputs{-1, -1, -1};
@@ -283,21 +285,25 @@ inline void parameters(Node& node, const Json& params) {
   case Kernel::materialGrain:
     node.p[0] = count("kind", 0, unsigned(GrainKind::count) - 1);
     node.p[1] = count("period", 2, 64);
+    if (params.contains("naturalDetail")) node.p[2] = range("naturalDetail", 0, 1);
     break;
   case Kernel::surfaceWear:
     node.p[0] = count("kind", 0, unsigned(WearKind::count) - 1);
     node.p[1] = count("period", 2, 64);
     node.p[2] = range("density", 0, 1);
+    if (params.contains("naturalDetail")) node.p[3] = range("naturalDetail", 0, 1);
     break;
   case Kernel::boardJoints:
     node.p[0] = count("columns", 1, 64);
     node.p[1] = count("seams", 0, 4);
     node.p[2] = range("width", .005f, .12f);
+    if (params.contains("irregularity")) node.p[3] = range("irregularity", 0, 1);
     break;
   case Kernel::stonework:
     node.p[0] = count("period", 1, 64);
     node.p[1] = range("mortar", .02f, .25f);
     node.p[2] = range("roundness", 0, 1);
+    if (params.contains("irregularity")) node.p[3] = range("irregularity", 0, 1);
     break;
   case Kernel::archBand:
     node.p[0] = count("period", 1, 64);
@@ -333,6 +339,7 @@ inline void parameters(Node& node, const Json& params) {
     node.p[2] = range("mortar", 0.01f, 0.4f);
     node.p[3] = range("bevel", 0.01f, 0.4f);
     node.p[4] = range("wear", 0, 0.7f);
+    if (params.contains("irregularity")) node.p[5] = range("irregularity", 0, 1);
     require(static_cast<unsigned>(node.p[1]) % 2 == 0, path + ".rows",
       "Use an even row count to tile the running bond across the seam.");
     break;
@@ -408,6 +415,7 @@ inline void parameters(Node& node, const Json& params) {
     if (params.contains("mode")) node.p[2] = count("mode", 0, 4);
     break;
   }
+  case Kernel::scalarBlend:
   case Kernel::add:
   case Kernel::multiply:
   case Kernel::minimum:

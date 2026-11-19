@@ -157,6 +157,9 @@ void checkMaterialFinishes() {
       const float sample = materialGrain(GrainKind(kind), 29, seed, u, v);
       check(sample == materialGrain(GrainKind(kind), 29, seed, u + 1, v) &&
         sample == materialGrain(GrainKind(kind), 29, seed, u, v + 1), "Periodic material grain");
+      const auto natural = naturalGrain(GrainKind(kind), 29, seed, u, v);
+      check(natural == naturalGrain(GrainKind(kind), 29, seed, u + 1, v) &&
+        natural == naturalGrain(GrainKind(kind), 29, seed, u, v + 1), "Periodic natural grain");
     }
   }
   for (unsigned kind = 0; kind < unsigned(WearKind::count); ++kind) {
@@ -168,6 +171,10 @@ void checkMaterialFinishes() {
       check(sample == surfaceWear(profile, 19, 1, seed, u + 1, v) &&
         sample == surfaceWear(profile, 19, 1, seed, u, v + 1), "Periodic surface wear");
       check(surfaceWear(profile, 19, 0, seed, u, v) == 0, "Zero density leaves the finish intact");
+      const float natural = naturalWear(profile, 19, 1, seed, u, v);
+      check(natural == naturalWear(profile, 19, 1, seed, u + 1, v) &&
+        natural == naturalWear(profile, 19, 1, seed, u, v + 1), "Periodic natural wear");
+      check(naturalWear(profile, 19, 0, seed, u, v) == 0, "Zero density leaves the natural finish intact");
       marked |= sample > .1f;
       intact |= sample == 0;
     }
@@ -175,14 +182,14 @@ void checkMaterialFinishes() {
   }
 
   auto steel = catalogPreset(3, 2, "painted-steel");
-  steel.source["outputs"]["opacity"] = {{"node", "damage"}, {"port", "value"}};
+  steel.source["outputs"]["opacity"] = {{"node", "open-damage"}, {"port", "value"}};
   const auto finish = evaluate(compile(steel), {128,128});
   unsigned bare = 0, painted = 0;
   for (size_t pixel = 0; pixel < finish.outputs.at("opacity")->pixels.size(); ++pixel) {
     const float damage = finish.outputs.at("opacity")->pixels[pixel][0];
     const float metalness = finish.outputs.at("metalness")->pixels[pixel][0];
     if (damage > .5f) {
-      check(metalness > .4f, "Paint loss exposes metal");
+      check(metalness > .49f, "Paint loss exposes metal");
       ++bare;
     }
     if (damage == 0) {
@@ -191,6 +198,20 @@ void checkMaterialFinishes() {
     }
   }
   check(bare > 0 && painted > bare, "Chipped steel contains both coatings");
+  const auto masonry = compile(catalogPreset(1, 1, "flemish"));
+  const auto brickPattern = std::find_if(masonry.nodes.begin(), masonry.nodes.end(), [](const Node& item) {
+    return item.id == "pattern";
+  });
+  check(brickPattern != masonry.nodes.end() && brickPattern->p[5] > 0, "Flemish bond enables irregularity");
+  for (unsigned i = 0; i < 256; ++i) {
+    const float t = float(i) / 256;
+    check(handLaidBrick(*brickPattern, seed, 0.f, t, .5f) == handLaidBrick(*brickPattern, seed, 1.f, t, .5f) &&
+      handLaidBrick(*brickPattern, seed, t, 0.f, .5f) == handLaidBrick(*brickPattern, seed, t, 1.f, .5f),
+      "Irregular brick geometry meets across tile edges");
+    check(roundedStone(seed, 7, .073f, .88f, .83f, 0.f, t) == roundedStone(seed, 7, .073f, .88f, .83f, 1.f, t) &&
+      roundedStone(seed, 7, .073f, .88f, .83f, t, 0.f) == roundedStone(seed, 7, .073f, .88f, .83f, t, 1.f),
+      "Rounded stone geometry meets across tile edges");
+  }
   auto invalid = steel;
   findNode(invalid, "damage")["parameters"]["kind"] = unsigned(WearKind::count);
   reject([&]{compile(invalid);}, "Integer is outside its supported range");
@@ -390,6 +411,11 @@ int main(int argc, char** argv) try {
   check(tiles.has_value(), "Tile evaluator supports filters with multi-level halos");
   for (const auto& [channel, image] : fullImage.outputs)
     check(image->pixels == tiles->outputs.at(channel)->pixels, "Tiles and whole-image evaluator agree at both wrap seams");
+  const Image signedNormals{{2, 1}, Port::normal, {{-.8f, 0, .6f, 1}, {-.2f, 0, .98f, 1}}};
+  const auto seamNormal = samplePreviewData(signedNormals, 0, .5f);
+  check(std::abs(seamNormal[0] + .5f) < 1e-6f &&
+    seamNormal == samplePreviewData(signedNormals, 1, .5f),
+    "Preview filters signed normals across the texture seam");
   const auto sphere = materialPreview(a, false);
   const auto cube = materialPreview(a, true);
   check(sphere.pixels.front()[3] == 0 && cube.pixels.front()[3] == 0,

@@ -54,7 +54,7 @@ inline constexpr MaterialRecipe catalogRecipes[][10]{
     {"broken-brick", "Broken Brick", Pattern::bricks, Pattern::cracks, Pattern::minimum, 8, 13, 0x4d3331, 0xa8766b},
     {"rough-stone", "Rough Stonework", Pattern::stonework, Pattern::ridged, Pattern::minimum, 7, 10, 0x4b4b45, 0xada99c},
     {"ashlar", "Ashlar Blocks", Pattern::tiles, Pattern::veins, Pattern::difference, 4, 34, 0x797161, 0xc1bc98},
-    {"cobblestone", "Rounded Cobblestone", Pattern::stonework, Pattern::worley, Pattern::multiply, 10, 18, 0x303337, 0xaca89f},
+    {"cobblestone", "Rounded Cobblestone", Pattern::stonework, Pattern::worley, Pattern::multiply, 7, 18, 0x424548, 0xaaa08d},
     {"mortar-rubble", "Mortar and Rubble", Pattern::stonework, Pattern::cracks, Pattern::minimum, 18, 8, 0x4c4c43, 0xa5a994},
     {"gothic-block", "Gothic Block", Pattern::flemish, Pattern::rings, Pattern::minimum, 4, 11, 0x353841, 0x9f9ba3},
     {"basalt-blocks", "Basalt Blocks", Pattern::tiles, Pattern::ridged, Pattern::multiply, 9, 17, 0x292b31, 0x77747b},
@@ -270,7 +270,7 @@ inline SurfaceFinish surfaceFinish(size_t category, size_t index) {
     if (index == 5) return {G::wood, W::chips, .98f, .64f, .64f, .92f, 0xb09a7c};
     if (index == 6) return {G::fibers, W::chips, .95f, .93f, .81f, .82f, 0x8a6954};
     if (index == 7) return {G::fibers, W::pits, .78f, .90f, .97f, .66f, 0x604733};
-    return {G::wood, index == 4 || index == 9 ? W::chips : W::scratches,
+    return {G::wood, index == 4 ? W::deposits : index == 9 ? W::chips : W::scratches,
       .82f, index == 4 ? .84f : .64f, .75f, .78f, index == 4 ? 0x514438u : 0xbc9366u};
   case 6:
     return {index == 2 ? G::sand : G::stone, index == 3 || index == 8 ? W::deposits : W::pits,
@@ -304,7 +304,11 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   auto& source = doc.source;
   source["name"] = recipe.name;
   source["provenance"]["preset"] = recipeId(category, index);
-  source["provenance"]["catalogVersion"] = 2;
+  const bool liquid = category == 9;
+  const bool marking = category == 10;
+  const bool activeDisplay = category == 11 && (index == 6 || index == 7);
+  const bool naturalDetail = !liquid && !marking && !activeDisplay;
+  source["provenance"]["catalogVersion"] = naturalDetail ? 3 : 2;
   auto& nodes = source["graph"]["nodes"] = Json::array();
   auto& edges = source["graph"]["edges"] = Json::array();
   auto& outputs = source["outputs"] = Json::object();
@@ -319,14 +323,19 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   const auto add = [&](const char* id, Pattern pattern, unsigned scale, int row) {
     const auto& type = recipeContract(pattern);
     auto parameters = recipePattern(pattern, scale);
-    if (pattern == Pattern::materialGrain) parameters["kind"] = unsigned(finish.grain);
+    if (pattern == Pattern::materialGrain) {
+      parameters["kind"] = unsigned(finish.grain);
+      if (naturalDetail) parameters["naturalDetail"] = 1;
+    }
     if (pattern == Pattern::boardJoints) {
       parameters["seams"] = category == 0 ? 0 : 1;
-      parameters["width"] = category == 0 ? .073 : .068;
+      parameters["width"] = category == 0 ? .067 : .064;
+      parameters["irregularity"] = category == 0 ? .37 : .70;
     }
     if (pattern == Pattern::stonework) {
       parameters["roundness"] = index == 5 ? .88 : .26;
-      parameters["mortar"] = index == 6 ? .13 : .075;
+      parameters["mortar"] = index == 6 ? .13 : .073;
+      parameters["irregularity"] = index == 5 ? .83 : .67;
     }
     if (pattern == Pattern::stripes && category == 3 && index == 7) {
       parameters["duty"] = .11;
@@ -339,6 +348,7 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
       parameters["rows"] = 2;
     }
     if (pattern == Pattern::bricks || pattern == Pattern::flemish) {
+      parameters["irregularity"] = category == 2 && index == 3 ? .16 : index == 2 ? 1.0 : .70;
       if (!std::any_of(nodes.begin(), nodes.end(), [](const Json& entry) { return entry["id"] == "wear"; }))
         nodes.push_back(node("wear", "GradientNoise", recipePattern(Pattern::gradient, 37), 0));
       edges.push_back(wire("wear", "value", id, "variation"));
@@ -382,6 +392,15 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     connect(a, id, "a");
     connect(b, id, "b");
   };
+  const auto constant = [&](const char* id, float value, int col, int row) {
+    nodes.push_back(node(id, "Constant", {{"value", value}}, col, row));
+  };
+  const auto maskedScalar = [&](const char* id, const char* a, const char* b, const char* mask, int col, int row) {
+    nodes.push_back(node(id, "ScalarBlend", Json::object(), col, row));
+    connect(a, id, "a");
+    connect(b, id, "b");
+    connect(mask, id, "mask");
+  };
   const auto combine = [&](const char* id, const char* type, const char* a, const char* b, int col, int row) {
     nodes.push_back(node(id, type, Json::object(), col, row));
     connect(a, id, "a");
@@ -391,26 +410,32 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     nodes.push_back(node(id, "Levels", {{"low", low}, {"high", high}, {"gamma", 1}}, col, row));
     connect(input, id, "value");
   };
-  nodes.push_back(node("grain", "MaterialGrain", {{"kind", unsigned(finish.grain)},
-    {"period", std::min(recipe.detailScale, 60u)}}, 1, 2));
+  Json grain = {{"kind", unsigned(finish.grain)}, {"period", std::min(recipe.detailScale, 60u)}};
+  if (naturalDetail) grain["naturalDetail"] = 1;
+  nodes.push_back(node("grain", "MaterialGrain", std::move(grain), 1, 2));
   const unsigned wearFrequency = finish.wear == WearKind::chips ? 9u + recipe.scale % 10u :
     finish.wear == WearKind::deposits ? 8u : std::min(52u, recipe.detailScale);
-  nodes.push_back(node("damage", "SurfaceWear", {{"kind", unsigned(finish.wear)},
-    {"period", wearFrequency}, {"density", finish.density}}, 1, 3));
+  Json wear = {{"kind", unsigned(finish.wear)}, {"period", wearFrequency}, {"density", finish.density}};
+  if (naturalDetail) wear["naturalDetail"] = 1;
+  nodes.push_back(node("damage", "SurfaceWear", std::move(wear), 1, 3));
   nodes.push_back(node("intact", "Invert", Json::object(), 2, 3));
   connect("damage", "intact", "value");
-  const bool liquid = category == 9;
-  const bool marking = category == 10;
-  const bool activeDisplay = category == 11 && (index == 6 || index == 7);
   const bool physicalJoint = recipe.pattern == Pattern::bricks || recipe.pattern == Pattern::flemish ||
     recipe.pattern == Pattern::tiles || recipe.pattern == Pattern::boardJoints || recipe.pattern == Pattern::panels ||
     recipe.pattern == Pattern::stonework || (category == 0 && index == 2);
   const bool gentleStructure = recipe.pattern == Pattern::materialGrain || recipe.pattern == Pattern::gradient ||
     recipe.pattern == Pattern::fbm || recipe.pattern == Pattern::ridged || recipe.pattern == Pattern::streaks;
+  const bool woodBoards = category == 5 && recipe.pattern == Pattern::boardJoints;
+  const bool stone = recipe.pattern == Pattern::stonework;
+  const bool wetStone = category == 1 && index == 5;
+  const bool paintedSteel = category == 3 && index == 2;
+  const bool peeledPlaster = category == 2 && (index == 0 || index == 1 || index == 6);
+  const bool boardConcrete = category == 0 && index == 1;
   const float structuralWeight = category == 0 && index == 9 ? 0.f :
-    recipe.pattern == Pattern::archBand ? .15f : gentleStructure ? .27f : physicalJoint ? .32f : .62f;
+    recipe.pattern == Pattern::archBand ? .15f : stone ? .12f : gentleStructure ? .27f : physicalJoint ? .32f : .62f;
   mixScalar("structure", "pattern", "composite", liquid || activeDisplay ? .38f : structuralWeight, 3, 0);
-  mixScalar("surface", "structure", "grain", liquid || activeDisplay ? .12f : gentleStructure ? .62f : .40f, 4, 1);
+  mixScalar("surface", "structure", "grain", liquid || activeDisplay ? .12f :
+    woodBoards ? .47f : stone ? .22f : gentleStructure ? .62f : .40f, 4, 1);
   mixScalar("worn-relief", "surface", "intact", finish.relief * (liquid || marking ? .06f : .22f), 5, 1);
   const auto rgb = [](uint32_t hex, float alpha) {
     return Json{fromSrgb(float((hex >> 16) & 255) / 255), fromSrgb(float((hex >> 8) & 255) / 255),
@@ -422,10 +447,14 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     (category == 0 && (index == 1 || index == 3 || index == 8));
   const bool firedClay = category == 1 && index < 3;
   const bool wearDecal = decal && (index == 4 || index == 5 || index == 8);
-  if (firedClay) levels("clay-variation", "pattern", .55f, 1.f, 3, 3);
-  const char* tonalStructure = tilePigment ? "detail" : firedClay ? "clay-variation" : "structure";
+  if (firedClay || stone || woodBoards || boardConcrete)
+    levels("piece-tone", "pattern", firedClay ? .60f : stone ? .59f : .78f,
+      firedClay ? .91f : stone ? .92f : .99f, 3, 3);
+  const bool pieceTone = firedClay || stone || woodBoards || boardConcrete;
+  const char* tonalStructure = tilePigment ? "detail" : pieceTone ? "piece-tone" : "structure";
   mixScalar("tone", "grain", tonalStructure, liquid || marking || activeDisplay || tilePigment ? .90f :
-    gentleStructure || cementJoint ? .22f : category == 5 ? .28f : .48f, 4, 0);
+    firedClay ? .61f : stone ? .47f : woodBoards ? .25f : boardConcrete ? .38f :
+    finish.grain == GrainKind::marble ? .14f : gentleStructure || cementJoint ? .22f : category == 5 ? .28f : .48f, 4, 0);
   nodes.push_back(node("pigment", "ColorRamp",
     {{"low", rgb(recipe.shadow, 1)}, {"high", rgb(recipe.highlight, 1)}}, 5, 0));
   connect("tone", "pigment", "value");
@@ -436,19 +465,48 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     connect(mask, id, "mask");
   };
   const char* colorLayer = "pigment";
+  if (firedClay || woodBoards || boardConcrete) {
+    nodes.push_back(node("age", "SurfaceWear", {{"kind", unsigned(WearKind::deposits)},
+      {"period", firedClay ? 14u : 10u}, {"density", .85}, {"naturalDetail", 1}}, 1, 6));
+    const auto low = firedClay ? 0x655b4du : woodBoards ? 0x4d4337u : 0x5d5d54u;
+    const auto high = firedClay ? 0xc5a589u : woodBoards ? 0xa09380u : 0xb1a99au;
+    nodes.push_back(node("aged-pigment", "ColorRamp",
+      {{"low", rgb(low, 1)}, {"high", rgb(high, 1)}}, 5, 8));
+    connect("grain", "aged-pigment", "value");
+    blend("with-age", colorLayer, "aged-pigment", "age", woodBoards ? .76f : .67f, 8);
+    colorLayer = "with-age";
+  }
   if (cementJoint) {
-    const uint32_t mortarLow = category == 0 ? 0x57544du : category == 1 && index >= 3 ? 0x514d45u : 0x726b60u;
-    const uint32_t mortarHigh = category == 0 ? 0x7d7b70u : category == 1 && index >= 3 ? 0x8b8378u : 0xa9a093u;
+    const uint32_t mortarLow = wetStone ? 0x3a362bu : category == 0 ? 0x484740u :
+      category == 1 && index >= 3 ? 0x454238u : 0x51483cu;
+    const uint32_t mortarHigh = wetStone ? 0x676252u : category == 0 ? 0x77756au :
+      category == 1 && index >= 3 ? 0x7c7366u : 0x978875u;
     nodes.push_back(node("mortar", "ColorRamp", {{"low", rgb(mortarLow, 1)}, {"high", rgb(mortarHigh, 1)}}, 5, 2));
     connect("grain", "mortar", "value");
     nodes.push_back(node("grooves", "Invert", Json::object(), 2, 4));
     connect("pattern", "grooves", "value");
-    levels("joint-mask", "grooves", .48f, .86f, 3, 4);
-    blend("with-joints", "pigment", "mortar", "joint-mask", 1, 0);
+    levels("joint-mask", "grooves", stone ? .68f : .57f, stone ? .95f : .90f, 3, 4);
+    blend("with-joints", colorLayer, "mortar", "joint-mask", 1, 0);
     colorLayer = "with-joints";
   }
-  nodes.push_back(node("worn-pigment", "ConstantColor", {{"rgba", rgb(finish.wearColor, 1)}}, 5, 3));
-  blend("with-wear", colorLayer, "worn-pigment", "damage", finish.wearContrast, 1);
+  const bool layeredWear = paintedSteel || peeledPlaster;
+  if (layeredWear) {
+    const uint32_t edge = paintedSteel ? 0x58402eu : 0x74614cu;
+    const uint32_t substrateLow = paintedSteel ? 0x343839u : 0x847662u;
+    const uint32_t substrateHigh = paintedSteel ? 0x939498u : 0xc1ac8fu;
+    nodes.push_back(node("wear-edge", "ConstantColor", {{"rgba", rgb(edge, 1)}}, 5, 9));
+    levels("wear-halo", "damage", .12f, .52f, 3, 5);
+    levels("open-damage", "damage", .48f, .89f, 4, 6);
+    blend("with-wear-edge", colorLayer, "wear-edge", "wear-halo", paintedSteel ? .78f : .45f, 9);
+    colorLayer = "with-wear-edge";
+    nodes.push_back(node("worn-pigment", "ColorRamp",
+      {{"low", rgb(substrateLow, 1)}, {"high", rgb(substrateHigh, 1)}}, 5, 3));
+    connect("grain", "worn-pigment", "value");
+  } else {
+    nodes.push_back(node("worn-pigment", "ConstantColor", {{"rgba", rgb(finish.wearColor, 1)}}, 5, 3));
+  }
+  const float wearContrast = firedClay ? .28f : stone ? .32f : woodBoards ? .44f : finish.wearContrast;
+  blend("with-wear", colorLayer, "worn-pigment", layeredWear ? "open-damage" : "damage", wearContrast, 1);
   colorLayer = "with-wear";
   if (category == 0 && index == 9) {
     combine("exposed-rebar", "Multiply", "detail", "damage", 4, 3);
@@ -485,9 +543,23 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   const bool metal = category == 3 || category == 4;
   nodes.push_back(node("normal", "HeightToNormal", {{"strength", .65f + 1.7f * finish.relief}, {"invertY", false}}, 7, 3));
   nodes.push_back(node("ao", "HeightToAO", {{"strength", .8f + finish.relief}}, 7, 4));
-  nodes.push_back(node("roughness", "Constant", {{"value", finish.roughness}}, 4, 4));
+  constant("roughness", wetStone ? .38f : finish.roughness, 4, 4);
   mixScalar("micro-roughness", "roughness", "grain", metal ? .22f : .16f, 5, 4);
-  mixScalar("worn-roughness", "micro-roughness", category == 0 && index == 4 ? "intact" : "damage", .22f, 6, 4);
+  if (naturalDetail) {
+    const bool damp = category == 0 && index == 4;
+    constant("substrate-roughness", paintedSteel ? .38f : damp ? .19f : .89f, 5, 11);
+    const char* mask = layeredWear ? "open-damage" : "damage";
+    if (wetStone) {
+      mask = "joint-mask";
+    } else if (paintedSteel) {
+      constant("oxidized-roughness", .83f, 5, 10);
+      maskedScalar("weathered-roughness", "micro-roughness", "oxidized-roughness", "wear-halo", 6, 6);
+    }
+    maskedScalar("worn-roughness", paintedSteel ? "weathered-roughness" : "micro-roughness",
+      "substrate-roughness", mask, 6, 4);
+  } else {
+    mixScalar("worn-roughness", "micro-roughness", "damage", .22f, 6, 4);
+  }
   connect("worn-relief", "normal", "height");
   connect("worn-relief", "ao", "height");
   channel("normal", "normal", "normal");
@@ -497,8 +569,13 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
     const bool painted = category == 4 || index == 2;
     const bool oxidized = category == 3 && (index == 1 || index == 9);
     nodes.push_back(node("metalness", "Constant", {{"value", painted ? .04 : oxidized ? .21 : .94}}, 4, 5));
-    mixScalar("worn-metalness", "metalness", painted ? "damage" : "intact",
-      painted ? .87f : oxidized ? .20f : .45f, 6, 5);
+    if (painted || oxidized) {
+      constant("substrate-metalness", painted ? .96f : .015f, 5, 7);
+      maskedScalar("worn-metalness", "metalness", "substrate-metalness",
+        paintedSteel ? "open-damage" : "damage", 6, 5);
+    } else {
+      mixScalar("worn-metalness", "metalness", "intact", .14f, 6, 5);
+    }
     channel("metalness", "worn-metalness", "value");
     expose({"Metalness", "metalness", "value", 0, 1, 0});
   }

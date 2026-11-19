@@ -267,6 +267,199 @@ inline float surfaceWear(WearKind kind, int frequency, float density, uint64_t s
     (.46f + .54f * valueNoise(seed + 8, frequency * 2, u, v));
 }
 
+// Keep features inside their cells and sample the surrounding field periodically. Marks
+// of two size classes can meet without lining up on the same lattice.
+inline float mineralMarks(uint64_t seed, int frequency, float density, float u, float v,
+                          float minRadius, float maxRadius, float stretch) {
+  const float x = frac(u) * frequency, y = frac(v) * frequency;
+  const unsigned i = unsigned(x), j = unsigned(y);
+  const float pick = lattice(seed, i, j);
+  if (pick >= density) return 0.f;
+  const float px = frac(x), py = frac(y);
+  const float dx = px - mix(.36f, .64f, lattice(seed + 1, i, j));
+  const float dy = py - mix(.36f, .64f, lattice(seed + 2, i, j));
+  const float size = lattice(seed + 3, i, j);
+  const float radius = mix(minRadius, maxRadius, size * size);
+  const float turn = lattice(seed + 4, i, j) - .5f;
+  const float ax = dx + dy * turn, ay = (dy - dx * turn) * stretch;
+  const float distance = ax * ax + ay * ay;
+  if (distance >= radius * radius * 1.6f) return 0.f;
+  const float edge = valueNoise(seed + 5, frequency * 5, u, v);
+  const float outline = radius * mix(.48f, 1.31f, edge);
+  const float border = std::min({px, 1.f - px, py, 1.f - py});
+  return (1.f - softThreshold(outline * outline * .59f, outline * outline, distance)) *
+    softThreshold(0.f, .055f, border) * mix(.55f, 1.f, lattice(seed + 6, i, j));
+}
+
+inline float sawnGrain(int frequency, uint64_t seed, float u, float v) {
+  const float broad = valueNoise(seed, 5, 3, u, v);
+  const float warp = .055f * (valueNoise(seed + 1, 5, 2, u, v) - .5f);
+  const int columns = 5, rows = 4;
+  const float x = frac(u) * columns, y = frac(v) * rows;
+  float bend = 0.f, split = 0.f;
+  for (int j = int(y) - 1; j <= int(y) + 1; ++j) {
+    const unsigned col = unsigned(x), row = wrap(j, rows);
+    if (lattice(seed + 2, col, row) < .59f) continue;
+    const float dx = frac(x) - mix(.36f, .64f, lattice(seed + 3, col, row));
+    const float dy = y - j - mix(.27f, .72f, lattice(seed + 4, col, row));
+    const float influence = (1.f - softThreshold(.04f, .35f, std::abs(dx))) *
+      (1.f - softThreshold(.05f, .65f, std::abs(dy)));
+    const float knotWidth = mix(.047f, .105f, lattice(seed + 5, col, row));
+    bend += .032f * influence * std::clamp(dx * 14.f, -1.f, 1.f);
+    const float knot = (1.f - softThreshold(.25f, 1.f,
+      dx * dx / (knotWidth * knotWidth) + dy * dy * 75.f));
+    const float check = (1.f - softThreshold(.006f, .024f, std::abs(dx + .028f * dy))) *
+      (1.f - softThreshold(.05f, .38f, std::abs(dy)));
+    split = std::max(split, std::max(knot, .64f * check));
+  }
+  const float grainU = u + warp + bend;
+  const float drift = .46f * valueNoise(seed + 6, 8, 3, grainU, v);
+  const float rings = .5f + .5f * cycleSine(grainU * frequency * 2.f + drift);
+  const float bands = valueNoise(seed + 7, frequency, 5, grainU, v);
+  const float fibers = valueNoise(seed + 8, frequency * 4, 17, grainU, v);
+  const float latewood = softThreshold(.62f, .96f, rings) * mix(.35f, 1.f, bands);
+  return unit(.57f + .29f * (broad - .5f) + .33f * (bands - .5f) +
+    .32f * (fibers - .5f) - .27f * latewood - .43f * split);
+}
+
+inline float naturalGrain(GrainKind kind, int frequency, uint64_t seed, float u, float v) {
+  u = frac(u);
+  v = frac(v);
+  if (kind == GrainKind::wood) return sawnGrain(frequency, seed, u, v);
+  if (kind == GrainKind::marble) {
+    const float a = valueNoise(seed, 3, 4, u, v);
+    const float b = valueNoise(seed + 1, 8, 9, u, v);
+    const float c = valueNoise(seed + 2, 23, 17, u, v);
+    const float strata = u + v + .78f * (a - .5f) + .29f * (b - .5f) + .058f * (c - .5f);
+    const float branch = strata + .27f * (b - .33f);
+    const float main = 1.f - softThreshold(.008f, mix(.030f, .095f, b), std::abs(frac(strata) - .5f));
+    const float hairline = 1.f - softThreshold(.002f, .023f, std::abs(frac(branch + .055f * a) - .5f));
+    const float cloud = valueNoise(seed + 3, 6, 8, u, v);
+    return unit(.67f + .34f * (cloud - .5f) - .57f * main - .29f * hairline);
+  }
+  if (kind != GrainKind::mineral && kind != GrainKind::stone &&
+      kind != GrainKind::brushed && kind != GrainKind::fibers) {
+    return materialGrain(kind, frequency, seed, u, v);
+  }
+  const int coarse = std::max(3, frequency / 2);
+  const float broad = valueNoise(seed, 4, 5, u, v);
+  const float mids = gradientNoise(seed + 1, coarse, u, v);
+  const float fine = valueNoise(seed + 2, frequency * 4, u, v);
+  const float specks = mineralMarks(seed + 3, frequency * 2, .76f, u, v, .11f, .28f, 1.14f);
+  if (kind == GrainKind::mineral || kind == GrainKind::stone) {
+    const float aggregate = mineralMarks(seed + 9, frequency, .44f, u, v, .09f, .26f, 1.07f);
+    const float stone = kind == GrainKind::stone ? 1.f : .62f;
+    return unit(.49f + .46f * (broad - .5f) + .36f * (mids - .5f) +
+      .27f * (fine - .5f) + stone * (.23f * aggregate - .32f * specks));
+  }
+  if (kind == GrainKind::brushed) {
+    const float mill = valueNoise(seed + 12, 5, frequency * 4, u, v);
+    return unit(.51f + .36f * (broad - .5f) + .26f * (mill - .5f) + .11f * (fine - .5f) - .15f * specks);
+  }
+  const float imprint = valueNoise(seed + 13, frequency * 2, 4, u + .023f * broad, v);
+  return unit(.48f + .46f * (broad - .5f) + .32f * (imprint - .5f) + .16f * (fine - .5f) - .20f * specks);
+}
+
+inline float naturalWear(WearKind kind, int frequency, float density, uint64_t seed, float u, float v) {
+  u = frac(u);
+  v = frac(v);
+  const float exposure = valueNoise(seed, 3, 5, u, v);
+  if (kind == WearKind::pits || kind == WearKind::chips) {
+    const bool chipped = kind == WearKind::chips;
+    const float p = density * mix(.38f, 1.f, exposure);
+    const float large = mineralMarks(seed + 9, frequency, p * .57f, u, v, .08f, .30f, 1.25f);
+    const float fine = mineralMarks(seed + 17, frequency * 3, p, u, v, .06f, .24f, 1.45f);
+    if (!chipped) return std::max(.76f * large, .58f * fine);
+
+    const int zones = std::max(3, frequency / 3);
+    const float wiggle = .62f / frequency;
+    const float x = u + wiggle * (valueNoise(seed + 24, frequency * 2, u, v) - .5f);
+    const float y = v + wiggle * (valueNoise(seed + 25, frequency * 2, u, v) - .5f);
+    const float adhesion = .59f * valueNoise(seed + 26, zones, x, y) +
+      .26f * valueNoise(seed + 27, frequency * 2, x, y) +
+      .15f * valueNoise(seed + 28, frequency * 6, x, y);
+    const float threshold = 1.f - .387f * density;
+    const float flake = softThreshold(threshold, threshold + .068f, adhesion);
+    return unit(std::max(.64f * large, .69f * fine) + flake);
+  }
+  if (kind == WearKind::deposits) {
+    const float winding = .027f * (valueNoise(seed + 30, frequency, u, v) - .5f);
+    const float stain = .62f * valueNoise(seed + 31, std::max(3, frequency / 2), u + winding, v) +
+      .25f * valueNoise(seed + 32, frequency * 2, u, v + winding) +
+      .13f * valueNoise(seed + 33, frequency * 6, u, v);
+    return softThreshold(.93f - .48f * density, 1.12f - .41f * density, stain) * density;
+  }
+  if (kind == WearKind::runoff) {
+    const float mineral = valueNoise(seed + 8, frequency * 2, 4, u + .012f * exposure, v);
+    const float rivulet = valueNoise(seed + 10, frequency * 5, 3, u + .009f * exposure, v);
+    const float leading = softThreshold(.76f - .29f * density, .91f - .29f * density,
+      .47f * exposure + .53f * mineral);
+    return leading * mix(.29f, 1.f, rivulet) * density;
+  }
+  return surfaceWear(kind, frequency, density, seed, u, v);
+}
+
+inline float roundedStone(uint64_t seed, int period, float mortar, float roundness, float irregularity,
+                          float u, float v) {
+  u = frac(u);
+  v = frac(v);
+  const float drift = (.08f + .17f * irregularity) / period;
+  const float x = frac(u + drift * (valueNoise(seed + 1, period * 3, u, v) - .5f)) * period;
+  const float y = frac(v + drift * (valueNoise(seed + 2, period * 3, u, v) - .5f)) * period;
+  const int ix = int(x), iy = int(y);
+  float closest = 8.f, second = 8.f, center = 0.f, shade = 0.f;
+  for (int j = iy - 2; j <= iy + 2; ++j) {
+    for (int i = ix - 2; i <= ix + 2; ++i) {
+      const unsigned a = wrap(i, period), b = wrap(j, period);
+      const float dx = i + mix(.14f, .86f, lattice(seed, a, b)) - x;
+      const float dy = j + mix(.19f, .81f, lattice(seed + 3, a, b)) - y;
+      const float distance = dx * dx + dy * dy;
+      const float score = distance - .17f * irregularity * lattice(seed + 4, a, b);
+      if (score < closest) {
+        second = closest;
+        closest = score;
+        center = distance;
+        shade = lattice(seed + 5, a, b);
+      } else second = std::min(second, score);
+    }
+  }
+  const float shoulders = mix(.075f, .18f, roundness);
+  const float body = softThreshold(mortar * .20f, mortar + shoulders, second - closest);
+  const float silhouette = 1.f - roundness * .52f * softThreshold(.32f, .82f, center);
+  return .07f + body * silhouette * (.58f + .30f * shade - .19f * roundness * unit(center));
+}
+
+inline float handLaidBrick(const Node& node, uint64_t seed, float u, float v, float variation) {
+  u = frac(u);
+  v = frac(v);
+  const int columns = int(node.p[0]), rows = int(node.p[1]);
+  const bool flemish = node.spec->kernel == Kernel::flemish;
+  const float uneven = node.p[5];
+  const float warpY = valueNoise(seed + 1, std::max(3, columns), std::max(2, rows / 2), u, v);
+  const float warpX = valueNoise(seed + 2, columns, rows * 2, u, v);
+  const float row = v * rows + .24f * uneven * (warpY - .5f);
+  const int course = int(std::floor(row)), rowId = wrap(course, rows);
+  const float rowOffset = .21f * (lattice(seed + 3, rowId, 0) - .5f);
+  const float column = u * columns + (rowId % 2 ? .5f : 0.f) +
+    uneven * (.10f * (warpX - .5f) + rowOffset);
+  const int columnId = wrap(int(std::floor(column)), columns);
+  const float a = frac(column), b = frac(row);
+  const float header = 1.f / 3.f + uneven * .18f * (lattice(seed + 4, columnId, rowId) - .5f);
+  const float side = flemish ? std::min({a, 1.f - a, std::abs(a - header)}) : std::min(a, 1.f - a);
+  const float bed = std::min(b, 1.f - b);
+  const float edge = std::min(side * 1.7f, bed);
+  const float grit = valueNoise(seed + 5, columns * 12, rows * 7, u, v);
+  const float rim = valueNoise(seed + 7, columns * 5, rows * 3, u, v);
+  const float erosion = uneven * (.085f * softThreshold(.63f, .94f, rim) +
+    std::max(0.f, grit - .63f) * .045f + .023f * (warpX - .5f));
+  const float width = node.p[2] * mix(.68f, 1.37f, warpX);
+  const float bevel = softThreshold(width * .43f, width * .43f + node.p[3], edge - erosion);
+  const unsigned brick = unsigned(columnId) * 2 + unsigned(flemish && a > header);
+  const float tint = lattice(seed + 6, brick, rowId);
+  const float clay = .63f + .33f * tint + .065f * (grit - .5f) - node.p[4] * .31f * variation;
+  return mix(.065f + .07f * grit, clay, bevel);
+}
+
 inline Pixel rasterPixel(const Raster& image, int x, int y) {
   const size_t offset = (size_t(wrap(y, int(image.size.height))) * image.size.width
     + size_t(wrap(x, int(image.size.width)))) * 4;
@@ -417,10 +610,38 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   case Kernel::noise: return scalar(.5f + node.p[1] * (valueNoise(seed, int(node.p[0]), u, v) - .5f));
   case Kernel::gradient: return scalar(.5f + node.p[1] * (gradientNoise(seed, int(node.p[0]), u, v) - .5f));
   case Kernel::worley: return scalar(cellularDistance(seed, int(node.p[0]), node.p[1], u, v));
-  case Kernel::materialGrain: return scalar(materialGrain(GrainKind(int(node.p[0])), int(node.p[1]), seed, u, v));
-  case Kernel::surfaceWear:
-    return scalar(surfaceWear(WearKind(int(node.p[0])), int(node.p[1]), node.p[2], seed, u, v));
+  case Kernel::materialGrain: {
+    const auto kind = GrainKind(int(node.p[0]));
+    const int frequency = int(node.p[1]);
+    if (node.p[2] == 1.f) return scalar(naturalGrain(kind, frequency, seed, u, v));
+    const float original = materialGrain(kind, frequency, seed, u, v);
+    return scalar(node.p[2] > 0.f ? mix(original, naturalGrain(kind, frequency, seed, u, v), node.p[2]) : original);
+  }
+  case Kernel::surfaceWear: {
+    const auto kind = WearKind(int(node.p[0]));
+    const int frequency = int(node.p[1]);
+    if (node.p[3] == 1.f) return scalar(naturalWear(kind, frequency, node.p[2], seed, u, v));
+    const float original = surfaceWear(kind, frequency, node.p[2], seed, u, v);
+    return scalar(node.p[3] > 0.f ? mix(original, naturalWear(kind, frequency, node.p[2], seed, u, v), node.p[3]) : original);
+  }
   case Kernel::boardJoints: {
+    if (node.p[3] > 0.f) {
+      const int columns = int(node.p[0]);
+      const float wander = valueNoise(seed + 4, columns, 5, u, v);
+      const float column = u * columns + node.p[3] * .37f * (wander - .5f);
+      const unsigned board = wrap(int(std::floor(column)), columns);
+      const float edge = std::min(frac(column), 1.f - frac(column));
+      const float knots = valueNoise(seed + 5, columns * 4, 15, u, v);
+      const float width = node.p[2] * mix(.58f, 1.59f, knots);
+      float height = softThreshold(width * .23f, width, edge);
+      if (node.p[1] > 0.f) {
+        const float seam = std::abs(frac(v * node.p[1] + lattice(seed, board, 0) +
+          .055f * node.p[3] * (wander - .5f)) - .5f);
+        height *= softThreshold(width * .065f, width * .21f, seam);
+      }
+      const float grain = valueNoise(seed + 6, columns * 9, 4, u, v);
+      return scalar(.08f + height * (.76f + .16f * lattice(seed + 2, board, 0) + .10f * (grain - .5f)));
+    }
     const float column = u * node.p[0];
     const unsigned board = unsigned(wrap(int(column), int(node.p[0])));
     const float edge = std::min(frac(column), 1.f - frac(column));
@@ -434,6 +655,7 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   }
   case Kernel::stonework: {
     const int period = int(node.p[0]);
+    if (node.p[3] > 0.f) return scalar(roundedStone(seed, period, node.p[1], node.p[2], node.p[3], u, v));
     const float drift = .28f / period;
     const float x = u + drift * (valueNoise(seed + 1, period * 3, u, v) - .5f);
     const float y = v + drift * (valueNoise(seed + 2, period * 3, u, v) - .5f);
@@ -527,6 +749,7 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
   }
   case Kernel::bricks:
   case Kernel::flemish: {
+    if (node.p[5] > 0.f) return scalar(handLaidBrick(node, seed, u, v, input[0]->sample(x, y)[0]));
     const float row = v * node.p[1];
     const float column = u * node.p[0] + (int(row) % 2 ? .5f : 0.f);
     const float a = frac(column), b = frac(row);
@@ -674,6 +897,8 @@ inline Pixel evaluatePixel(const Node& node, uint64_t seed, int x, int y, Resolu
     return scalar(input[0]->sample(x, y)[0] + input[1]->sample(x, y)[0]);
   case Kernel::scalarMix:
     return scalar(mix(input[0]->sample(x, y)[0], input[1]->sample(x, y)[0], node.p[0]));
+  case Kernel::scalarBlend:
+    return scalar(mix(input[0]->sample(x, y)[0], input[1]->sample(x, y)[0], input[2]->sample(x, y)[0]));
   case Kernel::minimum:
     return scalar(std::min(input[0]->sample(x, y)[0], input[1]->sample(x, y)[0]));
   case Kernel::maximum:
@@ -961,7 +1186,7 @@ inline Evaluation evaluate(const Plan& plan, Resolution size,
                            const std::atomic<bool>* cancelled = nullptr, size_t budget = memoryBudget,
                            unsigned threads = 1, unsigned frame = 0, NodeCache* cache = nullptr) {
   require(size.width > 0 && size.width <= maxDimension && size.height > 0 && size.height <= maxDimension,
-    "resolution", "The render size is outside the 1–8192 range.");
+    "resolution", "The render size is outside the 1Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРЎв„ў8192 range.");
   require(threads > 0 && threads <= maxThreads, "threads", "Choose 1 to 16 CPU workers.");
   require(plan.frames > 0 && (plan.loop || frame < plan.frames), "frame", "Frame is outside the animation range.");
   const float time = plan.frames == 1 ? 0.f : plan.loop ? float(frame % plan.frames) / plan.frames

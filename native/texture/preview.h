@@ -69,6 +69,34 @@ inline std::optional<PreviewSurface> cubeSurface(float x, float y, PreviewVector
   return PreviewSurface{{0,0,sign}, {sign,0,0}, {0,1,0}, uv(hit.x*sign), uv(-hit.y)};
 }
 
+inline Pixel samplePreviewData(const Image& data, float u, float v) {
+  const float x = frac(u) * data.size.width - .5f, y = frac(v) * data.size.height - .5f;
+  const int ix = int(std::floor(x)), iy = int(std::floor(y));
+  const auto a = data.sample(ix, iy), b = data.sample(ix + 1, iy);
+  const auto c = data.sample(ix, iy + 1), d = data.sample(ix + 1, iy + 1);
+  Pixel result{};
+  for (size_t i = 0; i < result.size(); ++i)
+    result[i] = mix(mix(a[i], b[i], frac(x)), mix(c[i], d[i], frac(x)), frac(y));
+  return result;
+}
+
+inline float fresnelFalloff(float cosine) {
+  const float grazing = 1.f - unit(cosine);
+  const float square = grazing * grazing;
+  return square * square * grazing;
+}
+
+inline float previewHighlight(float noL, float noV, float noH, float roughness) {
+  // GGX microfacet distribution and correlated Smith visibility.
+  const float alpha = roughness * roughness;
+  const float alpha2 = alpha * alpha;
+  const float l = noV * std::sqrt(alpha2 + (1.f - alpha2) * noL * noL);
+  const float v = noL * std::sqrt(alpha2 + (1.f - alpha2) * noV * noV);
+  const float d = noH * noH * (alpha2 - 1.f) + 1.f;
+  const float ggx = alpha2 / (3.14159265f * d * d);
+  return noL * ggx * (.5f / std::max(.0001f, l + v));
+}
+
 inline Image materialPreview(const Evaluation& image, bool cube, const std::atomic<bool>* cancel = nullptr,
                              PreviewCamera camera = {}) {
   require(std::isfinite(camera.yaw) && std::isfinite(camera.pitch) && std::isfinite(camera.panX) &&
@@ -93,8 +121,10 @@ inline Image materialPreview(const Evaluation& image, bool cube, const std::atom
   const auto up = cross(view, right);
   const auto light = normalized(camera.softLight ? view + up * .35f : view + right * -.7f + up * .85f);
   const auto half = normalized(view + light);
-  const float ambientLight = camera.softLight ? .53f : .34f;
-  const float directLight = camera.softLight ? .52f : .72f;
+  const float ambientLight = camera.softLight ? .58f : .37f;
+  const float directLight = camera.softLight ? .49f : .72f;
+  const float highlightRoughness = camera.softLight ? .31f : .17f;
+  const float directFresnel = fresnelFalloff(dot(view, half));
   Image result{{edge, edge}, Port::color, std::vector<Pixel>(edge * edge)};
   for (unsigned y = 0; y < edge; ++y) {
     if (cancel && cancel->load(std::memory_order_relaxed)) throw Error("preview", "Rendering was cancelled.");
@@ -106,23 +136,32 @@ inline Image materialPreview(const Evaluation& image, bool cube, const std::atom
       const auto& surface = *sample;
       const auto sampleData = [&](const Image* data, Pixel fallback) {
         if (!data) return fallback;
-        return data->sample(int(frac(surface.u) * data->size.width), int(frac(surface.v) * data->size.height));
+        return samplePreviewData(*data, surface.u, surface.v);
       };
       const auto albedo = sampleColor(color, surface.u, surface.v);
       const auto bump = sampleData(normals, {0,0,1,1});
       const auto normal = normalized(surface.t * (bump[0]*camera.relief) +
         surface.b * (bump[1]*camera.relief) + surface.n * bump[2]);
-      const float diffuse = unit(dot(light, normal));
+      const float noL = unit(dot(light, normal));
+      const float noV = std::max(.001f, unit(dot(view, normal)));
+      const float noH = unit(dot(half, normal));
       const float roughness = sampleData(gloss, {.6f,0,0,1})[0];
       const float metalness = sampleData(metal, {0,0,0,1})[0];
       const float ao = sampleData(ambient, {1,0,0,1})[0];
       const auto glow = sampleData(emission, {0,0,0,1});
-      const float specular = std::pow(unit(dot(half, normal)), mix(76.f, 4.f, roughness)) * (.28f * diffuse);
+      const float spec = previewHighlight(noL, noV, noH, std::max(highlightRoughness, roughness));
+      const auto reflectedView = normal * (2.f * noV) + view * -1.f;
+      const float sky = unit(.5f + .5f * reflectedView.y);
+      const float environment = mix(.045f, .4f, mix(sky * sky, .5f, roughness));
+      const float ambientFresnel = fresnelFalloff(noV) * (1.f - .65f * roughness);
+      const float diffuse = (1.f - metalness) * (ao * ambientLight + noL * directLight);
       auto& pixel = result.pixels[y * edge + x];
       for (size_t c = 0; c < 3; ++c) {
-        const float reflected = mix(.04f, albedo[c], metalness);
-        pixel[c] = unit(albedo[c] * (ao * ambientLight + diffuse * (directLight - .37f * metalness)) +
-          specular * reflected + glow[c]);
+        const float f0 = mix(.04f, albedo[c], metalness);
+        const float direct = spec * mix(f0, 1.f, directFresnel);
+        const float indirect = ao * environment * mix(f0, 1.f, ambientFresnel);
+        pixel[c] = unit(albedo[c] * diffuse * (1.f - f0) +
+          direct / (1.f + direct) + indirect + glow[c]);
       }
       pixel[3] = albedo[3];
     }

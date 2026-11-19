@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "ftebroom_child_process.h"
 #include "texture/legacy_codec.h"
 #include "texture/jpeg.h"
 #include "texture/catalog.h"
@@ -28,6 +29,12 @@ struct TextureStudioState {
     rbTexture::Evaluation image{};
     std::map<std::string,std::string> preview;
     std::vector<unsigned char> modelPixels;
+  };
+  struct SourceInput {
+    rbTexture::Document document;
+    rbTexture::Assets assets;
+    std::filesystem::path source, folder;
+    bool imported = false;
   };
 
   bool open = false, focus = false, focused = false, scheduled = false, fullSize = false;
@@ -66,6 +73,8 @@ struct TextureStudioState {
   std::shared_ptr<std::atomic<bool>> cancel;
   std::shared_ptr<rbTexture::NodeCache> previewCache = std::make_shared<rbTexture::NodeCache>(studioPreviewCacheBudget);
   std::future<Result> job;
+  std::shared_ptr<std::atomic<bool>> inputCancel;
+  std::future<SourceInput> inputJob;
   std::optional<Result> result;
   std::vector<std::filesystem::path> created;
   Apply apply = Apply::none;
@@ -178,6 +187,7 @@ static void studioEdit(rbTexture::Document document) {
 
 static void studioNewDocument(rbTexture::Document document) {
   auto& s = textureStudio;
+  if (s.inputCancel) *s.inputCancel = true;
   s.file.clear();
   s.drag.reset();
   s.movingNode.clear();
@@ -221,6 +231,7 @@ static void studioCancel(bool report = false) {
   s.movingNode.clear();
   s.wireStart = {};
   s.groupSelection.clear();
+  if (s.inputCancel) *s.inputCancel = true;
   if (s.cancel) *s.cancel = true;
   ++s.revision;
   s.scheduled = false;
@@ -664,6 +675,27 @@ static void studioTick() {
     s.apply = TextureStudioState::Apply::none;
     studioRollback();
   }
+  if (!s.inputJob.valid() || s.inputJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+  const bool cancelled = *s.inputCancel;
+  s.inputCancel.reset();
+  try {
+    auto input = s.inputJob.get();
+    if (cancelled || !s.open) return;
+    studioAutosave();
+    studioCancel();
+    studioNewDocument(std::move(input.document));
+    s.file = std::move(input.source);
+    s.assetFolder = std::move(input.folder);
+    s.assets = std::move(input.assets);
+    s.message.clear();
+    if (input.imported) {
+      s.savedSource.clear();
+      studioAutosave();
+    }
+    if (textureStudioDoc().readOnly) s.scheduled = false;
+  } catch (const std::exception& e) {
+    if (!cancelled && s.open) s.error = e.what();
+  }
 }
 
 static void studioSave(const std::filesystem::path& path) {
@@ -956,97 +988,127 @@ static void studioRemoveUserPreset(const std::string& id) {
     : "Removed from your preset library.";
 }
 
-static void studioOpenFile() {
+static TextureStudioState::SourceInput studioReadInput(const std::filesystem::path& tool,
+    const std::filesystem::path& recovery, const std::filesystem::path& file, std::string license,
+    std::string textureName, std::string palette, const std::shared_ptr<std::atomic<bool>>& stop) {
+  namespace fs = std::filesystem;
+  const bool importing = !license.empty();
+  const bool archived = !importing && entityLower(file.extension().u8string()) == ".rbtexpkg";
+  const auto temp = fs::temp_directory_path() / ("reyond-texture-input-" + ftebroom::bb::uuid());
+  rbTexture::require(fs::create_directory(temp), "input", "Cannot create the Texture Studio input workspace.");
+  struct Cleanup {
+    fs::path folder;
+    ~Cleanup() {
+      std::error_code error;
+      fs::remove_all(folder, error);
+    }
+  } cleanup{temp};
+
+#ifndef _WIN32
+  fs::permissions(temp, fs::perms::owner_all, fs::perm_options::replace);
+#endif
+  const auto output = temp / "output";
+  const auto diagnostics = temp / "diagnostics.txt";
+  std::vector<std::string> arguments{importing ? "import" : archived ? "unpack" : "open", file.u8string(),
+    "--editor-input", "--out", output.u8string()};
+  if (importing) {
+    arguments.insert(arguments.end(), {"--license", std::move(license)});
+    if (!textureName.empty())
+      arguments.insert(arguments.end(), {"--texture", std::move(textureName)});
+    if (palette.size() == 768) {
+      const auto path = temp / "palette.lmp";
+      ftebroom::bb::atomicWrite(path, palette);
+      arguments.insert(arguments.end(), {"--palette", path.u8string()});
+    }
+  }
+  const auto code = ftebroom::child::run(ftebroom::filesystemAccessPath(tool), arguments, diagnostics, stop.get(),
+    std::chrono::seconds(30), "Texture Studio input decoder");
+  rbTexture::require(!*stop, "input", "Opening cancelled.");
+  if (code != 0) {
+    const auto detail = ftebroom::bb::readFile(diagnostics, 4096);
+    throw std::runtime_error(detail.empty() ? "The input decoder stopped. Try a smaller image or package." : detail);
+  }
+
+  auto doc = rbTexture::open(ftebroom::bb::readFile(output / rbTexture::packageSourceName, rbTexture::maxSourceBytes));
+  rbTexture::Assets assets;
+  if (!doc.readOnly) {
+    std::map<std::string, const rbTexture::Json*> references;
+    for (const auto& reference : doc.source.at("assetReferences")) {
+      const auto id = rbTexture::idField(reference, "id", "assets");
+      rbTexture::require(references.emplace(id, &reference).second, "assets", "The input worker repeated an image ID.");
+    }
+    rbTexture::require(references.size() <= 64, "assets", "The input worker returned too many images.");
+    size_t index = 0, budget = rbTexture::decodedAssetLimit;
+    for (const auto& [id, reference] : references) {
+      rbTexture::require(!*stop, "input", "Opening cancelled.");
+      auto raster = std::make_shared<rbTexture::Raster>();
+      raster->size.width = rbTexture::integer(reference->at("width"), 1, rbTexture::maxDimension, "assets.width");
+      raster->size.height = rbTexture::integer(reference->at("height"), 1, rbTexture::maxDimension, "assets.height");
+      const size_t bytes = size_t(raster->size.width) * raster->size.height * 4;
+      rbTexture::require(bytes <= budget, "assets", "The decoded images exceed their memory budget.");
+      const auto decoded = output / ("raster-" + std::to_string(index++) + ".rgba");
+      rbTexture::require(fs::file_size(decoded) == bytes, "assets", "The input worker returned an incomplete image.");
+      raster->rgba.resize(bytes);
+      std::ifstream stream(decoded, std::ios::binary);
+      rbTexture::require(bool(stream.read(reinterpret_cast<char*>(raster->rgba.data()), bytes)), "assets",
+        "Cannot read the decoded image.");
+      assets.emplace(id, std::move(raster));
+      budget -= bytes;
+
+      if (importing || archived) {
+        const auto path = rbTexture::imageRelativePath(rbTexture::idField(*reference, "sha256", "assets"));
+        auto original = rbTexture::readOriginal(output, *reference);
+        rbTexture::require(!*stop, "input", "Opening cancelled.");
+        fs::create_directories(recovery);
+        studioWriteOriginal(recovery, path, original);
+      }
+    }
+  }
+  if (importing) doc.source["documentId"] = ftebroom::bb::uuid();
+  return {std::move(doc), std::move(assets), importing || archived ? fs::path{} : file,
+    importing || archived ? recovery : file.parent_path(), importing};
+}
+
+static void studioQueueInput(const std::string& name, std::string license = {}, std::string textureName = {}) {
   auto& s = textureStudio;
-  runUiChoose(s.file.u8string(), [](const std::string& name) {
-    studioAction([&] {
-      auto path = std::filesystem::u8path(name);
-      auto folder = path.parent_path();
-      rbTexture::Document doc;
-      rbTexture::Assets assets;
-      const bool archived = entityLower(path.extension().u8string()) == ".rbtexpkg";
-      if (archived) {
-        auto package = rbTexture::unpack(path);
-        folder = studioRecoveryRoot();
-        std::filesystem::create_directories(folder);
-        for (const auto& [relative, bytes] : package.originals)
-          studioWriteOriginal(folder, relative, bytes);
-        doc = std::move(package.document);
-        assets = std::move(package.assets);
-      } else {
-        doc = rbTexture::open(ftebroom::bb::readFile(path, rbTexture::maxSourceBytes));
-        if (!doc.readOnly) assets = rbTexture::loadAssets(doc, folder);
-      }
-      studioAutosave();
-      studioCancel();
-      textureStudio.drag.reset();
-      textureStudio.file = archived ? std::filesystem::path{} : path;
-      textureStudio.document.emplace(std::move(doc));
-      textureStudio.assetFolder = std::move(folder);
-      textureStudio.assets = std::move(assets);
-      textureStudio.savedSource = textureStudioDoc().save();
-      textureStudio.recoveryFile.clear();
-      textureStudio.recoveredSource.clear();
-      textureStudio.nextAutosave = ImGui::GetTime() + 60;
-      textureStudio.selectedNode = 0;
-      textureStudio.parameterLocks.clear();
-      textureStudio.frame = 0;
-      if (!textureStudioDoc().readOnly) {
-        textureStudio.variationBase = textureStudioDoc().seed();
-        studioSchedule();
-      }
-    });
+  rbTexture::require(!s.inputJob.valid(), "input", "Finish or cancel the current input first.");
+  const auto root = std::filesystem::absolute(documentPath("ftebroom.cfg")).parent_path().parent_path();
+  auto tool = root / "tools/texture-studio";
+#ifdef _WIN32
+  tool += ".exe";
+#endif
+  rbTexture::require(std::filesystem::is_regular_file(tool), "input",
+    "The Texture Studio decoder is missing. Restore the tools directory from the editor package.");
+  const auto recovery = std::filesystem::absolute(studioRecoveryRoot()).lexically_normal();
+  const auto file = std::filesystem::u8path(name);
+  std::string palette;
+  if (!license.empty()) {
+    // The helper also accepts modern raster files in the indexed game profiles.
+    try {
+      if (gameProfile == 2) palette = q1Palette();
+      if (gameProfile == 3) palette = q2Palette();
+    } catch (const std::exception&) {
+      // An indexed import will diagnose the missing palette. Raster imports do not use it.
+    }
+  }
+  s.playing = false;
+  s.error.clear();
+  s.message.clear();
+  s.inputCancel = std::make_shared<std::atomic<bool>>(false);
+  s.inputJob = std::async(std::launch::async, studioReadInput, std::move(tool), recovery, file,
+    std::move(license), std::move(textureName), std::move(palette), s.inputCancel);
+}
+
+static void studioOpenFile() {
+  runUiChoose(textureStudio.file.u8string(), [](const std::string& name) {
+    studioAction([&] { studioQueueInput(name); });
   });
 }
 
 static void studioImportRaster(std::string license, std::string textureName) {
-  for (char& c : textureName) if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
   runUiChoose(textureStudio.file.parent_path().u8string(), [license = std::move(license),
     textureName = std::move(textureName)](const std::string& name) {
-    studioAction([&] {
-      const auto file = std::filesystem::u8path(name);
-      auto bytes = rbTexture::imageFileBytes(file);
-      const auto digest = ftebroom::sha256(bytes);
-      const auto relative = rbTexture::imageRelativePath(digest);
-      rbTexture::Json reference{{"id", "original"}, {"path", relative}, {"sha256", digest}, {"license", license}};
-      const auto encoding = rbTexture::sourceEncoding(bytes, file);
-      if (encoding != "image") {
-        reference["encoding"] = encoding;
-        if (!textureName.empty()) reference["texture"] = textureName;
-        if (encoding == "wad2") {
-          rbTexture::require(gameProfile == 2, "palette", "Select the Quake 1 source game profile to import WAD2.");
-          reference["palette"] = rbTexture::writePalette(q1Palette());
-        } else if (encoding == "wal") {
-          rbTexture::require(gameProfile == 3, "palette", "Select the Quake II source game profile to import a WAL texture.");
-          reference["palette"] = rbTexture::writePalette(q2Palette());
-        }
-      }
-      auto raster = rbTexture::decodeOriginal(bytes, reference);
-      const auto root = studioRecoveryRoot();
-      std::filesystem::create_directories(root);
-      studioWriteOriginal(root, relative, bytes);
-      reference["width"] = raster->size.width;
-      reference["height"] = raster->size.height;
-      auto doc = rbTexture::importedImage(ftebroom::bb::uuid(), *raster, std::move(reference));
-      studioAutosave();
-      studioCancel();
-      auto& s = textureStudio;
-      s.file.clear();
-      s.recoveryFile.clear();
-      s.savedSource.clear();
-      s.recoveredSource.clear();
-      s.assetFolder = root;
-      s.assets = {{"original", std::move(raster)}};
-      s.drag.reset();
-      s.document.emplace(std::move(doc));
-      s.variationBase = 0;
-      s.channel = "baseColor";
-      s.selectedNode = 0;
-      s.parameterLocks.clear();
-      s.frame = 0;
-      studioSchedule();
-      studioAutosave();
-    });
+    studioAction([&] { studioQueueInput(name, license, textureName); });
   });
 }
 
@@ -2210,7 +2272,8 @@ static void textureStudioPanel() {
                                               [](const auto& entry) { return entry.second != 0; })},
         {"previewMode", int(s.previewMode)}, {"hasSurface", !s.surfaceData.empty()},
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
-        {"busy", s.job.valid() || s.apply != TextureStudioState::Apply::none}, {"error", s.error}
+        {"busy", s.job.valid() || s.inputJob.valid() || s.apply != TextureStudioState::Apply::none},
+        {"readingSource", s.inputJob.valid()}, {"error", s.error}
       };
       const auto* window = ImGui::GetCurrentWindowRead();
       if (!window->DockIsActive) {
@@ -2223,15 +2286,21 @@ static void textureStudioPanel() {
         };
       }
     }
-    const bool applying = s.apply != TextureStudioState::Apply::none;
+    const bool loading = s.inputJob.valid();
+    const bool applying = loading || s.apply != TextureStudioState::Apply::none;
     const bool writable = !textureStudioDoc().readOnly;
     const auto& io = ImGui::GetIO();
     const bool shortcuts = s.focused && !io.WantTextInput &&
       !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
     if (shortcuts && s.apply != TextureStudioState::Apply::commit && ImGui::IsKeyPressed(ImGuiKey_Escape) &&
         (applying || s.job.valid() || s.scheduled || s.drag || !s.wireStart.first.empty())) {
-      studioCancel(true);
-      s.drag.reset();
+      if (loading) {
+        *s.inputCancel = true;
+        s.message = "Opening cancelled.";
+      } else {
+        studioCancel(true);
+        s.drag.reset();
+      }
     }
     ImGui::BeginDisabled(applying);
     if (ImGui::Button("New")) {
@@ -2623,7 +2692,17 @@ static void textureStudioPanel() {
     }
     ImGui::EndDisabled();
     const bool cancelling = s.job.valid() && s.cancel && s.cancel->load() && !s.scheduled;
-    if (!cancelling && (s.job.valid() || s.apply != TextureStudioState::Apply::none)) {
+    if (loading) {
+      if (!*s.inputCancel) {
+        nextButton("Cancel");
+        if (ImGui::Button("Cancel")) {
+          *s.inputCancel = true;
+          s.message = "Opening cancelled.";
+        }
+        runUiRecordGlobal("texture-studio/cancel-input");
+        if (!*s.inputCancel) ImGui::TextUnformatted("Reading material source…");
+      }
+    } else if (!cancelling && (s.job.valid() || s.apply != TextureStudioState::Apply::none)) {
       nextButton("Cancel");
       ImGui::BeginDisabled(s.apply == TextureStudioState::Apply::commit);
       const bool cancel = ImGui::Button("Cancel");
@@ -2666,6 +2745,7 @@ static void textureStudioPanel() {
 static void textureStudioShutdown() {
   studioCancel();
   if (textureStudio.job.valid()) textureStudio.job.wait();
+  if (textureStudio.inputJob.valid()) textureStudio.inputJob.wait();
   if (textureStudio.thumbnailJob.valid()) textureStudio.thumbnailJob.wait();
   if (textureStudio.document && ImGui::GetCurrentContext())
     studioAction(studioAutosave);

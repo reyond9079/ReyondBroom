@@ -29,9 +29,10 @@ namespace ts = ftebroom::textureStudio;
 namespace fs = std::filesystem;
 
 std::string read(const fs::path& path, size_t limit = ts::maxSourceBytes) {
-  if (!fs::is_regular_file(path) || fs::file_size(path) > limit)
+  const auto physical = ftebroom::filesystemAccessPath(path);
+  if (!fs::is_regular_file(physical) || fs::file_size(physical) > limit)
     throw ts::Error("input", "A required file is missing or too large.");
-  std::ifstream in(path, std::ios::binary);
+  std::ifstream in(physical, std::ios::binary);
   std::string data;
   std::array<char, 16384> block{};
   while (in.read(block.data(), block.size()) || in.gcount() > 0) {
@@ -42,7 +43,7 @@ std::string read(const fs::path& path, size_t limit = ts::maxSourceBytes) {
   return data;
 }
 
-void writeNew(const fs::path& path, const std::string& bytes) {
+void writeNew(const fs::path& path, std::string_view bytes) {
   ts::require(!fs::exists(fs::symlink_status(path)), "output", "Choose a new output path.");
   std::ofstream out(path, std::ios::binary);
   out.write(bytes.data(), bytes.size());
@@ -81,7 +82,7 @@ public:
       if (fs::weakly_canonical(dir->parent_path(), error) == dir->parent_path() && !error) fs::remove(*dir, error);
     fs::remove(staging, error);
   }
-  void write(const std::string& name, const std::string& bytes) {
+  void write(const std::string& name, std::string_view bytes) {
     const auto relative = path(name).make_preferred();
     ts::require(fs::weakly_canonical(staging) == staging, "output", "The staging directory changed during export.");
     auto directory = staging;
@@ -119,6 +120,7 @@ public:
 struct Options {
   std::string command, source, out, profile, palette, license, preset, texture, name = "studio_brick";
   bool masked = false, pk3 = false, dryRun = false, allFrames = false, acceptRate = false;
+  bool editorInput = false;
   unsigned threads = 1, jpegQuality = 0, frame = 0;
   unsigned variation = 0;
   unsigned exportFrames = 0;
@@ -142,6 +144,12 @@ Options options(int argc, char** argv) {
     if (key == "--dry-run") { out.dryRun = true; continue; }
     if (key == "--all-frames") { out.allFrames = true; continue; }
     if (key == "--accept-rate-change") { out.acceptRate = true; continue; }
+    if (key == "--editor-input") {
+      ts::require(out.command == "import" || out.command == "unpack" || out.command == "open",
+        "command", "The editor input worker requires import, unpack or open.");
+      out.editorInput = true;
+      continue;
+    }
     ts::require(arg + 1 < argc, "command", "An option is missing its value.");
     const std::string value(argv[++arg]);
     if (key == "--out") out.out = value;
@@ -490,6 +498,20 @@ int main(int argc, char** argv) try {
     reference["height"] = imageSize.height;
     return ts::importedImage("image-" + digest.substr(0, 32), *raster, std::move(reference));
   }();
+  if (args.editorInput) {
+    ts::require(!args.out.empty(), "output", "Choose an input worker output directory.");
+    if (!doc.readOnly) ts::compile(doc, {}, assets);
+    OutputFolder folder(path(args.out));
+    folder.write(ts::packageSourceName, doc.save());
+    for (const auto& [name, bytes] : files) folder.write(name, bytes);
+    std::size_t index = 0;
+    for (const auto& [id, raster] : assets) {
+      folder.write("raster-" + std::to_string(index++) + ".rgba",
+        {reinterpret_cast<const char*>(raster->rgba.data()), raster->rgba.size()});
+    }
+    folder.commit();
+    return 0;
+  }
   const auto graph = ts::compile(doc, {}, assets);
   if (args.command == "bundle") {
     ts::require(!args.out.empty() && !args.dryRun, "output", "Choose a new .rbtexpkg file with --out.");

@@ -37,6 +37,7 @@ def main():
     cli.add_argument("--graph-keyboard", action="store_true")
     cli.add_argument("--recover-source", action="store_true")
     cli.add_argument("--interrupt-apply", choices=("before-asset", "before-register"))
+    cli.add_argument("--input-stall-helper", type=Path)
     cli.add_argument("--theme", choices=("light", "dark"), default="dark")
     cli.add_argument("--scale", choices=(100, 150, 200), type=int, default=100)
     cli.add_argument("--size", choices=("1280x720", "1440x900", "1920x1080"), default="1440x900")
@@ -110,6 +111,11 @@ def main():
     runtime_suffix = ".wad" if wad else ".wal" if profile == 3 else ".tga"
     folder = project / ("texture-wads" if wad else "textures/reyond-studio")
     env = os.environ.copy()
+    decoder = runtime / ("tools/texture-studio.exe" if os.name == "nt" else "tools/texture-studio")
+    if args.input_stall_helper:
+        actual_decoder = decoder.with_name("real-" + decoder.name)
+        decoder.rename(actual_decoder)
+        shutil.copy2(args.input_stall_helper.resolve(), decoder)
     if args.interrupt_apply:
         hook = output / "interrupt-asset-rename.so"
         fixture = Path(__file__).resolve().parents[1] / "tests/fixtures/texture-studio/interrupt-asset-rename.c"
@@ -179,6 +185,49 @@ def main():
             click("menu/Assets")
             click("Menu/Assets/Texture Studio...")
 
+            if args.input_stall_helper:
+                def current():
+                    return live()["globalWidgets"]["texture-studio/render-state"]
+
+                wait(lambda: current()["previewReady"] and not current()["busy"])
+                saved = output / "before-opening.rbtex.json"
+                click("texture-studio/save")
+                choose(saved)
+                wait(saved.is_file)
+                original = saved.read_bytes()
+                before = current()["revision"]
+
+                def open_source():
+                    click("texture-studio/open")
+                    click("texture-studio/open-choose")
+                    choose(saved)
+
+                started = time.monotonic()
+                open_source()
+                wait(lambda: current()["readingSource"])
+                # The application still processes input while its child is stalled.
+                click("texture-studio/cancel-input")
+                wait(lambda: not current()["readingSource"], timeout=5)
+                cancelled = time.monotonic() - started
+                assert current()["revision"] == before and current()["previewReady"]
+
+                started = time.monotonic()
+                open_source()
+                wait(lambda: current()["readingSource"])
+                wait(lambda: "input decoder timed out" in current()["error"], timeout=36)
+                elapsed = time.monotonic() - started
+                assert 29 <= elapsed < 37, elapsed
+                assert current()["revision"] == before and current()["previewReady"]
+                assert saved.read_bytes() == original
+
+                actual_decoder.replace(decoder)
+                open_source()
+                wait(lambda: current()["revision"] > before and current()["previewReady"])
+                assert not current()["error"] and saved.read_bytes() == original
+                print(json.dumps({"status": "PASS", "cancelledSeconds": cancelled, "timeoutSeconds": elapsed,
+                                  "draftUnchanged": True, "reopenedWithRealDecoder": True}))
+                return
+
             if args.interrupt_apply:
                 original_map = map_file.read_bytes()
                 recovery = output / "saved-before-interruption.rbtex.json"
@@ -216,8 +265,10 @@ def main():
                 click("Menu/Assets/Texture Studio...")
                 click("texture-studio/open")
                 click("texture-studio/open-choose")
+                previous = live()["globalWidgets"]["texture-studio/render-state"]["revision"]
                 choose(recovery)
-                wait(lambda: live()["globalWidgets"]["texture-studio/render-state"]["previewReady"])
+                wait(lambda: (state := live()["globalWidgets"]["texture-studio/render-state"])["previewReady"]
+                     and state["revision"] > previous)
                 click("texture-studio/apply")
                 wait(runtime_file.is_file)
                 generated = manifest["material"].removeprefix("textures/")

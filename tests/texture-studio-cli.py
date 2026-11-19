@@ -236,6 +236,27 @@ def run(executable, root):
     assert (root / "unpacked/source.rbtex.json").read_bytes() == imported.read_bytes()
     assert (root / "unpacked" / reference["path"]).read_bytes() == loose
 
+    worker_tga = root / "Input worker 日本.tga"
+    header = struct.pack("<BBBHHBHHHHBB", 0, 0, 2, 0, 0, 0, 0, 0, 2, 2, 32, 40)
+    worker_tga.write_bytes(header + bytes((0, 0, 255, 255, 0, 255, 0, 200,
+                                          255, 0, 0, 120, 2, 3, 4, 60)))
+    expected = bytes((255, 0, 0, 255, 0, 255, 0, 200, 0, 0, 255, 120, 4, 3, 2, 60))
+    worker_import = root / "worker imported"
+    proc = subprocess.run([str(executable), "import", str(worker_tga), "--license", "CC0-1.0",
+                           "--editor-input", "--out", str(worker_import)], capture_output=True, timeout=15)
+    assert proc.returncode == 0, proc.stderr
+    assert (worker_import / "raster-0.rgba").read_bytes() == expected
+    worker_source = worker_import / "source.rbtex.json"
+    worker_zip = root / "worker.rbtexpkg"
+    assert invoke("bundle", worker_source, "--out", worker_zip)[0] == 0
+    for operation, original in (("open", worker_source), ("unpack", worker_zip)):
+        worker_output = root / ("worker " + operation)
+        proc = subprocess.run([str(executable), operation, str(original), "--editor-input",
+                               "--out", str(worker_output)], capture_output=True, timeout=15)
+        assert proc.returncode == 0, proc.stderr
+        assert (worker_output / "source.rbtex.json").read_bytes() == worker_source.read_bytes()
+        assert (worker_output / "raster-0.rgba").read_bytes() == expected
+
     source_entry = zipfile.ZipInfo("source.rbtex.json")
     source_entry.create_system = 3
     source_entry.external_attr = 0o100644 << 16

@@ -5,6 +5,7 @@ name: Texture Studio checks
     - .github/workflows/texture-studio-checks.yml
     - native/texture/**
     - native/ftebroom_texture_studio.h
+    - native/ftebroom_child_process.h
     - native/ftebroom_pk3.h
     - qc/fb_texture_studio.qc
     - tests/*texture-studio*
@@ -15,6 +16,7 @@ name: Texture Studio checks
     paths:
     - native/texture/**
     - native/ftebroom_texture_studio.h
+    - native/ftebroom_child_process.h
     - native/ftebroom_pk3.h
     - qc/fb_texture_studio.qc
     - tests/*texture-studio*

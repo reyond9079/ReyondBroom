@@ -280,7 +280,14 @@ static void worldQa(){
   j["inputTrace"]=s.inputTrace;
   if(runUiLive)j["globalWidgets"]=runUiGlobalRects;
   j["candidateSeeds"]=wa::Json::array();for(const auto& world:s.batch.worlds)j["candidateSeeds"].push_back(world.seed);
-  if(auto world=worldSelected())j["world"]=wa::diagnostics(*world);worldAction([&]{bb::atomicWrite(documentPath("world-architect-ui-live.json"),j.dump());});
+  if(auto world=worldSelected())j["world"]=wa::diagnostics(*world);
+  try{
+    // Observing a snapshot must not replace the error shown in the editor.
+    bb::atomicWrite(documentPath("world-architect-ui-live.json"),
+      j.dump(-1,' ',false,wa::Json::error_handler_t::replace));
+  }catch(const std::exception& e){
+    core->Print((std::string("World Architect QA: ")+e.what()+"\n").c_str());
+  }
 }
 static void worldPanel(){
   auto& s=worldArchitect;

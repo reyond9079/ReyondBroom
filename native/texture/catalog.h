@@ -303,7 +303,8 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   auto doc = runningBrick(std::move(id));
   auto& source = doc.source;
   source["name"] = recipe.name;
-  source["provenance"]["preset"] = recipeId(category, index);
+  const auto preset = recipeId(category, index);
+  source["provenance"]["preset"] = preset;
   const bool liquid = category == 9;
   const bool marking = category == 10;
   const bool activeDisplay = category == 11 && (index == 6 || index == 7);
@@ -413,11 +414,14 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   Json grain = {{"kind", unsigned(finish.grain)}, {"period", std::min(recipe.detailScale, 60u)}};
   if (naturalDetail) grain["naturalDetail"] = 1;
   nodes.push_back(node("grain", "MaterialGrain", std::move(grain), 1, 2));
-  const unsigned wearFrequency = finish.wear == WearKind::chips ? 9u + recipe.scale % 10u :
+  const bool paintedSteel = category == 3 && index == 2;
+  const unsigned wearFrequency = paintedSteel ? 19u : finish.wear == WearKind::chips ? 9u + recipe.scale % 10u :
     finish.wear == WearKind::deposits ? 8u : std::min(52u, recipe.detailScale);
   Json wear = {{"kind", unsigned(finish.wear)}, {"period", wearFrequency}, {"density", finish.density}};
   if (naturalDetail) wear["naturalDetail"] = 1;
-  nodes.push_back(node("damage", "SurfaceWear", std::move(wear), 1, 3));
+  auto damage = node("damage", "SurfaceWear", std::move(wear), 1, 3);
+  if (naturalDetail) damage["seedIdentity"] = preset + "-wear";
+  nodes.push_back(std::move(damage));
   nodes.push_back(node("intact", "Invert", Json::object(), 2, 3));
   connect("damage", "intact", "value");
   const bool physicalJoint = recipe.pattern == Pattern::bricks || recipe.pattern == Pattern::flemish ||
@@ -428,7 +432,6 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   const bool woodBoards = category == 5 && recipe.pattern == Pattern::boardJoints;
   const bool stone = recipe.pattern == Pattern::stonework;
   const bool wetStone = category == 1 && index == 5;
-  const bool paintedSteel = category == 3 && index == 2;
   const bool peeledPlaster = category == 2 && (index == 0 || index == 1 || index == 6);
   const bool boardConcrete = category == 0 && index == 1;
   const float structuralWeight = category == 0 && index == 9 ? 0.f :
@@ -466,8 +469,10 @@ inline Document catalogPreset(size_t category, size_t index, std::string id) {
   };
   const char* colorLayer = "pigment";
   if (firedClay || woodBoards || boardConcrete) {
-    nodes.push_back(node("age", "SurfaceWear", {{"kind", unsigned(WearKind::deposits)},
-      {"period", firedClay ? 14u : 10u}, {"density", .85}, {"naturalDetail", 1}}, 1, 6));
+    auto age = node("age", "SurfaceWear", {{"kind", unsigned(WearKind::deposits)},
+      {"period", firedClay ? 14u : 10u}, {"density", .85}, {"naturalDetail", 1}}, 1, 6);
+    age["seedIdentity"] = preset + "-age";
+    nodes.push_back(std::move(age));
     const auto low = firedClay ? 0x655b4du : woodBoards ? 0x4d4337u : 0x5d5d54u;
     const auto high = firedClay ? 0xc5a589u : woodBoards ? 0xa09380u : 0xb1a99au;
     nodes.push_back(node("aged-pigment", "ColorRamp",

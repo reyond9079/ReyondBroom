@@ -183,6 +183,9 @@ void checkMaterialFinishes() {
 
   auto steel = catalogPreset(3, 2, "painted-steel");
   steel.source["outputs"]["opacity"] = {{"node", "open-damage"}, {"port", "value"}};
+  auto plaster = catalogPreset(2, 0, "peeling");
+  check(findNode(steel, "damage")["seedIdentity"] != findNode(plaster, "damage")["seedIdentity"],
+    "Unrelated finishes have independent wear locations");
   const auto finish = evaluate(compile(steel), {128,128});
   unsigned bare = 0, painted = 0;
   for (size_t pixel = 0; pixel < finish.outputs.at("opacity")->pixels.size(); ++pixel) {

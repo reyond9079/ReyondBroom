@@ -8,6 +8,7 @@
 #include "texture/layers.h"
 #include "texture/package.h"
 #include "texture/preview.h"
+#include "texture/project_presets.h"
 #include <thread>
 
 namespace rbTexture = ftebroom::textureStudio;
@@ -15,7 +16,7 @@ namespace rbTexture = ftebroom::textureStudio;
 static constexpr size_t studioPreviewCacheBudget = 12 * 1024 * 1024;
 
 struct TextureStudioState {
-  enum class Apply { none, asset, capture, baking, verify, commit, model };
+  enum class Apply { none, asset, capture, existing, baking, verify, commit, model };
   enum Preview { flat, tiled, sphere, cube, target, surface };
   struct ModelTarget {
     uint64_t epoch = 0, revision = 0, textureRevision = 0;
@@ -35,6 +36,18 @@ struct TextureStudioState {
     rbTexture::Assets assets;
     std::filesystem::path source, folder;
     bool imported = false;
+    std::string projectPreset;
+    unsigned projectFrame = 0;
+  };
+  struct ProjectProgress {
+    std::atomic<bool> cancel{false};
+    std::atomic<size_t> finished{0};
+  };
+  struct ProjectBake {
+    std::filesystem::path root;
+    int profile = -1, mapEpoch = 0;
+    std::string manifest, preset;
+    rbTexture::ProjectPresetFiles files;
   };
 
   bool open = false, focus = false, focused = false, scheduled = false, fullSize = false;
@@ -76,6 +89,12 @@ struct TextureStudioState {
   std::shared_ptr<std::atomic<bool>> inputCancel;
   std::future<SourceInput> inputJob;
   std::optional<Result> result;
+  std::filesystem::path projectRoot, projectDestination;
+  int projectProfile = -1, projectFamily = -2;
+  bool projectOffer = true, projectImported = false;
+  std::string projectPreset;
+  std::shared_ptr<ProjectProgress> projectProgress;
+  std::future<ProjectBake> projectJob;
   std::vector<std::filesystem::path> created;
   Apply apply = Apply::none;
 };
@@ -194,6 +213,7 @@ static void studioNewDocument(rbTexture::Document document) {
   auto& s = textureStudio;
   if (s.inputCancel) *s.inputCancel = true;
   s.file.clear();
+  s.projectPreset.clear();
   s.drag.reset();
   s.movingNode.clear();
   s.wireStart = {};
@@ -217,6 +237,7 @@ static void studioNewDocument(rbTexture::Document document) {
 
 static void studioNew(unsigned preset = 0) {
   studioNewDocument(rbTexture::builtinPreset(preset, ftebroom::bb::uuid()));
+  textureStudio.projectPreset = rbTexture::projectPresets().at(preset).key;
 }
 
 static void textureStudioShow() {
@@ -224,6 +245,7 @@ static void textureStudioShow() {
   auto& s = textureStudio;
   if (!s.document) studioNew();
   else if (!s.open && !s.result) studioSchedule();
+  if (!s.open) s.projectOffer = true;
   s.open = true;
   s.focus = true;
 }
@@ -239,6 +261,7 @@ static void studioCancel(bool report = false) {
   s.groupSelection.clear();
   if (s.inputCancel) *s.inputCancel = true;
   if (s.cancel) *s.cancel = true;
+  if (s.projectProgress) s.projectProgress->cancel = true;
   ++s.revision;
   s.scheduled = false;
   if (s.apply != TextureStudioState::Apply::commit) s.apply = TextureStudioState::Apply::none;
@@ -312,7 +335,8 @@ static void studioQCSend(const char* step, const std::string& material = {}) {
   command((cmd + "\n").c_str());
 }
 
-static void studioBeginApply(bool assetOnly) {
+static void studioBeginApply(bool assetOnly, const std::string& installedMaterial = {},
+                           const std::string& installedWad = {}) {
   auto& s = textureStudio;
   s.playing = false;
   if (!studioProfileAllowsApply()) throw std::runtime_error("Apply for this profile needs a profile-specific encoder.");
@@ -329,7 +353,9 @@ static void studioBeginApply(bool assetOnly) {
     studioSchedule(true);
     return;
   }
-  s.apply = TextureStudioState::Apply::capture;
+  s.apply = installedMaterial.empty() ? TextureStudioState::Apply::capture : TextureStudioState::Apply::existing;
+  s.material = installedMaterial;
+  s.wadReference = installedWad;
   s.ticket = s.ticket % 1000000 + 1;
   studioQCSend("capture");
 }
@@ -414,6 +440,8 @@ static std::string studioGoldSrcPalette() {
   }
   return palette;
 }
+
+#include "ftebroom_texture_project.h"
 
 static rbTexture::Image studioTargetPreview(const rbTexture::Image& image, int profile, const std::string& palette) {
   if (palette.empty()) return image;
@@ -592,7 +620,11 @@ static void studioApplyTick() {
   char value[80]{};
   if (ack) cvars->GetString("ftebroom_texture_apply_state", value, sizeof value);
   const std::string status(value);
-  if (s.apply == A::capture && status == "captured") {
+  if (s.apply == A::existing && status == "captured") {
+    s.apply = A::commit;
+    const auto material = s.profile == 1 ? s.material : s.material.substr(sizeof("textures/") - 1);
+    studioQCSend("commit", material);
+  } else if (s.apply == A::capture && status == "captured") {
     s.apply = A::baking;
     studioSchedule(true);
   } else if (s.apply == A::verify && status == "checked") {
@@ -690,7 +722,12 @@ static void studioTick() {
     studioAutosave();
     studioCancel();
     studioNewDocument(std::move(input.document));
-    s.file = std::move(input.source);
+    if (input.projectPreset.empty()) s.file = std::move(input.source);
+    s.projectPreset = std::move(input.projectPreset);
+    if (!s.projectPreset.empty()) {
+      s.frame = std::min(input.projectFrame, textureStudioDoc().source.at("animation").at("frames").get<unsigned>() - 1);
+      studioSchedule();
+    }
     s.assetFolder = std::move(input.folder);
     s.assets = std::move(input.assets);
     s.message.clear();
@@ -753,8 +790,11 @@ static std::string studioMaterialId(std::string_view material) {
   return std::string(material);
 }
 
+static void studioChooseProjectPreset(const rbTexture::ProjectPreset& preset);
+
 static bool textureStudioHasMaterialSource(std::string_view material) {
-  return !jamEditing() && studioProfileAllowsApply() && !studioMaterialId(material).empty();
+  return !jamEditing() && studioProfileAllowsApply() &&
+    (!studioMaterialId(material).empty() || studioProjectPresetForMaterial(material));
 }
 
 static void textureStudioShowMaterialSource(std::string_view material) {
@@ -763,6 +803,10 @@ static void textureStudioShowMaterialSource(std::string_view material) {
   studioAction([&] {
     auto& s = textureStudio;
     rbTexture::require(s.apply == TextureStudioState::Apply::none, "source", "Finish or cancel the current bake.");
+    if (const auto* preset = studioProjectPresetForMaterial(material)) {
+      studioChooseProjectPreset(*preset);
+      return;
+    }
     const auto id = studioMaterialId(material);
     const bool indexed = gameProfile == 2 || gameProfile == 4;
     const auto root = std::filesystem::canonical(studioDestination());
@@ -902,28 +946,31 @@ static void studioThumbnailTick() {
 }
 
 template<class Recipe>
-static float studioPresetThumbnail(const std::string& id, Recipe recipe) {
+static int studioFindThumbnail(const std::string& id, Recipe recipe, bool visible) {
   auto& s = textureStudio;
+  const auto found = s.thumbnails.find(id);
+  if (found != s.thumbnails.end()) return found->second;
+  if (visible && !s.thumbnailJob.valid()) {
+    s.thumbnailJob = std::async(std::launch::async, [id, recipe] {
+      try {
+        const auto plan = rbTexture::compile(recipe());
+        const auto result = rbTexture::evaluate(plan, {48, 48}, nullptr, rbTexture::memoryBudget, 1);
+        return std::make_pair(id, rbTexture::png(*result.outputs.at("baseColor")));
+      } catch (const std::exception&) {
+        return std::make_pair(id, std::string{});
+      }
+    });
+  }
+  return 0;
+}
+
+template<class Recipe>
+static float studioPresetThumbnail(const std::string& id, Recipe recipe) {
   const float side = 32 * uiScale();
   const ImVec2 size{side, side};
-  const auto found = s.thumbnails.find(id);
-  if (found != s.thumbnails.end() && found->second)
-    ImGui::Image((ImTextureID)found->second, size);
-  else {
-    const bool visible = ImGui::IsRectVisible(size);
-    ImGui::Dummy(size);
-    if (visible && found == s.thumbnails.end() && !s.thumbnailJob.valid()) {
-      s.thumbnailJob = std::async(std::launch::async, [id, recipe] {
-        try {
-          const auto plan = rbTexture::compile(recipe());
-          const auto result = rbTexture::evaluate(plan, {48, 48}, nullptr, rbTexture::memoryBudget, 1);
-          return std::make_pair(id, rbTexture::png(*result.outputs.at("baseColor")));
-        } catch (const std::exception&) {
-          return std::make_pair(id, std::string{});
-        }
-      });
-    }
-  }
+  const auto handle = studioFindThumbnail(id, recipe, ImGui::IsRectVisible(size));
+  if (handle) ImGui::Image((ImTextureID)handle, size);
+  else ImGui::Dummy(size);
   ImGui::SameLine();
   const auto& style = ImGui::GetStyle();
   return std::max(1.f, ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("☆").x -
@@ -1075,7 +1122,8 @@ static TextureStudioState::SourceInput studioReadInput(const std::filesystem::pa
     importing || archived ? recovery : file.parent_path(), importing};
 }
 
-static void studioQueueInput(const std::string& name, std::string license = {}, std::string textureName = {}) {
+static void studioQueueInput(const std::string& name, std::string license = {}, std::string textureName = {},
+                             std::string projectPreset = {}, unsigned projectFrame = 0) {
   auto& s = textureStudio;
   rbTexture::require(!s.inputJob.valid(), "input", "Finish or cancel the current input first.");
   const auto root = std::filesystem::absolute(documentPath("ftebroom.cfg")).parent_path().parent_path();
@@ -1101,8 +1149,33 @@ static void studioQueueInput(const std::string& name, std::string license = {}, 
   s.error.clear();
   s.message.clear();
   s.inputCancel = std::make_shared<std::atomic<bool>>(false);
-  s.inputJob = std::async(std::launch::async, studioReadInput, std::move(tool), recovery, file,
-    std::move(license), std::move(textureName), std::move(palette), s.inputCancel);
+  s.inputJob = std::async(std::launch::async, [tool = std::move(tool), recovery, file, license = std::move(license),
+      textureName = std::move(textureName), palette = std::move(palette), key = std::move(projectPreset),
+      projectFrame, stop = s.inputCancel] {
+    auto input = studioReadInput(tool, recovery, file, license, textureName, palette, stop);
+    input.projectPreset = key;
+    input.projectFrame = projectFrame;
+    return input;
+  });
+}
+
+static void studioChooseProjectPreset(const rbTexture::ProjectPreset& preset) {
+  auto& s = textureStudio;
+  studioRefreshProjectScope();
+  if (s.projectImported) {
+    const auto source = rbTexture::projectPresetStorage(gameProfile) + preset.key + ".rbtex.json";
+    const auto manifest = studioProjectManifest(s.projectRoot, gameProfile);
+    if (manifest.at("files").contains(source)) {
+      const auto path = studioProjectPath(s.projectRoot, source);
+      studioProjectOwnedFile(path, manifest.at("files").at(source));
+      const auto frame = manifest.contains("frames") ? manifest.at("frames").value(preset.key, 0u) : 0u;
+      studioQueueInput(path.u8string(), {}, {}, preset.key, frame);
+      return;
+    }
+  }
+  studioAutosave();
+  studioNewDocument(preset.document());
+  s.projectPreset = preset.key;
 }
 
 static void studioOpenFile() {
@@ -2213,11 +2286,114 @@ static void studioModeTabs(bool applying) {
   ImGui::EndDisabled();
 }
 
+static void studioProjectPrompt(bool busy) {
+  auto& s = textureStudio;
+  if (s.projectJob.valid()) {
+    ImGui::TextUnformatted(s.projectImported ? "Updating project material…" : "Importing project presets…");
+    const auto total = s.projectImported ? size_t(1) : rbTexture::projectPresets().size();
+    ImGui::ProgressBar(float(s.projectProgress->finished) / float(total), {-1, 0});
+    if (ImGui::Button("Cancel")) {
+      s.projectProgress->cancel = true;
+      s.message = "Project operation cancelled.";
+    }
+    runUiRecordGlobal("texture-studio/project/cancel");
+    return;
+  }
+  if (s.projectRoot.empty() || s.projectImported) return;
+  if (s.projectOffer)
+    ImGui::TextWrapped("Import %zu built-in presets into the %s project?", rbTexture::projectPresets().size(),
+      gameProfileName());
+  ImGui::BeginDisabled(busy);
+  if (ImGui::Button("Import presets")) studioAction([] { studioBeginProjectBake(); });
+  runUiRecordGlobal("texture-studio/project/import");
+  if (s.projectOffer) {
+    ImGui::SameLine();
+    if (ImGui::Button("Later")) s.projectOffer = false;
+    runUiRecordGlobal("texture-studio/project/later");
+  }
+  ImGui::EndDisabled();
+}
+
+static void studioProjectGallery(bool busy) {
+  auto& s = textureStudio;
+  ImGui::TextUnformatted("Project presets");
+  const char* family = s.projectFamily == -2 ? "All presets" : s.projectFamily == -1 ? "Built-in" :
+    rbTexture::recipeCategories[s.projectFamily];
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(-1);
+  if (ImGui::BeginCombo("##project-preset-family", family)) {
+    for (int group = -2; group < int(std::size(rbTexture::recipeCategories)); ++group) {
+      const auto title = group == -2 ? "All presets" : group == -1 ? "Built-in" : rbTexture::recipeCategories[group];
+      if (ImGui::Selectable(title, group == s.projectFamily)) s.projectFamily = group;
+    }
+    ImGui::EndCombo();
+  }
+  const auto* selected = studioProjectPresetByKey(s.projectPreset);
+  if (selected) ImGui::TextWrapped("%s", selected->label);
+  if (s.projectImported && selected) {
+    ImGui::BeginDisabled(busy || cvars->GetFloat("ftebroom_face_count") <= 0);
+    if (ImGui::Button("Apply material")) studioAction([&] { studioApplyProjectPreset(*selected); });
+    runUiRecordGlobal("texture-studio/project/apply");
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(busy || textureStudioDoc().readOnly);
+    if (ImGui::Button("Apply changes")) studioAction([&] { studioBeginProjectBake(selected); });
+    runUiRecordGlobal("texture-studio/project/update");
+    ImGui::EndDisabled();
+  }
+  ImGui::BeginChild("Texture Studio preset tiles", {0, 0}, ImGuiChildFlags_Borders);
+  const float side = 58 * uiScale(), padding = 3 * uiScale();
+  const float rowHeight = side + ImGui::GetTextLineHeightWithSpacing() + padding;
+  const auto width = ImGui::GetContentRegionAvail().x;
+  const auto columns = std::max(1, int((width + padding) / (side + padding)));
+  std::vector<const rbTexture::ProjectPreset*> visible;
+  for (const auto& preset : rbTexture::projectPresets())
+    if (s.projectFamily == -2 || preset.family == s.projectFamily) visible.push_back(&preset);
+  ImGuiListClipper clipper;
+  clipper.Begin(int((visible.size() + size_t(columns) - 1) / size_t(columns)),
+    rowHeight + ImGui::GetStyle().ItemSpacing.y);
+  ImGui::BeginDisabled(busy);
+  while (clipper.Step()) {
+    for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+      const float y = ImGui::GetCursorPosY();
+      for (int column = 0; column < columns && size_t(row * columns + column) < visible.size(); ++column) {
+        const auto& preset = *visible[size_t(row * columns + column)];
+        const float x = ImGui::GetStyle().WindowPadding.x + column * (side + padding);
+        ImGui::SetCursorPos({x, y});
+        ImGui::PushID(preset.key.c_str());
+        const auto top = ImGui::GetCursorScreenPos();
+        const bool click = ImGui::InvisibleButton("preset", {side, rowHeight});
+        runUiRecordGlobal("texture-studio/project/preset/" + preset.key);
+        const bool hovered = ImGui::IsItemHovered();
+        if (click) studioAction([&] { studioChooseProjectPreset(preset); });
+        const auto material = s.projectImported ? "textures/" + rbTexture::projectPresetMaterial(gameProfile, preset) : "";
+        const auto handle = !material.empty() ? thumbnail(material) :
+          studioFindThumbnail("project-" + preset.key, [&preset] { return preset.document(); }, ImGui::IsItemVisible());
+        auto* drawList = ImGui::GetWindowDrawList();
+        const ImVec2 imageEnd{top.x + side, top.y + side};
+        drawList->AddRectFilled(top, imageEnd, ImGui::GetColorU32(hovered ? ImGuiCol_HeaderHovered : ImGuiCol_FrameBg));
+        if (handle) drawList->AddImage((ImTextureID)handle, {top.x + padding, top.y + padding},
+          {imageEnd.x - padding, imageEnd.y - padding});
+        if (s.projectPreset == preset.key)
+          drawList->AddRect(top, imageEnd, ImGui::GetColorU32(ImGuiCol_HeaderActive), 0, 0, 2 * uiScale());
+        ImGui::RenderTextEllipsis(drawList, {top.x, imageEnd.y + padding}, {imageEnd.x, top.y + rowHeight},
+          imageEnd.x, imageEnd.x, preset.label, nullptr, nullptr);
+        if (hovered) ImGui::SetTooltip("%s", preset.label);
+        ImGui::PopID();
+      }
+    }
+  }
+  ImGui::EndDisabled();
+  ImGui::EndChild();
+}
+
 static void textureStudioPanel() {
   auto& s = textureStudio;
   studioTick();
   studioThumbnailTick();
-  if (!s.open) return;
+  if (s.open) studioAction([&] { studioRefreshProjectScope(s.projectOffer && s.focus); });
+  studioProjectTick();
+  if (!s.open || jamEditing()) return;
   if (s.previewMode == TextureStudioState::surface && s.apply == TextureStudioState::Apply::none &&
       !(s.scheduled && s.fullSize)) {
     if (ImGui::GetTime() >= s.nextSurfaceQuery) {
@@ -2260,7 +2436,19 @@ static void textureStudioPanel() {
   ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_FirstUseEver, {.5f, .5f});
   ImGui::SetNextWindowSize({std::min(1030 * uiScale(), maximum.x), std::min(650 * uiScale(), maximum.y)},
     ImGuiCond_FirstUseEver);
-  const bool contentVisible = ImGui::Begin("Texture Studio", &s.open);
+  if (!bbActive) {
+    for (const auto* name : {"Face", "Map", "Entity"}) {
+      const auto* inspector = ImGui::FindWindowByName(name);
+      if (inspector && inspector->DockId) {
+        ImGui::SetNextWindowDockID(inspector->DockId, ImGuiCond_FirstUseEver);
+        break;
+      }
+    }
+  }
+  // The model editor owns a separate workspace. Keep its texture dialog
+  // above that workspace without moving the map editor's docked tab.
+  const bool contentVisible = ImGui::Begin(bbActive ? "Texture Studio###Model Texture Studio" : "Texture Studio", &s.open,
+    bbActive ? ImGuiWindowFlags_NoDocking : ImGuiWindowFlags_None);
   s.focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
   if (contentVisible) {
     const auto nextButton = [](const char* label) {
@@ -2270,6 +2458,7 @@ static void textureStudioPanel() {
       if (nextRight <= ImGui::GetCurrentWindowRead()->WorkRect.Max.x) ImGui::SameLine();
     };
     if (runUiLive) {
+      const auto* window = ImGui::GetCurrentWindowRead();
       runUiGlobalRects["texture-studio/render-state"] = {
         {"revision", s.revision}, {"previewReady", s.handle != 0 && s.imageRevision == s.revision},
         {"theme", uiEffectiveTheme()}, {"scale", uiScale()},
@@ -2278,10 +2467,15 @@ static void textureStudioPanel() {
                                               [](const auto& entry) { return entry.second != 0; })},
         {"previewMode", int(s.previewMode)}, {"hasSurface", !s.surfaceData.empty()},
         {"fullSize", s.result && s.result->fullSize && s.result->revision == s.revision},
-        {"busy", s.job.valid() || s.inputJob.valid() || s.apply != TextureStudioState::Apply::none},
+        {"busy", s.job.valid() || s.inputJob.valid() || s.projectJob.valid() || s.apply != TextureStudioState::Apply::none},
+        {"projectImported", s.projectImported}, {"projectPreset", s.projectPreset},
+        {"projectMaterialReady", [&] {
+          const auto* preset = studioProjectPresetByKey(s.projectPreset);
+          return preset && materials.count("textures/" + rbTexture::projectPresetMaterial(gameProfile, *preset)) != 0;
+        }()},
+        {"docked", window->DockIsActive},
         {"readingSource", s.inputJob.valid()}, {"readOnly", textureStudioDoc().readOnly}, {"error", s.error}
       };
-      const auto* window = ImGui::GetCurrentWindowRead();
       if (!window->DockIsActive) {
         const auto title = window->TitleBarRect();
         const auto padding = ImGui::GetStyle().FramePadding;
@@ -2290,10 +2484,21 @@ static void textureStudioPanel() {
           {"x", title.Max.x - padding.x - button}, {"y", title.Min.y + padding.y},
           {"width", button}, {"height", button}
         };
+      } else if (auto* tabs = window->DockNode->TabBar) {
+        if (const auto* tab = ImGui::TabBarFindTabByID(tabs, window->TabId)) {
+          const auto left = std::max(tabs->ScrollingRectMinX,
+            tabs->BarRect.Min.x + tab->Offset - tabs->ScrollingAnim);
+          const auto right = std::min(tabs->ScrollingRectMaxX,
+            tabs->BarRect.Min.x + tab->Offset - tabs->ScrollingAnim + tab->Width);
+          if (right > left) runUiGlobalRects["texture-studio/tab"] = {
+            {"x", left}, {"y", tabs->BarRect.Min.y}, {"width", right - left}, {"height", tabs->BarRect.GetHeight()}
+          };
+        }
       }
     }
     const bool loading = s.inputJob.valid();
-    const bool applying = loading || s.apply != TextureStudioState::Apply::none;
+    const bool projectBusy = s.projectJob.valid();
+    const bool applying = loading || projectBusy || s.apply != TextureStudioState::Apply::none;
     const bool writable = !textureStudioDoc().readOnly;
     const auto& io = ImGui::GetIO();
     const bool shortcuts = s.focused && !io.WantTextInput &&
@@ -2308,6 +2513,17 @@ static void textureStudioPanel() {
         s.drag.reset();
       }
     }
+    const auto availableHeight = ImGui::GetContentRegionAvail().y;
+    const auto galleryHeight = std::clamp(availableHeight * .36f, 102 * uiScale(), 280 * uiScale());
+    const float controlsHeight = std::max(42.f, availableHeight - galleryHeight);
+    ImGui::BeginChild("Texture Studio controls", {0, controlsHeight});
+    if (runUiLive) {
+      const auto& clip = ImGui::GetCurrentWindowRead()->InnerClipRect;
+      runUiGlobalRects["texture-studio/controls"] = {
+        {"x", clip.Min.x}, {"y", clip.Min.y}, {"width", clip.GetWidth()}, {"height", clip.GetHeight()}
+      };
+    }
+    if (!bbActive) studioProjectPrompt(applying);
     ImGui::BeginDisabled(applying);
     if (ImGui::Button("New")) {
       s.presetSearch.fill(0);
@@ -2403,6 +2619,7 @@ static void textureStudioPanel() {
       rbTexture::Assets selectedAssets;
       std::filesystem::path selectedAssetRoot;
       std::string selectedId;
+      std::string selectedProjectPreset;
       if (ImGui::BeginChild("preset-library", ImVec2(listWidth, listHeight), ImGuiChildFlags_Borders)) {
         bool matched = query.empty() && !s.libraryFilter;
         const auto permitted = [&](const std::string& id) {
@@ -2470,6 +2687,7 @@ static void textureStudioPanel() {
             if (ImGui::Selectable(rbTexture::presetNames[preset], false, 0, {width, 32 * uiScale()})) {
               selected = rbTexture::builtinPreset(preset, ftebroom::bb::uuid());
               selectedId = id;
+              selectedProjectPreset = rbTexture::projectPresets().at(preset).key;
             }
             runUiRecordGlobal("texture-studio/preset/" + std::to_string(preset));
             favorite(id);
@@ -2495,6 +2713,7 @@ static void textureStudioPanel() {
                 selected = rbTexture::catalogPreset(category, index, ftebroom::bb::uuid());
                 if (variation) rbTexture::applyCatalogVariation(*selected, category, index, variation);
                 selectedId = id;
+                if (!variation) selectedProjectPreset = id;
               };
               if (ImGui::Selectable(name, false, 0, {std::max(1.f, width - variantsWidth), 32 * uiScale()}))
                 choose(0);
@@ -2597,10 +2816,14 @@ static void textureStudioPanel() {
       }
       if (selected) {
         studioAction([&] {
-          studioAutosave();
-          studioNewDocument(std::move(*selected));
-          s.assets = std::move(selectedAssets);
-          s.assetFolder = std::move(selectedAssetRoot);
+          if (const auto* preset = studioProjectPresetByKey(selectedProjectPreset))
+            studioChooseProjectPreset(*preset);
+          else {
+            studioAutosave();
+            studioNewDocument(std::move(*selected));
+            s.assets = std::move(selectedAssets);
+            s.assetFolder = std::move(selectedAssetRoot);
+          }
           ImGui::CloseCurrentPopup();
           studioRecordPreset(selectedId);
         });
@@ -2686,8 +2909,10 @@ static void textureStudioPanel() {
     const char* generate = assetOnly ? "Generate Asset" : "Generate & Apply";
     nextButton(generate);
     ImGui::BeginDisabled(!studioProfileAllowsApply());
-    if (ImGui::Button(generate)) studioAction([&] { studioBeginApply(assetOnly); });
-    runUiRecordGlobal("texture-studio/apply");
+    if (!(s.projectImported && !s.projectPreset.empty())) {
+      if (ImGui::Button(generate)) studioAction([&] { studioBeginApply(assetOnly); });
+      runUiRecordGlobal("texture-studio/apply");
+    }
     ImGui::EndDisabled();
     if (bbActive) {
       nextButton("Apply to model texture");
@@ -2698,7 +2923,7 @@ static void textureStudioPanel() {
     }
     ImGui::EndDisabled();
     const bool cancelling = s.job.valid() && s.cancel && s.cancel->load() && !s.scheduled;
-    if (loading) {
+    if (!projectBusy && loading) {
       if (!*s.inputCancel) {
         nextButton("Cancel");
         if (ImGui::Button("Cancel")) {
@@ -2708,7 +2933,7 @@ static void textureStudioPanel() {
         runUiRecordGlobal("texture-studio/cancel-input");
         if (!*s.inputCancel) ImGui::TextUnformatted("Reading material source…");
       }
-    } else if (!cancelling && (s.job.valid() || s.apply != TextureStudioState::Apply::none)) {
+    } else if (!projectBusy && !cancelling && (s.job.valid() || s.apply != TextureStudioState::Apply::none)) {
       nextButton("Cancel");
       ImGui::BeginDisabled(s.apply == TextureStudioState::Apply::commit);
       const bool cancel = ImGui::Button("Cancel");
@@ -2722,7 +2947,8 @@ static void textureStudioPanel() {
     if (!writable) ImGui::TextWrapped("This source uses a newer format. Save As preserves its original bytes.");
     const bool stacked = ImGui::GetContentRegionAvail().x < std::min(660 * uiScale(), 980.f);
     if (writable && stacked) {
-      const float height = std::clamp(ImGui::GetContentRegionAvail().y * .45f, 130.f, std::max(130.f, 310 * uiScale()));
+      const float height = std::min(std::clamp(ImGui::GetContentRegionAvail().x, 220 * uiScale(), 310 * uiScale()),
+        std::max(180.f, controlsHeight - ImGui::GetFrameHeight()));
       ImGui::BeginChild("Texture Preview", {-1, height}, ImGuiChildFlags_Borders);
       studioAction(studioPreview);
       ImGui::EndChild();
@@ -2736,6 +2962,8 @@ static void textureStudioPanel() {
       studioModeTabs(applying);
       ImGui::EndTable();
     }
+    ImGui::EndChild();
+    studioProjectGallery(applying);
   }
   ImGui::End();
   if (!s.open) {
@@ -2752,6 +2980,7 @@ static void textureStudioShutdown() {
   studioCancel();
   if (textureStudio.job.valid()) textureStudio.job.wait();
   if (textureStudio.inputJob.valid()) textureStudio.inputJob.wait();
+  if (textureStudio.projectJob.valid()) textureStudio.projectJob.wait();
   if (textureStudio.thumbnailJob.valid()) textureStudio.thumbnailJob.wait();
   if (textureStudio.document && ImGui::GetCurrentContext())
     studioAction(studioAutosave);

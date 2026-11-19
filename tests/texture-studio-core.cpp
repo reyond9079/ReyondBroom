@@ -3,6 +3,7 @@
 #include "../native/texture/catalog.h"
 #include "../native/texture/layers.h"
 #include "../native/texture/preview.h"
+#include "../native/texture/project_presets.h"
 
 #include <filesystem>
 #include <fstream>
@@ -26,6 +27,64 @@ template<class F> void reject(F action, std::string_view expected) {
 }
 
 #include "texture-studio-subgraphs.h"
+
+void checkProjectPresets() {
+  using namespace ts;
+  namespace q1 = ftebroom::quake1;
+  constexpr unsigned edge = 32;
+  const auto& presets = projectPresets();
+  check(presets.size() == presetNames.size() + std::size(catalogRecipes) * std::size(catalogRecipes[0]),
+    "Project gallery contains every default preset");
+  const auto& first = presets.front();
+  std::string palette;
+  for (unsigned i = 0; i < 256; ++i) palette += std::string(3, char(i));
+  for (int profile = 0; profile < 5; ++profile) {
+    std::set<std::string> names;
+    ProjectPresetFiles files, lumps;
+    for (const auto& preset : presets) {
+      const auto name = projectPresetMaterial(profile, preset);
+      check(names.insert(name).second, "Each profile gives every preset a unique material name");
+      check(name.size() <= (projectUsesWad(profile) ? 15 : 31), "Material fits its on-disk format");
+      if (profile <= 1)
+        check(projectPresetShaders(profile).find(projectProfileId(profile)) != std::string::npos,
+          "The shader script name is scoped to the game profile");
+      const auto evaluation = evaluate(compile(preset.document()), {edge, edge});
+      projectEncodePreset(files, lumps, profile, preset, evaluation, palette);
+    }
+    const auto firstMaterial = projectPresetMaterial(profile, first);
+    if (projectUsesWad(profile)) {
+      const auto archive = q1::mipWad(lumps, profile == 4);
+      const auto decoded = projectWadLumps(archive, profile);
+      check(decoded == lumps && decoded.size() == presets.size(), "WAD preserves every complete mip lump");
+      const auto& mip = decoded.at(firstMaterial);
+      check(q1::word(mip, 16) == edge && q1::word(mip, 20) == edge, "WAD textures have the requested dimensions");
+      const auto paletteOffset = q1::word(mip, 36) + edge * edge / 64;
+      check(profile == 4 ? mip.substr(paletteOffset + 2, palette.size()) == palette : mip.size() == paletteOffset,
+        "GoldSrc WAD3 carries a per-texture palette and Quake WAD2 uses the game palette");
+      auto doc = first.document();
+      doc.source["rootSeed"] = 8128;
+      projectEncodePreset(files, lumps, profile, first, evaluate(compile(doc), {edge, edge}), palette);
+      check(lumps.at(firstMaterial) != mip, "A preset edit changes the existing mip lump");
+      lumps[firstMaterial] = mip;
+      check(lumps == decoded, "Updating a preset leaves every other mip lump intact");
+    } else {
+      const auto& firstImage = files.at(projectPresetImagePath(profile, firstMaterial));
+      check(files.size() == presets.size() * (profile == 1 ? 3 : 1), "Every native texture channel was generated");
+      if (profile == 3) {
+        check(q1::name(firstImage, 0, 32) == firstMaterial && q1::word(firstImage, 32) == edge &&
+          q1::word(firstImage, 36) == edge, "Quake 2 WAL stores the stable name and mip dimensions");
+      } else {
+        const auto shader = projectShaderText(profile);
+        check(shader.find("textures/" + firstMaterial + ".tga") != std::string::npos,
+          "The shader references the generated TGA");
+        check(firstImage[2] == 2 && firstImage[12] == edge && firstImage[14] == edge &&
+          firstImage[16] == 32 && !(firstImage[17] & 32), "The native game image is a bottom-origin 32-bit TGA");
+        check(shader.find(profile == 1 ? "fte_program defaultwall" : "map $lightmap") != std::string::npos,
+          "The shader uses the appropriate game lighting pipeline");
+      }
+    }
+  }
+}
 
 void write(const fs::path& file, const std::string& value) {
   std::ofstream out(file, std::ios::binary);
@@ -432,6 +491,7 @@ int main(int argc, char** argv) try {
     }
   }
   checkCatalog({});
+  checkProjectPresets();
   for (const auto& spec : contracts()) {
     if (spec.kernel == Kernel::image) continue; // Exercised with encoded originals in the CLI suite.
     auto doc = runningBrick("node-check");

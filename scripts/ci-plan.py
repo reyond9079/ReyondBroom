@@ -82,6 +82,8 @@ RULES = [
     (['scripts/test-engine-viewport.py'], {'input'}),
     (['patches/*input*', 'patches/*mouse*', 'patches/*window*'], {'input'}),
     (['native/ftebroom_cursor.h', 'patches/*cursor*'], {'viewport'}),
+    (['native/ftebroom_texture_studio.h', 'native/ftebroom_texture_project.h', 'native/texture/project_presets.h',
+      'scripts/test-texture-studio-ui.py', 'tests/texture-studio-core.cpp'], {'resources', 'ui'}),
     (['qc/fb_sculpt.qc'], {'viewport', 'placement'}),
     (['patches/*resource*', 'patches/*mapasset*'], {'resources'}),
     (['patches/*grid*', 'patches/*render*', 'patches/*shader*'], {'render'}),
@@ -395,6 +397,23 @@ ENTITY_LINK_COLOR_HOST_SCOPES = {
 }
 
 
+PROJECT_PRESET_HOST_SCOPES = {
+    'qc/csaddon.qc': ({'render'}, [
+        ('static void() perf_renderscene =\n{\n'
+         '    if(checkbuiltin(editor_shader_clock))editor_shader_clock(gettime(0));\n\trenderscene();\n};\n',
+         'var float autocvar_ftebroom_editor_render = 0;\nstatic void() perf_renderscene =\n{\n'
+         '    if(checkbuiltin(editor_shader_clock))editor_shader_clock(gettime(0));\n'
+         '\tcvar_set("ftebroom_editor_render", "1");\n\trenderscene();\n'
+         '\tcvar_set("ftebroom_editor_render", "0");\n};\n'),
+    ]),
+    'native/ftebroom_workspace.h': ({'ui'}, [
+        ('    ImGui::DockBuilderDockWindow("Plant Brush", right);\n',
+         '    ImGui::DockBuilderDockWindow("Plant Brush", right);\n'
+         '    ImGui::DockBuilderDockWindow("Texture Studio", right);\n'),
+    ]),
+}
+
+
 def editor_host_scope(path, before, after, scopes=EDITOR_HOST_SCOPES):
     scope = scopes.get(path)
     if not scope or before == after:
@@ -412,7 +431,8 @@ def semantic_scopes(base, head, paths):
     result = {}
     for path in paths:
         if not any(path in entries for entries in (WORLD_HOST_ADDITIONS, ONBOARDING_HOST_REPLACEMENTS,
-                                                     LESSON_HOST_REPLACEMENTS, EDITOR_HOST_SCOPES, RB36_HOST_SCOPES, ENTITY_LINK_COLOR_HOST_SCOPES)):
+                                                     LESSON_HOST_REPLACEMENTS, EDITOR_HOST_SCOPES, RB36_HOST_SCOPES,
+                                                     ENTITY_LINK_COLOR_HOST_SCOPES, PROJECT_PRESET_HOST_SCOPES)):
             continue
         def read(ref):
             return subprocess.check_output(['git', 'show', ref+':'+path], stderr=subprocess.PIPE).decode()
@@ -420,7 +440,8 @@ def semantic_scopes(base, head, paths):
         groups = (world_host_scope(path, before, after) or onboarding_host_scope(path, before, after)
                   or lesson_host_scope(path, before, after) or editor_host_scope(path, before, after)
                   or editor_host_scope(path, before, after, RB36_HOST_SCOPES)
-                  or editor_host_scope(path, before, after, ENTITY_LINK_COLOR_HOST_SCOPES))
+                  or editor_host_scope(path, before, after, ENTITY_LINK_COLOR_HOST_SCOPES)
+                  or editor_host_scope(path, before, after, PROJECT_PRESET_HOST_SCOPES))
         if groups:
             result[path] = groups
     return result

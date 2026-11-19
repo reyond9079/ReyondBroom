@@ -116,6 +116,9 @@ static void assetsReady()
     {
       if (path == "textures/ftebroom/overlay.tga" || path.rfind("textures/_ftebroom_q1/",0)==0 || path.rfind("textures/_ftebroom_q2/",0)==0 || path.rfind("textures/_ftebroom_missing/",0)==0)
         continue;
+      if (path.rfind("textures/reyond-studio/p", 0) == 0 && dot >= 5 &&
+          (path.compare(dot - 5, 5, "_norm") == 0 || path.compare(dot - 5, 5, "_luma") == 0))
+        continue; // These images are resolved through the project's FTE preset shader.
       auto name = path.substr(0, dot);
       if(gameProfile==3){
         name="textures/"+ftebroom::materialKey(name);

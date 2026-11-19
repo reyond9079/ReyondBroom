@@ -79,10 +79,13 @@ void(vector mouse) editor_options_overlay =
 };
 
 void(float seconds) editor_shader_clock = #0:editor_shader_clock;
+var float autocvar_ftebroom_editor_render = 0;
 static void() perf_renderscene =
 {
     if(checkbuiltin(editor_shader_clock))editor_shader_clock(gettime(0));
+	cvar_set("ftebroom_editor_render", "1");
 	renderscene();
+	cvar_set("ftebroom_editor_render", "0");
 };
 
 float fb_benchmark_start,fb_benchmark_frames;

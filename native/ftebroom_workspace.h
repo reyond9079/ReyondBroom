@@ -234,6 +234,7 @@ static void uiWorkspace(float w,float h,float top,float statusHeight,float margi
     ImGui::DockBuilderDockWindow("Entity", right);
     ImGui::DockBuilderDockWindow("Face", right);
     ImGui::DockBuilderDockWindow("Plant Brush", right);
+    ImGui::DockBuilderDockWindow("Texture Studio", right);
     ImGui::DockBuilderDockWindow("FTE Engine terrain", right);
     ImGui::DockBuilderFinish(uiDockId);
     uiReset = false;

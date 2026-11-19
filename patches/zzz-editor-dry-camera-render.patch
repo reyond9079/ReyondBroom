@@ -1,0 +1,23 @@
+--- a/engine/client/r_surf.c
++++ b/engine/client/r_surf.c
+@@ -2251,8 +2251,18 @@
+ 	}
+ 	if (!r_refdef.recurse)
+ 	{
+-		r_viewcontents = viewcontents;
++		/* Keep the real clusters and contents queries above. The editor camera
++		 * only needs the dry visual presentation, including Quake II views
++		 * whose underwater flag is supplied by the game. */
++		const qboolean editview = Cvar_VariableValue("ftebroom_editor_render") ||
++			(COM_CheckParm("-ftebroom-preview") && !Cvar_VariableValue("ftebroom_preview_play"));
++		r_viewcontents = editview ? 0 : viewcontents;
++		if (editview)
++			r_refdef.flags &= ~(RDF_UNDERWATER | RDF_WATERWARP);
+ 		if (!r_secondaryview)
+-			V_SetContentsColor (viewcontents);
++		{
++			if (editview) r_refdef.playerview->cshifts[CSHIFT_CONTENTS].percent = 0;
++			else V_SetContentsColor (viewcontents);
++		}
+ 	}
+ 

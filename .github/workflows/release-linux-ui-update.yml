@@ -286,6 +286,11 @@ jobs:
         xvfb-run -a -s '-screen 0 1920x1080x24' python -u scripts/test-texture-studio-ui.py "$runtime" \
           --output qa/texture-studio/native --graph-keyboard | tee qa/texture-studio/native.log
         if test "$PLATFORM" = Linux-x64; then
+          for profile in quake1 halflife quake2 quake3 fte; do
+            project_qa="qa/texture-studio/presets-$profile"
+            xvfb-run -a -s '-screen 0 1920x1080x24' python -u scripts/test-texture-studio-ui.py "$runtime" \
+              --output "$project_qa" --profile "$profile" --project-presets | tee "$project_qa.log"
+          done
           xvfb-run -a -s '-screen 0 1920x1080x24' python -u scripts/test-texture-studio-ui.py "$runtime" \
             --output qa/texture-studio/relocation --profile quake1 --move-project | tee qa/texture-studio/relocation.log
           xvfb-run -a -s '-screen 0 1920x1080x24' python -u scripts/test-texture-studio-ui.py "$runtime" \
@@ -552,6 +557,9 @@ jobs:
         python -u scripts/test-texture-studio-ui.py $runtime --output qa/texture-studio/native --graph-keyboard |
           Tee-Object -FilePath qa/texture-studio/native.log
         if ($LASTEXITCODE) { throw 'Packaged Texture Studio failed' }
+        python -u scripts/test-texture-studio-ui.py $runtime --output qa/texture-studio/presets-quake1 --profile quake1 --project-presets |
+          Tee-Object -FilePath qa/texture-studio/presets-quake1.log
+        if ($LASTEXITCODE) { throw 'Texture Studio project presets failed' }
         python -u scripts/test-texture-studio-ui.py $runtime --output qa/texture-studio/relocation --profile quake1 --move-project |
           Tee-Object -FilePath qa/texture-studio/relocation.log
         if ($LASTEXITCODE) { throw 'Texture Studio project relocation failed' }

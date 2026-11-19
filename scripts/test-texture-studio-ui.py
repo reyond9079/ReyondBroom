@@ -24,6 +24,16 @@ def faces(path):
     )))
 
 
+def wad_contents(path):
+    data = path.read_bytes()
+    count, offset = struct.unpack_from("<II", data, 4)
+    result = {}
+    for index in range(count):
+        address, size, _, _, _, name = struct.unpack_from("<IIIBB2x16s", data, offset + 32 * index)
+        result[name.rstrip(b"\0").decode("ascii")] = data[address:address + size]
+    return result
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("runtime", type=Path)
@@ -32,6 +42,7 @@ def main():
     cli.add_argument("--three-faces", action="store_true")
     cli.add_argument("--layout-only", action="store_true")
     cli.add_argument("--preset-library", action="store_true")
+    cli.add_argument("--project-presets", action="store_true")
     cli.add_argument("--move-project", action="store_true")
     cli.add_argument("--renderer-restart", action="store_true")
     cli.add_argument("--graph-keyboard", action="store_true")
@@ -98,7 +109,9 @@ def main():
     state_path = data / "compilation-ui-live.json"
     state_path.unlink(missing_ok=True)
     config = data / "texture-studio-qa.cfg"
+    mount = f'set ftebroom_assetpath "{project.as_posix()}"\nfs_restart\n' if args.project_presets else ""
     config.write_text("exec ftebroom.cfg\nset ftebroom_skip_setup 1\n"
+                      f"{mount}"
                       f'set ftebroom_test_import_root "{output.as_posix()}"\n'
                       "in 7 mapedit maps/texture-studio-qa.map\n"
                       f"in 9 ftebroom_test_desktop reyon8qa {args.theme}\n",
@@ -155,8 +168,27 @@ def main():
 
             ui = NativeInput(game, state_path, live, wait, output)
 
-            def click(name):
+            def locate(name):
                 rect = wait(lambda: live()["globalWidgets"].get(name))
+                studio = live()["globalWidgets"].get("texture-studio/controls")
+                if (studio and name.startswith("texture-studio/") and not name.startswith("texture-studio/project/")
+                        and studio["x"] <= rect["x"] + rect["width"] * .5 <= studio["x"] + studio["width"]):
+                    middle = rect["y"] + rect["height"] * .5
+                    if not studio["y"] <= middle <= studio["y"] + studio["height"]:
+                        ui.move(studio["x"] + studio["width"] - 20, studio["y"] + 10)
+                        for _ in range(30):
+                            ui.scroll(-1 if middle > studio["y"] else 1)
+                            rect = wait(lambda: live()["globalWidgets"].get(name))
+                            middle = rect["y"] + rect["height"] * .5
+                            if studio["y"] <= middle <= studio["y"] + studio["height"]:
+                                break
+                return rect
+
+            def click(name):
+                if name == "texture-studio/close" and (tab := live()["globalWidgets"].get("texture-studio/tab")):
+                    ui.click(tab["x"] + tab["width"] * .5, tab["y"] + tab["height"] * .5, button=2)
+                    return
+                rect = locate(name)
                 ui.click(rect["x"] + rect["width"] * .5, rect["y"] + rect["height"] * .5)
 
             def edit(name, selection=False):
@@ -180,10 +212,89 @@ def main():
             wait(lambda: live()["globalWidgets"].get("menu/Assets"))
             wait(map_open)
             edit("Select All", selection=True)
+            if args.project_presets:
+                save_when(lambda rows: rows and "// Format:" in map_file.read_text(encoding="ascii"))
             if args.scale != 100:
                 ui.console(f"ftebroom_test_run {60 + (args.scale - 100) // 25}")
             click("menu/Assets")
             click("Menu/Assets/Texture Studio...")
+
+            if args.project_presets:
+                studio = lambda: live()["globalWidgets"]["texture-studio/render-state"]
+                assert wait(lambda: studio()["docked"])
+                assert not studio()["projectImported"]
+                original = [(geometry, uv) for geometry, _, uv in faces(map_file)]
+                click("texture-studio/project/import")
+                wait(lambda: studio()["projectImported"] or studio()["error"], timeout=360)
+                assert studio()["projectImported"], studio()["error"]
+                profile_id = ("q3", "fte", "q1", "q2", "hl")[profile]
+                metadata = project / "texture-studio-presets" / profile_id
+                manifest_file = metadata / "manifest.json"
+                manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+                assert manifest["profile"] == profile_id
+                assert len(manifest["files"]) == (1 if wad else 403 if profile == 1 else 135 if profile == 0 else 134)
+                for name, expected in manifest["files"].items():
+                    assert hashlib.sha256((project / name).read_bytes()).hexdigest() == expected, name
+                key = "builtin-0"
+                token = hashlib.sha256(f"{profile_id}/{key}".encode()).hexdigest()
+                material = "rbs_" + token[:11] if wad else "reyond-studio/p" + token[:14]
+                relative = f"texture-wads/reyond-studio-presets-{profile_id}.wad" if wad else f"textures/{material}{runtime_suffix}"
+                resource = project / relative
+                if wad:
+                    assert resource.read_bytes()[:4] == (b"WAD2" if profile == 2 else b"WAD3")
+                    lumps = wad_contents(resource)
+                    assert material in lumps and len(lumps) == 134
+                if profile == 3:
+                    assert resource.read_bytes()[:32].rstrip(b"\0").decode() == material
+                if profile <= 1:
+                    script = f"reyond-studio-presets-{profile_id}"
+                    assert script in (project / "scripts/shaderlist.txt").read_text()
+                    assert f"textures/{material}.tga" in (project / f"scripts/{script}.shader").read_text()
+                wait(lambda: studio()["projectPreset"] == key and studio()["previewReady"] and not studio()["busy"]
+                     and studio().get("projectMaterialReady", True))
+                click("texture-studio/project/apply")
+                applied = save_when(lambda rows: bool(rows) and
+                                    all(row[1].removeprefix("textures/") == material for row in rows))
+                assert [(geometry, uv) for geometry, _, uv in applied] == original
+                if wad:
+                    assert relative in map_file.read_text() and "prior.wad" in map_file.read_text()
+                previous = studio()["revision"]
+                seed = locate("texture-studio/seed")
+                ui.click(seed["x"] + 30, seed["y"] + seed["height"] * .5)
+                ui.key("a", ("ctrl",))
+                ui.text("8128")
+                ui.key("enter")
+                wait(lambda: studio()["revision"] != previous and studio()["previewReady"] and not studio()["busy"])
+                if profile == 0 and sys.platform.startswith("linux"):
+                    import fcntl
+                    with (metadata / ".lock").open("rb") as project_lock:
+                        fcntl.flock(project_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        click("texture-studio/project/update")
+                        wait(lambda: "preset library lock" in studio()["error"], timeout=90)
+                        assert manifest == json.loads(manifest_file.read_text(encoding="utf-8"))
+                        assert hashlib.sha256(resource.read_bytes()).hexdigest() == manifest["files"][relative]
+                click("texture-studio/project/update")
+                custom_source = metadata / f"{key}.rbtex.json"
+                def updated():
+                    if not custom_source.is_file():
+                        return None
+                    files = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]
+                    return files if files[relative] != manifest["files"][relative] else None
+                changed = wait(lambda: updated() or studio()["error"], timeout=90)
+                assert not studio()["error"], studio()["error"]
+                assert hashlib.sha256(resource.read_bytes()).hexdigest() == changed[relative]
+                if wad:
+                    new_lumps = wad_contents(resource)
+                    assert new_lumps.pop(material) != lumps.pop(material)
+                    assert new_lumps == lumps
+                assert faces(map_file) == applied
+                from PIL import ImageGrab
+                x, y = ui.position()
+                scale_x, scale_y = getattr(ui, "scale", (1, 1))
+                ImageGrab.grab(bbox=(x, y, x + round(int(width) * scale_x),
+                                     y + round(int(height) * scale_y))).save(output / "project-presets.png")
+                print(f"PASS {args.profile}: imported 134 native presets, applied one to selected brushes, and updated it in place")
+                return
 
             if args.input_stall_helper:
                 def current():
@@ -412,24 +523,28 @@ def main():
                 widgets = wait(lambda: (items if (items := live()["globalWidgets"]).get(
                     "texture-studio/render-state", {}).get("previewReady") else None))
                 state = widgets["texture-studio/render-state"]
+                preview = locate("texture-studio/preview-image")
                 if os.name != "nt":
                     from PIL import ImageGrab
                     ImageGrab.grab().save(output / "quick.png")
                 assert state["scale"] == args.scale / 100 and state["theme"] == (3 if args.theme == "light" else 0)
                 assert live()["display"] == [int(width), int(height)]
-                preview = widgets["texture-studio/preview-image"]
                 assert min(preview["width"], preview["height"]) >= 64, preview
-                assert preview["y"] + preview["height"] <= int(height), preview
                 controls = ("new", "import", "save", "save-package", "export", "apply",
                             "preview-mode", "quick-tab", "layers-tab", "graph-tab")
-                controls = [widgets[f"texture-studio/{name}"] for name in controls]
-                for rect in controls:
+                for name in controls:
+                    rect = locate(f"texture-studio/{name}")
                     assert 0 <= rect["x"] < rect["x"] + rect["width"] <= int(width), rect
-                    assert 0 <= rect["y"] < rect["y"] + rect["height"] <= int(height), rect
-                for i, a in enumerate(controls):
-                    for b in controls[i + 1:]:
-                        assert a["x"] + a["width"] <= b["x"] or b["x"] + b["width"] <= a["x"] or \
-                            a["y"] + a["height"] <= b["y"] or b["y"] + b["height"] <= a["y"], (a, b)
+                    current = live()["globalWidgets"]
+                    clip = current["texture-studio/controls"]
+                    edge = clip["y"] + clip["height"]
+                    assert clip["y"] <= rect["y"] + rect["height"] * .5 <= edge, rect
+                    for other in controls:
+                        box = current.get(f"texture-studio/{other}")
+                        if other == name or not box or not clip["y"] <= box["y"] + box["height"] * .5 <= edge:
+                            continue
+                        assert (rect["x"] + rect["width"] <= box["x"] or box["x"] + box["width"] <= rect["x"] or
+                                rect["y"] + rect["height"] <= box["y"] or box["y"] + box["height"] <= rect["y"]), (rect, box)
                 click("texture-studio/layers-tab")
                 wait(lambda: live()["globalWidgets"].get("texture-studio/layer-add"))
                 click("texture-studio/graph-tab")

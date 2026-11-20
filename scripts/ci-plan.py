@@ -401,6 +401,16 @@ ENTITY_LINK_COLOR_HOST_SCOPES = {
 
 
 PROJECT_PRESET_HOST_SCOPES = {
+    'qc/ftebroom_document.qc': ({'entities', 'resources'}, [
+        ('    if(fb_document_assets_epoch!=currentAssets){fb_document_assets_epoch=currentAssets;fb_entity_definitions_load();editor_ents_reload();fb_grid_geometry_epoch++;}\n',
+         '    int assetsChanged=fb_document_assets_epoch!=currentAssets;\n'
+         '    if(assetsChanged){fb_document_assets_epoch=currentAssets;fb_entity_definitions_load();editor_ents_reload();fb_grid_geometry_epoch++;}\n'),
+        ('    if(revision!=fb_seen_revision) {\n', '    if(assetsChanged || revision!=fb_seen_revision) {\n'),
+        ('        if(reload){\n',
+         '        // A renderer reload can retire engine brush and model handles without editing the map.\n'
+         '        if(assetsChanged)fb_document_rebuild();\n'
+         '        else if(reload){\n'),
+    ]),
     'native/ftebroom.cpp': ({'input'}, [
         ('    if (!inJam&&!soundKeyboardEvent(key, down)&&(!down||(!runUiNavigation()&&!plantFocused()&&!worldArchitectFocused()&&!textureStudioFocused())))\n'
          '      dispatchAction(key, down, inScene, hit, tourActive&&tourStep==tourGridStep);\n',

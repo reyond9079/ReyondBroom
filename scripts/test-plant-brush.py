@@ -194,7 +194,9 @@ try:
     current = wait(lambda: live()['widgets'].get('plant-brush/current',{}).get('visible'))
     check(current and live()['plantBrush']['selection']=='@current',
           'Plant Editor reveals and selects the current draft in the brush catalogue')
-    ui.click(x+view['width']*.18,y)
+    # The far-right edge of the floor runs through the old click at some viewport heights.
+    view = live()['views'][0]
+    ui.click(view['x']+view['width']*.66,view['y']+view['height']*.83)
     plants, _ = snapshot('paint-draft')
     check(any(json.loads((data/item['_reyondbroom_source']).read_text())['name']=='Untitled oak' for item in plants),
           'the transferred draft can be painted without saving it as a preset first')

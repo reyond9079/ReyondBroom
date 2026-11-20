@@ -354,6 +354,15 @@ def main():
                 wait(lambda: not studio()["busy"])
                 assert not studio()["error"], studio()["error"]
                 assert hashlib.sha256(resource.read_bytes()).hexdigest() == changed[relative]
+                if profile == 1:
+                    # Material updates reload engine resources while the map remains open.
+                    snapshot = data / "data/export-map.map"
+                    snapshot.unlink(missing_ok=True)
+                    ui.console("ftebroom_export_map")
+                    wait(snapshot.is_file)
+                    exported = faces(snapshot)
+                    assert len(exported) == len(applied)
+                    assert {row[1].strip('"').removeprefix("textures/") for row in exported} == {material}
                 from PIL import ImageGrab
                 x, y = ui.position()
                 scale_x, scale_y = getattr(ui, "scale", (1, 1))

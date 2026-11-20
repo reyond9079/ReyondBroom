@@ -311,12 +311,13 @@ var float fb_document_assets_epoch=-1;
 void fb_document_tick()
 {
     float currentAssets=cvar("ftebroom_entity_assets_epoch");
-    if(fb_document_assets_epoch!=currentAssets){fb_document_assets_epoch=currentAssets;fb_entity_definitions_load();editor_ents_reload();fb_grid_geometry_epoch++;}
+    int assetsChanged=fb_document_assets_epoch!=currentAssets;
+    if(assetsChanged){fb_document_assets_epoch=currentAssets;fb_entity_definitions_load();editor_ents_reload();fb_grid_geometry_epoch++;}
     int revision=fb_document_revision();
     cvar_set("ftebroom_revision",itos(revision));
     if(revision!=fb_saved_revision || cvar("ftebroom_terrain_dirty")) cvar_set("ftebroom_dirty","1");
     else cvar_set("ftebroom_dirty","0");
-    if(revision!=fb_seen_revision) {
+    if(assetsChanged || revision!=fb_seen_revision) {
         static int structureRevision=-1,previousHistory=-1;
         int structure=history_base_revision;
         for(int record=history-1;record>=history_min;record--) {
@@ -337,7 +338,9 @@ void fb_document_tick()
         int redo=history>previousHistory;previousHistory=history;
         fb_seen_revision=revision;structureRevision=structure;
         // Selection history must not rebuild every brush surface and grid cache.
-        if(reload){
+        // A renderer reload can retire engine brush and model handles without editing the map.
+        if(assetsChanged)fb_document_rebuild();
+        else if(reload){
             // QC boolean operators can evaluate both operands. Never invoke a
             // mutating fallback until its range and ownership are eligible.
             int updated=fb_batch_document(first,last,redo);

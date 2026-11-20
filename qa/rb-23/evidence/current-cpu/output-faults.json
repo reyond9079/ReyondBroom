@@ -1,0 +1,11 @@
+{
+  "fileSizeLimitExit": 1,
+  "accessDeniedExit": 1,
+  "overwriteExit": 1,
+  "priorAssetHashes": {
+    "source.rbtex.json": "439552eac1fa9b515599b3d523a84eea8e85ee8aac49e3b68a44b842b340384f",
+    "manifest.json": "e5344f8b873b8bc20467972a75f740d12c326c0e4b390230d07e38b91b9362c3",
+    "textures/qa/current.tga": "492f9d83280ca0f249139aaf95b32d07702f0845aaeec7216a49d180dcb21de3"
+  },
+  "pendingDirectoriesAfterFailure": 0
+}

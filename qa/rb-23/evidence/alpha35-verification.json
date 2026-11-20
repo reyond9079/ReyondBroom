@@ -1,0 +1,91 @@
+{
+  "baseline": "8f58961ccf93b3bcff6528b26d38c732455bdd84",
+  "sourceCommit": "bec0066ed371ce9622517631c3c97fb37decc68e",
+  "packageValidation": "https://github.com/reyond9079/ReyondBroom/actions/runs/44705988194",
+  "date": "2026-11-20T10:13:57.645878+00:00",
+  "profilesAndLocalRetests": {
+    "Windows Plant Brush transfer lands within the test fixture": [
+      "PASS context opens a docked Plant Brush tab",
+      "PASS world-space radius can be edited",
+      "PASS paint places exactly one profile-native FTE plant at small radius",
+      "PASS placed plant includes its reusable IQM and editable source",
+      "PASS Plant Brush defaults use Half-Life player scale for FTE",
+      "PASS painted IQM geometry has mushroom stature relative to a 72-unit player",
+      "PASS different catalogue plants can share the same area",
+      "PASS erase catalogue contains scene plants only",
+      "PASS filtered erase removes only the chosen species",
+      "PASS unfiltered erase removes remaining plants and preserves unrelated entities",
+      "PASS erase is a single Undo step",
+      "PASS filtered erase is a single Undo step",
+      "PASS a single drag places plants along its path",
+      "PASS one Undo removes the whole paint stroke",
+      "PASS create new plant opens Plant Editor and releases scene input",
+      "PASS Plant Editor reveals and selects the current draft in the brush catalogue",
+      "PASS the transferred draft can be painted without saving it as a preset first",
+      "PASS Create new plant and editor-to-brush transfer retain the FTE oak scale"
+    ],
+    "FTE native Texture Studio project on Windows": [
+      "PASS Windows compiled the FTE material after import, apply and update, in the same editor session",
+      "PASS fte: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "FTE shader uses metalness and roughness with a test reflection cubemap": [
+      "metal delta 56.00",
+      "rough delta 1.58",
+      "PASS Windows FTE loads the exact post-update toolbar BSP and reads both generated maps with the actual id1 shader"
+    ],
+    "Post-update editor BSP renders both maps in FTE on Windows": [
+      "PASS Windows FTE loads the exact post-update toolbar BSP and reads both generated maps with the actual id1 shader"
+    ],
+    "The editor compiles without reopening the FTE map on Windows": [
+      "PASS Windows compiled the FTE material after import, apply and update, in the same editor session",
+      "PASS fte: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "FTE native Texture Studio project on Linux": [
+      "PASS fte: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "FTE migrated catalog retains source and legacy image bytes": [
+      "PASS upgraded all FTE catalog textures while preserving previous texture bytes and edited source",
+      "PASS fte: imported 134 native presets, applied one to selected brushes, and updated it in place",
+      "PASS compiled FTE room using generated material and tangent-space deluxemaps",
+      "PASS actual id1 defaultwall visually responds to both _gloss AO and _norm on a compiled BSP"
+    ],
+    "FTE runtime reads both maps from the original id1 wall shader": [
+      "PASS compiled FTE room using generated material and tangent-space deluxemaps",
+      "PASS actual id1 defaultwall visually responds to both _gloss AO and _norm on a compiled BSP"
+    ],
+    "FTE on Windows reads both maps from the original id1 wall shader": [
+      "PASS Windows game executable renders _gloss and _norm with the actual id1 shader"
+    ],
+    "Texture Studio compiled in the map editor toolbar": [
+      "PASS the real editor Compile button baked a lightmapped FTE BSP with tangent-space deluxemaps"
+    ],
+    "Colour data bytes and existing project codecs": [
+      "PASS 120 distinct catalog recipes at five seeds, including 12 looping recipes",
+      "PASS Texture Studio seed, graph, sampling, color, history, memory, and PNG fixtures",
+      "PASS independent PNG, TGA, WAD2, WAD3 and WAL validation"
+    ],
+    "CLI package and project format regression": [
+      "PASS profile routes, deterministic PK3, import preservation, safe paths, and refusal to overwrite"
+    ]
+  },
+  "scope": "Retained baseline evidence for unchanged codec, graph, parser, and other unrelated subsystems. Re-ran affected native and format checks and verified all three final package jobs at the source revision.",
+  "packagedChecks": {
+    "linux (Linux-x64)": "success",
+    "windows": "success",
+    "linux (Linux-SDL2-x64)": "success"
+  },
+  "changedFiles": [
+    "native/ftebroom_assets.h",
+    "native/ftebroom_build.h",
+    "native/ftebroom_texture_project.h",
+    "native/ftebroom_texture_studio.h",
+    "native/texture/legacy_codec.h",
+    "native/texture/project_presets.h",
+    "qc/ftebroom_document.qc",
+    "scripts/ci-plan.py",
+    "scripts/test-plant-brush.py",
+    "scripts/test-texture-studio-ui.py",
+    "tests/texture-studio-cli.py",
+    "tests/texture-studio-core.cpp"
+  ]
+}

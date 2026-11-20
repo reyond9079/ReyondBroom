@@ -1,0 +1,25 @@
+{
+  "source": "c6bf481e28ae0e5ca89ba5b70c24c92d7048670b",
+  "moduleSha256": "c9c19a722c38c719bf4a5af71e1a9d07af38497dce28904865500b4f6888b782",
+  "liveWindowTest": "PASS",
+  "undoRestoredOriginalFaceProjections": 42,
+  "applyChangedMap": true,
+  "nativeCases": [
+    "selected face projection",
+    "Generate Asset",
+    "apply/save/undo/redo",
+    "model apply and reopen",
+    "import original image",
+    "dry run checksum",
+    "overwrite refusal",
+    "quick and layers",
+    "keyboard-only graph"
+  ],
+  "artifactSha256": {
+    "before-apply.map": "5d3e12dfcbe7dd2155ce7c1d47d51cf2c3811c2d9875d0b8aac059e37102a5fe",
+    "applied.map": "315270795eb46db51bbfbd9399d7c26508f41146d0acc40f605d3e95e93473c2",
+    "restored.map": "ee3f74002a5a57a6b72a6ed602276504436ad33a9e717fa4846c1ac962d77354",
+    "exported-source.png": "16017cb7335426d30a88e3054d60cf05bcc50fdfeb4b74b385b6c7bb85d5295f",
+    "imported-image.rbtexpkg": "0ac793bb34062b1d600eb0c2f3ba9f8a681f0e017c5ec2c0420e54dd9a1b9dce"
+  }
+}

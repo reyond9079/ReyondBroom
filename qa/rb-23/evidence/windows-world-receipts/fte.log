@@ -1,0 +1,14 @@
+PASS selected brush surface preview used the actual map geometry and UV projection
+PASS Generate Asset creates the game texture without changing the map
+PASS fte Apply, save, Undo and Redo update the entire selection and preserve all 42 face projections
+PASS Edit Texture Studio source opens the map material's graph and preserves the original
+PASS Model Editor Apply, save, Undo and Redo preserve the selected slot, UVs and graph
+PASS native Image Import and Save Package preserve the original image and license
+PASS native Texture Studio PNG matches the exact bytes and SHA-256 shown by Dry run
+PASS exporting over an existing file requires confirmation and preserves it on cancel
+PASS Model Editor opens the saved graph and preserves original bytes through Undo and Redo
+PASS native preset search, layer editor, and saved source share the same graph
+PASS Ctrl+Z and Ctrl+Y target the focused Texture Studio history
+PASS randomizing Quick parameters preserves the root seed and can be undone
+PASS native graph grouping and typed group input reconnection persist in the source
+PASS keyboard-only graph grouping, connecting, error navigation, deleting and undo

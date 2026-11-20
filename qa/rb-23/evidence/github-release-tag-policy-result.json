@@ -1,0 +1,8 @@
+{
+  "ruleId": 27628350,
+  "ruleActive": true,
+  "deployKeyId": 170429116,
+  "keyWritableForThisRepository": true,
+  "protectedEnvironment": "rb23-release",
+  "releaseTagsCreated": 0
+}

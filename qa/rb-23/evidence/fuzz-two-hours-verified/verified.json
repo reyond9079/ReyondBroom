@@ -1,0 +1,32 @@
+{
+  "graph": {
+    "accepted": 1518456,
+    "durationSeconds": 7200,
+    "iterations": 10154139,
+    "mode": "graph",
+    "seed": 24058,
+    "fuzzSourceCommit": "4d802af5ef82044056aa00fac79fb23f32c25a01",
+    "noWarningsOrCrashes": true,
+    "artifactSha256": "7e8e9312ca62189704e661aeaca465f50686f29b0f996b7184f60fce25d256e3"
+  },
+  "image": {
+    "accepted": 75055938,
+    "durationSeconds": 7200,
+    "iterations": 319124949,
+    "mode": "image",
+    "seed": 24058,
+    "fuzzSourceCommit": "4d802af5ef82044056aa00fac79fb23f32c25a01",
+    "noWarningsOrCrashes": true,
+    "artifactSha256": "214df3e64dc6f517037610d6b51d6e768bf2ef2e78e1055e1ba9fbb4e03440e6"
+  },
+  "zip": {
+    "accepted": 3908898,
+    "durationSeconds": 7200,
+    "iterations": 27310452,
+    "mode": "zip",
+    "seed": 24058,
+    "fuzzSourceCommit": "4d802af5ef82044056aa00fac79fb23f32c25a01",
+    "noWarningsOrCrashes": true,
+    "artifactSha256": "7b4c19d51a6a3820311fc95e828a513b657a547b494d9b0c7059c56684bebfd6"
+  }
+}

@@ -1,0 +1,21 @@
+[
+  "right-click empty file grid creates a file",
+  "right-click an existing item creates a file",
+  "ancestor breadcrumb navigates to its directory",
+  "trailing blank opens editable path and Enter navigates",
+  "file commands and breadcrumbs share one row",
+  "Hide files is in the browser footer",
+  "Show files reopens the same docked browser and preserves its folder and view",
+  "list and tile buttons switch views and show zoom only for tiles",
+  "files/grid plain wheel preserves thumbnail size",
+  "files/grid Ctrl+wheel increases thumbnail size",
+  "model-heavy folder shows cached image previews",
+  "plain wheel scrolls an overflowing file grid without resizing thumbnails",
+  "warm model folder performs no resource reads or preview rebuilds",
+  "warm model folder does not significantly reduce frame rate",
+  "entity browser includes point entities and excludes brush entities",
+  "entities/grid plain wheel preserves thumbnail size",
+  "entities/grid Ctrl+wheel increases thumbnail size",
+  "materials/grid plain wheel preserves thumbnail size",
+  "materials/grid Ctrl+wheel increases thumbnail size"
+]

@@ -1,0 +1,120 @@
+{
+  "baseline": "bec0066ed371ce9622517631c3c97fb37decc68e",
+  "sourceCommit": "933224882bac08df3ec54504eaffcebd932db0fd",
+  "packageValidation": "https://github.com/reyond9079/ReyondBroom/actions/runs/44774525347",
+  "plan": {
+    "components": [
+      "ci",
+      "duplicate_flash"
+    ],
+    "flags": {
+      "atlas": false,
+      "audio": false,
+      "audio_archive": false,
+      "audio_core": false,
+      "audio_ui": false,
+      "browser": false,
+      "build": false,
+      "catalog": false,
+      "character_core": false,
+      "character_ui": false,
+      "ci": true,
+      "ci_unit": true,
+      "compilation": false,
+      "compilation_ui": false,
+      "duplicate_flash": true,
+      "entities": false,
+      "grid": false,
+      "input": false,
+      "jam_world": false,
+      "matrix_ui": false,
+      "model_ui": false,
+      "models": false,
+      "onboarding": false,
+      "placement": false,
+      "plant_core": false,
+      "plant_ui": false,
+      "plants": false,
+      "profile_core": false,
+      "profiles": false,
+      "reference": false,
+      "render": false,
+      "resource_lookup": false,
+      "resources": false,
+      "texture_studio": false,
+      "ui": false,
+      "updater": false,
+      "viewport": false,
+      "world_architect": false,
+      "world_core": false,
+      "world_legacy": false,
+      "world_ui": false
+    },
+    "mode": "affected",
+    "paths": [
+      ".github/workflows/release-linux-ui-update.yml",
+      "qc/csaddon.qc",
+      "qc/fb_visual.qc",
+      "qc/ftebroom.qc",
+      "scripts/ci-plan.py",
+      "scripts/ci-run-checks.py",
+      "scripts/test-duplicate-flash.py",
+      "tests/ci-policy.py"
+    ],
+    "reasons": {
+      ".github/workflows/release-linux-ui-update.yml": [
+        "ci"
+      ],
+      "qc/csaddon.qc": [
+        "duplicate_flash"
+      ],
+      "qc/fb_visual.qc": [
+        "duplicate_flash"
+      ],
+      "qc/ftebroom.qc": [
+        "duplicate_flash"
+      ],
+      "scripts/ci-plan.py": [
+        "ci"
+      ],
+      "scripts/ci-run-checks.py": [
+        "ci"
+      ],
+      "scripts/test-duplicate-flash.py": [
+        "duplicate_flash"
+      ],
+      "tests/ci-policy.py": [
+        "ci"
+      ]
+    },
+    "runtime": true,
+    "schema": 1,
+    "smoke": true,
+    "suites": [
+      "ci_unit",
+      "duplicate_flash"
+    ]
+  },
+  "localChecks": {
+    "Windows": "PASS Ctrl+D flashes all four viewports, expires, and preserves geometry and Undo ([589, 195, 191, 193])",
+    "Linux": "PASS Ctrl+D flashes all four viewports, expires, and preserves geometry and Undo ([6235, 195, 191, 193])"
+  },
+  "packageSteps": {
+    "linux (Linux-x64)": {
+      "Run affected packaged checks": "success",
+      "Validate every packaged release (short smoke)": "success",
+      "Verify Texture Studio in the packaged editor": "skipped"
+    },
+    "windows": {
+      "Run affected packaged checks": "success",
+      "Validate every packaged release (short smoke)": "success",
+      "Verify Texture Studio in the packaged editor": "skipped"
+    },
+    "linux (Linux-SDL2-x64)": {
+      "Run affected packaged checks": "success",
+      "Validate every packaged release (short smoke)": "success",
+      "Verify Texture Studio in the packaged editor": "skipped"
+    }
+  },
+  "scope": "RB-40 and the affected CI plan were tested. Texture Studio evidence was carried forward from alpha.35."
+}

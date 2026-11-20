@@ -140,17 +140,8 @@ inline void projectEncodeMaterial(ProjectPresetFiles& files, ProjectPresetFiles&
     }
     return;
   }
-  const auto texture = "textures/" + material;
-  files[projectPresetImagePath(profile, material)] = tga(base, TgaOrigin::lowerLeft);
-  if (profile == 1) {
-    const auto bake = [&](const char* channel, Port type, Pixel value) {
-      const auto found = evaluation.outputs.find(channel);
-      if (found != evaluation.outputs.end()) return tga(*found->second);
-      return tga(Image{base.size, type, std::vector<Pixel>(base.pixels.size(), value)});
-    };
-    files[texture + "_norm.tga"] = bake("normal", Port::normal, {0, 0, 1, 1});
-    files[texture + "_luma.tga"] = bake("emissive", Port::color, {0, 0, 0, 1});
-  }
+  if (profile == 1) fteWallImages(files, evaluation, "textures/" + material);
+  else files[projectPresetImagePath(profile, material)] = tga(base, TgaOrigin::lowerLeft);
 }
 
 inline void projectEncodePreset(ProjectPresetFiles& files, ProjectPresetFiles& lumps, int profile,
@@ -159,18 +150,12 @@ inline void projectEncodePreset(ProjectPresetFiles& files, ProjectPresetFiles& l
 }
 
 inline std::string projectShaderEntry(int profile, const std::string& name) {
-    const auto material = "textures/" + name;
-    std::string shaders;
-    shaders += material + "\n{\n qer_editorimage " + material + ".tga\n";
-    if (profile == 1) {
-      shaders += " fte_program defaultwall\n diffusemap " + material + ".tga\n normalmap " + material
-        + "_norm.tga\n fullbrightmap " + material + "_luma.tga\n {\n  map $diffuse\n }\n}\n";
-    } else {
-      // Alpha-tested surfaces still receive the BSP lightmap.
-      shaders += " {\n  map " + material + ".tga\n  alphaFunc GE128\n  depthWrite\n }\n"
-        " {\n  map $lightmap\n  blendFunc filter\n  depthFunc equal\n }\n}\n";
-    }
-    return shaders;
+  const auto material = "textures/" + name;
+  if (profile == 1) return fteWallShader(material);
+  // Alpha-tested surfaces still receive the BSP lightmap.
+  return material + "\n{\n qer_editorimage " + material + ".tga\n {\n  map " + material +
+    ".tga\n  alphaFunc GE128\n  depthWrite\n }\n"
+    " {\n  map $lightmap\n  blendFunc filter\n  depthFunc equal\n }\n}\n";
 }
 
 inline std::string projectShaderText(int profile) {

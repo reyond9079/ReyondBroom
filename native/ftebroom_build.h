@@ -303,7 +303,12 @@ static void buildBegin(bool allowLeaks=false,bool retryJamGeometry=false)
     common+="-fs_pakpath \"${WORK_DIR_PATH}\" -fs_pakpath "+modQuote(documentPath("ftebroom.cfg").parent_path().generic_u8string())+" ";
     if(buildGeometry){profile.tasks.push_back({1,"${q3map2}",common+"-meta "+geometryArguments+" \"${WORK_DIR_PATH}/snapshot.map\""});buildStages.push_back("Geometry / BSP");}
     if(visibility){profile.tasks.push_back({1,"${q3map2}",common+"-vis "+buildArguments[1]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});buildStages.push_back("Visibility / VIS");}
-    if(buildLight){profile.tasks.push_back({1,"${q3map2}",common+"-light "+buildArguments[2]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});buildStages.push_back("Lighting / LIGHT");}
+    if(buildLight){
+      // The FTE game wall shader reads tangent-space light directions.
+      const std::string lightDefaults = gameProfile == 1 ? "-deluxe -deluxemode 1 " : "";
+      profile.tasks.push_back({1,"${q3map2}",common+"-light "+lightDefaults+buildArguments[2]+" \"${WORK_DIR_PATH}/snapshot.bsp\""});
+      buildStages.push_back("Lighting / LIGHT");
+    }
     }
     runExportHook=buildExported;runStageHook=buildStageFinished;runBegin(profile);runWindow=false;buildRunning=runActive;gameProfileLocked=buildRunning;buildStarted=ImGui::GetTime();
     if(allowLeaks)runAppend("Open-map compile: outside filling disabled where supported; VIS skipped. Saved compiler settings and source MAP are unchanged.\n");

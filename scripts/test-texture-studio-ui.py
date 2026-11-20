@@ -279,7 +279,7 @@ def main():
                 manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
                 assert manifest["profile"] == profile_id
                 if not legacy_wad:
-                    assert len(manifest["files"]) == (1 if wad else 403 if profile == 1 else 135 if profile == 0 else 134)
+                    assert len(manifest["files"]) == (1 if wad else 537 if profile == 1 else 135 if profile == 0 else 134)
                 for name, expected in manifest["files"].items():
                     assert hashlib.sha256((project / name).read_bytes()).hexdigest() == expected, name
                 key = "builtin-0"
@@ -301,7 +301,12 @@ def main():
                 if profile <= 1:
                     script = f"reyond-studio-presets-{profile_id}"
                     assert script in (project / "scripts/shaderlist.txt").read_text()
-                    assert f"textures/{material}.tga" in (project / f"scripts/{script}.shader").read_text()
+                    definition = (project / f"scripts/{script}.shader").read_text()
+                    assert f"textures/{material}.tga" in definition
+                    if profile == 1:
+                        assert f"normalmap textures/{material}_norm.tga" in definition
+                        assert f"specularmap $nosrgb:textures/{material}_gloss.tga" in definition
+                        assert manifest["fteWallGloss"]
                 if studio()["projectPreset"] != key:
                     click(f"texture-studio/project/preset/{key}")
                 wait(lambda: studio()["projectPreset"] == key and studio()["previewReady"] and not studio()["busy"]
@@ -657,6 +662,9 @@ def main():
             source = stem.with_suffix(".rbtex.json")
             assert hashlib.sha256(runtime_bytes(runtime_texture, asset_name)).hexdigest() == manifest["runtimeHash"]
             assert re.fullmatch(r"[a-z]+_\d+", stem.name)
+            if profile == 1:
+                assert (folder / (stem.name + "_norm.tga")).is_file()
+                assert (folder / (stem.name + "_gloss.tga")).is_file()
             assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest["sourceHash"]
             if wad:
                 content = runtime_texture.read_bytes()

@@ -212,20 +212,53 @@ inline std::string tga(const Image& image, TgaOrigin origin = TgaOrigin::upperLe
   return bytes;
 }
 
+inline std::string fteWallGloss(const Evaluation& images) {
+  const auto& base = *images.outputs.at("baseColor");
+  const auto find = [&](const char* key) -> const Image* {
+    const auto output = images.outputs.find(key);
+    return output == images.outputs.end() ? nullptr : output->second.get();
+  };
+  const auto* metalness = find("metalness");
+  const auto* roughness = find("roughness");
+  const auto* ao = find("ao");
+  Image packed{base.size, Port::packed, std::vector<Pixel>(base.pixels.size())};
+  for (size_t i = 0; i < packed.pixels.size(); ++i) {
+    // FTE's game defaultwall samples metalness, roughness, AO in RGB order.
+    packed.pixels[i] = {metalness ? metalness->pixels[i][0] : 0.f,
+      roughness ? std::max(.045f, roughness->pixels[i][0]) : .6f,
+      ao ? ao->pixels[i][0] : 1.f, 1.f};
+  }
+  return tga(packed);
+}
+
+inline void fteWallImages(std::map<std::string, std::string>& files, const Evaluation& images,
+    const std::string& material) {
+  const auto& base = *images.outputs.at("baseColor");
+  const auto bake = [&](const char* channel, Port type, Pixel fallback) {
+    const auto found = images.outputs.find(channel);
+    if (found != images.outputs.end()) return tga(*found->second);
+    return tga(Image{base.size, type, std::vector<Pixel>(base.pixels.size(), fallback)});
+  };
+  files[material + ".tga"] = tga(base, TgaOrigin::lowerLeft);
+  files[material + "_norm.tga"] = bake("normal", Port::normal, {0, 0, 1, 1});
+  files[material + "_gloss.tga"] = fteWallGloss(images);
+  files[material + "_luma.tga"] = bake("emissive", Port::color, {0, 0, 0, 1});
+}
+
+inline std::string fteWallShader(const std::string& material) {
+  return material + "\n{\n qer_editorimage " + material + ".tga\n fte_program defaultwall\n diffusemap " +
+    material + ".tga\n normalmap " + material + "_norm.tga\n specularmap $nosrgb:" + material +
+    "_gloss.tga\n fullbrightmap " + material + "_luma.tga\n {\n  map $diffuse\n }\n}\n";
+}
+
 inline std::map<std::string, std::string> fteWallMaterial(const Evaluation& images, const std::string& name) {
   require(indexedName(name, true, false), "name", "Choose a portable texture name.");
-  const auto base = images.outputs.find("baseColor");
-  const auto normal = images.outputs.find("normal");
-  const auto emissive = images.outputs.find("emissive");
-  require(base != images.outputs.end() && normal != images.outputs.end() && emissive != images.outputs.end(),
-    "profile", "The FTE material requires Base Color, Normal and Emissive outputs.");
+  require(images.outputs.count("baseColor") != 0, "profile", "The FTE material requires a Base Color output.");
   const auto material = "textures/" + name;
-  const auto diffusePath = material + ".tga";
-  const auto normalPath = material + "_norm.tga";
-  const auto emissionPath = material + "_luma.tga";
-  return {{diffusePath, tga(*base->second)}, {normalPath, tga(*normal->second)}, {emissionPath, tga(*emissive->second)},
-    {"scripts/reyond-texture.shader", material + "\n{\n  fte_program defaultwall\n  diffusemap " + diffusePath +
-      "\n  normalmap " + normalPath + "\n  fullbrightmap " + emissionPath + "\n  {\n    map $diffuse\n  }\n}\n"}};
+  std::map<std::string, std::string> files;
+  fteWallImages(files, images, material);
+  files.emplace("scripts/reyond-texture.shader", fteWallShader(material));
+  return files;
 }
 
 } // namespace ftebroom::textureStudio

@@ -70,7 +70,7 @@ void checkProjectPresets() {
       check(lumps == decoded, "Updating a preset leaves every other mip lump intact");
     } else {
       const auto& firstImage = files.at(projectPresetImagePath(profile, firstMaterial));
-      check(files.size() == presets.size() * (profile == 1 ? 3 : 1), "Every native texture channel was generated");
+      check(files.size() == presets.size() * (profile == 1 ? 4 : 1), "Every native texture channel was generated");
       if (profile == 3) {
         check(q1::name(firstImage, 0, 32) == firstMaterial && q1::word(firstImage, 32) == edge &&
           q1::word(firstImage, 36) == edge, "Quake 2 WAL stores the stable name and mip dimensions");
@@ -82,9 +82,36 @@ void checkProjectPresets() {
           firstImage[16] == 32 && !(firstImage[17] & 32), "The native game image is a bottom-origin 32-bit TGA");
         check(shader.find(profile == 1 ? "fte_program defaultwall" : "map $lightmap") != std::string::npos,
           "The shader uses the appropriate game lighting pipeline");
+        if (profile == 1)
+          check(shader.find("specularmap $nosrgb:textures/" + firstMaterial + "_gloss.tga") != std::string::npos,
+            "FTE binds the packed material data without sRGB conversion");
       }
     }
   }
+}
+
+void checkFteWallChannels() {
+  using namespace ts;
+  constexpr Resolution size{1, 1};
+  Evaluation image{size, {}};
+  const auto add = [&](const char* key, Port type, Pixel pixel) {
+    image.outputs[key] = std::make_shared<Image>(Image{size, type, {pixel}});
+  };
+  add("baseColor", Port::color, {.3f, .2f, .1f, 1.f});
+  auto files = fteWallMaterial(image, "brick_1");
+  check(files.at("textures/brick_1_gloss.tga").substr(18) == std::string("\xff\x99\x00\xff", 4),
+    "Missing FTE data uses unoccluded, rough dielectric defaults");
+  check(files.at("textures/brick_1_norm.tga").substr(18) == std::string("\xff\x80\x80\xff", 4),
+    "A missing normal output is flat");
+  add("metalness", Port::scalar, {.6f, 0, 0, 1});
+  add("roughness", Port::scalar, {.25f, 0, 0, 1});
+  add("ao", Port::scalar, {.8f, 0, 0, 1});
+  add("normal", Port::normal, {-.6f, 0.f, .8f, 1});
+  files = fteWallMaterial(image, "brick_1");
+  check(files.at("textures/brick_1_gloss.tga").substr(18) == std::string("\xcc\x40\x99\xff", 4),
+    "FTE stores linear metalness, roughness and AO in the shader's RGB order");
+  check(files.at("textures/brick_1_norm.tga").substr(18) == std::string("\xe6\x80\x33\xff", 4),
+    "Authored tangent-space normals keep their signed components");
 }
 
 void write(const fs::path& file, const std::string& value) {
@@ -493,6 +520,7 @@ int main(int argc, char** argv) try {
   }
   checkCatalog({});
   checkProjectPresets();
+  checkFteWallChannels();
   for (const auto& spec : contracts()) {
     if (spec.kernel == Kernel::image) continue; // Exercised with encoded originals in the CLI suite.
     auto doc = runningBrick("node-check");

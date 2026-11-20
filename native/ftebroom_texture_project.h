@@ -90,9 +90,13 @@ static void studioRefreshProjectScope(bool force = false) {
   }
   s.projectRoot = std::move(root);
   s.projectProfile = gameProfile;
-  studioProjectStatus(studioParseProjectManifest({}, gameProfile));
-  if (!s.projectRoot.empty()) studioProjectStatus(studioProjectManifest(s.projectRoot, gameProfile));
-  s.projectOffer = !s.projectRoot.empty() && s.projectNames.empty() &&
+  auto manifest = studioParseProjectManifest({}, gameProfile);
+  studioProjectStatus(manifest);
+  s.projectOffer = false;
+  if (!s.projectRoot.empty()) manifest = studioProjectManifest(s.projectRoot, gameProfile);
+  studioProjectStatus(manifest);
+  s.projectOffer = !s.projectRoot.empty() &&
+    (s.projectNames.empty() || (gameProfile == 1 && !manifest.value("fteWallGloss", false))) &&
     !s.promptedProjects.count({gameProfile, s.projectRoot});
 }
 
@@ -200,20 +204,20 @@ static void studioBeginProjectBake(const rbTexture::ProjectPreset* selected = nu
     const bool legacy = studioLegacyCatalog(manifest);
     auto names = manifest.value("catalogNames", rbTexture::Json::object());
     const auto folder = rbTexture::projectPresetStorage(profile);
-    const auto evaluate = [&](const std::string& material, const rbTexture::Document& source,
-        const rbTexture::Assets& inputs, unsigned imageFrame, const std::string& alias = "") {
+    const auto evaluate = [&](const rbTexture::Document& source, const rbTexture::Assets& inputs, unsigned imageFrame) {
       rbTexture::require(!progress->cancel, "project", "Preset generation cancelled.");
       const auto plan = rbTexture::compile(source, {}, inputs);
       const auto threads = std::clamp(std::thread::hardware_concurrency(), 1u, 4u);
-      const auto evaluation = rbTexture::evaluate(plan, source.resolution(), &progress->cancel,
+      return rbTexture::evaluate(plan, source.resolution(), &progress->cancel,
         rbTexture::memoryBudget, selected ? threads : 1, imageFrame);
-      rbTexture::projectEncodeMaterial(result.files, lumps, profile, material, evaluation, palette);
-      if (!alias.empty() && alias != material)
-        rbTexture::projectEncodeMaterial(result.files, lumps, profile, alias, evaluation, palette);
     };
     if (selected) {
-      evaluate(studioPresetMaterial(profile, *selected, names, legacy), *doc, assets, frame,
-        legacy ? rbTexture::legacyProjectPresetMaterial(profile, *selected) : "");
+      const auto image = evaluate(*doc, assets, frame);
+      const auto material = studioPresetMaterial(profile, *selected, names, legacy);
+      rbTexture::projectEncodeMaterial(result.files, lumps, profile, material, image, palette);
+      const auto alias = legacy ? rbTexture::legacyProjectPresetMaterial(profile, *selected) : "";
+      if (!alias.empty() && alias != material)
+        rbTexture::projectEncodeMaterial(result.files, lumps, profile, alias, image, palette);
       ++progress->finished;
       result.files.emplace(folder + selected->key + ".rbtex.json", doc->save());
       for (const auto& reference : doc->source.at("assetReferences")) {
@@ -229,6 +233,10 @@ static void studioBeginProjectBake(const rbTexture::ProjectPreset* selected = nu
         used.insert("textures/" + name);
         reserved.insert("textures/" + name);
       }
+      const auto& owned = manifest.at("files");
+      const auto installedFile = [&](const std::string& path) {
+        return owned.contains(path) && std::filesystem::is_regular_file(studioProjectPath(root, path));
+      };
       for (const auto& preset : rbTexture::projectPresets()) {
         rbTexture::require(!progress->cancel, "project", "Preset generation cancelled.");
         if (!names.contains(preset.key)) {
@@ -249,24 +257,50 @@ static void studioBeginProjectBake(const rbTexture::ProjectPreset* selected = nu
         const auto material = studioPresetMaterial(profile, preset, names, false);
         const auto path = rbTexture::projectPresetImagePath(profile, material);
         const auto source = folder + preset.key + ".rbtex.json";
-        const auto& owned = manifest.at("files");
-        const bool installed = usesWad ? lumps.count(material) != 0 :
-          owned.contains(path) && std::filesystem::is_regular_file(studioProjectPath(root, path)) &&
-          (profile != 1 || (std::filesystem::is_regular_file(studioProjectPath(root, "textures/" + material + "_norm.tga")) &&
-                           std::filesystem::is_regular_file(studioProjectPath(root, "textures/" + material + "_luma.tga"))));
-        if (!installed) {
-          const auto alias = rbTexture::legacyProjectPresetMaterial(profile, preset);
-          if (usesWad && legacy && lumps.count(alias)) {
-            auto lump = lumps.at(alias);
-            lump.replace(0, 16, material + std::string(16 - material.size(), '\0'));
-            lumps.emplace(material, std::move(lump));
-          } else if (owned.contains(source)) {
+        const bool installed = usesWad ? lumps.count(material) != 0 : installedFile(path) &&
+          (profile != 1 || (installedFile("textures/" + material + "_norm.tga") &&
+                           installedFile("textures/" + material + "_luma.tga")));
+        const auto alias = legacy ? rbTexture::legacyProjectPresetMaterial(profile, preset) : "";
+        const auto gloss = "textures/" + material + "_gloss.tga";
+        const auto aliasGloss = "textures/" + alias + "_gloss.tga";
+        const bool upgrade = profile == 1 && installed && !installedFile(gloss);
+        const bool upgradeAlias = profile == 1 && !alias.empty() &&
+          installedFile(rbTexture::projectPresetImagePath(profile, alias)) && !installedFile(aliasGloss);
+        if (!installed && usesWad && !alias.empty() && lumps.count(alias)) {
+          auto lump = lumps.at(alias);
+          lump.replace(0, 16, material + std::string(16 - material.size(), '\0'));
+          lumps.emplace(material, std::move(lump));
+        } else if (!installed || upgrade || upgradeAlias) {
+          const auto image = [&] {
+            if (!owned.contains(source)) return evaluate(preset.document(), {}, 0);
             const auto custom = rbTexture::open(studioProjectOwnedFile(studioProjectPath(root, source), owned.at(source)));
             const auto customFrame = manifest.contains("frames") ? manifest.at("frames").value(preset.key, 0u) : 0u;
-            evaluate(material, custom, rbTexture::loadAssets(custom, root / folder), customFrame);
-          } else evaluate(material, preset.document(), {}, 0);
+            return evaluate(custom, rbTexture::loadAssets(custom, root / folder), customFrame);
+          }();
+          if (!installed) rbTexture::projectEncodeMaterial(result.files, lumps, profile, material, image, palette);
+          if (upgrade || upgradeAlias) {
+            const auto data = rbTexture::fteWallGloss(image);
+            if (upgrade) result.files.emplace(gloss, data);
+            if (upgradeAlias) result.files.emplace(aliasGloss, data);
+          }
         }
         ++progress->finished;
+      }
+      if (profile == 1) {
+        const auto generated = manifest.value("generated", rbTexture::Json::object());
+        for (const auto& name : generated) {
+          const auto id = name.get<std::string>();
+          rbTexture::require(rbTexture::projectNumberedName(id), "project", "The project has an invalid generated material name.");
+          const auto texture = "textures/" + rbTexture::projectMaterialPath(profile, id);
+          if (installedFile(texture + "_gloss.tga")) continue;
+          const auto source = texture + ".rbtex.json";
+          const auto metadata = texture + ".reyond.json";
+          const auto doc = rbTexture::open(studioProjectOwnedFile(studioProjectPath(root, source), owned.at(source)));
+          const auto info = rbTexture::parseJson(studioProjectOwnedFile(studioProjectPath(root, metadata), owned.at(metadata)));
+          const auto image = evaluate(doc, rbTexture::loadAssets(doc, root / "textures/reyond-studio"), info.value("frame", 0u));
+          result.files.emplace(texture + "_gloss.tga", rbTexture::fteWallGloss(image));
+        }
+        manifest["fteWallGloss"] = true;
       }
       manifest["catalogNames"] = std::move(names);
       manifest["legacyCatalog"] = legacy;

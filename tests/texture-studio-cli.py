@@ -196,7 +196,8 @@ def run(executable, root):
     jpeg = (root / "jpeg/textures/custom/mortar.jpg").read_bytes()
     assert jpeg.startswith(b"\xff\xd8") and jpeg.endswith(b"\xff\xd9")
     assert export("q3-baseline", "invalid-jpeg", "custom/mortar", "--jpeg", 101)[0] != 0
-    assert export("fte-rich", "missing-emission", "custom/mortar")[0] != 0
+    assert export("fte-rich", "missing-emission", "custom/mortar")[0] == 0
+    assert (root / "missing-emission/textures/custom/mortar_luma.tga").read_bytes()[18:22] == b"\0\0\0\xff"
     rich = json.loads(source.read_text(encoding="utf-8"))
     rich["outputs"]["emissive"] = {"node": "diffuse", "port": "color"}
     source.write_text(json.dumps(rich), encoding="utf-8")
@@ -208,6 +209,9 @@ def run(executable, root):
     ))
     assert (rich / "textures/custom/mortar_luma.tga").read_bytes() == fte_tga
     assert (rich / "textures/custom/mortar_norm.tga").read_bytes() != fte_tga
+    assert "specularmap $nosrgb:textures/custom/mortar_gloss.tga" in shader
+    gloss = (rich / "textures/custom/mortar_gloss.tga").read_bytes()
+    assert gloss[19:22] == b"\xc2\0\xff" and min(gloss[18::4]) < 255
     assert export("q3-baseline", "invalid-workers", "custom/mortar", "--threads", 17)[0] != 0
     assert export("q3-baseline", "q3", "custom/mortar")[0] != 0
     assert (root / "q3" / texture_path).read_bytes() == loose

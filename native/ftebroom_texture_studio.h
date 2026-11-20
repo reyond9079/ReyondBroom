@@ -577,8 +577,16 @@ static void studioInstall() {
   };
   s.wadReference = wad && s.apply != TextureStudioState::Apply::asset ? studioProjectWadReference(root, profile) : "";
   if (unfinishedLump.empty() && rbTexture::projectNumberedName(id) && nameExists(id)) {
-    s.material = "textures/" + rbTexture::projectMaterialPath(profile, id);
-    return;
+    const auto material = "textures/" + rbTexture::projectMaterialPath(profile, id);
+    const auto installed = [&](const char* suffix) {
+      const auto relative = material + suffix;
+      return library.at("files").contains(relative) &&
+        std::filesystem::is_regular_file(studioProjectPath(root, relative));
+    };
+    if (profile != 1 || (installed("_norm.tga") && installed("_gloss.tga"))) {
+      s.material = material;
+      return;
+    }
   }
   if (!rbTexture::projectNumberedName(id)) {
     const auto category = rbTexture::projectMaterialWord(graph.source.value("name", std::string{}));
@@ -1317,8 +1325,7 @@ static void studioExportDialog() {
   const bool ready = s.result && s.result->revision == s.revision && s.result->fullSize;
   if (ready) ImGui::Text("%u × %u", s.result->image.size.width, s.result->image.size.height);
   const bool paletteReady = (target != F::wad2 || gameProfile == 2) && (target != F::wal || gameProfile == 3);
-  const bool outputsReady = ready && (target < F::jpeg || s.result->image.outputs.count("baseColor")) &&
-    (target != F::fte || (s.result->image.outputs.count("normal") && s.result->image.outputs.count("emissive")));
+  const bool outputsReady = ready && (target < F::jpeg || s.result->image.outputs.count("baseColor"));
   if (!paletteReady) ImGui::TextUnformatted("Select the matching game profile before exporting its indexed texture.");
   if (ready && !outputsReady) ImGui::TextUnformatted("Connect the output channels required by this format.");
   ImGui::BeginDisabled(!outputsReady || !paletteReady);

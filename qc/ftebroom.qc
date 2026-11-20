@@ -165,6 +165,20 @@ void fb_duplicate_numeric(vector offset)
     if(fb_transform_capture()) {fb_transform_duplicate=TRUE;fb_transform_commit(offset);}
     fb_transform_clear();
 }
+
+float fb_duplicate_flash_until;
+int fb_duplicate_flash_history,fb_duplicate_flash_selection,fb_duplicate_flash_visible;
+void fb_duplicate_with_flash()
+{
+    int previous=history;
+    fb_duplicate_numeric('0 0 0');
+    if(history==previous || !selectedbrushcount)return;
+    // The duplication transaction selects the copies and deselects the sources.
+    fb_duplicate_flash_history=history;
+    fb_duplicate_flash_selection=fb_selection_epoch;
+    fb_duplicate_flash_until=gettime(0)+0.8;
+}
+
 void fb_begin(vector pixel, float alt, int view)
 {
     fb_cancel();
@@ -595,6 +609,8 @@ void ftebroom_prepare()
     // must not pull the example brush away from that animated path.
     if(!cvar("ftebroom_tour_demo")){float stage81_4=gettime(1);fb_tool_pointer_move(curmousepos,cvar("ftebroom_alt"),cvar("ca_brush_view"));fb_commit_profile("fb_tool_pointer_move",stage81_4);}
     {float stage81_5=gettime(1);fb_visibility_sync();fb_commit_profile("fb_visibility_sync",stage81_5);}
+    fb_duplicate_flash_visible=gettime(0)<fb_duplicate_flash_until &&
+        history==fb_duplicate_flash_history && fb_selection_epoch==fb_duplicate_flash_selection;
     fb_commit_profile("ftebroom_prepare",profile81Time);
 }
 void fb_trace_draw();
@@ -739,7 +755,7 @@ float() ftebroom_command =
         if(fb_vertex_tool()) {fb_vertex_delete();return TRUE;}
         fb_delete_selection();return TRUE;
     }
-    if(argv(0)=="ftebroom_duplicate") {fb_duplicate_numeric('0 0 0');return TRUE;}
+    if(argv(0)=="ftebroom_duplicate") {fb_duplicate_with_flash();return TRUE;}
     if(argv(0)=="ftebroom_nudge" || argv(0)=="ftebroom_duplicate_nudge") {
         vector offset='0 0 0';int axis=stoi(argv(1));
         if(axis<0 || axis>2) return TRUE;

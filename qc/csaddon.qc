@@ -103,7 +103,7 @@ void CSQC_RendererRestarted(string rendererDescription)
 string fb_view_cache_signature(int type,vector mn,vector sz)
 {
     string key=sprintf("%i %v %v %v %v %g",type,mn,sz,vidsize,fb_view_centers[type],cvar("ca_brush_viewsize"));
-    key=strcat(key,itos(fb_filter_epoch));
+    key=strcat(key,itos(fb_filter_epoch)," ",itos(fb_duplicate_flash_visible));
     key=strcat(key,cvar_string("ftebroom_color_entity_bounds"),"|",cvar_string("ftebroom_entity_bounds_class_colors"));
     key=strcat(key,"|",cvar_string("ftebroom_color_entity_links"),"|",cvar_string("ftebroom_color_selected_entity_links"));
     key=strcat(key,"|",cvar_string("ftebroom_color_brush_edges"),"|",cvar_string("ftebroom_color_2d_background"));

@@ -474,6 +474,7 @@ void fb_visual_draw()
     int cacheable=!fb_visual_test_reference && checkbuiltin(ftebroom_indexed_overlay) && fb_visual_candidate_count>256 && !fb_active && !fb_transform_preview && !fb_vertex_preview_valid && !fb_generator_count && !fb_clip_count && !autocvar_ftebroom_hover_highlight;
     static string cacheKey;
     string currentKey=sprintf("%i %i %i %i %g %v %v",fb_visual_candidate_epoch,fb_grid_geometry_epoch,fb_incremental_epoch,ortho,autocvar_ftebroom_sky_overlays,autocvar_ftebroom_color_selected,autocvar_ftebroom_color_locked);
+    currentKey=strcat(currentKey," ",itos(fb_duplicate_flash_visible));
     int reuse=cacheable && currentKey==cacheKey;
     if(!cacheable){strunzone(cacheKey);cacheKey="";fb_visual_cache_clear();}
     int candidates=nativePointBoxes?geometryCount:(movingPoints?originalCount:fb_visual_candidate_count);
@@ -503,6 +504,7 @@ void fb_visual_draw()
         // Selected surfaces use the shared face cache; overlays are batched below.
         vector color=autocvar_ftebroom_color_hover;float fill=0.06;
         if(selected) {color=autocvar_ftebroom_color_selected;fill=0.08;}
+        if(fb_duplicate_flash_visible && selected && item.kind>=FB_NODE_BRUSH) {color='1 0.8 0.15';fill=0.16;}
         if(locked) {color=autocvar_ftebroom_color_locked;fill=0.08;}
         if(item.kind==FB_NODE_ENTITY) {
             if(fb_transform_replaces(0,item.id)) continue;
@@ -547,7 +549,7 @@ void fb_visual_draw()
     fb_visual_profile[2]+=gettime(1)-started;started=gettime(1);
     fb_entity_drop_preview();
     fb_visual_profile[3]+=gettime(1)-started;
-    if(fb_visual_has_bounds) fb_visual_box(fb_visual_min,fb_visual_max,fb_visual_group_bounds?'0.65 0.35 1':autocvar_ftebroom_color_selected,fb_visual_group_bounds?1:.6,
+    if(fb_visual_has_bounds && !fb_duplicate_flash_visible) fb_visual_box(fb_visual_min,fb_visual_max,fb_visual_group_bounds?'0.65 0.35 1':autocvar_ftebroom_color_selected,fb_visual_group_bounds?1:.6,
         !cvar("ca_brush_view") && fb_visual_spikes && autocvar_ftebroom_selection_spikes);
     fb_commit_profile("fb_visual_draw",profile81Time);
 }

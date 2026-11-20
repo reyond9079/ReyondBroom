@@ -194,13 +194,15 @@ jobs:
     - name: Check changed audio DSP
       if: fromJSON(needs.plan.outputs.plan).flags.audio_core
       run: scripts/test-audio-core.sh "$PWD/audio-qa" /usr/bin/ffmpeg
+    - name: Build the packaged Texture Studio CLI
+      run: g++ -std=c++17 -O2 -ffp-contract=off -pthread native/texture/cli.cpp -lz -ldl -o deps/texture-studio
     - name: Verify Texture Studio graph, formats and release guard
+      if: fromJSON(needs.plan.outputs.plan).flags.texture_studio
       run: |
         g++ -std=c++17 -O2 -ffp-contract=off -pthread tests/texture-studio-core.cpp -lz -o deps/texture-studio-core
         deps/texture-studio-core qa/texture-studio/fixtures
         g++ -std=c++17 -O2 -ffp-contract=off -pthread tests/texture-studio-properties.cpp -lz -o deps/texture-studio-properties
         deps/texture-studio-properties
-        g++ -std=c++17 -O2 -ffp-contract=off -pthread native/texture/cli.cpp -lz -ldl -o deps/texture-studio
         python3 tests/check-texture-studio-formats.py qa/texture-studio/fixtures
         python3 tests/texture-studio-cli.py deps/texture-studio
         python3 tests/texture-studio-release-gate.py
@@ -277,7 +279,7 @@ jobs:
     - name: Install OS input probes
       run: python -m pip install python-xlib Pillow
     - name: Verify Texture Studio in the packaged editor
-      if: inputs.validation_mode == 'full' || github.ref == 'refs/heads/main'
+      if: fromJSON(needs.plan.outputs.plan).flags.texture_studio
       shell: bash
       run: |
         set -euo pipefail
@@ -436,13 +438,17 @@ jobs:
         make -C deps/fteqw/engine/qclib -j4 R_qcc CC=gcc BASE_CFLAGS=-DQCCONLY BASE_LDFLAGS='-s -lz -Wl,--stack,16777216'
         deps/fteqw/engine/qclib/fteqcc.bin -src qc -srcfile csaddon.src -max_globals 262144 -max_strings 4194304
         g++ -std=c++17 -O1 -ffp-contract=off -shared -static -pthread -Ideps/bullet/src -Ideps/fteqw/plugins -Ideps/imgui -include deps/jam-release-endpoint.h native/ftebroom.cpp deps/imgui/imgui{,_draw,_tables,_widgets}.cpp deps/profile-core/libreyond-profile.a deps/bullet-build/lib/libBulletDynamics.a deps/bullet-build/lib/libBulletCollision.a deps/bullet-build/lib/libLinearMath.a -lz -lole32 -lwindowscodecs -lcomdlg32 -lshell32 -lgdi32 -o audio-qa/fteplug_ftebroom_x64.dll
+    - name: Build the packaged Texture Studio CLI
+      shell: msys2 {0}
+      run: g++ -std=c++17 -O2 -ffp-contract=off -pthread -static native/texture/cli.cpp -lz -lshell32 -o deps/texture-studio.exe
     - name: Build Texture Studio test binaries
+      if: fromJSON(needs.plan.outputs.plan).flags.texture_studio
       shell: msys2 {0}
       run: |
         g++ -std=c++17 -O2 -ffp-contract=off -pthread -static tests/texture-studio-core.cpp -lz -o deps/texture-studio-core.exe
         g++ -std=c++17 -O2 -ffp-contract=off -pthread -static tests/texture-studio-properties.cpp -lz -o deps/texture-studio-properties.exe
-        g++ -std=c++17 -O2 -ffp-contract=off -pthread -static native/texture/cli.cpp -lz -lshell32 -o deps/texture-studio.exe
     - name: Verify Texture Studio graph, formats and release guard
+      if: fromJSON(needs.plan.outputs.plan).flags.texture_studio
       run: |
         & ./deps/texture-studio-core.exe qa/texture-studio/fixtures
         if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -545,11 +551,11 @@ jobs:
         python scripts/ci-release-smoke.py out/release --platform Windows-x64 --version $env:VERSION --output qa/smoke --require-jam
         if ($LASTEXITCODE) { throw 'Packaged smoke failed' }
     - name: Build the Texture Studio decoder timeout fixture
-      if: inputs.validation_mode == 'full' || github.ref == 'refs/heads/main'
+      if: fromJSON(needs.plan.outputs.plan).flags.texture_studio
       shell: msys2 {0}
       run: g++ -std=c++17 -pthread -static tests/fixtures/texture-studio/stalled-decoder.cpp -o deps/stalled-decoder.exe
     - name: Verify Texture Studio in the packaged editor
-      if: inputs.validation_mode == 'full' || github.ref == 'refs/heads/main'
+      if: fromJSON(needs.plan.outputs.plan).flags.texture_studio
       shell: pwsh
       run: |
         $runtime = "out/release/ReyondBroom-Windows-x64"

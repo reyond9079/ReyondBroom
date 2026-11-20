@@ -33,7 +33,7 @@ DEPENDENCIES = {
 SUITES = {'jam_world', 'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation', 'compilation_ui', 'resource_lookup',
           'audio_core', 'audio_ui', 'audio_archive', 'plant_core', 'plant_ui', 'character_core', 'character_ui',
           'model_ui', 'placement', 'viewport', 'grid', 'browser', 'onboarding',
-          'updater', 'entities', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
+          'updater', 'entities', 'texture_studio', 'duplicate_flash', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
 RULES = [
     (['native/ftebroom_jam_world.h', 'native/ftebroom_jam_scene.h', 'native/ftebroom_jam_ui.h',
       'native/ftebroom_jam_qa.h', 'qc/fb_jam_world*.qc', 'scripts/test-jam-world.py',
@@ -85,6 +85,10 @@ RULES = [
     (['native/ftebroom_texture_studio.h', 'native/ftebroom_texture_project.h', 'native/texture/project_presets.h',
       'native/texture/legacy_codec.h', 'scripts/test-texture-studio-ui.py',
       'tests/texture-studio-core.cpp', 'tests/texture-studio-cli.py'], {'resources', 'ui'}),
+    (['native/ftebroom_texture_studio.h', 'native/ftebroom_texture_project.h', 'native/texture/**',
+      'qc/fb_texture_studio.qc', 'scripts/test-texture-studio*.py', 'tests/texture-studio*',
+      'tests/check-texture-studio-formats.py'], {'texture_studio'}),
+    (['scripts/test-duplicate-flash.py'], {'duplicate_flash'}),
     (['qc/fb_sculpt.qc', 'qc/fb_sweep.qc', 'qc/fb_generators_tests.qc',
       'scripts/test-rock-linux.sh', 'tests/rock45.cfg'], {'viewport', 'placement'}),
     (['qc/fb_view_options.qc', 'qc/fb_view_options_tests.qc'], {'viewport', 'render'}),
@@ -145,7 +149,7 @@ def plan(paths, full=False, release=False, semantic=None):
         if not matched:
             if path.startswith(('native/', 'qc/', 'patches/', 'runtime/', 'tests/', 'scripts/')):
                 # An unclassified shared edit must not silently evade integration.
-                matched = {'profiles', 'resources', 'input', 'render', 'audio', 'plants', 'models', 'updater', 'world_architect'}
+                matched = {'profiles', 'resources', 'input', 'render', 'audio', 'plants', 'models', 'updater', 'world_architect', 'texture_studio'}
             else:
                 matched = {'ci'}
         components |= matched
@@ -438,6 +442,44 @@ PROJECT_PRESET_HOST_SCOPES = {
 }
 
 
+DUPLICATE_FLASH_HOST_SCOPES = {
+    'qc/csaddon.qc': ({'duplicate_flash'}, [
+        ('    key=strcat(key,itos(fb_filter_epoch));\n',
+         '    key=strcat(key,itos(fb_filter_epoch)," ",itos(fb_duplicate_flash_visible));\n'),
+    ]),
+    'qc/fb_visual.qc': ({'duplicate_flash'}, [
+        ('    int reuse=cacheable && currentKey==cacheKey;\n',
+         '    currentKey=strcat(currentKey," ",itos(fb_duplicate_flash_visible));\n'
+         '    int reuse=cacheable && currentKey==cacheKey;\n'),
+        ('        if(locked) {color=autocvar_ftebroom_color_locked;fill=0.08;}\n',
+         "        if(fb_duplicate_flash_visible && selected && item.kind>=FB_NODE_BRUSH) {color='1 0.8 0.15';fill=0.16;}\n"
+         '        if(locked) {color=autocvar_ftebroom_color_locked;fill=0.08;}\n'),
+        ('    if(fb_visual_has_bounds) fb_visual_box(',
+         '    if(fb_visual_has_bounds && !fb_duplicate_flash_visible) fb_visual_box('),
+    ]),
+    'qc/ftebroom.qc': ({'duplicate_flash'}, [
+        ('void fb_begin(vector pixel, float alt, int view)\n',
+         '\nfloat fb_duplicate_flash_until;\n'
+         'int fb_duplicate_flash_history,fb_duplicate_flash_selection,fb_duplicate_flash_visible;\n'
+         'void fb_duplicate_with_flash()\n{\n'
+         '    int previous=history;\n'
+         "    fb_duplicate_numeric('0 0 0');\n"
+         '    if(history==previous || !selectedbrushcount)return;\n'
+         '    // The duplication transaction selects the copies and deselects the sources.\n'
+         '    fb_duplicate_flash_history=history;\n'
+         '    fb_duplicate_flash_selection=fb_selection_epoch;\n'
+         '    fb_duplicate_flash_until=gettime(0)+0.8;\n}\n\n'
+         'void fb_begin(vector pixel, float alt, int view)\n'),
+        ('    fb_commit_profile("ftebroom_prepare",profile81Time);\n',
+         '    fb_duplicate_flash_visible=gettime(0)<fb_duplicate_flash_until &&\n'
+         '        history==fb_duplicate_flash_history && fb_selection_epoch==fb_duplicate_flash_selection;\n'
+         '    fb_commit_profile("ftebroom_prepare",profile81Time);\n'),
+        ("    if(argv(0)==\"ftebroom_duplicate\") {fb_duplicate_numeric('0 0 0');return TRUE;}\n",
+         '    if(argv(0)=="ftebroom_duplicate") {fb_duplicate_with_flash();return TRUE;}\n'),
+    ]),
+}
+
+
 def editor_host_scope(path, before, after, scopes=EDITOR_HOST_SCOPES):
     scope = scopes.get(path)
     if not scope or before == after:
@@ -456,7 +498,8 @@ def semantic_scopes(base, head, paths):
     for path in paths:
         if not any(path in entries for entries in (WORLD_HOST_ADDITIONS, ONBOARDING_HOST_REPLACEMENTS,
                                                      LESSON_HOST_REPLACEMENTS, EDITOR_HOST_SCOPES, RB36_HOST_SCOPES,
-                                                     ENTITY_LINK_COLOR_HOST_SCOPES, PROJECT_PRESET_HOST_SCOPES)):
+                                                     ENTITY_LINK_COLOR_HOST_SCOPES, PROJECT_PRESET_HOST_SCOPES,
+                                                     DUPLICATE_FLASH_HOST_SCOPES)):
             continue
         def read(ref):
             return subprocess.check_output(['git', 'show', ref+':'+path], stderr=subprocess.PIPE).decode()
@@ -465,7 +508,8 @@ def semantic_scopes(base, head, paths):
                   or lesson_host_scope(path, before, after) or editor_host_scope(path, before, after)
                   or editor_host_scope(path, before, after, RB36_HOST_SCOPES)
                   or editor_host_scope(path, before, after, ENTITY_LINK_COLOR_HOST_SCOPES)
-                  or editor_host_scope(path, before, after, PROJECT_PRESET_HOST_SCOPES))
+                  or editor_host_scope(path, before, after, PROJECT_PRESET_HOST_SCOPES)
+                  or editor_host_scope(path, before, after, DUPLICATE_FLASH_HOST_SCOPES))
         if groups:
             result[path] = groups
     return result

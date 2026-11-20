@@ -43,6 +43,8 @@ def main():
         run('fixture', 'tests/make-linux-build-fixture.py', root, gui=False)
     if 'entities' in suites:
         run('entities', 'scripts/test-entity-rb36.py', root, out/'entities')
+    if 'duplicate_flash' in suites:
+        run('duplicate_flash', 'scripts/test-duplicate-flash.py', root, out/'duplicate-flash')
     if 'jam_world' in suites:
         run('jam_world', 'scripts/test-jam-world.py', root, out/'jam-world')
     if 'character_ui' in suites:

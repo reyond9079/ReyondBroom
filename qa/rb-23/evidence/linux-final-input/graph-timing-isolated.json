@@ -1,0 +1,10 @@
+{
+  "nodes": 500,
+  "events": 810,
+  "warmupRuns": 5,
+  "frames": 443,
+  "medianFrameMs": 24.946808,
+  "p95FrameMs": 26.938568,
+  "maxFrameMs": 41.343226,
+  "renderer": "Xvfb Mesa software GLX, end of swap to end of swap"
+}

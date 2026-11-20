@@ -1,0 +1,242 @@
+{
+  "height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 37086
+  },
+  "fat": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 4482
+  },
+  "muscle": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 2135
+  },
+  "bulk": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 4297
+  },
+  "shoulders": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 6362
+  },
+  "chest": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 766
+  },
+  "waist": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 18
+  },
+  "belly": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 394
+  },
+  "hips": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 2507
+  },
+  "neck": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 118
+  },
+  "upper_arm": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1408
+  },
+  "forearm": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 109
+  },
+  "thigh": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 131
+  },
+  "calf": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 200
+  },
+  "head_width": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1261
+  },
+  "head_height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1149
+  },
+  "head_depth": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 414
+  },
+  "forehead_height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1138
+  },
+  "forehead_slope": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 2389
+  },
+  "brow_height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1209
+  },
+  "brow_width": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1532
+  },
+  "eye_size": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 655
+  },
+  "eye_spacing": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1377
+  },
+  "eye_depth": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1415
+  },
+  "eye_tilt": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1158
+  },
+  "nose_bridge": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1244
+  },
+  "nose_width": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 466
+  },
+  "nose_length": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 788
+  },
+  "nose_tip": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 140
+  },
+  "nostrils": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 422
+  },
+  "cheek_height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 460
+  },
+  "cheek_fullness": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 2153
+  },
+  "jaw_width": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 3729
+  },
+  "jaw_length": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1085
+  },
+  "jaw_angle": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 211
+  },
+  "chin_height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 652
+  },
+  "chin_width": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 445
+  },
+  "chin_projection": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1257
+  },
+  "mouth_width": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 888
+  },
+  "mouth_height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 948
+  },
+  "lip_fullness": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 941
+  },
+  "upper_lip": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 392
+  },
+  "lower_lip": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 317
+  },
+  "ear_size": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 637
+  },
+  "ear_angle": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 238
+  },
+  "eye_height": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1625
+  },
+  "cheek_width": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 2514
+  },
+  "ear_depth": {
+    "minimum": -1,
+    "maximum": 1,
+    "pixelsChanged": 1650
+  }
+}

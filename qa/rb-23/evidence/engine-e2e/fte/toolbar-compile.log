@@ -1,0 +1,165 @@
+Running Viewport build: texture-studio-qa.map
+Step 1: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.map 
+Exported current editor contents from: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/texture-studio-qa.map
+Build copy: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.map
+Revision: 0
+Step 2: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/tools/q3map2/q3map2 -game quake3 -fs_basepath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor" -fs_basegame "baseq3" -fs_game "baseq3" -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3" -threads 22 -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976" -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom" -meta  "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.map"
+2.5.17n
+22 threads
+Q3Map         - v1.0r (c) 1999 Id Software Inc.
+Q3Map (ydnar) - v2.5.17n
+NetRadiant    - v1.6.0n Oct 23 2026 20:14:02
+Your map saw the pretty lights from q3map2's BFG
+/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/tools/q3map2/q3map2.bin
+VFS Init: /root/.q3a/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/
+
+--- BSP ---
+Creating meta surfaces from brush faces
+No shaderlist.txt found: loading all shaders
+entering scripts/ftebroom.shader
+entering /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.map
+        0 areaportals
+Size:  -272,  -272,   -16 to   272,   272,   272
+block size = { 1024 1024 1024 }
+       28 leafs filled
+        0 leafs filled
+writing /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.prt
+--- EmitMetaStats ---
+       12 total meta surfaces
+       12 stripped surfaces
+        0 fanned surfaces
+        0 maxarea'd surfaces
+        0 patch meta surfaces
+        0 meta verts
+        0 meta triangles
+--- WriteSurfaceExtraFile ---
+Writing /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.srf
+Writing /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.bsp
+Wrote 0.0 MB (6940 bytes)
+        0 seconds elapsed
+Step 3: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/tools/q3map2/q3map2 -game quake3 -fs_basepath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor" -fs_basegame "baseq3" -fs_game "baseq3" -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3" -threads 22 -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976" -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom" -vis  "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.bsp"
+2.5.17n
+22 threads
+Q3Map         - v1.0r (c) 1999 Id Software Inc.
+Q3Map (ydnar) - v2.5.17n
+NetRadiant    - v1.6.0n Oct 23 2026 20:14:02
+Your map saw the pretty lights from q3map2's BFG
+/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/tools/q3map2/q3map2.bin
+VFS Init: /root/.q3a/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/
+
+--- Vis ---
+Loading /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.bsp
+Loading /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.prt
+     4 portalclusters
+     4 numportals
+    16 numfaces
+     8 active portals
+     0 hint portals
+visdatasize:40
+
+--- BasePortalVis (8) ---
+0...1...2...3...5...5...6...7...8... (0)
+      2 average number of passages per leaf
+      0 MB required passage memory
+
+--- CreatePassages (8) ---
+0...1...2...3...5...5...6...7...8... (0)
+
+--- PassagePortalFlow (8) ---
+0...1...2...3...5...5...6...7...8... (0)
+creating leaf vis...
+Total clusters: 4
+Total visible clusters: 20
+Average clusters visible: 5.00 (125.000%/total)
+  Standard deviation: 0.00 (0.000%/total, 0.000%/avg)
+  Minimum: 5 (125.000%/total, 100.000%/avg)
+  Maximum: 5 (125.000%/total, 100.000%/avg)
+Writing /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.bsp
+Wrote 0.0 MB (6988 bytes)
+        0 seconds elapsed
+Step 4: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/tools/q3map2/q3map2 -game quake3 -fs_basepath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor" -fs_basegame "baseq3" -fs_game "baseq3" -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3" -threads 22 -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976" -fs_pakpath "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom" -light  "/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.bsp"
+2.5.17n
+22 threads
+Q3Map         - v1.0r (c) 1999 Id Software Inc.
+Q3Map (ydnar) - v2.5.17n
+NetRadiant    - v1.6.0n Oct 23 2026 20:14:02
+Your map saw the pretty lights from q3map2's BFG
+/tmp/rb23-closure/e2e-fte-toolbar-retry/editor/tools/q3map2/q3map2.bin
+VFS Init: /root/.q3a/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/baseq3/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/
+VFS Init: /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/
+
+--- Light ---
+--- ProcessGameSpecific ---
+ lighting model: quake3
+ lightmap size: 128 x 128 pixels
+ lighting gamma: 1.000000
+ lightmap colorspace: linear
+ texture colorspace: linear
+ _color colorspace: linear
+ lighting compensation: 1.000000
+ lighting exposure: 0.000000
+ lightgrid scale: 1.000000
+ lightgrid ambient scale: 1.000000
+ shader lightstyles hack: enabled
+ patch shadows: disabled
+ deluxemapping: disabled
+--- ProcessCommandLine ---
+No shaderlist.txt found: loading all shaders
+entering scripts/ftebroom.shader
+Loading /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.bsp
+entering /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.srf
+entering /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.map
+--- SetupGrid ---
+Grid size = { 64, 64, 128 }
+      243 grid points
+        1 point lights
+        0 spotlights
+        0 diffuse (area) lights
+        0 sun/sky lights
+        1 total lights
+        0 culled lights
+--- TraceGrid ---
+0...1...2...3...4...5...6...7...8...9... (0)
+9 x 9 x 3 = 243 grid
+--- MapRawLightmap ---
+0...1...2...3...4...5...6...7...8...9 (0)
+     4612 luxels
+     4420 luxels mapped
+       14 luxels occluded
+--- FloodlightRawLightmap ---
+0...1...2...3...4...5...6...7...8...9 (0)
+        0 custom lightmaps floodlighted
+        1 total lights
+        0 culled lights
+--- IlluminateRawLightmap ---
+0...1...2...3...4...5...6...7...8...9 (0)
+     4612 luxels illuminated
+--- IlluminateVertexes ---
+0...1...2...3...4...5...6...7...8...9 (0)
+       48 vertexes illuminated
+--- StoreSurfaceLightmaps ---
+Subsampling...0.collapsing...0.sorting...0.allocating...0.storing...0.projecting...0.done.
+     4612 luxels used
+    16384 luxels stored (28.15 percent efficiency)
+        4 solid surface lightmaps
+        6 identical surface lightmaps, using 1737 luxels
+        0 vertex forced surfaces
+        0 vertex approximated surfaces
+        1 BSP lightmaps
+        1 total lightmaps
+        1 unique lightmap/shader combinations
+Writing /tmp/rb23-closure/e2e-fte-toolbar-retry/editor/ftebroom/maps/_ftebroom-build/1795083068097922976/snapshot.bsp
+Wrote 0.1 MB (58092 bytes)
+        0 seconds elapsed
+Completed successfully.

@@ -1,0 +1,13 @@
+{
+  "sourceCommit": "c6bf481e28ae0e5ca89ba5b70c24c92d7048670b",
+  "nativeSourceCommit": "c6bf481e28ae0e5ca89ba5b70c24c92d7048670b",
+  "localNativeSourceCommit": "6448fc637c46c1962954df27b465d90a4ee7a2d0",
+  "reverifiedQaOnlyChanges": [
+    "native/ftebroom_world_architect.h"
+  ],
+  "createdAt": "2026-11-19T15:41:32.077242+00:00",
+  "originalDigestsOfRedactedLogs": {
+    "current-cpu/cancel-map-resize-retry.log": "e2ce68877c9c220f755ffd07a054cf61156610408609e16c3696231bfc2e0c79"
+  },
+  "handledFixtures": "Generated scenes and test data. Native runtime assets are recorded by hash."
+}

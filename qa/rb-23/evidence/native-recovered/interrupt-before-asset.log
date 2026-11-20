@@ -1,0 +1,1 @@
+PASS restart after before-asset interruption preserves map and retries the same asset

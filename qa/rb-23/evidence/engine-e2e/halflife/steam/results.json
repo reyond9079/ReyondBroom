@@ -1,0 +1,22 @@
+{
+  "engine": "Steam Half-Life",
+  "compile": {
+    "profile": "halflife",
+    "bspVersion": 30,
+    "bspSha256": "a3817851d12aeafeb37c5a1b5f9c91a19adcd37101d4a261738a8f4fef7cac27",
+    "asset": "rb_e6b7b3b41ab8.wad",
+    "assetSha256": "d1d1cceb2819b1b398f3ffbfa99bb73750dc450a0726c4efee70e37330b4544e",
+    "mapSha256": "410d502447608948e6d6635523a2e38682bcae02fc591c30017dbc60bbdc4126",
+    "compilerFiles": {
+      "sdHLCSG": "5977dbc0ce1cc0e84c44bab26a1796dcf08029189361c3802fefbca0ab05baf7"
+    },
+    "isolatedRuntimeRoot": "/tmp/rb23-closure/e2e-engine-halflife",
+    "exit": 0
+  },
+  "renderRGB": [
+    196.1116359132607,
+    150.0188089090413,
+    113.13802296534206
+  ],
+  "exit": 0
+}

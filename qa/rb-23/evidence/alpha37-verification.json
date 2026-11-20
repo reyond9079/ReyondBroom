@@ -1,0 +1,136 @@
+{
+  "baseline": "933224882bac08df3ec54504eaffcebd932db0fd",
+  "sourceCommit": "d792ecb685d29a057b715eeca7e0f5deaf29e276",
+  "packageValidation": "https://github.com/reyond9079/ReyondBroom/actions/runs/44779132647",
+  "plan": {
+    "components": [
+      "ci",
+      "docs",
+      "image_editor"
+    ],
+    "flags": {
+      "atlas": false,
+      "audio": false,
+      "audio_archive": false,
+      "audio_core": false,
+      "audio_ui": false,
+      "browser": false,
+      "build": false,
+      "catalog": false,
+      "character_core": false,
+      "character_ui": false,
+      "ci": true,
+      "ci_unit": true,
+      "compilation": false,
+      "compilation_ui": false,
+      "duplicate_flash": false,
+      "entities": false,
+      "grid": false,
+      "image_editor": true,
+      "input": false,
+      "jam_world": false,
+      "matrix_ui": false,
+      "model_ui": false,
+      "models": false,
+      "onboarding": false,
+      "placement": false,
+      "plant_core": false,
+      "plant_ui": false,
+      "plants": false,
+      "profile_core": false,
+      "profiles": false,
+      "reference": false,
+      "render": false,
+      "resource_lookup": false,
+      "resources": false,
+      "texture_studio": false,
+      "ui": false,
+      "updater": false,
+      "viewport": false,
+      "world_architect": false,
+      "world_core": false,
+      "world_legacy": false,
+      "world_ui": false
+    },
+    "mode": "affected",
+    "paths": [
+      "docs/manual.md",
+      "native/ftebroom.cpp",
+      "native/ftebroom_image_edit.h",
+      "native/ftebroom_image_editor_ui.h",
+      "native/ftebroom_image_viewer.h",
+      "native/ftebroom_mod_files.h",
+      "scripts/ci-plan.py",
+      "scripts/ci-run-checks.py",
+      "scripts/test-image-editor.py"
+    ],
+    "reasons": {
+      "docs/manual.md": [
+        "docs"
+      ],
+      "native/ftebroom.cpp": [
+        "image_editor"
+      ],
+      "native/ftebroom_image_edit.h": [
+        "image_editor"
+      ],
+      "native/ftebroom_image_editor_ui.h": [
+        "image_editor"
+      ],
+      "native/ftebroom_image_viewer.h": [
+        "image_editor"
+      ],
+      "native/ftebroom_mod_files.h": [
+        "image_editor"
+      ],
+      "scripts/ci-plan.py": [
+        "ci"
+      ],
+      "scripts/ci-run-checks.py": [
+        "ci"
+      ],
+      "scripts/test-image-editor.py": [
+        "image_editor"
+      ]
+    },
+    "runtime": true,
+    "schema": 1,
+    "smoke": true,
+    "suites": [
+      "ci_unit",
+      "image_editor"
+    ]
+  },
+  "localChecks": {
+    "Windows": [
+      "PASS loose PNG, clockwise rotation, Undo/Redo and alpha-preserving PNG/TGA",
+      "PASS brush, eraser, crop and protection from closing or replacing the source",
+      "PASS archive image opens, flips and exports without changing its archive",
+      "PASS resize and brightness adjustment preserve expected alpha and pixels"
+    ],
+    "Linux": [
+      "PASS loose PNG, clockwise rotation, Undo/Redo and alpha-preserving PNG/TGA",
+      "PASS brush, eraser, crop and protection from closing or replacing the source",
+      "PASS archive image opens, flips and exports without changing its archive",
+      "PASS resize and brightness adjustment preserve expected alpha and pixels"
+    ]
+  },
+  "packageSteps": {
+    "windows": {
+      "Run affected packaged checks": "success",
+      "Validate every packaged release (short smoke)": "success",
+      "Verify Texture Studio in the packaged editor": "skipped"
+    },
+    "linux (Linux-x64)": {
+      "Run affected packaged checks": "success",
+      "Validate every packaged release (short smoke)": "success",
+      "Verify Texture Studio in the packaged editor": "skipped"
+    },
+    "linux (Linux-SDL2-x64)": {
+      "Run affected packaged checks": "success",
+      "Validate every packaged release (short smoke)": "success",
+      "Verify Texture Studio in the packaged editor": "skipped"
+    }
+  },
+  "scope": "RB-24 and the affected CI plan were tested. Texture Studio evidence was carried forward from alpha.36."
+}

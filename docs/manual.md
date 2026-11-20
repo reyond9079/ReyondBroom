@@ -213,6 +213,13 @@ icons with an archive stripe. Browse, import, replace and rename members; archiv
 writes retain backups. Cross-boundary Cut and entire packed-folder copying are not
 supported. Use Copy to extract/import. See [PAK operations](alpha34.md).
 
+Right-click an image and choose **Edit image…**, or open it and click **Edit
+image**. Crop, rotate, flip, resize, adjust brightness and contrast, or paint and
+erase directly on the image. **Undo** and **Redo** work on the current picture.
+**Save copy…** writes a PNG or TGA beside a loose image or in the mod root for an
+archive member. The source and existing files are preserved. For animated GIFs,
+the editor uses the first frame.
+
 Double-click a model for **Model viewer**. Left-drag orbits, the wheel zooms. Choose
 an animation, play/pause or scrub the frame slider and set playback FPS. Skeletal
 models offer bones; vertex-animated MDL/MD3 models do not have skeletal bones.

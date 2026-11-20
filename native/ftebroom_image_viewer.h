@@ -3,13 +3,17 @@
 #include "ftebroom_lmp.h"
 #include "ftebroom_legacy_images.h"
 #include "ftebroom_stb_image.h"
+#include "ftebroom_image_editor_ui.h"
 // Decode loose files and archive members, then upload bounded images to FTE.
-struct FileImage { qhandle_t handle=0; int slot=0,frame=-1; unsigned long long used=0; std::string error; };
+struct FileImage { qhandle_t handle=0; int slot=0,frame=-1; unsigned long long used=0; std::string error, raster; };
 static std::map<std::pair<std::filesystem::path,bool>,FileImage> fileImages;
 static unsigned long long fileImageClock=0;
 static std::filesystem::path imageViewerPath;
 static bool imageViewerOpen=false, imageViewerFit=true;
 static float imageViewerZoom=1;
+static bool imageViewerEditRequested=false, imageViewerFocus=false, imageViewerConfirm=false;
+static std::optional<std::filesystem::path> imageViewerPending;
+static bool imageViewerPendingEdit=false;
 static bool imageFile(const std::filesystem::path& path) {
   auto ext=entityLower(path.extension().u8string());
   return ext==".wal"||ext==".pcx"||ext==".lmp"||ext==".png"||ext==".jpg"||ext==".jpeg"||ext==".tga"||ext==".bmp"||ext==".gif"||ext==".psd";
@@ -57,6 +61,7 @@ static void fileImagePump(){
   FileImage entry;entry.error=result.error;entry.used=++fileImageClock;
   for(;;entry.slot++){bool occupied=false;for(const auto& cached:fileImages)occupied|=cached.second.slot==entry.slot;if(!occupied)break;}
   if(entry.error.empty()){auto name="ftebroom/file-image-slot-"+std::to_string(entry.slot)+".tga";draw->LoadImageData(name.c_str(),"image/tga",result.bytes.data(),result.bytes.size());entry.handle=draw->LoadImage(name.c_str());if(!entry.handle)entry.error="Cannot upload image.";}
+  if (fileImageJobKey.second) entry.raster = std::move(result.bytes);
   fileImages.emplace(fileImageJobKey,std::move(entry));
 }
 static FileImage& fileImage(const std::filesystem::path& path,bool full=false) {
@@ -82,26 +87,106 @@ static bool fileImageTile(const std::filesystem::path& path,ImVec2 p,float size)
   auto list=ImGui::GetWindowDrawList();list->PushClipRect(p,{p.x+size,p.y+size},true);
   list->AddImage((ImTextureID)image.handle,a,{a.x+w*scale,a.y+h*scale});list->PopClipRect();return true;
 }
-static void imageViewerShow(const std::filesystem::path& path){imageViewerPath=path;imageViewerOpen=true;imageViewerFit=true;imageViewerZoom=1;}
+static void imageViewerSwitch(const std::filesystem::path& path, bool edit) {
+  imageEditUI.reset();
+  imageViewerPath = path;
+  imageViewerOpen = !path.empty();
+  imageViewerFit = true;
+  imageViewerZoom = 1;
+  imageViewerEditRequested = edit;
+  imageViewerFocus = imageViewerOpen;
+}
+
+static void imageViewerShow(const std::filesystem::path& path, bool edit=false) {
+  if (imageViewerOpen && path == imageViewerPath) {
+    imageViewerFocus = true;
+    if (edit && !imageEditUI.active()) imageViewerEditRequested = true;
+    return;
+  }
+  if (imageCopyJob.valid()) return;
+  if (imageEditUI.document.dirty()) {
+    imageViewerPending = path;
+    imageViewerPendingEdit = edit;
+    imageViewerConfirm = true;
+    imageViewerFocus = true;
+  } else imageViewerSwitch(path, edit);
+}
+
 static void imageViewerPanel() {
   if(!imageViewerOpen)return;
+  if (imageViewerFocus) ImGui::SetNextWindowFocus();
+  imageViewerFocus = false;
   ImGui::SetNextWindowSize({760,580},ImGuiCond_FirstUseEver);
-  if(ImGui::Begin("Image viewer",&imageViewerOpen)) {
+  ImGui::SetNextWindowSizeConstraints({540, 360}, {FLT_MAX, FLT_MAX});
+  bool open = true;
+  const char* title = imageEditUI.active() ? "Image editor###image-viewer" : "Image viewer###image-viewer";
+  imageEditUI.focused = false;
+  if(ImGui::Begin(title,&open)) {
+    browserQaWindow("image-editor/window");
     ImGui::TextWrapped("%s",imageViewerPath.u8string().c_str());
+    if (imageViewerConfirm) {
+      ImGui::OpenPopup("Discard image edits?");
+      imageViewerConfirm = false;
+    }
+    if (ImGui::BeginPopupModal("Discard image edits?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      ImGui::TextUnformatted("Save a copy to keep your changes.");
+      if (ImGui::Button("Discard")) {
+        auto path = imageViewerPending.value_or(std::filesystem::path{});
+        imageViewerSwitch(path, imageViewerPendingEdit);
+        imageViewerPending.reset();
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        ImGui::End();
+        return;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Keep editing")) {
+        imageViewerPending.reset();
+        ImGui::CloseCurrentPopup();
+      }
+      browserQaItem("image-editor/keep-editing");
+      ImGui::EndPopup();
+    }
     ImGui::Checkbox("Fit image",&imageViewerFit);ImGui::SameLine();
     if(ImGui::Button("100%")){imageViewerFit=false;imageViewerZoom=1;}
     ImGui::SameLine();ImGui::SetNextItemWidth(180);
     if(ImGui::SliderFloat("Zoom",&imageViewerZoom,.05f,8.f,"%.2fx"))imageViewerFit=false;
-    auto& image=fileImage(imageViewerPath,true);float w=0,h=0;
-    if(!image.error.empty())ImGui::TextWrapped("%s",image.error.c_str());
-    else if(image.handle&&draw->ImageSize(image.handle,&w,&h)>0&&w>0&&h>0) {
-      ImGui::Text("%.0f x %.0f",w,h);
+    float w=0,h=0;
+    FileImage* view = nullptr;
+    if (!imageEditUI.active()) {
+      view = &fileImage(imageViewerPath, true);
+      if (!view->error.empty()) {
+        ImGui::TextWrapped("%s", view->error.c_str());
+        imageViewerEditRequested = false;
+      } else if (view->handle && draw->ImageSize(view->handle, &w, &h) > 0 && w > 0 && h > 0) {
+        ImGui::SameLine();
+        if (ImGui::Button("Edit image")) imageViewerEditRequested = true;
+        browserQaItem("image-editor/edit");
+        if (imageViewerEditRequested) {
+          try { imageEditUI.document.current.pixels = imageEdit::decode(view->raster); }
+          catch (const std::exception& error) { imageEditUI.notice = error.what(); }
+          imageViewerEditRequested = false;
+        }
+      } else ImGui::TextUnformatted("Loading image...");
+      if (!imageEditUI.active() && !imageEditUI.notice.empty()) ImGui::TextWrapped("%s", imageEditUI.notice.c_str());
+    }
+    if (imageEditUI.active()) {
+      imageEditUI.focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+      imageEditorTools(imageViewerPath);
+      w = imageEditUI.document.current.pixels.width;
+      h = imageEditUI.document.current.pixels.height;
+    }
+    if(w > 0 && h > 0) {
+      ImGui::Text("%.0f x %.0f%s",w,h,imageEditUI.document.dirty() ? "  *" : "");
       ImGui::BeginChild("Image canvas",{0,0},ImGuiChildFlags_Borders,ImGuiWindowFlags_HorizontalScrollbar);
-      auto avail=ImGui::GetContentRegionAvail();float zoom=imageViewerFit?std::min(avail.x/w,avail.y/h):imageViewerZoom;
-      ImGui::Image((ImTextureID)image.handle,{std::max(1.f,w*zoom),std::max(1.f,h*zoom)});
+      const auto avail=ImGui::GetContentRegionAvail();
+      const float zoom=imageViewerFit ? std::max(.001f,std::min((avail.x-2)/w,(avail.y-2)/h)) : imageViewerZoom;
+      if (imageEditUI.active()) imageEditorCanvas(zoom);
+      else ImGui::Image((ImTextureID)view->handle,{std::max(1.f,w*zoom),std::max(1.f,h*zoom)});
       ImGui::EndChild();
-    }else ImGui::TextUnformatted("Loading image...");
+    }
   }ImGui::End();
+  if (!open) imageViewerShow({});
 }
 
 static void lmpShow(const std::filesystem::path& path){

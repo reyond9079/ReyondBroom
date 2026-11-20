@@ -424,6 +424,10 @@ static void modFilesPanel(const char* status,bool warning) {
           if(ImGui::MenuItem("Create file...",nullptr,false,!wadBrowseFolder(modFilesFolder)))modFilesCreateRequest=true;browserQaItem("files/context-create");
           ImGui::Separator();
           if(!directory&&entityLower(path.extension().u8string())==".lmp"&&ImGui::MenuItem("Open LMP viewer"))lmpShow(path);
+          if (!directory && imageFile(path)) {
+            if (ImGui::MenuItem("Edit image...")) imageViewerShow(path, true);
+            browserQaItem("files/edit-image");
+          }
           if(directory&&!wadBrowseFolder(path)&&ImGui::MenuItem("New WAD..."))newWadShow(path);
           if(!directory&&modelViewableFile(path)&&ImGui::MenuItem("Open in model editor"))modelEditorShow(modFileModelPath(path));
           if(!directory&&modelFile(path)&&ImGui::MenuItem("Open native model inspector"))modelNativeInspectorShow(modFileModelPath(path));

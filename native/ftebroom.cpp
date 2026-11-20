@@ -1659,7 +1659,7 @@ event(int type, int key, int unicode, float x, float y, float w, float h)
     {
       if (down && textureStudioFocused())
         dispatchFlightKey(key, inScene || sceneLook || textureStudioDocked());
-      else if (!down || (!runUiNavigation() && !plantFocused() && !worldArchitectFocused()))
+      else if (!down || (!runUiNavigation() && !plantFocused() && !worldArchitectFocused() && !imageEditUI.focused))
         dispatchAction(key, down, inScene, hit, tourActive && tourStep == tourGridStep);
     }
   }
@@ -2202,6 +2202,7 @@ static void QDECL videoChanged(int width,int height,qboolean restarted)
   if(!ready || !restarted)return;
   // Renderer handles have expired; do not unload them in the new renderer.
   thumbnailCache.clear();entityPreviews.clear();++entityPreviewGeneration;fileImages.clear();++fileImageGeneration;
+  imageEditUI.invalidatePreview();
   bbImages.clear();bbImageRevisions.clear();bbImageTimes.clear();bbCheckerReady=false;bbRenderRevision=0;
   modelViewerImage=0;modelViewerSkinTexture=0;modelViewerSkinTextureIndex=-1;
   characterEditor.uploaded=false;

@@ -33,7 +33,7 @@ DEPENDENCIES = {
 SUITES = {'jam_world', 'world_core', 'world_ui', 'world_legacy', 'profile_core', 'compilation', 'compilation_ui', 'resource_lookup',
           'audio_core', 'audio_ui', 'audio_archive', 'plant_core', 'plant_ui', 'character_core', 'character_ui',
           'model_ui', 'placement', 'viewport', 'grid', 'browser', 'onboarding',
-          'updater', 'entities', 'texture_studio', 'duplicate_flash', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
+          'updater', 'entities', 'texture_studio', 'duplicate_flash', 'image_editor', 'ci_unit', 'atlas', 'reference', 'catalog', 'matrix_ui'}
 RULES = [
     (['native/ftebroom_jam_world.h', 'native/ftebroom_jam_scene.h', 'native/ftebroom_jam_ui.h',
       'native/ftebroom_jam_qa.h', 'qc/fb_jam_world*.qc', 'scripts/test-jam-world.py',
@@ -89,6 +89,10 @@ RULES = [
       'qc/fb_texture_studio.qc', 'scripts/test-texture-studio*.py', 'tests/texture-studio*',
       'tests/check-texture-studio-formats.py'], {'texture_studio'}),
     (['scripts/test-duplicate-flash.py'], {'duplicate_flash'}),
+    (['native/ftebroom_image_*.h', 'native/ftebroom_bb_image_ops.h', 'native/ftebroom_bb_paint.h',
+      'native/ftebroom_bb_io.h', 'native/ftebroom_stb_image.h', 'native/ftebroom_lmp.h',
+      'native/ftebroom_legacy_images.h', 'native/ftebroom_wad_browser.h',
+      'scripts/test-image-editor.py'], {'image_editor'}),
     (['qc/fb_sculpt.qc', 'qc/fb_sweep.qc', 'qc/fb_generators_tests.qc',
       'scripts/test-rock-linux.sh', 'tests/rock45.cfg'], {'viewport', 'placement'}),
     (['qc/fb_view_options.qc', 'qc/fb_view_options_tests.qc'], {'viewport', 'render'}),
@@ -442,6 +446,25 @@ PROJECT_PRESET_HOST_SCOPES = {
 }
 
 
+IMAGE_EDITOR_HOST_SCOPES = {
+    'native/ftebroom.cpp': ({'image_editor'}, [
+        ('      else if (!down || (!runUiNavigation() && !plantFocused() && !worldArchitectFocused()))\n',
+         '      else if (!down || (!runUiNavigation() && !plantFocused() && !worldArchitectFocused() && !imageEditUI.focused))\n'),
+        ('  thumbnailCache.clear();entityPreviews.clear();++entityPreviewGeneration;fileImages.clear();++fileImageGeneration;\n',
+         '  thumbnailCache.clear();entityPreviews.clear();++entityPreviewGeneration;fileImages.clear();++fileImageGeneration;\n'
+         '  imageEditUI.invalidatePreview();\n'),
+    ]),
+    'native/ftebroom_mod_files.h': ({'image_editor'}, [
+        ('          if(!directory&&entityLower(path.extension().u8string())==".lmp"&&ImGui::MenuItem("Open LMP viewer"))lmpShow(path);\n',
+         '          if(!directory&&entityLower(path.extension().u8string())==".lmp"&&ImGui::MenuItem("Open LMP viewer"))lmpShow(path);\n'
+         '          if (!directory && imageFile(path)) {\n'
+         '            if (ImGui::MenuItem("Edit image...")) imageViewerShow(path, true);\n'
+         '            browserQaItem("files/edit-image");\n'
+         '          }\n'),
+    ]),
+}
+
+
 DUPLICATE_FLASH_HOST_SCOPES = {
     'qc/csaddon.qc': ({'duplicate_flash'}, [
         ('    key=strcat(key,itos(fb_filter_epoch));\n',
@@ -499,7 +522,7 @@ def semantic_scopes(base, head, paths):
         if not any(path in entries for entries in (WORLD_HOST_ADDITIONS, ONBOARDING_HOST_REPLACEMENTS,
                                                      LESSON_HOST_REPLACEMENTS, EDITOR_HOST_SCOPES, RB36_HOST_SCOPES,
                                                      ENTITY_LINK_COLOR_HOST_SCOPES, PROJECT_PRESET_HOST_SCOPES,
-                                                     DUPLICATE_FLASH_HOST_SCOPES)):
+                                                     DUPLICATE_FLASH_HOST_SCOPES, IMAGE_EDITOR_HOST_SCOPES)):
             continue
         def read(ref):
             return subprocess.check_output(['git', 'show', ref+':'+path], stderr=subprocess.PIPE).decode()
@@ -509,7 +532,8 @@ def semantic_scopes(base, head, paths):
                   or editor_host_scope(path, before, after, RB36_HOST_SCOPES)
                   or editor_host_scope(path, before, after, ENTITY_LINK_COLOR_HOST_SCOPES)
                   or editor_host_scope(path, before, after, PROJECT_PRESET_HOST_SCOPES)
-                  or editor_host_scope(path, before, after, DUPLICATE_FLASH_HOST_SCOPES))
+                  or editor_host_scope(path, before, after, DUPLICATE_FLASH_HOST_SCOPES)
+                  or editor_host_scope(path, before, after, IMAGE_EDITOR_HOST_SCOPES))
         if groups:
             result[path] = groups
     return result

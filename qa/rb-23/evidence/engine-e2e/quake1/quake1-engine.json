@@ -1,0 +1,29 @@
+{
+  "engine": "quakespasm",
+  "engineSha256": "b73d8f5de8cf1f33be9d43da2b0a85c6e6887603033f015f6de41730339d62cb",
+  "bspSha256": "9ead1a826f848396dfdec536240ec95ee8f8c48abc0551a4b6fc0cf944782632",
+  "binaryExit": 0,
+  "referenceRGB": [
+    146.29736328125,
+    111.97828674316406,
+    91.78811645507812
+  ],
+  "renderedRGB": [
+    111.83139595019294,
+    83.0182201535585,
+    66.94771850260572
+  ],
+  "resource": "rb_383ba0db2be3.wad",
+  "command": [
+    "/tmp/rb21-engine-packages/usr/games/quakespasm",
+    "-basedir",
+    "/tmp/rb23-closure/e2e-engine-quake1",
+    "-window",
+    "-width",
+    "1024",
+    "-height",
+    "768",
+    "-nosound",
+    "-condebug"
+  ]
+}

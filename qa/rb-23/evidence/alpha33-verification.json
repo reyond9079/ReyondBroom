@@ -1,0 +1,80 @@
+{
+  "baseline": "c6bf481e28ae0e5ca89ba5b70c24c92d7048670b",
+  "sourceCommit": "aa84c1ce7b10bf38c3577e94f5ef027656f4d514",
+  "packageValidation": "https://github.com/reyond9079/ReyondBroom/actions/runs/44574357701",
+  "date": "2026-11-19T18:21:12.863310+00:00",
+  "profilesAndLocalRetests": {
+    "Windows WAD2": [
+      "PASS quake1: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "Windows WAD3": [
+      "PASS halflife: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "Linux catalog and shader": [
+      "PASS fte: imported 134 native presets, applied one to selected brushes, and updated it in place",
+      "PASS quake3: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "Linux Quake II and GoldSrc": [
+      "PASS halflife: imported 134 native presets, applied one to selected brushes, and updated it in place",
+      "PASS quake2: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "Linux competing project lock, then retry": [
+      "PASS quake3: imported 134 native presets, applied one to selected brushes, and updated it in place"
+    ],
+    "Linux editor at 200 percent": [
+      "PASS layout dark 1280x720 at 200%, all three modes reachable"
+    ],
+    "Linux model material editing": [
+      "PASS selected brush surface preview used the actual map geometry and UV projection",
+      "PASS Generate Asset creates the game texture without changing the map",
+      "PASS fte Apply, save, Undo and Redo update the entire selection and preserve all 42 face projections",
+      "PASS Edit Texture Studio source opens the map material's graph and preserves the original",
+      "PASS Model Editor Apply, save, Undo and Redo preserve the selected slot, UVs and graph",
+      "PASS native Image Import and Save Package preserve the original image and license",
+      "PASS native Texture Studio PNG matches the exact bytes and SHA-256 shown by Dry run",
+      "PASS exporting over an existing file requires confirmation and preserves it on cancel",
+      "PASS Model Editor opens the saved graph and preserves original bytes through Undo and Redo",
+      "PASS native preset search, layer editor, and saved source share the same graph",
+      "PASS Ctrl+Z and Ctrl+Y target the focused Texture Studio history",
+      "PASS randomizing Quick parameters preserves the root seed and can be undone",
+      "PASS native graph grouping and typed group input reconnection persist in the source"
+    ],
+    "Real viewport in compiled water": [
+      "PASS real editor BSP viewport under water differs from the original engine by 45.72 / 255 per channel"
+    ],
+    "Gameplay and editor water comparison": [
+      "Visual differences (0\u2013255): wet/dry 48.72, dry/wet again 48.63",
+      "PASS the same viewpoint inside an actual BSP water volume loses the effect only for the editor render"
+    ],
+    "Compilation of imported textures in all profiles": [
+      "PASS quake1 compiled a map using an imported preset",
+      "PASS quake2 compiled a map using an imported preset",
+      "PASS quake3 compiled a map using an imported preset",
+      "PASS fte compiled a map using an imported preset",
+      "PASS halflife compiled a map using an imported preset"
+    ],
+    "Formats and core regression": [
+      "PASS 120 distinct catalog recipes at five seeds, including 12 looping recipes",
+      "PASS Texture Studio seed, graph, sampling, color, history, memory, and PNG fixtures"
+    ]
+  },
+  "scope": "Retained baseline evidence for unchanged codec, graph, parser, and other unrelated subsystems. Re-ran affected native and format checks and verified all three final package jobs at the source revision.",
+  "packagedChecks": {
+    "windows": "success",
+    "linux (Linux-x64)": "success",
+    "linux (Linux-SDL2-x64)": "success"
+  },
+  "changedFiles": [
+    ".github/workflows/release-linux-ui-update.yml",
+    "native/ftebroom_assets.h",
+    "native/ftebroom_texture_project.h",
+    "native/ftebroom_texture_studio.h",
+    "native/ftebroom_workspace.h",
+    "native/texture/project_presets.h",
+    "patches/zzz-editor-dry-camera-render.patch",
+    "qc/csaddon.qc",
+    "scripts/ci-plan.py",
+    "scripts/test-texture-studio-ui.py",
+    "tests/texture-studio-core.cpp"
+  ]
+}

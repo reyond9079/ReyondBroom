@@ -1,0 +1,84 @@
+WARNING: you should NOT be running this as root!
+fteplug_ftebroom_amd64.so: unable to find end-of-central-directory (not a zip?)
+Failed opening zipfile "fteplug_ftebroom_amd64.so" corrupt?
+Unable to open fteplug_ftebroom_amd64.so - corrupt?
+No archive in fteplug_ftebroom_amd64.so
+couldn't exec autoexec.cfg
+
+Engine Version: FTE git-6729-f937b9d8-dirty
+execing texture-studio-qa.cfg
+execing ftebroom.cfg
+execing display-resolution.cfg
+ReyondBroom cache cleanup: 0 generated files, 0 MiB reclaimed.
+ReyondBroom: native module loaded. Type ftebroom.
+Setting windowed mode 1440*900 OpenGL
+VidModeExtension extension not available.
+GL_VENDOR: Mesa
+GL_RENDERER: llvmpipe (LLVM 20.1.2, 256 bits)
+GL_VERSION: 4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.4
+Unable to explicitly disable vsync
+OpenGL renderer initialized
+------- ReyondBroom Initialized -------
+Failed to load sseditor.dat
+Switching to extended coord sizes
+Switching to big coords
+client Player connected
+
+
+-------------------
+
+[0;m_ftebroom_profile_start.map
+[0;mCOM_WriteFile: data/ftebroom-ui-tree.txt
+COM_WriteFile: data/ftebroom-entity-list.txt
+COM_WriteFile: data/material-usage.txt
+COM_WriteFile: data/ftebroom-entity-selection.txt
+Error: hidden name (glsl/.glsl)
+ReyondBroom: permanent workspace restored for map.
+ReyondBroom: Dear ImGui renderer initialized (atlas 57).
+ReyondBroom: info_player_start model 'progs/player.mdl' in mod '/dev/shm/RB23 [0;mP0P2Q[0;m-[0;mP>P=P>P<P=Q[0;m#[0;mP9[0;m [0;mP?Q[0;m-[0;mP>P5P:Q[0;m-/editor/id1': MISSING
+ReyondBroom: loaded 101 entity definitions from /dev/shm/RB23 [0;mP0P2Q[0;m-[0;mP>P=P>P<P=Q[0;m#[0;mP9[0;m [0;mP?Q[0;m-[0;mP>P5P:Q[0;m-/editor/ftebroom/quake1.ent
+FTEBroom: refreshed 0 asset models after resource switch.
+ReyondBroom: info_player_start model 'progs/player.mdl' in mod '/dev/shm/RB23 [0;mP0P2Q[0;m-[0;mP>P=P>P<P=Q[0;m#[0;mP9[0;m [0;mP?Q[0;m-[0;mP>P5P:Q[0;m-/editor/id1': MISSING
+ReyondBroom: loaded 101 entity definitions from /dev/shm/RB23 [0;mP0P2Q[0;m-[0;mP>P=P>P<P=Q[0;m#[0;mP9[0;m [0;mP?Q[0;m-[0;mP>P5P:Q[0;m-/editor/ftebroom/quake1.ent
+COM_WriteFile: data/material-usage.txt
+FTEBroom: refreshed 0 asset models after resource switch.
+ReyondBroom: info_player_start model 'progs/player.mdl' in mod '/dev/shm/RB23 [0;mP0P2Q[0;m-[0;mP>P=P>P<P=Q[0;m#[0;mP9[0;m [0;mP?Q[0;m-[0;mP>P5P:Q[0;m-/editor/id1': MISSING
+ReyondBroom: loaded 101 entity definitions from /dev/shm/RB23 [0;mP0P2Q[0;m-[0;mP>P=P>P<P=Q[0;m#[0;mP9[0;m [0;mP?Q[0;m-[0;mP>P5P:Q[0;m-/editor/ftebroom/quake1.ent
+COM_WriteFile: data/material-usage.txt
+Switching to classic coords
+Failed to load sseditor.dat
+Switching to extended coord sizes
+Switching to big coords
+
+Changing map...
+
+
+-------------------
+
+[0;mtexture-studio-qa.map
+[0;mW_LoadTextureWadFile: invalid number of lumps (0)
+COM_WriteFile: data/ftebroom-ui-tree.txt
+COM_WriteFile: data/ftebroom-entity-list.txt
+Error: hidden name (glsl/.glsl)
+COM_WriteFile: data/material-usage.txt
+ReyondBroom: permanent workspace restored for map.
+FTEBroom: refreshed 0 asset models after resource switch.
+Error: hidden name (glsl/.glsl)
+COM_WriteFile: data/material-usage.txt
+FTEBROOM_SAVED maps/texture-studio-qa.map
+FTEBroom: refreshed 0 asset models after resource switch.
+COM_WriteFile: data/ftebroom-ui-tree.txt
+COM_WriteFile: data/ftebroom-entity-list.txt
+Error: hidden name (glsl/.glsl)
+COM_WriteFile: data/ftebroom-ui-tree.txt
+COM_WriteFile: data/ftebroom-entity-list.txt
+COM_WriteFile: data/material-usage.txt
+FTEBROOM_SAVED maps/texture-studio-qa.map
+COM_WriteFile: data/ftebroom-ui-tree.txt
+COM_WriteFile: data/ftebroom-entity-list.txt
+COM_WriteFile: data/material-usage.txt
+FTEBROOM_SAVED maps/texture-studio-qa.map
+COM_WriteFile: data/ftebroom-ui-tree.txt
+COM_WriteFile: data/ftebroom-entity-list.txt
+COM_WriteFile: data/material-usage.txt
+FTEBROOM_SAVED maps/texture-studio-qa.map

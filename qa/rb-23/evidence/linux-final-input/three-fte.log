@@ -1,0 +1,4 @@
+PASS selected brush surface preview used the actual map geometry and UV projection
+PASS Generate Asset creates the game texture without changing the map
+PASS fte Apply, save, Undo and Redo update three selected faces and preserve all 42 face projections
+PASS Edit Texture Studio source opens the map material's graph and preserves the original

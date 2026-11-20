@@ -1,0 +1,1 @@
+PASS closing an unsaved Texture Studio panel preserves the exact source for recovery after restart

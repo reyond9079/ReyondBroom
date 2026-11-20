@@ -1,0 +1,17 @@
+{
+  "exact": {
+    "exitCode": 0,
+    "publishedByMock": true,
+    "assetCount": 12
+  },
+  "wrong-tag": {
+    "exitCode": 1,
+    "publishedByMock": false,
+    "assetCount": 0
+  },
+  "extra-asset": {
+    "exitCode": 1,
+    "publishedByMock": false,
+    "assetCount": 12
+  }
+}

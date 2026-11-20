@@ -1,0 +1,54 @@
+PASS the first workspace tab click is received after actual OS activation
+PASS exploration experience generates a real validated level
+PASS adventure experience generates a real validated level
+PASS hub experience generates a real validated level
+PASS arena experience generates a real validated level
+PASS experience modes produce four distinct mission topologies in the editor
+PASS experience count controls produce the requested five-beat branch-free mission
+PASS actual generated rooms have independently varied usable ceiling heights
+PASS experience count edits undo to inherited preset defaults
+PASS grid streets generate and validate in the editor
+PASS organic streets generate and validate in the editor
+PASS hybrid streets generate and validate in the editor
+PASS radial streets generate and validate in the editor
+PASS four road patterns change actual street plans rather than labels
+PASS radial road recipe replays after saved project reopen
+PASS actual field type selection and pointer painting create a required route volume
+PASS painted must-pass field becomes a real required navigation stop
+PASS hard planning field creation participates in settings Undo
+PASS required volume survives save/reopen and validates again
+PASS experience, road and route planning previews preserve the active authored map
+World Architect planning UI: 20 checks passed
+PASS the first workspace tab click is received after actual OS activation
+PASS hospital exports the actual exterior stair lights
+PASS actual owned import accepts exterior light point entities
+PASS active map retains the exterior light properties
+PASS one map Undo restores the authored scene after lighting import
+PASS checkpoint exports the actual exterior stair lights
+PASS courtyard exports the actual exterior stair lights
+PASS lighting previews and exports preserve the authored map
+World Architect exterior light UI: 8 checks passed
+PASS the first workspace tab click is received after actual OS activation
+PASS actual generation realizes 1 physical prerequisite gates
+PASS actual generation realizes 0 physical prerequisite gates
+PASS actual generation realizes 1 physical prerequisite gates
+PASS export includes actual door and activation brush models
+PASS executed Apply accepts owned gate brush entities
+PASS the active editor map contains both complete gate brush models
+PASS owned project update preserves nested gate models and their exact brush geometry
+PASS one Undo restores the complete pre-update gate models
+PASS the next Undo removes the original Apply including dynamic models and retains authored content
+PASS Redo restores both gate transactions and all nested brushes
+PASS saved/reopened dynamic models retain their ownership baseline and remain safely replaceable
+PASS production ExportMap snapshot retains both complete runtime gate brush models
+PASS manual door property edits are still strictly preserved and reject replacement
+World Architect physical gates UI: 14 checks passed
+PASS physical gate BSP/light + actual brush models profile 1
+PASS the first workspace tab click is received after actual OS activation
+PASS actual file-dialog import embeds the authored module pack source
+PASS assigned authored geometry changes the actual exported room
+PASS export preserves byte-exact authored MAP source with versioned provenance
+PASS one settings Undo removes the room assignment and restores procedural geometry
+PASS embedded module pack and room assignment replay exactly after project reopen
+PASS module import, assignment, history and export preserve the active authored scene
+World Architect authored module UI: 7 checks passed

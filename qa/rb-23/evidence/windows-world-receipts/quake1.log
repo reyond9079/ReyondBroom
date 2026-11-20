@@ -1,0 +1,4 @@
+PASS Generate Asset creates the game texture without changing the map
+PASS quake1 Apply, save, Undo and Redo update the entire selection and preserve all 42 face projections
+PASS Edit Texture Studio source opens the map material's graph and preserves the original
+PASS reopening the map after moving its project preserves the relative WAD and editable graph

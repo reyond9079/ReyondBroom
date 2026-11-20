@@ -1,0 +1,244 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="RB-23 Texture Studio" tests="71" failures="0" errors="0"><testcase classname="ReyondBroom.RB23" name="E01"><system-out>engine-e2e/fte/fte-engine.json
+engine-e2e/fte/toolbar-compile.log
+engine-e2e/halflife/steam/results.json
+engine-e2e/quake1/quake1-engine.json
+engine-e2e/quake2/yamagi-result.json
+engine-e2e/quake3/openarena-result.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="E02"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="E03"><system-out>engine-e2e/halflife/steam/results.json
+fte-rich-verified/results.json
+runtime-a3131ac/animation-fte-deltas.json
+runtime-a3131ac/animation-q1-deltas.json
+runtime-a3131ac/animation-q2-deltas.json
+runtime-a3131ac/animation-q3-deltas.json
+runtime-a3131ac/goldsrc-animation-prmzy2yn/differences.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="E04"><system-out>current-cpu/source-headless-memory.json
+offline-unicode/engine.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="E05"><system-out>character-render-present.json
+engine-e2e/fte/toolbar-compile.log
+linux-final-input/audio-regression.log
+linux-final-input/browser-regression.json
+linux-final-input/fte.log
+linux-final-input/uv-regression.log
+windows-texture-after-world-receipts.json
+windows-world-receipts/fte.log
+world-menu-linux-results.json
+world-menu-recheck-windows/result-corrected/results.json
+world-menu-recheck-windows/result-final-receipts-retry/results.json
+world-menu-recheck-windows/result-final-receipts/results.json
+world-regression-linux-recovered.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="G01"><system-out>linux-final-input/quick-controls.json
+windows-world-receipts/fte.log
+windows-world-receipts/module-sha256.txt
+windows-world-receipts/results.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="G02"><system-out>linux-final-input/fte.log
+windows-world-receipts/fte.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="G03"><system-out>windows-world-receipts/dark-1280x720-200.log
+windows-world-receipts/light-1920x1080-200.log
+windows-world-receipts/results.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="G04"><system-out>linux-final-input/input-timeout.log
+windows-world-receipts/fte.log
+windows-world-receipts/recovery.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="G05"><system-out>current-cpu/cancel-map-resize-retry.log
+current-cpu/native-latency.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="G06"><system-out>engine-e2e/fte/selected-surface.png
+engine-e2e/fte/target-preview.png
+linux-final-input/quick-controls.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I01"><system-out>linux-final-input/fte.log
+windows-world-receipts/fte.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I02"><system-out>current-cpu/native-latency.json
+current-cpu/native-preview-latency.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I03"><system-out>current-cpu/cancel-map-resize-retry.log
+current-cpu/native-cancel-sampled.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I04"><system-out>linux-final-input/three-fte.log
+linux-final-input/three-halflife.log
+linux-final-input/three-quake1.log
+linux-final-input/three-quake2.log
+linux-final-input/three-quake3.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I05"><system-out>linux-final-input/fte.log
+windows-world-receipts/fte.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I06"><system-out>linux-final-input/quake1.log
+offline-unicode/generated-graph-copy.rbtex.json
+windows-world-receipts/quake1.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I07"><system-out>current-cpu/output-faults.json
+native-recovered/interrupt-before-asset.log
+native-recovered/interrupt-before-register.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I08"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+current-cpu/exact-independent-formats.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I09"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+current-cpu/exact-independent-formats.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I10"><system-out>coverage-current/exact-cli-tests.log
+current-cpu/exact-presets.log
+linux-final-input/family-settings.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I11"><system-out>windows-world-receipts/preset-library.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="I12"><system-out>coverage-current/exact-cli-tests.log
+windows-world-receipts/results.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P01"><system-out>current-cpu/native-latency.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P02"><system-out>current-cpu/evaluator-40-256.json
+current-cpu/native-preview-latency.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P03"><system-out>current-cpu/evaluator-100-512.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P04"><system-out>current-cpu/evaluator-100-2048.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P05"><system-out>current-cpu/cancel-2048.json
+current-cpu/native-cancel-sampled.json
+current-cpu/native-latency.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P06"><system-out>current-cpu/native-latency.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P07"><system-out>linux-final-input/graph-timing-isolated.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P08"><system-out>current-cpu/catalogue-soak.json
+gl-retention.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="P09"><system-out>current-cpu/catalogue-soak.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="S01"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+coverage-current/supplemental-v3-source-coverage.txt
+current-cpu/exact-independent-formats.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="S02"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+coverage-current/supplemental-v3-source-coverage.txt
+current-cpu/exact-independent-formats.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="S03"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+coverage-current/supplemental-v3-source-coverage.txt
+current-cpu/exact-independent-formats.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="S04"><system-out>fuzz-two-hours-verified/verified.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="S05"><system-out>current-cpu/source-headless-memory.json
+linux-final-input/input-timeout.log
+linux-final-input/renderer-restart.log
+windows-world-receipts/input-timeout.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="S06"><system-out>current-cpu/input-child-soak-linux.json
+current-cpu/input-child-soak-windows.json
+gl-retention.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="S07"><system-out>archives.json
+ci.json
+final-secret-scan-release.json
+vendor-header-checkouts.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS01"><system-out>ci.json
+linux-final-input/fte.log
+linux-final-input/quick-controls.json
+windows-world-receipts/fte.log
+windows-world-receipts/module-sha256.txt
+windows-world-receipts/results.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS02"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log
+linux-final-input/fte.log
+windows-world-receipts/fte.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS03"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/catalogue-soak.json
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS04"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS05"><system-out>coverage-current/exact-cli-tests.log
+current-cpu/exact-presets.log
+linux-final-input/family-settings.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS06"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS07"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log
+current-cpu/output-faults.json
+linux-final-input/input-timeout.log
+linux-final-input/quake1.log
+native-recovered/interrupt-before-asset.log
+native-recovered/interrupt-before-register.log
+offline-unicode/generated-graph-copy.rbtex.json
+windows-world-receipts/fte.log
+windows-world-receipts/quake1.log
+windows-world-receipts/recovery.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS08"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+engine-e2e/fte/fte-engine.json
+engine-e2e/fte/toolbar-compile.log
+engine-e2e/halflife/steam/results.json
+engine-e2e/quake1/quake1-engine.json
+engine-e2e/quake2/yamagi-result.json
+engine-e2e/quake3/openarena-result.json
+fte-rich-verified/results.json
+runtime-a3131ac/animation-fte-deltas.json
+runtime-a3131ac/animation-q1-deltas.json
+runtime-a3131ac/animation-q2-deltas.json
+runtime-a3131ac/animation-q3-deltas.json
+runtime-a3131ac/goldsrc-animation-prmzy2yn/differences.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS09"><system-out>coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+current-cpu/exact-independent-formats.log
+windows-world-receipts/results.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS10"><system-out>current-cpu/cancel-map-resize-retry.log
+current-cpu/native-cancel-sampled.json
+linux-final-input/fte.log
+linux-final-input/quake1.log
+linux-final-input/three-fte.log
+linux-final-input/three-halflife.log
+linux-final-input/three-quake1.log
+linux-final-input/three-quake2.log
+linux-final-input/three-quake3.log
+offline-unicode/generated-graph-copy.rbtex.json
+windows-world-receipts/fte.log
+windows-world-receipts/quake1.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS11"><system-out>current-cpu/cancel-map-resize-retry.log
+current-cpu/native-latency.json
+engine-e2e/fte/selected-surface.png
+engine-e2e/fte/target-preview.png
+linux-final-input/fte.log
+linux-final-input/input-timeout.log
+linux-final-input/quick-controls.json
+windows-world-receipts/dark-1280x720-200.log
+windows-world-receipts/fte.log
+windows-world-receipts/light-1920x1080-200.log
+windows-world-receipts/module-sha256.txt
+windows-world-receipts/recovery.log
+windows-world-receipts/results.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS12"><system-out>current-cpu/cancel-2048.json
+current-cpu/catalogue-soak.json
+current-cpu/evaluator-100-2048.json
+current-cpu/evaluator-100-512.json
+current-cpu/evaluator-40-256.json
+current-cpu/native-cancel-sampled.json
+current-cpu/native-latency.json
+current-cpu/native-preview-latency.json
+gl-retention.json
+linux-final-input/graph-timing-isolated.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS13"><system-out>archives.json
+ci.json
+coverage-current/exact-cli-tests.log
+coverage-current/supplemental-v3-checks.log
+coverage-current/supplemental-v3-source-coverage.txt
+current-cpu/exact-independent-formats.log
+current-cpu/input-child-soak-linux.json
+current-cpu/input-child-soak-windows.json
+current-cpu/source-headless-memory.json
+final-secret-scan-release.json
+fuzz-two-hours-verified/verified.json
+gl-retention.json
+linux-final-input/input-timeout.log
+linux-final-input/renderer-restart.log
+vendor-header-checkouts.json
+windows-world-receipts/input-timeout.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS14"><system-out>character-render-present.json
+ci.json
+engine-e2e/fte/toolbar-compile.log
+linux-final-input/audio-regression.log
+linux-final-input/browser-regression.json
+linux-final-input/fte.log
+linux-final-input/uv-regression.log
+windows-texture-after-world-receipts.json
+windows-world-receipts/fte.log
+world-menu-linux-results.json
+world-menu-recheck-windows/result-corrected/results.json
+world-menu-recheck-windows/result-final-receipts-retry/results.json
+world-menu-recheck-windows/result-final-receipts/results.json
+world-regression-linux-recovered.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS15"><system-out>archives.json
+ci-policy-current.log
+ci.json
+gate-regression-current.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="TS17"><system-out>ci-policy-current.log
+gate-regression-current.log
+github-release-tag-policy-result.json
+mock-publisher-final.json</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U01"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U02"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U03"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U04"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U05"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U06"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U07"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U08"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U09"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U10"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U11"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U12"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U13"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U14"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U15"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase><testcase classname="ReyondBroom.RB23" name="U16"><system-out>coverage-current/supplemental-v3-checks.log
+current-cpu/exact-core.log
+current-cpu/exact-independent-formats.log
+current-cpu/exact-properties.log</system-out></testcase></testsuite>

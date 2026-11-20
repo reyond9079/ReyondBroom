@@ -1,0 +1,5 @@
+[
+  "Plugins opens a visible error when the registry is missing",
+  "corrupt registry can be retried in the same window",
+  "Reload opens the actual World Architect after package repair"
+]

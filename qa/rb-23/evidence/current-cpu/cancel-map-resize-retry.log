@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/mnt/c/Games/RBJ-World-QA/rb23-baseline/rb23-cancel-map-resize.py", line 71, in <module>
+    exec(compile(source,str(suite),"exec"),{"__name__":"__main__","__file__":str(suite),"copy_large_asset":copy_large_asset})
+  File "%QA_USER%/Documents/Codex/2026-10-13/bp/work/rb23-texture-studio/scripts/test-texture-studio-ui.py", line 822, in <module>
+  File "%QA_USER%/Documents/Codex/2026-10-13/bp/work/rb23-texture-studio/scripts/test-texture-studio-ui.py", line 219, in main
+    choose(recovery)
+^^^^^^^^^^^^^^^^^^^^^
+  File "%QA_USER%/Documents/Codex/2026-10-13/bp/work/rb23-texture-studio/scripts/test-texture-studio-ui.py", line 148, in wait
+    raise TimeoutError("The editor did not report the expected state")
+TimeoutError: The editor did not report the expected state

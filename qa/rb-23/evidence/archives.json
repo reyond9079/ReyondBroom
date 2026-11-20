@@ -1,0 +1,46 @@
+{
+  "sourceCommit": "c6bf481e28ae0e5ca89ba5b70c24c92d7048670b",
+  "version": "0.6.0-alpha.32",
+  "runId": 44531760875,
+  "runUrl": "https://github.com/reyond9079/ReyondBroom/actions/runs/44531760875",
+  "buildSha256": "ec58fbd8612f189e0ceb0d100c1eeea333276856783909a1d1d7062be301a8bb",
+  "archives": {
+    "ReyondBroom-0.6.0-alpha.32-Linux-SDL2-x64.tar.gz": {
+      "sha256": "39953ed8c170a1a604dbb0491e02d2e9f5aec298e3a7ba243186f85be73d1fca",
+      "bytes": 194296742,
+      "platform": "Linux-SDL2-x64",
+      "workflowArtifact": 14540341999
+    },
+    "ReyondBroom-0.6.0-alpha.32-Linux-SDL2-x64-Sources.zip": {
+      "sha256": "c3574084f605275bc3812b1b652db644f05d349fc7d133ef20c08e112a4b828f",
+      "bytes": 326109531,
+      "platform": "Linux-SDL2-x64",
+      "workflowArtifact": 14540341999
+    },
+    "ReyondBroom-0.6.0-alpha.32-Linux-x64.tar.gz": {
+      "sha256": "4521fb60a9a345075ce082a570770d39efb7067d479234f8017a8f2061b9a37d",
+      "bytes": 195376049,
+      "platform": "Linux-x64",
+      "workflowArtifact": 14541236997
+    },
+    "ReyondBroom-0.6.0-alpha.32-Linux-x64-Sources.zip": {
+      "sha256": "142e26fbdea6fa90af12e14f9ffab1d458e641ecfbbd9385481a615ed30246e5",
+      "bytes": 326109521,
+      "platform": "Linux-x64",
+      "workflowArtifact": 14541236997
+    },
+    "ReyondBroom-0.6.0-alpha.32-Windows-x64.zip": {
+      "sha256": "d2eaf21eb9ac7db1b89eb098319ec91885a7ca01bd3acee2d428c6495ef16fa2",
+      "bytes": 187470107,
+      "platform": "Windows-x64",
+      "workflowArtifact": 14544918629
+    },
+    "ReyondBroom-0.6.0-alpha.32-Windows-x64-Sources.zip": {
+      "sha256": "5df74b5696991a81ba629795928667d26a6882a34789852cb377dd3e9b7354e6",
+      "bytes": 254116184,
+      "platform": "Windows-x64",
+      "workflowArtifact": 14544918629
+    }
+  },
+  "verification": "Recorded the sidecars from the exact artifact ZIP. The protected verifier rehashes every archive."
+}
